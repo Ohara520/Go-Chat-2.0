@@ -1,1 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Go Chat</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/welcome.css">
+<link rel="stylesheet" href="css/home.css">
+</head>
+<body>
+<div class="container">
+
+  <!-- 启动页 -->
+  <div class="screen" id="welcomeScreen">
+    <div class="welcome-avatar">👻</div>
+    <div class="welcome-title">Go Chat</div>
+    <div class="welcome-subtitle">异国恋虚拟伴侣 💕</div>
+    <div class="welcome-input-group">
+      <input type="text" class="welcome-input" id="userNameInput" placeholder="输入你的昵称...">
+      <button class="welcome-button" onclick="startChat()">开始聊天</button>
+    </div>
+  </div>
+
+  <!-- 主页 -->
+  <div class="screen" id="mainScreen">
+    <div class="main-content">
+      <div class="card card-large" onclick="openScreen('chatScreen')">
+        <div class="card-icon">💬</div>
+        <div class="card-title">聊天</div>
+        <div class="card-desc">与Ghost聊天</div>
+      </div>
+      <div class="card" id="calendarCard" onclick="openScreen('calendarScreen')">
+        <div class="card-icon" id="calendarCardIcon">🏰</div>
+        <div class="card-title">纪念</div>
+        <div class="card-desc" id="calendarCardDesc">结婚纪念日 🥂</div>
+      </div>
+      <div class="card" onclick="openScreen('collectionScreen')">
+        <div class="card-icon">⭐</div>
+        <div class="card-title">收藏</div>
+        <div class="card-desc">珍贵时刻</div>
+      </div>
+      <div class="card" onclick="openScreen('marketScreen')">
+        <div class="card-icon">🛒</div>
+        <div class="card-title">超市</div>
+        <div class="card-desc">买礼物</div>
+      </div>
+      <div class="card" id="walletCard" onclick="openScreen('walletScreen')">
+        <div class="card-icon" id="walletCardIcon">💳</div>
+        <div class="card-title">钱包</div>
+        <div class="card-desc">虚拟币</div>
+      </div>
+      <div class="card achievement-card" onclick="openScreen('achievementScreen')">
+        <div class="card-icon">🏆</div>
+        <div class="card-title">成就</div>
+        <div class="card-desc" id="mainAchievementDesc">解锁徽章</div>
+      </div>
+      <div class="card secret-card" onclick="openScreen('secretScreen')">
+        <div class="card-icon">💌</div>
+        <div class="card-title">秘密</div>
+        <div class="card-desc">只有Ghost知道</div>
+      </div>
+      <div class="card work-card" onclick="openScreen('workScreen')">
+        <div class="card-icon">⏱️</div>
+        <div class="card-title">打工</div>
+        <div class="card-desc" id="workCardDesc">赚点零花钱</div>
+      </div>
+      <div class="card vocab-card" onclick="openScreen('vocabScreen')">
+        <div class="card-icon">📖</div>
+        <div class="card-title">单词</div>
+        <div class="card-desc" id="vocabCardDesc">跟Ghost学英语</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="js/app.js"></script>
+</body>
+</html>
 
