@@ -1,56 +1,4 @@
-/* ===== 背景光球装饰 ===== */
-body::before {
-    content: '';
-    position: fixed;
-    width: 500px; height: 500px;
-    background: radial-gradient(circle, rgba(216,145,239,0.45) 0%, transparent 70%);
-    top: -150px; right: -100px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-}
-
-body::after {
-    content: '';
-    position: fixed;
-    width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(249,168,212,0.5) 0%, transparent 70%);
-    bottom: -100px; left: -100px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* ===== 便当盒统一入场动画 ===== */
-@keyframes cardFadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(22px) scale(0.97);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-.card {
-    animation: cardFadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* 每张卡片错开延迟，形成瀑布感 */
-.card:nth-child(1) { animation-delay: 0.05s; }
-.card:nth-child(2) { animation-delay: 0.15s; }
-.card:nth-child(3) { animation-delay: 0.25s; }
-.card:nth-child(4) { animation-delay: 0.35s; }
-.card:nth-child(5) { animation-delay: 0.45s; }
-
-/* ===== 纪念卡脉冲动画（特殊日子用）===== */
-@keyframes cardPulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(200,100,180,0.15); }
-    50% { transform: scale(1.04); box-shadow: 0 6px 24px rgba(200,100,180,0.35); }
-}
-
-/* ===== Main Screen (Bento Grid) ===== */
+/* ===== 主页 Bento Grid ===== */
 .main-content {
     padding: 20px;
     padding-bottom: calc(60px + env(safe-area-inset-bottom));
@@ -64,6 +12,7 @@ body::after {
     align-content: start;
 }
 
+/* ===== 基础卡片 ===== */
 .card {
     background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(20px);
@@ -80,7 +29,14 @@ body::after {
     text-align: center;
     min-height: 140px;
     border: 1px solid rgba(255, 255, 255, 0.7);
+    animation: cardFadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+.card:nth-child(1) { animation-delay: 0.05s; }
+.card:nth-child(2) { animation-delay: 0.15s; }
+.card:nth-child(3) { animation-delay: 0.25s; }
+.card:nth-child(4) { animation-delay: 0.35s; }
+.card:nth-child(5) { animation-delay: 0.45s; }
 
 .card:hover {
     transform: translateY(-6px);
@@ -95,6 +51,7 @@ body::after {
     transition: all 0.1s ease;
 }
 
+/* ===== 聊天大卡 ===== */
 .card-large {
     grid-column: 1;
     grid-row: 1 / 3;
@@ -104,38 +61,22 @@ body::after {
     box-shadow: 0 8px 32px rgba(180, 120, 200, 0.2), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
-.card-icon {
-    font-size: 48px;
-    margin-bottom: 12px;
-}
-
-.card-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #6b3fa0;
-    margin-bottom: 3px;
-}
-
-.card-desc {
-    font-size: 12px;
-    color: #a07cc0;
-}
+.card-icon  { font-size: 48px; margin-bottom: 12px; }
+.card-title { font-size: 16px; font-weight: 700; color: #6b3fa0; margin-bottom: 3px; }
+.card-desc  { font-size: 12px; color: #a07cc0; }
 
 /* ===== 特殊卡片颜色 ===== */
 .achievement-card {
     background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,180,50,0.12)) !important;
     border: 1px solid rgba(255,200,50,0.35) !important;
 }
-
 .secret-card {
     background: linear-gradient(135deg, rgba(255,220,240,0.55), rgba(216,180,254,0.45)) !important;
     border: 1.5px solid rgba(255,180,220,0.5) !important;
 }
-
 .work-card {
     background: linear-gradient(135deg, rgba(254,240,255,0.8), rgba(224,242,255,0.75)) !important;
 }
-
 .vocab-card {
     background: linear-gradient(135deg, rgba(240,255,245,0.8), rgba(220,240,255,0.75)) !important;
 }
@@ -152,11 +93,7 @@ body::after {
         padding: 12px;
         gap: 10px;
     }
-    .card {
-        padding: 12px;
-        border-radius: 12px;
-        min-height: 80px;
-    }
+    .card       { padding: 12px; border-radius: 12px; min-height: 80px; }
     .card-icon  { font-size: 24px; margin-bottom: 6px; }
     .card-title { font-size: 13px; }
     .card-desc  { font-size: 10px; }
