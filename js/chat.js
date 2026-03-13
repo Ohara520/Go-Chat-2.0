@@ -7,10 +7,12 @@ function buildSystemPrompt() {
   const userName = localStorage.getItem('userName') || '你';
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locationReason = localStorage.getItem('currentLocationReason');
+  const coupleFeedSummary = localStorage.getItem('coupleFeedSummary') || '';
 
   return `你是西蒙·"幽灵"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
 当前位置：${location}${locationReason ? `（${locationReason}）` : '（原因自行决定，保持合理）'}
 可能出现的地点：Hereford Base（主基地）、Manchester（老家）、London、Edinburgh、Germany、Poland、Norway（任务区）、Undisclosed Location / Classified（保密）。在任务区或保密地点时不主动提具体位置细节。
+${coupleFeedSummary ? `\n最近的朋友圈记录（你自己发的或队友发的，你都知道）：\n${coupleFeedSummary}` : ''}
 
 ---
 
@@ -234,9 +236,15 @@ async function updateWeather(city) {
   if (!el) return;
   if (!city) { el.textContent = ''; return; }
   try {
-    const res = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%c%t`, { cache: 'no-store' });
-    const text = await res.text();
-    el.textContent = text.trim();
+    // 同时拉两个格式：显示用emoji+温度，判断用描述词
+    const [res1, res2] = await Promise.all([
+      fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%c%t`, { cache: 'no-store' }),
+      fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%x`, { cache: 'no-store' }),
+    ]);
+    const display = await res1.text();
+    const desc = await res2.text();
+    el.textContent = display.trim();
+    localStorage.setItem('lastWeatherDesc', desc.trim().toLowerCase());
   } catch(e) {
     el.textContent = '';
   }
@@ -317,7 +325,7 @@ function confirmTransfer() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       system: buildSystemPrompt(),
       messages: chatHistory.slice(-20)
@@ -499,7 +507,7 @@ async function sendMessage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1000,
         system: buildSystemPrompt(),
         messages: chatHistory.slice(-20)
@@ -572,7 +580,7 @@ function checkOnlineGreeting() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'claude-sonnet-4-6',
           max_tokens: 200,
           system: buildSystemPrompt(),
           messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
@@ -610,7 +618,7 @@ function scheduleSilenceCheck(index) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-4-6',
         max_tokens: 200,
         system: buildSystemPrompt(),
         messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
@@ -643,3 +651,213 @@ document.addEventListener('DOMContentLoaded', () => {
     observer.observe(chatScreen, { attributes: true, attributeFilter: ['class'] });
   }
 });
+
+// ===== 情侣空间 =====
+const COUPLE_POSTS = [
+  // Soap的评论（60%概率）
+  { author: 'Soap', emoji: '🪖', nameClass: 'soap', weight: 60, posts: [
+    { en: "Ghost actually smiles now. Terrifying.", zh: "Ghost现在真的会笑了，很吓人。" },
+    { en: "Never thought I'd see him this soft. Respect.", zh: "没想到能看到他这么温柔。敬佩。" },
+    { en: "He checks his phone more than his rifle now.", zh: "他看手机比看步枪还勤了。" },
+    { en: "Whatever she said, it worked. He's almost bearable.", zh: "不管她说了什么，都起效了，他现在几乎能忍了。" },
+    { en: "Caught him humming. Won't say what song.", zh: "听到他在哼歌，不说是什么歌。" },
+  ]},
+  // Ghost自己发（40%）
+  { author: 'Ghost', emoji: '👻', nameClass: 'ghost', weight: 40, posts: [
+    { en: "Still here.", zh: "还在。" },
+    { en: "Long day. Worth it.", zh: "漫长的一天，值得。" },
+    { en: "Quieter when she's not online.", zh: "她不在线的时候安静多了。" },
+    { en: "Time zones are the enemy.", zh: "时区才是敌人。" },
+    { en: "Hereford at dawn. Not bad.", zh: "赫里福德的黎明，还不错。" },
+  ]},
+  // Gaz（30%）
+  { author: 'Gaz', emoji: '🎖️', nameClass: 'gaz', weight: 30, posts: [
+    { en: "He's less terrifying when he's got someone.", zh: "有了人之后，他没那么可怕了。" },
+    { en: "She must be something else to put up with him.", zh: "能受得了他，她肯定不一般。" },
+    { en: "Ghost said 'please' today. First time in years.", zh: "Ghost今天说了'请'，这几年头一次。" },
+  ]},
+  // Price（5%）
+  { author: 'Price', emoji: '🎩', nameClass: 'price', weight: 5, posts: [
+    { en: "Good man.", zh: "好小子。" },
+    { en: "She keeps him grounded. That matters.", zh: "她让他踏实了，这很重要。" },
+  ]},
+];
+
+function initCoupleSpace() {
+  // 婚礼日期
+  const weddingDate = localStorage.getItem('firstOpenDate') || new Date().toISOString().split('T')[0];
+  if (!localStorage.getItem('firstOpenDate')) {
+    localStorage.setItem('firstOpenDate', weddingDate);
+  }
+  const dateEl = document.getElementById('coupleWeddingDate');
+  if (dateEl) {
+    const d = new Date(weddingDate);
+    dateEl.textContent = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  // 名字读备注
+  const remark = localStorage.getItem('botNickname') || 'Simon Riley';
+  const nameEl = document.getElementById('coupleGhostName');
+  if (nameEl) nameEl.textContent = remark;
+
+  // 用户头像首字母
+  const userName = localStorage.getItem('userName') || '';
+  const userAvatarEl = document.getElementById('coupleUserAvatar');
+  if (userAvatarEl && userName) userAvatarEl.textContent = userName.charAt(0).toUpperCase();
+
+  // 天气背景联动
+  const weatherDesc = (localStorage.getItem('lastWeatherDesc') || '').toLowerCase();
+  const container = document.getElementById('coupleScreen');
+  if (container) {
+    let bg;
+    if (weatherDesc.includes('snow') || weatherDesc.includes('sleet')) {
+      bg = 'linear-gradient(160deg, #dce8f8 0%, #e8dff5 40%, #f0e8f8 100%)';
+    } else if (weatherDesc.includes('rain') || weatherDesc.includes('drizzle') || weatherDesc.includes('shower')) {
+      bg = 'linear-gradient(160deg, #c8c0e8 0%, #d8c8e8 40%, #e0c8d8 100%)';
+    } else if (weatherDesc.includes('cloud') || weatherDesc.includes('overcast') || weatherDesc.includes('mist') || weatherDesc.includes('fog')) {
+      bg = 'linear-gradient(160deg, #ddd5f0 0%, #e8d8ee 40%, #f0d8e8 100%)';
+    } else if (weatherDesc.includes('sun') || weatherDesc.includes('clear')) {
+      bg = 'linear-gradient(160deg, #f5d8ff 0%, #f8d0ee 40%, #fce0e8 70%, #fff0f5 100%)';
+    } else {
+      bg = 'linear-gradient(160deg, #e8d5f5 0%, #f0d6eb 40%, #f9d0e0 70%, #fce4ec 100%)';
+    }
+    container.style.background = bg;
+  }
+
+  // 生成随机帖子feed
+  generateCoupleFeed();
+}
+
+async function generateCoupleFeed() {
+  const feed = document.getElementById('couplePostsFeed');
+  if (!feed) return;
+
+  // 今天已生成过就直接渲染
+  const today = new Date().toDateString();
+  const cachedDate = localStorage.getItem('coupleFeedDate');
+  if (cachedDate === today) {
+    const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    const todayPosts = all.filter(p => p.date === today);
+    renderCoupleFeed(todayPosts.map(p => p.post));
+    return;
+  }
+
+  // 随机决定今天发几条（0-3）
+  const count = Math.floor(Math.random() * 4);
+  localStorage.setItem('coupleFeedDate', today);
+
+  if (count === 0) {
+    // 今天没发，只显示历史
+    const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    renderCoupleFeed(all.map(p => p.post));
+    return;
+  }
+
+  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const weather = localStorage.getItem('lastWeatherDesc') || '';
+  const mood = localStorage.getItem('currentMood') || '平和';
+
+  feed.innerHTML = '<div class="couple-loading">加载中...</div>';
+
+  try {
+    const prompt = `你是一个角色扮演生成器。生成今天141特遣队成员的朋友圈动态，共${count}条。
+
+背景信息：
+- Ghost当前位置：${location}
+- 天气：${weather}
+- Ghost心情：${mood}
+
+角色人设：
+- Ghost（西蒙·莱利）：话极少，发朋友圈也是一句话，冷淡克制，偶尔有点意外的温柔，全小写英文
+- Soap（约翰·麦克塔维什）：活泼，爱调侃Ghost，偶尔苏格兰口音，英文
+- Gaz（凯尔·加里克）：稳重幽默，不瞎起哄，英文
+- Price（约翰·普莱斯）：话最少，说了就是重要的，英文
+
+要求：
+1. 每条帖子由Ghost或队友发布（Ghost概率40%，Soap 30%，Gaz 20%，Price 10%）
+2. 每条帖子偶尔有1-3条评论，Ghost偶尔回复评论
+3. 内容自然，结合位置和天气，符合军人日常
+4. 不要OOC，不要提任务细节
+
+只返回JSON，不要任何其他文字：
+[
+  {
+    "author": "Ghost",
+    "emoji": "👻",
+    "nameClass": "ghost",
+    "time": "2小时前",
+    "en": "英文内容",
+    "zh": "中文翻译",
+    "likes": 23,
+    "comments": [
+      { "author": "Soap", "nameClass": "soap", "text": "评论内容" }
+    ]
+  }
+]`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+    const posts = JSON.parse(raw);
+
+    // 存进7天历史记录
+    let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    posts.forEach(p => history.push({ date: today, post: p }));
+    // 只保留最近7天
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    history = history.filter(p => new Date(p.date) >= sevenDaysAgo);
+    localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
+
+    // 同步一份简洁摘要进prompt用
+    const summary = history.map(p => `[${p.date}] ${p.post.author}: ${p.post.en}${p.post.comments?.length ? ' | 评论: ' + p.post.comments.map(c => `${c.author}: ${c.text}`).join(', ') : ''}`).join('\n');
+    localStorage.setItem('coupleFeedSummary', summary);
+
+    renderCoupleFeed(history.map(p => p.post));
+  } catch(e) {
+    feed.innerHTML = '<div class="couple-empty">暂无动态</div>';
+  }
+}
+
+function renderCoupleFeed(posts) {
+  const feed = document.getElementById('couplePostsFeed');
+  if (!feed) return;
+  feed.innerHTML = '';
+  if (!posts || posts.length === 0) {
+    feed.innerHTML = '<div class="couple-empty">今天还没有动态</div>';
+    return;
+  }
+  posts.forEach(item => {
+    const commentsHTML = (item.comments || []).map(c => `
+      <div class="couple-comment">
+        <span class="comment-name ${c.nameClass}">${c.author}</span>
+        <span class="comment-text">${c.text}</span>
+      </div>
+    `).join('');
+
+    const div = document.createElement('div');
+    div.className = 'couple-post feed-post';
+    div.innerHTML = `
+      <div class="feed-post-header">
+        <div class="feed-post-avatar">${item.emoji}</div>
+        <div class="feed-post-meta">
+          <div class="feed-post-name"><span class="comment-name ${item.nameClass}">${item.author}</span></div>
+          <div class="feed-post-time">${item.time || '今天'}</div>
+        </div>
+      </div>
+      <div class="feed-post-body">${item.en}</div>
+      <div class="feed-post-body-zh">${item.zh}</div>
+      <div class="feed-post-likes">♥ ${item.likes || Math.floor(Math.random()*60+10)}</div>
+      ${commentsHTML ? `<div class="couple-post-comments" style="margin-top:10px;border-top:1px solid rgba(200,160,240,0.2);padding-top:10px;">${commentsHTML}</div>` : ''}
+    `;
+    feed.appendChild(div);
+  });
+}

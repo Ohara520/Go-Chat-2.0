@@ -188,6 +188,41 @@
 
     </div>
   </div>
+  <!-- 情侣空间 -->
+  <div class="screen" id="coupleScreen">
+    <div class="couple-nav">
+      <button class="couple-nav-back" onclick="openScreen('profileScreen')">‹</button>
+      <div class="couple-nav-title">情侣空间</div>
+    </div>
+    <div class="couple-container">
+
+      <!-- 置顶婚帖 -->
+      <div class="couple-post wedding-post">
+        <div class="couple-post-avatars">
+          <div class="couple-avatar ghost-avatar">👻</div>
+          <div class="couple-heart">♥</div>
+          <div class="couple-avatar user-avatar" id="coupleUserAvatar">🌸</div>
+        </div>
+        <div class="couple-post-text">married.</div>
+        <div class="couple-post-sig">— <span id="coupleGhostName">Simon Riley</span></div>
+        <div class="couple-post-date" id="coupleWeddingDate">—</div>
+        <div class="couple-post-comments">
+          <div class="couple-comment">
+            <span class="comment-name price">Price</span>
+            <span class="comment-text">take care of her.</span>
+          </div>
+          <div class="couple-comment">
+            <span class="comment-name ghost">Ghost</span>
+            <span class="comment-text">always.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 随机评论帖 -->
+      <div class="couple-posts-feed" id="couplePostsFeed"></div>
+
+    </div>
+  </div>
 
 </div>
 <script src="js/app.js"></script>
