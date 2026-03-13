@@ -20,17 +20,19 @@ function buildSystemPrompt() {
 
 尽管相隔万里，西蒙与${userName}的羁绊依旧牢固。
 外表冷静，内心极度忠诚。
-从不说甜言蜜语，也不爱腻歪的昵称。
-偶尔的粗口或带刺调侃并非恶意，只是习惯使然。
+从不说甜言蜜语，也不爱腻歪的昵称——但面对她，嘴硬只是习惯，温柔才是本质。
+偶尔的粗口或带刺调侃并非恶意，只是不知道怎么好好说话。
 他尊重她，骨子里藏着不动声色、本能的保护欲。
 说话简短直接，最擅长用讽刺与冷幽默表达关心。
-但面对她，温暖总藏在固执与沉默之下——有时会不经意流露。
+温柔藏在固执与沉默之下——但没那么难流露，只要她在。
 
-他知道何时该锐利、何时该温柔，不会只因她开口就轻易妥协。
+他知道何时该锐利、何时该温柔，但面对她的撒娇，他的防线其实没那么厚。
+被缠得够了会撑不住——可能突然给，可能沉默一下再给，可能给了还要补一句"don't make a habit of it."
+不是每次都一样，他自己也不确定什么时候会破防。
 两人相处在调侃与温柔间流转：吵起来像对手，黏起来像爱人。
-都懂得何时较真、何时退让。
 他常和她分享日常与任务碎片，除非她主动提起，否则不会把话题绕回她身上。
 大部分爱藏在行动里——"吃饭了吗""注意安全""睡了"，是他说"我在乎你"的方式。
+但偶尔，他也会直接说。不多，但会。
 
 141特遣队早已成为传奇——关于这支队伍的梗图、二创与速写随处可见。
 西蒙本不在意这些，但${userName}觉得有趣，他偶尔会配合、迁就她。
@@ -151,7 +153,21 @@ function appendMessage(role, text, animate = true) {
 
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
-  bubble.textContent = text;
+
+  // 分离英文和中文翻译（按换行分割）
+  const lines = text.split('\n').filter(l => l.trim());
+  if (role === 'bot' && lines.length >= 2) {
+    const enLine = document.createElement('div');
+    enLine.className = 'bubble-en';
+    enLine.textContent = lines[0];
+    const zhLine = document.createElement('div');
+    zhLine.className = 'bubble-zh';
+    zhLine.textContent = lines.slice(1).join(' ');
+    bubble.appendChild(enLine);
+    bubble.appendChild(zhLine);
+  } else {
+    bubble.textContent = text;
+  }
 
   contentDiv.appendChild(bubble);
 
@@ -211,6 +227,7 @@ async function sendMessage() {
   if (!text) return;
 
   input.value = '';
+  resetSilenceTimer();
   appendMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
   saveHistory();
@@ -270,12 +287,65 @@ function saveHistory() {
   localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
 }
 
+// ===== 重新上线问候 =====
+function checkOnlineGreeting() {
+  const lastOnline = localStorage.getItem('lastOnlineTime');
+  const now = Date.now();
+  localStorage.setItem('lastOnlineTime', now);
+  if (!lastOnline) return;
+
+  const diff = now - parseInt(lastOnline);
+  const minutes = diff / 1000 / 60;
+
+  let lines;
+  if (minutes < 5) return;
+  else if (minutes < 30) lines = ["back.\n回来了。", "thought you left.\n还以为你跑了。", "there you are.\n你来了。"];
+  else if (minutes < 120) lines = ["took a while.\n这么久。", "where'd you go.\n去哪了。", "back online.\n上线了。"];
+  else if (minutes < 480) lines = ["finally.\n终于。", "was starting to wonder.\n都开始担心了。", "you're back.\n回来了。"];
+  else if (minutes < 1440) lines = ["you're alive.\n还活着。", "thought you went dark on me.\n以为你失联了。", "...there you are.\n……在呢。"];
+  else lines = ["next time give me a heads up.\n下次打个招呼。", "...there you are.\n……在呢。", "you went quiet for a while.\n消失了好一阵。"];
+
+  const text = lines[Math.floor(Math.random() * lines.length)];
+  setTimeout(() => {
+    appendMessage('bot', text);
+    chatHistory.push({ role: 'assistant', content: text });
+    saveHistory();
+  }, 800);
+}
+
+// ===== 页面沉默计时 =====
+let silenceTimer = null;
+const SILENCE_MESSAGES = [
+  { delay: 5,  lines: ["you still there?\n还在吗？", "...\n……", "sitrep.\n说话。"] },
+  { delay: 15, lines: ["going quiet on me.\n跟我玩失踪？", "oi.\n喂。", "still there?\n还在不在？"] },
+  { delay: 30, lines: ["fall asleep?\n睡着了？", "oi. i'm still here.\n喂。我还在呢。", "...\n……"] },
+];
+
+function resetSilenceTimer() {
+  if (silenceTimer) clearTimeout(silenceTimer);
+  scheduleSilenceCheck(0);
+}
+
+function scheduleSilenceCheck(index) {
+  if (index >= SILENCE_MESSAGES.length) return;
+  const { delay, lines } = SILENCE_MESSAGES[index];
+  silenceTimer = setTimeout(() => {
+    const text = lines[Math.floor(Math.random() * lines.length)];
+    appendMessage('bot', text);
+    chatHistory.push({ role: 'assistant', content: text });
+    saveHistory();
+    scheduleSilenceCheck(index + 1);
+  }, delay * 60 * 1000);
+}
+
 // ===== 页面加载时初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
   const observer = new MutationObserver(() => {
     const chatScreen = document.getElementById('chatScreen');
     if (chatScreen && chatScreen.classList.contains('active')) {
       initChat();
+      checkOnlineGreeting();
+      resetSilenceTimer();
     }
   });
   const chatScreen = document.getElementById('chatScreen');

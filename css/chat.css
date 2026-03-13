@@ -210,6 +210,23 @@
     padding: 0 4px;
 }
 
+/* ===== 英文/中文翻译分行 ===== */
+.bubble-en {
+    color: inherit;
+    line-height: 1.4;
+}
+
+.bubble-zh {
+    margin-top: 4px;
+    font-size: 11px;
+    color: rgba(90,45,130,0.5);
+    line-height: 1.4;
+}
+
+.message.user .bubble-zh {
+    color: rgba(255,255,255,0.65);
+}
+
 /* ===== 打字中动画 ===== */
 .typing-indicator {
     display: flex;
