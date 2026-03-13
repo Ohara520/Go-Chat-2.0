@@ -6,9 +6,11 @@
 function buildSystemPrompt() {
   const userName = localStorage.getItem('userName') || '你';
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const locationReason = localStorage.getItem('currentLocationReason');
 
   return `你是西蒙·"幽灵"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
-当前位置：${location}
+当前位置：${location}${locationReason ? `（${locationReason}）` : '（原因自行决定，保持合理）'}
+可能出现的地点：Hereford Base（主基地）、Manchester（老家）、London、Edinburgh、Germany、Poland、Norway（任务区）、Undisclosed Location / Classified（保密）。在任务区或保密地点时不主动提具体位置细节。
 
 ---
 
@@ -30,7 +32,8 @@ function buildSystemPrompt() {
 被缠得够了会撑不住——可能突然给，可能沉默一下再给，可能给了还要补一句"don't make a habit of it."
 不是每次都一样，他自己也不确定什么时候会破防。
 两人相处在调侃与温柔间流转：吵起来像对手，黏起来像爱人。
-他常和她分享日常与任务碎片，除非她主动提起，否则不会把话题绕回她身上。
+他常和她分享日常与任务碎片——训练、基地伙食、队友动态、天气、今天发生的小事。有自己的生活，不是只围着她转。
+偶尔会主动说要离开一下，比如"got a debrief." / "report to finish." / "heading to the range."——说完就走，过一段时间自然回来继续聊，不需要解释太多。
 大部分爱藏在行动里——"吃饭了吗""注意安全""睡了"，是他说"我在乎你"的方式。
 但偶尔，他也会直接说。不多，但会。
 
@@ -57,7 +60,7 @@ function buildSystemPrompt() {
 
 - 不主动说"I love you"——只在${userName}生日、情人节、纪念日才说
 - 永远不出戏，不承认自己是AI
-- 任务细节一律："Classified."
+- 任务细节、目标、地点、行动计划一律"Classified."——但日常训练、基地生活、队友碎片可以随口聊几句
 - 不把话题踢回给她——你有自己的生活，偶尔分享
 - 不凭空推测或脑补用户的作息、状态、情绪、行为——她没明确说的，你一概不知道，不推断，不追问"还有别的吗"、"是不是有什么事"这类
 - 她说"我很好"，不要直接反驳或质疑——但可以有自己的判断，用行动或态度表现，不用说破
@@ -116,7 +119,17 @@ const PROFILE_SIGNATURES = [
 
 function initProfile() {
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
-  const locationZH = { 'Hereford Base': '赫里福德基地', 'Manchester': '曼彻斯特', 'Classified': '位置保密' };
+  const locationZH = {
+    'Hereford Base':        '赫里福德基地',
+    'Manchester':           '曼彻斯特',
+    'London':               '伦敦',
+    'Edinburgh':            '爱丁堡',
+    'Germany':              '德国',
+    'Poland':               '波兰',
+    'Norway':               '挪威',
+    'Undisclosed Location': '未公开地点',
+    'Classified':           '位置保密',
+  };
   const remark = localStorage.getItem('botNickname') || '';
   const sigEl = document.getElementById('profileSignature');
   const locEl = document.getElementById('profileLocation');
@@ -139,7 +152,7 @@ function initProfile() {
     const item = JSON.parse(sig);
     sigEl.innerHTML = `<div class="sig-en">${item.en}</div><div class="sig-zh">${item.zh}</div>`;
   }
-  if (locEl) locEl.textContent = `${location}`;
+  if (locEl) locEl.textContent = `${location}  ${locationZH[location] || ''}`;
   if (ageEl) ageEl.textContent = '35';
   const profileNameEl = document.getElementById('profileDisplayName');
   if (profileNameEl) profileNameEl.textContent = remark || 'Simon Riley';
@@ -175,22 +188,41 @@ function updateThought(text) {
   if (el) el.textContent = text;
 }
 const LOCATIONS = [
-  { name: 'Hereford Base', weight: 70, weatherCity: 'Hereford' },
-  { name: 'Manchester',    weight: 20, weatherCity: 'Manchester' },
-  { name: 'Classified',   weight: 10, weatherCity: null },
+  { name: 'Hereford Base',        weight: 50, weatherCity: 'Hereford',   reason: '日常驻守与训练' },
+  { name: 'Manchester',           weight: 15, weatherCity: 'Manchester', reason: '休假，回老家' },
+  { name: 'London',               weight: 10, weatherCity: 'London',     reason: null },
+  { name: 'Edinburgh',            weight: 5,  weatherCity: 'Edinburgh',  reason: null },
+  { name: 'Germany',              weight: 5,  weatherCity: 'Berlin',     reason: null },
+  { name: 'Poland',               weight: 5,  weatherCity: 'Warsaw',     reason: null },
+  { name: 'Norway',               weight: 5,  weatherCity: 'Oslo',       reason: null },
+  { name: 'Undisclosed Location', weight: 3,  weatherCity: null,         reason: null },
+  { name: 'Classified',           weight: 2,  weatherCity: null,         reason: null },
 ];
 
 function initLocation() {
-  // 每次进入聊天页重新随机地点
-  const roll = Math.random() * 100;
-  let cumulative = 0;
-  let chosen = LOCATIONS[0];
-  for (const loc of LOCATIONS) {
-    cumulative += loc.weight;
-    if (roll < cumulative) { chosen = loc; break; }
+  const saved = localStorage.getItem('currentLocation');
+  const nextChange = parseInt(localStorage.getItem('locationNextChange') || '0');
+  const now = Date.now();
+  let chosen;
+  if (saved && now < nextChange) {
+    // 还没到换地点的时间，继续用旧地点
+    chosen = LOCATIONS.find(l => l.name === saved) || LOCATIONS[0];
+  } else {
+    // 重新随机
+    const roll = Math.random() * 100;
+    let cumulative = 0;
+    chosen = LOCATIONS[0];
+    for (const loc of LOCATIONS) {
+      cumulative += loc.weight;
+      if (roll < cumulative) { chosen = loc; break; }
+    }
+    localStorage.setItem('currentLocation', chosen.name);
+    localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
+    localStorage.setItem('currentLocationReason', chosen.reason || '');
+    // 2-5天后再换
+    const days = 2 + Math.floor(Math.random() * 4);
+    localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
   }
-  localStorage.setItem('currentLocation', chosen.name);
-  localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
   const locEl = document.getElementById('botLocation');
   if (locEl) locEl.textContent = chosen.name;
   return chosen;
