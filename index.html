@@ -98,8 +98,6 @@
         </div>
         <div class="chat-header-actions">
           <button class="thought-btn" id="thoughtBtn" onclick="toggleThought()" title="他在想什么">💭</button>
-          <button class="call-btn" title="视频通话">📹</button>
-          <button class="call-btn" title="语音通话">📞</button>
         </div>
       </div>
 
@@ -124,6 +122,7 @@
       <!-- 转账弹窗 -->
       <div class="transfer-overlay" id="transferOverlay" onclick="closeTransfer()"></div>
       <div class="transfer-modal" id="transferModal">
+        <div class="transfer-modal-handle"></div>
         <div class="transfer-modal-title">转账给 Ghost</div>
         <div class="transfer-modal-balance">余额：<span id="transferBalance">£0</span></div>
         <input type="number" class="transfer-input" id="transferAmount" placeholder="输入金额 £" min="1">
