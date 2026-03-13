@@ -852,3 +852,36 @@
     0%, 100% { transform: scale(1); opacity: 0.8; }
     50% { transform: scale(1.15); opacity: 1; }
 }
+
+/* ===== 阴阳帖 ===== */
+.couple-sassy {
+    border-color: rgba(200,80,110,0.25);
+    background: rgba(255,235,242,0.75);
+    position: relative;
+    overflow: hidden;
+}
+.couple-sassy-bar {
+    position: absolute;
+    top: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #e05580, #c060a0);
+    border-radius: 2px;
+    width: 100%;
+}
+.couple-deleting-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(224,85,128,0.1);
+    color: #e05580;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.couple-mention {
+    color: #7c4daa;
+    font-weight: 600;
+}

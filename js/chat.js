@@ -538,6 +538,8 @@ async function sendMessage() {
 
     chatHistory.push({ role: 'assistant', content: reply });
     saveHistory();
+    // 并行判断是否触发阴阳帖
+    checkSassyPost(text, reply);
 
   } catch (err) {
     hideTyping();
@@ -678,7 +680,7 @@ const COUPLE_POSTS = [
     { en: "Ghost said 'please' today. First time in years.", zh: "Ghost今天说了'请'，这几年头一次。" },
   ]},
   // Price（5%）
-  { author: 'Price', emoji: '🎩', nameClass: 'price', weight: 5, posts: [
+  { author: 'Price', emoji: '🚬', nameClass: 'price', weight: 5, posts: [
     { en: "Good man.", zh: "好小子。" },
     { en: "She keeps him grounded. That matters.", zh: "她让他踏实了，这很重要。" },
   ]},
@@ -712,10 +714,14 @@ function initCoupleSpace() {
   const coverNamesEl = document.getElementById('coupleCoverNames');
   if (coverNamesEl) coverNamesEl.textContent = `${remark} & 你`;
 
-  // 用户头像首字母
-  const userName = localStorage.getItem('userName') || '';
+  // 用户头像首字母 + @mention
+  const userName = localStorage.getItem('userName') || '你';
   const userAvatarEl = document.getElementById('coupleUserAvatar');
-  if (userAvatarEl && userName) userAvatarEl.textContent = userName.charAt(0).toUpperCase();
+  if (userAvatarEl) userAvatarEl.textContent = userName.charAt(0).toUpperCase();
+  const mentionEl = document.getElementById('coupleUserMention');
+  if (mentionEl) mentionEl.textContent = `@${userName}`;
+  const mentionZhEl = document.getElementById('coupleUserMentionZh');
+  if (mentionZhEl) mentionZhEl.textContent = `@${userName}`;
 
   // 天气badge
   const weatherDisplay = localStorage.getItem('lastWeatherDisplay') || '';
@@ -726,14 +732,14 @@ function initCoupleSpace() {
   const weatherDesc = (localStorage.getItem('lastWeatherDesc') || '').toLowerCase();
   const scene = document.querySelector('.couple-cover-scene');
   if (scene) {
-    if (weatherDesc.includes('snow') || weatherDesc.includes('sleet')) {
-      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2a3545 30%, #354555 60%, #253545 100%)';
-    } else if (weatherDesc.includes('rain') || weatherDesc.includes('drizzle')) {
+    if (isRaining) {
       scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%)';
-    } else if (weatherDesc.includes('sun') || weatherDesc.includes('clear')) {
-      scene.style.background = 'linear-gradient(160deg, #1a1535 0%, #2d2550 30%, #3a3a5a 60%, #2a2a4a 100%)';
+    } else if (isNight) {
+      scene.style.background = 'linear-gradient(160deg, #1a1028 0%, #221535 40%, #1e1230 100%)';
+    } else if (isSunny) {
+      scene.style.background = 'linear-gradient(160deg, #4a2060 0%, #6b3490 30%, #8b4aaa 60%, #7a3a99 100%)';
     } else {
-      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%)';
+      scene.style.background = 'linear-gradient(160deg, #3a1a55 0%, #4d2870 35%, #5a3080 60%, #4a2568 100%)';
     }
   }
 
@@ -782,6 +788,48 @@ function initCoupleSpace() {
 
   // 生成朋友圈feed
   generateCoupleFeed();
+
+  // 检查阴阳帖
+  const sassy = getSassyPost();
+  if (sassy) {
+    const feed = document.getElementById('couplePostsFeed');
+    const remaining = Math.max(0, Math.ceil((sassy.expires - Date.now()) / 60000));
+    const sassyDiv = document.createElement('div');
+    sassyDiv.className = 'couple-post-card couple-sassy';
+    sassyDiv.id = 'sassyPostCard';
+    sassyDiv.innerHTML = `
+      <div class="couple-sassy-bar" id="sassyBar"></div>
+      <div class="couple-deleting-tag">🔥 ${remaining}分钟后删除</div>
+      <div class="couple-post-header">
+        <div class="couple-avatar">👻</div>
+        <div class="couple-post-meta">
+          <div class="couple-post-name couple-ghost-name" >${localStorage.getItem('botNickname') || 'Simon Riley'}</div>
+          <div class="couple-post-time">刚刚</div>
+        </div>
+      </div>
+      <div class="couple-post-en">${sassy.en}</div>
+      <div class="couple-post-zh">${sassy.zh}</div>
+      <div class="couple-post-footer">
+        <button class="couple-like-btn" onclick="toggleCoupleLike(this)">🤍 点赞</button>
+      </div>
+    `;
+    if (feed) feed.insertBefore(sassyDiv, feed.firstChild);
+
+    // 进度条动画
+    const bar = document.getElementById('sassyBar');
+    if (bar) {
+      const pct = ((sassy.expires - Date.now()) / (60 * 60 * 1000)) * 100;
+      bar.style.width = pct + '%';
+      bar.style.transition = `width ${sassy.expires - Date.now()}ms linear`;
+      setTimeout(() => { bar.style.width = '0%'; }, 50);
+    }
+
+    // 到期自动移除
+    setTimeout(() => {
+      const el = document.getElementById('sassyPostCard');
+      if (el) el.remove();
+    }, sassy.expires - Date.now());
+  }
 }
 
 async function generateCoupleFeed() {
@@ -892,7 +940,7 @@ function renderCoupleFeed(posts) {
     return;
   }
 
-  const emojiMap = { Ghost: '👻', Soap: '🧼', Gaz: '🎖️', Price: '🪖' };
+  const emojiMap = { Ghost: '👻', Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
   const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
 
   posts.forEach(item => {
@@ -927,9 +975,91 @@ function renderCoupleFeed(posts) {
   });
 }
 
-function toggleCoupleLike(btn) {
-  const isLiked = btn.classList.toggle('couple-liked');
-  const match = btn.textContent.match(/\d+/);
-  const count = match ? parseInt(match[0]) : 0;
-  btn.textContent = isLiked ? `❤️ ${count + 1}` : (count > 1 ? `🤍 ${count - 1}` : '🤍 点赞');
+function toggleCoupleLike(btn, key) {
+  const storageKey = key || ('like_' + btn.closest('.couple-post-card')?.querySelector('.couple-post-en')?.textContent?.slice(0,10));
+  const isLiked = localStorage.getItem(storageKey) === '1';
+  const countEl = btn.querySelector('.like-count');
+  const count = countEl ? parseInt(countEl.textContent) || 0 : 0;
+  if (isLiked) {
+    localStorage.removeItem(storageKey);
+    btn.classList.remove('couple-liked');
+    if (countEl) countEl.textContent = Math.max(0, count - 1);
+    btn.querySelector('.like-count') ? btn.childNodes[0].textContent = '🤍 ' : btn.textContent = '🤍 ' + Math.max(0, count - 1);
+  } else {
+    localStorage.setItem(storageKey, '1');
+    btn.classList.add('couple-liked');
+    if (countEl) countEl.textContent = count + 1;
+  }
+  // 同步emoji
+  const likeEmoji = btn.classList.contains('couple-liked') ? '❤️ ' : '🤍 ';
+  btn.childNodes[0].textContent = likeEmoji;
+}
+
+// ===== 阴阳帖系统 =====
+async function checkSassyPost(userText, ghostReply) {
+  // 冷却：1小时内不重复触发
+  const lastSassy = parseInt(localStorage.getItem('lastSassyTime') || '0');
+  if (Date.now() - lastSassy < 60 * 60 * 1000) return;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 100,
+        system: '你是情绪判断器。只返回JSON，不要任何其他文字。',
+        messages: [{
+          role: 'user',
+          content: `用户说："${userText}"\nGhost回复："${ghostReply}"\n\n判断这段对话是否触发了吵架、冷战、吃醋、被晾着、生气中的任意一种。只返回：{"triggered": true/false}`
+        }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(raw);
+    if (result.triggered) generateSassyPost();
+  } catch(e) {}
+}
+
+async function generateSassyPost() {
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 150,
+        system: '你是西蒙·莱利。只返回JSON，不要任何其他文字。',
+        messages: [{
+          role: 'user',
+          content: `你刚刚跟老婆吵架/吃醋/冷战了。在朋友圈发一条阴阳怪气的帖子，一句话，全小写英文，要有Ghost的味道——看起来平静但明显有情绪。附上中文翻译。\n\n只返回：{"en": "英文内容", "zh": "中文翻译"}`
+        }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+    const post = JSON.parse(raw);
+
+    // 存入，1小时后过期
+    const sassyData = {
+      en: post.en,
+      zh: post.zh,
+      expires: Date.now() + 60 * 60 * 1000
+    };
+    localStorage.setItem('sassyPost', JSON.stringify(sassyData));
+    localStorage.setItem('lastSassyTime', Date.now().toString());
+  } catch(e) {}
+}
+
+function getSassyPost() {
+  try {
+    const data = JSON.parse(localStorage.getItem('sassyPost') || 'null');
+    if (!data) return null;
+    if (Date.now() > data.expires) {
+      localStorage.removeItem('sassyPost');
+      return null;
+    }
+    return data;
+  } catch(e) { return null; }
 }
