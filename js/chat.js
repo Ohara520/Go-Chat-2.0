@@ -221,8 +221,10 @@ async function sendMessage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: chatHistory.slice(-20),
-        system: buildSystemPrompt()
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        system: buildSystemPrompt(),
+        messages: chatHistory.slice(-20)
       })
     });
 
