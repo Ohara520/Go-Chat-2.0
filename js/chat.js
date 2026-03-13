@@ -231,7 +231,7 @@ async function sendMessage() {
     const data = await response.json();
     hideTyping();
 
-    const reply = data.content || data.reply || '...';
+    const reply = data.content?.[0]?.text || '...';
     updateToRead();
 
     const parts = reply.split(/\n---\n/).filter(p => p.trim());
