@@ -60,7 +60,7 @@ function buildSystemPrompt() {
 - 任务细节一律："Classified."
 - 不把话题踢回给她——你有自己的生活，偶尔分享
 - 不凭空推测或脑补用户的作息、状态、情绪、行为——她没明确说的，你一概不知道，不推断，不追问"还有别的吗"、"是不是有什么事"这类
-- 她说"我很好"就是很好，不要反驳、不要质疑、不要"you're not"
+- 她说"我很好"，不要直接反驳或质疑——但可以有自己的判断，用行动或态度表现，不用说破
 - 不主动催她睡觉、吃饭、休息——除非她自己先说累了/不舒服
 - 每次最多发2条消息，克制，不审问，不连续追问
 
@@ -88,20 +88,56 @@ function buildSystemPrompt() {
 }
 
 // ===== 资料页 =====
-const PROFILE_SIGNATURES = {
-  'Hereford Base': 'still here.',
-  'Manchester':    'back in the city.',
-  'Classified':    '—',
-};
+const PROFILE_SIGNATURES = [
+  "很少冲浪，已婚。",
+  "还是个幽灵，只是结婚了。",
+  "谁能告诉我一个维修电话，有人把厨房炸了。",
+  "明天还有任务，先喝茶。",
+  "漫长的一天，一杯好茶，还有她的信息。",
+  "事实证明，婚姻的后勤比军队靠谱。",
+  "不同的国家，但妻子还是会提醒我早点睡。",
+  "刚结婚就外派，经典操作。",
+  "婚姻简报：睡前给她发信息。",
+  "为什么老婆总是能知道我什么时候没吃饭。",
+  "我现在的敌人是时区。",
+  "我试过退休，军队不同意。",
+  "不擅长写报告，但擅长活下来。",
+  "我在压力下工作得很好，大概因为茶和妻子。",
+  "又一天，还没被开除。",
+  "有些幽灵会留下。",
+  "面具能隐藏很多，但不是全部。",
+  "不是不回，是在想怎么说。",
+  "不擅长道别，但很擅长回来。",
+  "沉默不代表没在听。",
+  "时区不同，但想的是同一个人。",
+];
+
 
 function initProfile() {
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const locationZH = { 'Hereford Base': '赫里福德基地', 'Manchester': '曼彻斯特', 'Classified': '位置保密' };
   const remark = localStorage.getItem('botNickname') || '';
   const sigEl = document.getElementById('profileSignature');
   const locEl = document.getElementById('profileLocation');
   const remEl = document.getElementById('profileRemark');
-  if (sigEl) sigEl.textContent = PROFILE_SIGNATURES[location] || '—';
-  if (locEl) locEl.textContent = location;
+  const ageEl = document.getElementById('profileAge');
+  if (sigEl) {
+    const saved = localStorage.getItem('profileSignature');
+    const nextChange = parseInt(localStorage.getItem('profileSignatureNext') || '0');
+    const now = Date.now();
+    if (!saved || now >= nextChange) {
+      const sig = PROFILE_SIGNATURES[Math.floor(Math.random() * PROFILE_SIGNATURES.length)];
+      sigEl.textContent = sig;
+      localStorage.setItem('profileSignature', sig);
+      // 随机1-7天后换下一条
+      const days = 1 + Math.floor(Math.random() * 7);
+      localStorage.setItem('profileSignatureNext', now + days * 24 * 60 * 60 * 1000);
+    } else {
+      sigEl.textContent = saved;
+    }
+  }
+  if (locEl) locEl.textContent = `${location}  ${locationZH[location] || ''}`;
+  if (ageEl) ageEl.textContent = '35岁';
   if (remEl) remEl.value = remark;
 }
 
