@@ -140,16 +140,18 @@ function initProfile() {
     sigEl.innerHTML = `<div class="sig-en">${item.en}</div><div class="sig-zh">${item.zh}</div>`;
   }
   if (locEl) locEl.textContent = `${location}  ${locationZH[location] || ''}`;
-  if (ageEl) ageEl.textContent = '35岁';
+  const profileNameEl = document.getElementById('profileDisplayName');
+  if (profileNameEl) profileNameEl.textContent = remark || 'Simon Riley';
   if (remEl) remEl.value = remark;
 }
 
 function saveRemark() {
   const val = document.getElementById('profileRemark').value.trim();
   localStorage.setItem('botNickname', val);
-  // 同步聊天页header名字
   const nameEl = document.getElementById('chatBotName');
   if (nameEl) nameEl.textContent = val || 'Simon Riley';
+  const profileNameEl = document.getElementById('profileDisplayName');
+  if (profileNameEl) profileNameEl.textContent = val || 'Simon Riley';
 }
 
 // ===== 思想气泡 =====
