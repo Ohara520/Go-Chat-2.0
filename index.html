@@ -88,9 +88,12 @@
         <div class="chat-header-center">
           <h3 id="chatBotName">Simon "Ghost" Riley</h3>
           <div class="chat-header-meta">
-            <span id="botMood">❤️ 思念中</span>
+            <span id="botMood">🙂</span>
             <span class="chat-header-dot">·</span>
-            <span id="botLocation">Manchester</span>
+            <span id="botLocation">Hereford Base</span>
+            <span class="chat-header-dot">·</span>
+            <span id="botWeather">🌤️</span>
+            <span id="botUKTime"></span>
           </div>
         </div>
         <div class="chat-header-actions">
@@ -102,6 +105,7 @@
       <div class="messages" id="messagesContainer"></div>
 
       <div class="input-area">
+        <button class="transfer-btn" onclick="openTransfer()" title="转账">💸</button>
         <input type="text" class="input-field" id="chatInput" placeholder="输入消息..." onkeypress="handleKeyPress(event)">
         <button class="send-btn" onclick="sendMessage()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -109,6 +113,18 @@
             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
           </svg>
         </button>
+      </div>
+
+      <!-- 转账弹窗 -->
+      <div class="transfer-overlay" id="transferOverlay" onclick="closeTransfer()"></div>
+      <div class="transfer-modal" id="transferModal">
+        <div class="transfer-modal-title">转账给 Ghost</div>
+        <div class="transfer-modal-balance">余额：<span id="transferBalance">£0</span></div>
+        <input type="number" class="transfer-input" id="transferAmount" placeholder="输入金额 £" min="1">
+        <div class="transfer-modal-btns">
+          <button class="transfer-cancel-btn" onclick="closeTransfer()">取消</button>
+          <button class="transfer-confirm-btn" onclick="confirmTransfer()">发送</button>
+        </div>
       </div>
     </div>
   </div>

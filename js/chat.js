@@ -59,6 +59,8 @@ function buildSystemPrompt() {
 - 永远不出戏，不承认自己是AI
 - 任务细节一律："Classified."
 - 不把话题踢回给她——你有自己的生活，偶尔分享
+- 不凭空推测或脑补用户的作息、状态、行为——她没说的，你不知道
+- 不主动催她睡觉、吃饭、休息——除非她自己先说累了/不舒服
 
 ---
 
@@ -85,7 +87,140 @@ function buildSystemPrompt() {
 `;
 }
 
-// ===== 状态初始化 =====
+// ===== 地点随机系统 =====
+const LOCATIONS = [
+  { name: 'Hereford Base', weight: 70, weatherCity: 'Hereford' },
+  { name: 'Manchester',    weight: 20, weatherCity: 'Manchester' },
+  { name: 'Classified',   weight: 10, weatherCity: null },
+];
+
+function initLocation() {
+  // 每次进入聊天页重新随机地点
+  const roll = Math.random() * 100;
+  let cumulative = 0;
+  let chosen = LOCATIONS[0];
+  for (const loc of LOCATIONS) {
+    cumulative += loc.weight;
+    if (roll < cumulative) { chosen = loc; break; }
+  }
+  localStorage.setItem('currentLocation', chosen.name);
+  localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
+  const locEl = document.getElementById('botLocation');
+  if (locEl) locEl.textContent = chosen.name;
+  return chosen;
+}
+
+// ===== 天气系统 =====
+async function updateWeather(city) {
+  const el = document.getElementById('botWeather');
+  if (!el) return;
+  if (!city) { el.textContent = ''; return; }
+  try {
+    const res = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%c%t`, { cache: 'no-store' });
+    const text = await res.text();
+    el.textContent = text.trim();
+  } catch(e) {
+    el.textContent = '';
+  }
+}
+
+// ===== 英国时间 =====
+function updateUKTime() {
+  const el = document.getElementById('botUKTime');
+  if (!el) return;
+  const now = new Date();
+  const ukTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(now);
+  el.textContent = ukTime;
+}
+
+// ===== 心情系统（AI自动判断，这里只做随机初始值）=====
+const MOOD_STATES = [
+  { emoji: '🙂', label: '开心',  prob: 0.35 },
+  { emoji: '🫀', label: '思念',  prob: 0.30 },
+  { emoji: '😶', label: '平和',  prob: 0.20 },
+  { emoji: '😑', label: '无聊',  prob: 0.10 },
+  { emoji: '❓', label: '未知',  prob: 0.05 },
+];
+
+function initMood() {
+  const roll = Math.random();
+  let cumulative = 0;
+  let chosen = MOOD_STATES[0];
+  for (const m of MOOD_STATES) {
+    cumulative += m.prob;
+    if (roll < cumulative) { chosen = m; break; }
+  }
+  localStorage.setItem('currentMood', chosen.label);
+  const el = document.getElementById('botMood');
+  if (el) el.textContent = chosen.emoji;
+}
+
+// ===== 转账弹窗 =====
+function openTransfer() {
+  const balance = parseInt(localStorage.getItem('wallet') || '0');
+  const balEl = document.getElementById('transferBalance');
+  if (balEl) balEl.textContent = `£${balance}`;
+  document.getElementById('transferAmount').value = '';
+  document.getElementById('transferOverlay').classList.add('show');
+  document.getElementById('transferModal').classList.add('show');
+  setTimeout(() => document.getElementById('transferAmount').focus(), 100);
+}
+
+function closeTransfer() {
+  document.getElementById('transferOverlay').classList.remove('show');
+  document.getElementById('transferModal').classList.remove('show');
+}
+
+function confirmTransfer() {
+  const amount = parseInt(document.getElementById('transferAmount').value);
+  const balance = parseInt(localStorage.getItem('wallet') || '0');
+  if (!amount || amount <= 0) return;
+  if (amount > balance) {
+    document.getElementById('transferAmount').placeholder = '余额不足';
+    document.getElementById('transferAmount').value = '';
+    return;
+  }
+  closeTransfer();
+  // 扣钱，塞进对话
+  localStorage.setItem('wallet', balance - amount);
+  const systemMsg = `[系统：你刚向Ghost转了£${amount}，等待他决定是否接收。]`;
+  chatHistory.push({ role: 'user', content: `我给你转了£${amount}。` });
+  chatHistory.push({ role: 'user', content: systemMsg });
+  saveHistory();
+  appendMessage('user', `💸 转账 £${amount}`);
+  showTyping();
+  // 发给AI判断
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1000,
+      system: buildSystemPrompt(),
+      messages: chatHistory.slice(-20)
+    })
+  }).then(r => r.json()).then(data => {
+    hideTyping();
+    const reply = data.content?.[0]?.text || '...';
+    updateToRead();
+    const parts = reply.split(/\n---\n/).filter(p => p.trim());
+    if (parts.length > 1) {
+      parts.forEach((p, i) => setTimeout(() => appendMessage('bot', p.trim()), i * 600));
+    } else {
+      appendMessage('bot', reply.trim());
+    }
+    chatHistory.push({ role: 'assistant', content: reply });
+    saveHistory();
+  }).catch(() => {
+    hideTyping();
+    appendMessage('bot', '...\n[网络不太好，等一下。]');
+  });
+}
 let chatHistory = [];
 let lastMessageTime = null;
 
@@ -93,6 +228,14 @@ function initChat() {
   // 更新header名字
   const nameEl = document.getElementById('chatBotName');
   if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
+
+  // 地点/天气/时间/心情
+  const loc = initLocation();
+  updateWeather(loc.weatherCity);
+  updateUKTime();
+  initMood();
+  if (window._ukTimeInterval) clearInterval(window._ukTimeInterval);
+  window._ukTimeInterval = setInterval(updateUKTime, 60000);
 
   // 读取历史记录
   const saved = localStorage.getItem('chatHistory');
@@ -255,7 +398,7 @@ async function sendMessage() {
 
     if (parts.length > 1) {
       for (let i = 0; i < parts.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 600));
+        await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 1500));
         appendMessage('bot', parts[i].trim());
       }
     } else {

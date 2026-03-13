@@ -210,23 +210,6 @@
     padding: 0 4px;
 }
 
-/* ===== 英文/中文翻译分行 ===== */
-.bubble-en {
-    color: inherit;
-    line-height: 1.4;
-}
-
-.bubble-zh {
-    margin-top: 4px;
-    font-size: 11px;
-    color: rgba(90,45,130,0.5);
-    line-height: 1.4;
-}
-
-.message.user .bubble-zh {
-    color: rgba(255,255,255,0.65);
-}
-
 /* ===== 打字中动画 ===== */
 .typing-indicator {
     display: flex;
@@ -342,6 +325,104 @@
 
 .send-btn:active { transform: scale(0.92); }
 .send-btn:hover { box-shadow: 0 6px 18px rgba(186,85,211,0.5); transform: scale(1.05); }
+
+/* ===== 转账按钮 ===== */
+.transfer-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.6);
+    border: 1px solid rgba(200,160,240,0.5);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+.transfer-btn:active { transform: scale(0.92); }
+
+/* ===== 转账弹窗 ===== */
+.transfer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+}
+.transfer-modal {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    background: rgba(255,245,255,0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 24px 24px 0 0;
+    padding: 28px 24px 40px;
+    z-index: 101;
+    box-shadow: 0 -8px 40px rgba(180,120,220,0.2);
+}
+.transfer-overlay.show, .transfer-modal.show { display: block; }
+.transfer-modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #3d1f66;
+    text-align: center;
+    margin-bottom: 6px;
+}
+.transfer-modal-balance {
+    font-size: 12px;
+    color: rgba(90,45,130,0.5);
+    text-align: center;
+    margin-bottom: 20px;
+}
+.transfer-input {
+    width: 100%;
+    border: 1.5px solid rgba(200,160,240,0.6);
+    border-radius: 16px;
+    padding: 14px 18px;
+    font-size: 20px;
+    font-family: 'Playfair Display', serif;
+    color: #3d1f66;
+    background: rgba(255,255,255,0.7);
+    outline: none;
+    text-align: center;
+    box-sizing: border-box;
+    margin-bottom: 16px;
+}
+.transfer-input:focus {
+    border-color: rgba(192,132,252,0.8);
+    box-shadow: 0 0 15px rgba(192,132,252,0.2);
+}
+.transfer-modal-btns {
+    display: flex;
+    gap: 12px;
+}
+.transfer-cancel-btn, .transfer-confirm-btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+.transfer-cancel-btn {
+    background: rgba(200,160,240,0.2);
+    color: #6b3fa0;
+}
+.transfer-confirm-btn {
+    background: linear-gradient(135deg, #ba55d3, #ff6b9d);
+    color: white;
+    box-shadow: 0 4px 12px rgba(186,85,211,0.35);
+}
+.transfer-confirm-btn:active { transform: scale(0.97); }
 
 /* ===== 响应式 ===== */
 @media (max-width: 768px) {
