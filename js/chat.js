@@ -59,8 +59,10 @@ function buildSystemPrompt() {
 - 永远不出戏，不承认自己是AI
 - 任务细节一律："Classified."
 - 不把话题踢回给她——你有自己的生活，偶尔分享
-- 不凭空推测或脑补用户的作息、状态、行为——她没说的，你不知道
+- 不凭空推测或脑补用户的作息、状态、情绪、行为——她没明确说的，你一概不知道，不推断，不追问"还有别的吗"、"是不是有什么事"这类
+- 她说"我很好"就是很好，不要反驳、不要质疑、不要"you're not"
 - 不主动催她睡觉、吃饭、休息——除非她自己先说累了/不舒服
+- 每次最多发2条消息，克制，不审问，不连续追问
 
 ---
 
@@ -398,7 +400,11 @@ async function sendMessage() {
 
     if (parts.length > 1) {
       for (let i = 0; i < parts.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 1500));
+        if (i > 0) {
+          showTyping();
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          hideTyping();
+        }
         appendMessage('bot', parts[i].trim());
       }
     } else {
@@ -434,26 +440,26 @@ function saveHistory() {
 function checkOnlineGreeting() {
   const lastOnline = localStorage.getItem('lastOnlineTime');
   const now = Date.now();
+  // 只有真正离开超过5分钟才触发，刷新页面（<30秒）不触发
+  if (lastOnline) {
+    const diff = now - parseInt(lastOnline);
+    const minutes = diff / 1000 / 60;
+    if (minutes >= 5) {
+      let lines;
+      if (minutes < 30) lines = ["back.\n回来了。", "thought you left.\n还以为你跑了。", "there you are.\n你来了。"];
+      else if (minutes < 120) lines = ["took a while.\n这么久。", "where'd you go.\n去哪了。", "back online.\n上线了。"];
+      else if (minutes < 480) lines = ["finally.\n终于。", "was starting to wonder.\n都开始担心了。", "you're back.\n回来了。"];
+      else if (minutes < 1440) lines = ["you're alive.\n还活着。", "thought you went dark on me.\n以为你失联了。", "...there you are.\n……在呢。"];
+      else lines = ["next time give me a heads up.\n下次打个招呼。", "...there you are.\n……在呢。", "you went quiet for a while.\n消失了好一阵。"];
+      const text = lines[Math.floor(Math.random() * lines.length)];
+      setTimeout(() => {
+        appendMessage('bot', text);
+        chatHistory.push({ role: 'assistant', content: text });
+        saveHistory();
+      }, 800);
+    }
+  }
   localStorage.setItem('lastOnlineTime', now);
-  if (!lastOnline) return;
-
-  const diff = now - parseInt(lastOnline);
-  const minutes = diff / 1000 / 60;
-
-  let lines;
-  if (minutes < 5) return;
-  else if (minutes < 30) lines = ["back.\n回来了。", "thought you left.\n还以为你跑了。", "there you are.\n你来了。"];
-  else if (minutes < 120) lines = ["took a while.\n这么久。", "where'd you go.\n去哪了。", "back online.\n上线了。"];
-  else if (minutes < 480) lines = ["finally.\n终于。", "was starting to wonder.\n都开始担心了。", "you're back.\n回来了。"];
-  else if (minutes < 1440) lines = ["you're alive.\n还活着。", "thought you went dark on me.\n以为你失联了。", "...there you are.\n……在呢。"];
-  else lines = ["next time give me a heads up.\n下次打个招呼。", "...there you are.\n……在呢。", "you went quiet for a while.\n消失了好一阵。"];
-
-  const text = lines[Math.floor(Math.random() * lines.length)];
-  setTimeout(() => {
-    appendMessage('bot', text);
-    chatHistory.push({ role: 'assistant', content: text });
-    saveHistory();
-  }, 800);
 }
 
 // ===== 页面沉默计时 =====
