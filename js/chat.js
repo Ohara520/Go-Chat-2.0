@@ -245,6 +245,7 @@ async function updateWeather(city) {
     const desc = await res2.text();
     el.textContent = display.trim();
     localStorage.setItem('lastWeatherDesc', desc.trim().toLowerCase());
+    localStorage.setItem('lastWeatherDisplay', display.trim());
   } catch(e) {
     el.textContent = '';
   }
@@ -684,47 +685,102 @@ const COUPLE_POSTS = [
 ];
 
 function initCoupleSpace() {
-  // 婚礼日期
-  const weddingDate = localStorage.getItem('firstOpenDate') || new Date().toISOString().split('T')[0];
-  if (!localStorage.getItem('firstOpenDate')) {
+  // 结婚日期（第一次打开App的日期）
+  let weddingDate = localStorage.getItem('firstOpenDate');
+  if (!weddingDate) {
+    weddingDate = new Date().toISOString().split('T')[0];
     localStorage.setItem('firstOpenDate', weddingDate);
   }
+  const d = new Date(weddingDate);
+  const dateStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+
+  // 天数计算
+  const days = Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
+  const daysEl = document.getElementById('coupleDaysNum');
+  if (daysEl) daysEl.textContent = days;
+
+  // 日期显示
   const dateEl = document.getElementById('coupleWeddingDate');
-  if (dateEl) {
-    const d = new Date(weddingDate);
-    dateEl.textContent = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
-  }
+  if (dateEl) dateEl.textContent = dateStr;
+  const dateSubEl = document.getElementById('coupleWeddingDateSub');
+  if (dateSubEl) dateSubEl.textContent = dateStr;
 
   // 名字读备注
   const remark = localStorage.getItem('botNickname') || 'Simon Riley';
-  const nameEl = document.getElementById('coupleGhostName');
-  if (nameEl) nameEl.textContent = remark;
+  const ghostNameEl = document.getElementById('coupleGhostName');
+  if (ghostNameEl) ghostNameEl.textContent = remark;
+  const coverNamesEl = document.getElementById('coupleCoverNames');
+  if (coverNamesEl) coverNamesEl.textContent = `${remark} & 你`;
 
   // 用户头像首字母
   const userName = localStorage.getItem('userName') || '';
   const userAvatarEl = document.getElementById('coupleUserAvatar');
   if (userAvatarEl && userName) userAvatarEl.textContent = userName.charAt(0).toUpperCase();
 
+  // 天气badge
+  const weatherDisplay = localStorage.getItem('lastWeatherDisplay') || '';
+  const weatherBadge = document.getElementById('coupleWeatherBadge');
+  if (weatherBadge && weatherDisplay) weatherBadge.textContent = weatherDisplay;
+
   // 天气背景联动
   const weatherDesc = (localStorage.getItem('lastWeatherDesc') || '').toLowerCase();
-  const container = document.getElementById('coupleScreen');
-  if (container) {
-    let bg;
+  const scene = document.querySelector('.couple-cover-scene');
+  if (scene) {
     if (weatherDesc.includes('snow') || weatherDesc.includes('sleet')) {
-      bg = 'linear-gradient(160deg, #dce8f8 0%, #e8dff5 40%, #f0e8f8 100%)';
-    } else if (weatherDesc.includes('rain') || weatherDesc.includes('drizzle') || weatherDesc.includes('shower')) {
-      bg = 'linear-gradient(160deg, #c8c0e8 0%, #d8c8e8 40%, #e0c8d8 100%)';
-    } else if (weatherDesc.includes('cloud') || weatherDesc.includes('overcast') || weatherDesc.includes('mist') || weatherDesc.includes('fog')) {
-      bg = 'linear-gradient(160deg, #ddd5f0 0%, #e8d8ee 40%, #f0d8e8 100%)';
+      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2a3545 30%, #354555 60%, #253545 100%)';
+    } else if (weatherDesc.includes('rain') || weatherDesc.includes('drizzle')) {
+      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%)';
     } else if (weatherDesc.includes('sun') || weatherDesc.includes('clear')) {
-      bg = 'linear-gradient(160deg, #f5d8ff 0%, #f8d0ee 40%, #fce0e8 70%, #fff0f5 100%)';
+      scene.style.background = 'linear-gradient(160deg, #1a1535 0%, #2d2550 30%, #3a3a5a 60%, #2a2a4a 100%)';
     } else {
-      bg = 'linear-gradient(160deg, #e8d5f5 0%, #f0d6eb 40%, #f9d0e0 70%, #fce4ec 100%)';
+      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%)';
     }
-    container.style.background = bg;
   }
 
-  // 生成随机帖子feed
+  // 雨滴动画 + 天气背景联动
+  const rainEl = document.getElementById('coupleRain');
+  const scene = document.querySelector('.couple-cover-scene');
+  const isRaining = weatherDesc.includes('rain') || weatherDesc.includes('drizzle') || weatherDesc.includes('shower') || weatherDesc.includes('snow') || weatherDesc.includes('sleet');
+  const isSunny = weatherDesc.includes('sun') || weatherDesc.includes('clear');
+  const ukHour = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false });
+  const isNight = parseInt(ukHour) >= 22 || parseInt(ukHour) < 6;
+
+  if (scene) {
+    if (isNight) {
+      scene.style.background = 'linear-gradient(160deg, #0a0a1a 0%, #111128 40%, #0d0d22 100%)';
+    } else if (isRaining) {
+      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%)';
+    } else if (isSunny) {
+      scene.style.background = 'linear-gradient(160deg, #2a1a3a 0%, #3d2555 30%, #4a3560 50%, #3a2550 100%)';
+    } else {
+      scene.style.background = 'linear-gradient(160deg, #1e1e2e 0%, #2a2a3e 40%, #252535 100%)';
+    }
+  }
+
+  // 只有雨雪才有雨滴，夜晚有星星，晴天有光晕
+  if (rainEl) {
+    rainEl.innerHTML = '';
+    if (isRaining) {
+      for (let i = 0; i < 40; i++) {
+        const drop = document.createElement('div');
+        drop.className = 'couple-raindrop';
+        drop.style.cssText = `left:${Math.random()*100}%;height:${Math.random()*14+7}px;animation-duration:${Math.random()*0.7+0.45}s;animation-delay:${Math.random()*2.5}s;`;
+        rainEl.appendChild(drop);
+      }
+    } else if (isNight) {
+      for (let i = 0; i < 30; i++) {
+        const star = document.createElement('div');
+        star.style.cssText = `position:absolute;width:${Math.random()*2+1}px;height:${Math.random()*2+1}px;border-radius:50%;background:white;left:${Math.random()*100}%;top:${Math.random()*100}%;opacity:${Math.random()*0.6+0.2};animation:coupleTwinkle ${Math.random()*3+2}s ease-in-out infinite;animation-delay:${Math.random()*3}s;`;
+        rainEl.appendChild(star);
+      }
+    } else if (isSunny) {
+      const glow = document.createElement('div');
+      glow.style.cssText = `position:absolute;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle, rgba(255,200,100,0.18), transparent 70%);top:10%;right:15%;animation:coupleGlow 4s ease-in-out infinite;`;
+      rainEl.appendChild(glow);
+    }
+  }
+
+  // 生成朋友圈feed
   generateCoupleFeed();
 }
 
@@ -835,29 +891,45 @@ function renderCoupleFeed(posts) {
     feed.innerHTML = '<div class="couple-empty">今天还没有动态</div>';
     return;
   }
+
+  const emojiMap = { Ghost: '👻', Soap: '🧼', Gaz: '🎖️', Price: '🪖' };
+  const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
+
   posts.forEach(item => {
     const commentsHTML = (item.comments || []).map(c => `
       <div class="couple-comment">
-        <span class="comment-name ${c.nameClass}">${c.author}</span>
-        <span class="comment-text">${c.text}</span>
+        <div class="couple-avatar couple-avatar-sm">${emojiMap[c.author] || '👤'}</div>
+        <div class="couple-comment-body">
+          <div class="couple-comment-name ${nameClassMap[c.author] || ''}">${c.author}</div>
+          <div class="couple-comment-en">${c.text}</div>
+        </div>
       </div>
     `).join('');
 
     const div = document.createElement('div');
-    div.className = 'couple-post feed-post';
+    div.className = 'couple-post-card';
     div.innerHTML = `
-      <div class="feed-post-header">
-        <div class="feed-post-avatar">${item.emoji}</div>
-        <div class="feed-post-meta">
-          <div class="feed-post-name"><span class="comment-name ${item.nameClass}">${item.author}</span></div>
-          <div class="feed-post-time">${item.time || '今天'}</div>
+      <div class="couple-post-header">
+        <div class="couple-avatar">${emojiMap[item.author] || '👤'}</div>
+        <div class="couple-post-meta">
+          <div class="couple-post-name ${nameClassMap[item.author] || ''}">${item.author}</div>
+          <div class="couple-post-time">${item.time || '今天'}</div>
         </div>
       </div>
-      <div class="feed-post-body">${item.en}</div>
-      <div class="feed-post-body-zh">${item.zh}</div>
-      <div class="feed-post-likes">♥ ${item.likes || Math.floor(Math.random()*60+10)}</div>
-      ${commentsHTML ? `<div class="couple-post-comments" style="margin-top:10px;border-top:1px solid rgba(200,160,240,0.2);padding-top:10px;">${commentsHTML}</div>` : ''}
+      <div class="couple-post-en">${item.en}</div>
+      <div class="couple-post-zh">${item.zh}</div>
+      ${commentsHTML ? `<div class="couple-divider"></div><div class="couple-comments">${commentsHTML}</div>` : ''}
+      <div class="couple-post-footer">
+        <button class="couple-like-btn" onclick="toggleCoupleLike(this)">🤍 ${item.likes || Math.floor(Math.random()*60+5)}</button>
+      </div>
     `;
     feed.appendChild(div);
   });
+}
+
+function toggleCoupleLike(btn) {
+  const isLiked = btn.classList.toggle('couple-liked');
+  const match = btn.textContent.match(/\d+/);
+  const count = match ? parseInt(match[0]) : 0;
+  btn.textContent = isLiked ? `❤️ ${count + 1}` : (count > 1 ? `🤍 ${count - 1}` : '🤍 点赞');
 }

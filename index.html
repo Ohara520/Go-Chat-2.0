@@ -190,36 +190,74 @@
   </div>
   <!-- 情侣空间 -->
   <div class="screen" id="coupleScreen">
-    <div class="couple-nav">
-      <button class="couple-nav-back" onclick="openScreen('profileScreen')">‹</button>
-      <div class="couple-nav-title">情侣空间</div>
+    <div class="couple-page-header">
+      <button class="couple-back-btn" onclick="openScreen('profileScreen')">‹</button>
+      <div class="couple-page-title">情侣空间</div>
     </div>
-    <div class="couple-container">
+
+    <!-- 封面 -->
+    <div class="couple-cover-section">
+      <div class="couple-cover-scene">
+        <div class="couple-rain" id="coupleRain"></div>
+      </div>
+      <div class="couple-cover-overlay"></div>
+      <div class="couple-cover-weather" id="coupleWeatherBadge">☁️ —</div>
+      <div class="couple-cover-bottom">
+        <div class="couple-cover-names">
+          <div class="couple-cover-main" id="coupleCoverNames">Ghost & 你</div>
+          <div class="couple-cover-sub" id="coupleWeddingDate">—</div>
+        </div>
+        <div class="couple-cover-days">
+          <div class="couple-days-num" id="coupleDaysNum">0</div>
+          <div class="couple-days-label">天在一起</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feed -->
+    <div class="couple-feed-section">
 
       <!-- 置顶婚帖 -->
-      <div class="couple-post wedding-post">
-        <div class="couple-post-avatars">
-          <div class="couple-avatar ghost-avatar">👻</div>
-          <div class="couple-heart">♥</div>
-          <div class="couple-avatar user-avatar" id="coupleUserAvatar">🌸</div>
+      <div class="couple-post-card couple-wedding">
+        <div class="couple-pinned-tag">📌 置顶</div>
+        <div class="couple-post-header">
+          <div class="couple-double-avatar">
+            <div class="couple-av1">👻</div>
+            <div class="couple-av2" id="coupleUserAvatar">🌸</div>
+          </div>
+          <div class="couple-post-meta">
+            <div class="couple-post-name" id="coupleGhostName">Simon Riley</div>
+            <div class="couple-post-time" id="coupleWeddingDateSub">—</div>
+          </div>
         </div>
-        <div class="couple-post-text">married.</div>
-        <div class="couple-post-sig">— <span id="coupleGhostName">Simon Riley</span></div>
-        <div class="couple-post-date" id="coupleWeddingDate">—</div>
-        <div class="couple-post-comments">
+        <div class="couple-post-en">we're married. that's all.</div>
+        <div class="couple-post-zh">我们结婚了。就这样。</div>
+        <div class="couple-post-sig">— S</div>
+        <div class="couple-divider"></div>
+        <div class="couple-comments">
           <div class="couple-comment">
-            <span class="comment-name price">Price</span>
-            <span class="comment-text">take care of her.</span>
+            <div class="couple-avatar couple-avatar-sm">🪖</div>
+            <div class="couple-comment-body">
+              <div class="couple-comment-name couple-price-name">Price</div>
+              <div class="couple-comment-en">take care of her.</div>
+              <div class="couple-comment-zh">好好照顾她。</div>
+            </div>
           </div>
           <div class="couple-comment">
-            <span class="comment-name ghost">Ghost</span>
-            <span class="comment-text">always.</span>
+            <div class="couple-avatar couple-avatar-sm">👻</div>
+            <div class="couple-comment-body">
+              <div class="couple-comment-en">always.</div>
+              <div class="couple-comment-zh">一直会。</div>
+            </div>
           </div>
+        </div>
+        <div class="couple-post-footer">
+          <button class="couple-like-btn couple-liked" onclick="toggleCoupleLike(this)">❤️ 2</button>
         </div>
       </div>
 
-      <!-- 随机评论帖 -->
-      <div class="couple-posts-feed" id="couplePostsFeed"></div>
+      <!-- AI动态Feed -->
+      <div id="couplePostsFeed"></div>
 
     </div>
   </div>
