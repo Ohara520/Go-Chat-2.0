@@ -136,53 +136,57 @@
 
   <!-- 资料页 -->
   <div class="screen" id="profileScreen">
+    <div class="profile-screen-nav">
+      <button class="profile-nav-back" onclick="openScreen('chatScreen')">‹</button>
+      <div class="profile-nav-title">Ghost 资料</div>
+    </div>
     <div class="profile-container">
 
-      <!-- 顶部背景+返回 -->
-      <div class="profile-header-bg">
-        <button class="profile-back-btn" onclick="openScreen('chatScreen')">‹</button>
-      </div>
-
-      <!-- 头像区 -->
-      <div class="profile-avatar-wrap">
-        <div class="profile-avatar">👻</div>
-        <div class="profile-online-dot"></div>
-      </div>
-
-      <!-- 基本信息 -->
-      <div class="profile-info">
+      <!-- 头像+名字 -->
+      <div class="profile-header">
+        <div class="profile-avatar">
+          👻
+          <div class="profile-online-dot"></div>
+        </div>
         <div class="profile-name" id="profileDisplayName">Simon Riley</div>
-        <div class="profile-name-zh">西蒙·莱利</div>
-        <div class="profile-tags">
-          <span class="profile-tag">TF141</span>
-          <span class="profile-tag">中尉</span>
-          <span class="profile-tag" id="profileAge">35岁</span>
+        <div class="profile-name-sub">西蒙 · 莱利</div>
+        <span class="profile-tag">TF141 · 中尉</span>
+      </div>
+
+      <!-- 签名 -->
+      <div class="profile-signature" id="profileSignature">—</div>
+
+      <!-- 信息表格 -->
+      <div class="profile-info-table">
+        <div class="profile-item">
+          <span class="profile-label">年龄 / Age</span>
+          <span class="profile-value" id="profileAge">35</span>
+        </div>
+        <div class="profile-item">
+          <span class="profile-label">位置 / Location</span>
+          <span class="profile-value" id="profileLocation">Hereford Base</span>
+        </div>
+        <div class="profile-item">
+          <span class="profile-label">身份 / Rank</span>
+          <span class="profile-value">TF141 中尉</span>
+        </div>
+        <div class="profile-item">
+          <span class="profile-label">状态 / Status</span>
+          <span class="profile-value">已婚 ❤️</span>
         </div>
       </div>
 
-      <!-- 动态签名 -->
-      <div class="profile-section">
-        <div class="profile-section-label">签名</div>
-        <div class="profile-signature" id="profileSignature">—</div>
-      </div>
-
-      <!-- 动态位置 -->
-      <div class="profile-section">
-        <div class="profile-section-label">位置</div>
-        <div class="profile-location" id="profileLocation">Hereford Base</div>
-      </div>
-
-      <!-- 我的备注 -->
-      <div class="profile-section">
-        <div class="profile-section-label">我的备注</div>
-        <input type="text" class="profile-remark-input" id="profileRemark"
+      <!-- 备注 -->
+      <div class="profile-note">
+        <div class="profile-note-label">❤️ 我的备注</div>
+        <input type="text" class="profile-note-input" id="profileRemark"
           placeholder="给他起个备注..."
           onchange="saveRemark()"
           maxlength="20">
       </div>
 
       <!-- 进入情侣空间 -->
-      <button class="profile-space-btn" onclick="openScreen('coupleScreen')">
+      <button class="profile-btn" onclick="openScreen('coupleScreen')">
         💑 进入情侣空间
       </button>
 

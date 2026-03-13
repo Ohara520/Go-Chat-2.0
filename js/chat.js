@@ -139,7 +139,8 @@ function initProfile() {
     const item = JSON.parse(sig);
     sigEl.innerHTML = `<div class="sig-en">${item.en}</div><div class="sig-zh">${item.zh}</div>`;
   }
-  if (locEl) locEl.textContent = `${location}  ${locationZH[location] || ''}`;
+  if (locEl) locEl.textContent = `${location}`;
+  if (ageEl) ageEl.textContent = '35';
   const profileNameEl = document.getElementById('profileDisplayName');
   if (profileNameEl) profileNameEl.textContent = remark || 'Simon Riley';
   if (remEl) remEl.value = remark;
