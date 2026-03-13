@@ -97,9 +97,15 @@
           </div>
         </div>
         <div class="chat-header-actions">
+          <button class="thought-btn" id="thoughtBtn" onclick="toggleThought()" title="他在想什么">💭</button>
           <button class="call-btn" title="视频通话">📹</button>
           <button class="call-btn" title="语音通话">📞</button>
         </div>
+      </div>
+
+      <!-- 思想气泡弹出 -->
+      <div class="thought-bubble" id="thoughtBubble">
+        <span id="thoughtText">...</span>
       </div>
 
       <div class="messages" id="messagesContainer"></div>
@@ -126,6 +132,60 @@
           <button class="transfer-confirm-btn" onclick="confirmTransfer()">发送</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 资料页 -->
+  <div class="screen" id="profileScreen">
+    <div class="profile-container">
+
+      <!-- 顶部背景+返回 -->
+      <div class="profile-header-bg">
+        <button class="profile-back-btn" onclick="openScreen('chatScreen')">‹</button>
+      </div>
+
+      <!-- 头像区 -->
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar">👻</div>
+        <div class="profile-online-dot"></div>
+      </div>
+
+      <!-- 基本信息 -->
+      <div class="profile-info">
+        <div class="profile-name">Simon Riley</div>
+        <div class="profile-name-zh">西蒙·莱利</div>
+        <div class="profile-tags">
+          <span class="profile-tag">TF141</span>
+          <span class="profile-tag">中尉</span>
+        </div>
+      </div>
+
+      <!-- 动态签名 -->
+      <div class="profile-section">
+        <div class="profile-section-label">签名</div>
+        <div class="profile-signature" id="profileSignature">—</div>
+      </div>
+
+      <!-- 动态位置 -->
+      <div class="profile-section">
+        <div class="profile-section-label">位置</div>
+        <div class="profile-location" id="profileLocation">Hereford Base</div>
+      </div>
+
+      <!-- 我的备注 -->
+      <div class="profile-section">
+        <div class="profile-section-label">我的备注</div>
+        <input type="text" class="profile-remark-input" id="profileRemark"
+          placeholder="给他起个备注..."
+          onchange="saveRemark()"
+          maxlength="20">
+      </div>
+
+      <!-- 进入情侣空间 -->
+      <button class="profile-space-btn" onclick="openScreen('coupleScreen')">
+        💑 进入情侣空间
+      </button>
+
     </div>
   </div>
 

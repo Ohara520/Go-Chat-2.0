@@ -135,6 +135,62 @@
 }
 .call-btn:active { transform: scale(0.92); }
 
+/* ===== 思想气泡按钮 ===== */
+.thought-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.6);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    position: relative;
+}
+.thought-btn:active { transform: scale(0.92); }
+
+/* ===== 思想气泡弹出 ===== */
+.thought-bubble {
+    display: none;
+    position: absolute;
+    top: 70px;
+    right: 16px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(200,160,240,0.4);
+    border-radius: 16px 16px 4px 16px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #5a3a7a;
+    box-shadow: 0 4px 20px rgba(180,120,220,0.2);
+    z-index: 50;
+    max-width: 160px;
+    text-align: center;
+    animation: bubblePop 0.2s ease;
+}
+.thought-bubble::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 14px;
+    width: 10px;
+    height: 10px;
+    background: rgba(255,255,255,0.92);
+    border-left: 1px solid rgba(200,160,240,0.4);
+    border-top: 1px solid rgba(200,160,240,0.4);
+    transform: rotate(45deg);
+}
+.thought-bubble.show { display: block; }
+
+@keyframes bubblePop {
+    from { opacity: 0; transform: scale(0.85) translateY(-5px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* ===== 消息区域 ===== */
 .messages {
     flex: 1;
@@ -432,3 +488,167 @@
     .input-field { font-size: 11px; padding: 8px 10px; }
     .send-btn { width: 32px; height: 32px; font-size: 14px; }
 }
+
+/* ===== 资料页 ===== */
+.profile-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100%;
+    background: linear-gradient(135deg, #e8d5f5 0%, #f0d6eb 40%, #f9d0e0 70%, #fce4ec 100%);
+    position: relative;
+    padding-bottom: 40px;
+}
+
+.profile-header-bg {
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(135deg, rgba(216,180,254,0.65), rgba(249,168,212,0.6));
+    backdrop-filter: blur(20px);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.profile-back-btn {
+    position: absolute;
+    top: calc(16px + env(safe-area-inset-top));
+    left: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.6);
+    font-size: 22px;
+    color: #5a2d82;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-avatar-wrap {
+    position: relative;
+    margin-top: -50px;
+}
+
+.profile-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px);
+    border: 3px solid rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    box-shadow: 0 8px 30px rgba(180,120,220,0.2);
+}
+
+.profile-online-dot {
+    width: 16px;
+    height: 16px;
+    background: #4ade80;
+    border-radius: 50%;
+    border: 3px solid white;
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+}
+
+.profile-info {
+    text-align: center;
+    margin-top: 12px;
+    margin-bottom: 8px;
+}
+
+.profile-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #3d1f66;
+    letter-spacing: 0.5px;
+}
+
+.profile-name-zh {
+    font-size: 13px;
+    color: rgba(90,45,130,0.55);
+    margin-top: 3px;
+}
+
+.profile-tags {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.profile-tag {
+    background: rgba(255,255,255,0.6);
+    border: 1px solid rgba(200,160,240,0.5);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 11px;
+    color: #6b3fa0;
+    font-weight: 600;
+}
+
+.profile-section {
+    width: calc(100% - 48px);
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 16px;
+    padding: 14px 18px;
+    margin-top: 12px;
+}
+
+.profile-section-label {
+    font-size: 11px;
+    color: rgba(90,45,130,0.5);
+    margin-bottom: 5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.profile-signature {
+    font-size: 14px;
+    color: #5a3a7a;
+    font-style: italic;
+}
+
+.profile-location {
+    font-size: 14px;
+    color: #5a3a7a;
+}
+
+.profile-remark-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: #5a3a7a;
+    outline: none;
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    box-sizing: border-box;
+}
+
+.profile-remark-input::placeholder {
+    color: rgba(160,120,200,0.5);
+}
+
+.profile-space-btn {
+    margin-top: 24px;
+    width: calc(100% - 48px);
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(192,132,252,0.75), rgba(244,114,182,0.7));
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 20px;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(192,132,252,0.3);
+    transition: all 0.2s;
+}
+.profile-space-btn:active { transform: scale(0.97); }

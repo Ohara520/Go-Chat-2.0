@@ -7,6 +7,7 @@ function openScreen(id) {
     const target = document.getElementById(id);
     target.style.display = 'flex';
     target.classList.add('active');
+    if (id === 'profileScreen' && typeof initProfile === 'function') initProfile();
 }
 
 function goBack() {
