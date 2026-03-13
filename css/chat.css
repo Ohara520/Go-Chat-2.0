@@ -652,3 +652,15 @@
     transition: all 0.2s;
 }
 .profile-space-btn:active { transform: scale(0.97); }
+
+/* ===== 资料页签名双语 ===== */
+.sig-en {
+    font-size: 14px;
+    color: #5a3a7a;
+    font-style: italic;
+}
+.sig-zh {
+    font-size: 11px;
+    color: rgba(90,45,130,0.45);
+    margin-top: 3px;
+}
