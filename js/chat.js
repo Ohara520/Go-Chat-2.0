@@ -89,7 +89,51 @@ function buildSystemPrompt() {
 `;
 }
 
-// ===== 地点随机系统 =====
+// ===== 资料页 =====
+const PROFILE_SIGNATURES = {
+  'Hereford Base': 'still here.',
+  'Manchester':    'back in the city.',
+  'Classified':    '—',
+};
+
+function initProfile() {
+  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const remark = localStorage.getItem('botNickname') || '';
+  const sigEl = document.getElementById('profileSignature');
+  const locEl = document.getElementById('profileLocation');
+  const remEl = document.getElementById('profileRemark');
+  if (sigEl) sigEl.textContent = PROFILE_SIGNATURES[location] || '—';
+  if (locEl) locEl.textContent = location;
+  if (remEl) remEl.value = remark;
+}
+
+function saveRemark() {
+  const val = document.getElementById('profileRemark').value.trim();
+  localStorage.setItem('botNickname', val);
+  // 同步聊天页header名字
+  const nameEl = document.getElementById('chatBotName');
+  if (nameEl) nameEl.textContent = val || 'Simon Riley';
+}
+
+// ===== 思想气泡 =====
+let thoughtTimer = null;
+
+function toggleThought() {
+  const bubble = document.getElementById('thoughtBubble');
+  if (bubble.classList.contains('show')) {
+    bubble.classList.remove('show');
+    if (thoughtTimer) clearTimeout(thoughtTimer);
+  } else {
+    bubble.classList.add('show');
+    if (thoughtTimer) clearTimeout(thoughtTimer);
+    thoughtTimer = setTimeout(() => bubble.classList.remove('show'), 3000);
+  }
+}
+
+function updateThought(text) {
+  const el = document.getElementById('thoughtText');
+  if (el) el.textContent = text;
+}
 const LOCATIONS = [
   { name: 'Hereford Base', weight: 70, weatherCity: 'Hereford' },
   { name: 'Manchester',    weight: 20, weatherCity: 'Manchester' },
@@ -143,7 +187,7 @@ function updateUKTime() {
 // ===== 心情系统（AI自动判断，这里只做随机初始值）=====
 const MOOD_STATES = [
   { emoji: '🙂', label: '开心',  prob: 0.35 },
-  { emoji: '🫀', label: '思念',  prob: 0.30 },
+  { emoji: '💜', label: '思念',  prob: 0.30 },
   { emoji: '😶', label: '平和',  prob: 0.20 },
   { emoji: '😑', label: '无聊',  prob: 0.10 },
   { emoji: '❓', label: '未知',  prob: 0.05 },
@@ -440,23 +484,36 @@ function saveHistory() {
 function checkOnlineGreeting() {
   const lastOnline = localStorage.getItem('lastOnlineTime');
   const now = Date.now();
-  // 只有真正离开超过5分钟才触发，刷新页面（<30秒）不触发
   if (lastOnline) {
     const diff = now - parseInt(lastOnline);
-    const minutes = diff / 1000 / 60;
-    if (minutes >= 5) {
-      let lines;
-      if (minutes < 30) lines = ["back.\n回来了。", "thought you left.\n还以为你跑了。", "there you are.\n你来了。"];
-      else if (minutes < 120) lines = ["took a while.\n这么久。", "where'd you go.\n去哪了。", "back online.\n上线了。"];
-      else if (minutes < 480) lines = ["finally.\n终于。", "was starting to wonder.\n都开始担心了。", "you're back.\n回来了。"];
-      else if (minutes < 1440) lines = ["you're alive.\n还活着。", "thought you went dark on me.\n以为你失联了。", "...there you are.\n……在呢。"];
-      else lines = ["next time give me a heads up.\n下次打个招呼。", "...there you are.\n……在呢。", "you went quiet for a while.\n消失了好一阵。"];
-      const text = lines[Math.floor(Math.random() * lines.length)];
-      setTimeout(() => {
-        appendMessage('bot', text);
-        chatHistory.push({ role: 'assistant', content: text });
-        saveHistory();
-      }, 800);
+    const minutes = Math.floor(diff / 1000 / 60);
+    if (minutes >= 480) {
+      let context;
+      if (minutes < 1440) context = '她离开了将近一天，刚刚回来。你注意到她不在，但没到担心的程度。';
+      else if (minutes < 4320) context = '她消失了一天多，现在回来了。这段时间你可能想过她，有些话想说但没说出口。';
+      else if (minutes < 10080) context = '她消失了好几天，现在突然回来了。你等了一阵，心里有些话积着。';
+      else context = '她消失了将近一周甚至更久，现在重新出现了。这段时间足够长，你有自己的感受——可能担心，可能有些话憋着，由你决定怎么反应。';
+
+      const systemNote = `[系统提示：${context}现在她上线了，自然地做出反应，由你决定说什么或者什么都不说。]`;
+      showTyping();
+      fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 200,
+          system: buildSystemPrompt(),
+          messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
+        })
+      }).then(r => r.json()).then(data => {
+        hideTyping();
+        const reply = data.content?.[0]?.text;
+        if (reply && reply.trim()) {
+          appendMessage('bot', reply.trim());
+          chatHistory.push({ role: 'assistant', content: reply });
+          saveHistory();
+        }
+      }).catch(() => hideTyping());
     }
   }
   localStorage.setItem('lastOnlineTime', now);
@@ -464,11 +521,7 @@ function checkOnlineGreeting() {
 
 // ===== 页面沉默计时 =====
 let silenceTimer = null;
-const SILENCE_MESSAGES = [
-  { delay: 5,  lines: ["you still there?\n还在吗？", "...\n……", "sitrep.\n说话。"] },
-  { delay: 15, lines: ["going quiet on me.\n跟我玩失踪？", "oi.\n喂。", "still there?\n还在不在？"] },
-  { delay: 30, lines: ["fall asleep?\n睡着了？", "oi. i'm still here.\n喂。我还在呢。", "...\n……"] },
-];
+const SILENCE_DELAYS = [5, 15, 30]; // 分钟
 
 function resetSilenceTimer() {
   if (silenceTimer) clearTimeout(silenceTimer);
@@ -476,14 +529,30 @@ function resetSilenceTimer() {
 }
 
 function scheduleSilenceCheck(index) {
-  if (index >= SILENCE_MESSAGES.length) return;
-  const { delay, lines } = SILENCE_MESSAGES[index];
+  if (index >= SILENCE_DELAYS.length) return;
+  const delay = SILENCE_DELAYS[index];
   silenceTimer = setTimeout(() => {
-    const text = lines[Math.floor(Math.random() * lines.length)];
-    appendMessage('bot', text);
-    chatHistory.push({ role: 'assistant', content: text });
-    saveHistory();
-    scheduleSilenceCheck(index + 1);
+    const systemNote = `[系统提示：她已经${delay}分钟没有说话了，还停留在聊天页面。你可以开口，也可以继续等，由你决定。]`;
+    showTyping();
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        system: buildSystemPrompt(),
+        messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
+      })
+    }).then(r => r.json()).then(data => {
+      hideTyping();
+      const reply = data.content?.[0]?.text;
+      if (reply && reply.trim()) {
+        appendMessage('bot', reply.trim());
+        chatHistory.push({ role: 'assistant', content: reply });
+        saveHistory();
+        scheduleSilenceCheck(index + 1);
+      }
+    }).catch(() => hideTyping());
   }, delay * 60 * 1000);
 }
 
