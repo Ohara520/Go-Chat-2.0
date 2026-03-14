@@ -599,8 +599,7 @@ function confirmTransfer() {
     let reply = data.content?.[0]?.text || '...';
     updateToRead();
     const shouldRefund = reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8));
-    reply = reply.replace(/
-?(REFUND|KEEP)\s*$/i, '').trim();
+    reply = reply.replace(/(REFUND|KEEP)\s*$/gim, '').trim();
     if (shouldRefund) {
       setBalance(getBalance() + amount);
       addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amount });
@@ -1680,6 +1679,12 @@ const VOCAB_WORDS = [
   { word: 'Formidable',   zh: '令人敬畏的',     ghost: "Formidable. Impressive and slightly terrifying. Price uses that word about the team.",  ghostZh: '令人敬畏的。令人印象深刻又有点可怕。Price用这个词形容我们队。' },
   { word: 'Rugged',       zh: '粗犷的/坚韧的',  ghost: "Rugged. Tough. Built for difficult conditions. ...Soap called me this. Once.",          ghostZh: '粗犷的，坚韧的。强硬。为艰难环境而生。……Soap这么叫过我。一次。' },
   { word: 'Longing',      zh: '渴望/思念',      ghost: "Longing. When you want something that isn't there. ...Don't ask.",                      ghostZh: '渴望，思念。想要某个不在身边的东西。……别问。' },
+  { word: 'Bloke',        zh: '家伙/男人（英式）', ghost: "Bloke. Just means a man. Perfectly normal word. Don't overthink it.",                   ghostZh: '家伙，男人。很普通的词。别想太多。' },
+  { word: 'Knackered',    zh: '累坏了（英式）',  ghost: "Knackered. Means exhausted. More honest than saying tired.",                               ghostZh: '累坏了。比说tired更诚实。' },
+  { word: 'Sorted',       zh: '搞定了（英式）',  ghost: "Sorted. Means handled. Done. Move on.",                                                     ghostZh: '搞定了。处理好了。继续。' },
+  { word: 'Reckon',       zh: '认为/觉得（英式）', ghost: "Reckon. Means think or suppose. I reckon you already knew that.",                         ghostZh: '认为，觉得。我觉得你早就知道这个词了。' },
+  { word: 'Gutted',       zh: '很失望（英式）',  ghost: "Gutted. Deeply disappointed. Not just a little — properly gutted.",                         ghostZh: '很失望。不是一点点——是真的很失望。' },
+  { word: 'Cheers',       zh: '谢了/干杯（英式）', ghost: "Cheers. Means thanks. Or a toast. Context dependent. Figure it out.",                      ghostZh: '谢了，或者干杯。看情况。你自己判断。' },
 ];
 
 const VOCAB_CORRECT_BI = [
