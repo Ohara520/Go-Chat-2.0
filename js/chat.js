@@ -1201,12 +1201,24 @@ function initCoupleSpace() {
   const coverNamesEl = document.getElementById('coupleCoverNames');
   if (coverNamesEl) coverNamesEl.textContent = `${remark} & 你`;
 
-  // 用户头像首字母 + @mention
+  // 用户头像：用自定义头像或默认头像，不用首字母
   const userName = localStorage.getItem('userName') || '你';
+  const savedAvatar = localStorage.getItem('userAvatarBase64');
+  const avatarSrc = savedAvatar || 'images/default-avatar.jpg';
   const userAvatarEl = document.getElementById('coupleUserAvatar');
-  if (userAvatarEl) userAvatarEl.textContent = userName.charAt(0).toUpperCase();
+  if (userAvatarEl) {
+    userAvatarEl.style.backgroundImage = `url(${avatarSrc})`;
+    userAvatarEl.style.backgroundSize = 'cover';
+    userAvatarEl.style.backgroundPosition = 'center';
+    userAvatarEl.textContent = '';
+  }
   const coverUserEl = document.getElementById('coupleCoverUserAvatar');
-  if (coverUserEl) coverUserEl.textContent = userName.charAt(0).toUpperCase();
+  if (coverUserEl) {
+    coverUserEl.style.backgroundImage = `url(${avatarSrc})`;
+    coverUserEl.style.backgroundSize = 'cover';
+    coverUserEl.style.backgroundPosition = 'center';
+    coverUserEl.textContent = '';
+  }
   const mentionEl = document.getElementById('coupleUserMention');
   if (mentionEl) mentionEl.textContent = `@${userName}`;
   const mentionZhEl = document.getElementById('coupleUserMentionZh');
@@ -2424,6 +2436,10 @@ function updateCalendarCard(today, marriageDate, userBirthday) {
   const calDesc = document.getElementById('calendarCardDesc');
   const calCard = document.getElementById('calendarCard');
   const m = today.getMonth()+1, d = today.getDate();
+  // 先重置为默认值
+  if (calIcon) calIcon.textContent = '📅';
+  if (calDesc) calDesc.textContent = '结婚纪念日 💍';
+  if (calCard) calCard.style.animation = '';
 
   if (userBirthday) {
     const [bm, bd] = userBirthday.split('-').map(Number);
