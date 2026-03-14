@@ -254,6 +254,26 @@
     box-shadow: 0 4px 15px rgba(180,120,200,0.12);
 }
 
+.bubble-en {
+    font-size: 13px;
+    line-height: 1.5;
+    color: inherit;
+}
+
+.message.bot .bubble-zh {
+    font-size: 11px;
+    color: rgba(90,58,122,0.5);
+    margin-top: 3px;
+    line-height: 1.4;
+}
+
+.message.user .bubble-zh {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    margin-top: 3px;
+    line-height: 1.4;
+}
+
 .message-time {
     font-size: 10px;
     color: rgba(130,80,170,0.45);
