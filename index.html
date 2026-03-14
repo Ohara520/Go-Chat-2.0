@@ -449,6 +449,136 @@
     </div>
   </div>
 
+  <!-- 打工页 -->
+  <div class="screen" id="workScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="if(pomodoroTimer){cancelPomodoro();}openScreen('mainScreen')">‹</button>
+      <div class="screen-title">⏱️ 打工赚钱</div>
+    </div>
+    <div class="work-container">
+      <div class="work-income-bar">
+        <span>💷 今日已赚</span>
+        <span id="workTodayIncome">£0</span>
+        <span class="work-quota" id="workQuotaText">（今日还可完成 4 个）</span>
+      </div>
+      <div class="pomodoro-card" id="pomodoroCard">
+        <div class="pomodoro-job-selector" id="jobSelector">
+          <div class="job-option active" data-job="study" data-minutes="25" data-pay="20" onclick="selectJob(this)">
+            <div class="job-emoji">📚</div>
+            <div class="job-name">学习</div>
+            <div class="job-detail">25分钟 · £20</div>
+          </div>
+          <div class="job-option" data-job="exercise" data-minutes="30" data-pay="25" onclick="selectJob(this)">
+            <div class="job-emoji">💪</div>
+            <div class="job-name">运动</div>
+            <div class="job-detail">30分钟 · £25</div>
+          </div>
+          <div class="job-option" data-job="create" data-minutes="45" data-pay="35" onclick="selectJob(this)">
+            <div class="job-emoji">🎨</div>
+            <div class="job-name">创作</div>
+            <div class="job-detail">45分钟 · £35</div>
+          </div>
+          <div class="job-option" data-job="slack" data-minutes="10" data-pay="5" onclick="selectJob(this)">
+            <div class="job-emoji">😴</div>
+            <div class="job-name">摸鱼</div>
+            <div class="job-detail">10分钟 · £5</div>
+          </div>
+        </div>
+        <div class="pomodoro-timer-wrap" id="timerWrap" style="display:none">
+          <div class="pomodoro-job-label" id="timerJobLabel">📚 学习中</div>
+          <div class="pomodoro-ring">
+            <svg viewBox="0 0 120 120" class="pomodoro-svg">
+              <circle cx="60" cy="60" r="52" class="ring-bg"/>
+              <circle cx="60" cy="60" r="52" class="ring-progress" id="ringProgress"/>
+            </svg>
+            <svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#c084fc"/><stop offset="100%" style="stop-color:#f472b6"/></linearGradient></defs></svg>
+            <div class="pomodoro-time" id="timerDisplay">25:00</div>
+          </div>
+          <button class="pomodoro-cancel-btn" onclick="cancelPomodoro()">放弃</button>
+        </div>
+        <button class="pomodoro-start-btn" id="startBtn" onclick="startPomodoro()">开始打工</button>
+        <div class="pomodoro-done" id="pomodoroDone" style="display:none">
+          <div class="done-emoji">🎉</div>
+          <div class="done-text">完成！工资已到账</div>
+          <div class="done-amount" id="doneAmount">+£20</div>
+        </div>
+      </div>
+      <div class="work-log" id="workLog"></div>
+      <div class="noah-tag">👤 诺亚工作室 · 按时发薪，童叟无欺</div>
+    </div>
+  </div>
+
+  <!-- 单词页 -->
+  <div class="screen" id="vocabScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">📖 跟Ghost学英语</div>
+    </div>
+    <div class="vocab-container">
+      <div id="vocabHome">
+        <div class="vocab-stats-row">
+          <div class="vocab-stat-card">
+            <div class="vocab-stat-num" id="vocabStreakCount">0</div>
+            <div class="vocab-stat-label">🔥 连续天数</div>
+          </div>
+          <div class="vocab-stat-card">
+            <div class="vocab-stat-num" id="vocabLearnedCount">0/5</div>
+            <div class="vocab-stat-label">📚 今日进度</div>
+          </div>
+        </div>
+        <div class="vocab-today-title">今日单词</div>
+        <div class="vocab-preview-list" id="vocabPreviewList"></div>
+        <div class="vocab-action-btns">
+          <button class="vocab-btn-learn" onclick="openVocabLearn(); showVocabMode('learn');">📖 开始学习</button>
+          <button class="vocab-btn-test" id="vocabTestBtn" onclick="startVocabTest()">✏️ 开始测验</button>
+        </div>
+        <div class="vocab-ghost-quote" id="vocabGhostQuote">
+          "The more words you know, the less you have to say. Use them well."
+          <span class="vocab-ghost-quote-zh">词汇量越大，需要说的越少。好好用。</span>
+        </div>
+      </div>
+
+      <!-- 学习模式 -->
+      <div id="vocabLearnMode" style="display:none;flex-direction:column;align-items:center;gap:16px;padding-top:8px;">
+        <div class="vocab-mode-progress" id="vocabCardProgress">1 / 5</div>
+        <div class="vocab-flip-card" id="vocabFlipCard" onclick="flipVocabCard()">
+          <div class="vocab-flip-inner">
+            <div class="vocab-flip-front">
+              <div class="vocab-front-word" id="vocabCardFront"></div>
+              <div class="vocab-flip-hint">点击翻转</div>
+            </div>
+            <div class="vocab-flip-back" id="vocabCardBack"></div>
+          </div>
+        </div>
+        <div class="vocab-learn-btns">
+          <button class="vocab-btn-next" onclick="nextVocabCard()">下一个 →</button>
+          <button class="vocab-btn-back-home" onclick="showVocabMode('home'); renderVocabScreen();">返回</button>
+        </div>
+      </div>
+
+      <!-- 测验模式 -->
+      <div id="vocabTestMode" style="display:none;flex-direction:column;align-items:center;gap:14px;padding-top:8px;width:100%;">
+        <div class="vocab-mode-progress" id="vocabTestProgress">1 / 5</div>
+        <div class="vocab-test-word" id="vocabTestWord">Word</div>
+        <div class="vocab-test-question">这个单词的意思是？</div>
+        <div class="vocab-test-options" id="vocabTestOptions"></div>
+        <div class="vocab-feedback" id="vocabTestFeedback"></div>
+        <div class="vocab-dot-row" id="vocabDotRow"></div>
+        <div class="vocab-ghost-hint">
+          <div class="vocab-ghost-avatar">🐈‍⬛</div>
+          <div class="vocab-ghost-hint-text" id="vocabGhostHint">一次机会。想清楚再选。</div>
+        </div>
+      </div>
+
+      <!-- 完成 -->
+      <div id="vocabDoneMode" style="display:none;flex-direction:column;align-items:center;gap:12px;padding-top:40px;">
+        <div style="font-size:48px">🐈‍⬛</div>
+        <div class="vocab-done-msg" id="vocabDoneMsg">Good work.</div>
+        <button class="vocab-btn-back-home" onclick="showVocabMode('home'); renderVocabScreen();">返回</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 <script src="js/app.js"></script>
 <script src="js/chat.js"></script>
