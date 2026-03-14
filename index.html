@@ -586,7 +586,48 @@
       <div class="screen-title">我的收藏</div>
     </div>
     <div class="collection-container" id="collectionList">
-      <div style="text-align:center;color:rgba(130,80,170,0.45);padding:40px 20px;font-size:13px;">还没有收藏 ⭐<br><span style="font-size:11px;opacity:0.7">点击消息下方的星星收藏</span></div>
+    </div>
+  </div>
+
+  <!-- 日历页 -->
+  <div class="screen" id="calendarScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">结婚纪念</div>
+    </div>
+    <!-- 特效粒子容器 -->
+    <div id="calendarParticles" style="position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;"></div>
+    <div class="calendar-container">
+      <div class="marriage-stats">
+        <div class="stat-card">
+          <div class="stat-label">结婚天数</div>
+          <div class="stat-value" id="marriageDays">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label" id="countdownLabel">距离52天</div>
+          <div class="stat-value" id="nextMilestoneDays">—</div>
+        </div>
+      </div>
+
+      <div class="milestone-section">
+        <div class="milestone-title">🎉 重要纪念</div>
+        <div id="milestonesContainer"></div>
+      </div>
+
+      <div class="marriage-date-display">
+        结婚日期：<strong id="marriageDateDisplay">—</strong>
+      </div>
+
+      <div class="calendar">
+        <div class="calendar-title" id="calendarTitle">March 2026</div>
+        <div class="weekdays">
+          <div class="weekday">Sun</div><div class="weekday">Mon</div>
+          <div class="weekday">Tue</div><div class="weekday">Wed</div>
+          <div class="weekday">Thu</div><div class="weekday">Fri</div>
+          <div class="weekday">Sat</div>
+        </div>
+        <div class="days" id="calendarDays"></div>
+      </div>
     </div>
   </div>
 

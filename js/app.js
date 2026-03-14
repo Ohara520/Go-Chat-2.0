@@ -14,6 +14,7 @@ function openScreen(id) {
     if (id === 'workScreen'     && typeof updateWorkUI      === 'function') updateWorkUI();
     if (id === 'vocabScreen'       && typeof renderVocabScreen    === 'function') renderVocabScreen();
     if (id === 'collectionScreen'  && typeof renderCollectionScreen === 'function') renderCollectionScreen();
+    if (id === 'calendarScreen'     && typeof initCalendar           === 'function') initCalendar();
 }
 
 function goBack() {
@@ -28,6 +29,14 @@ function startChat() {
         return;
     }
     localStorage.setItem('userName', name);
+    // 首次登录自动记录结婚日期
+    if (!localStorage.getItem('marriageDate')) {
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' +
+            String(today.getMonth()+1).padStart(2,'0') + '-' +
+            String(today.getDate()).padStart(2,'0');
+        localStorage.setItem('marriageDate', dateStr);
+    }
     openScreen('mainScreen');
 }
 

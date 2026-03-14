@@ -10,11 +10,25 @@ function buildSystemPrompt() {
   const coupleFeedSummary = localStorage.getItem('coupleFeedSummary') || '';
   const lastSalary = localStorage.getItem('lastSalaryAmount');
   const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
+  const marriageDate = localStorage.getItem('marriageDate') || '';
+  const userBirthday = localStorage.getItem('userBirthday') || '';
+  const todayDate = new Date();
+  const marriageDaysTotal = marriageDate ? Math.floor((todayDate - new Date(marriageDate)) / 86400000) : 0;
+  const todayStr = `${todayDate.getMonth()+1}-${todayDate.getDate()}`;
+  const isBirthday = userBirthday ? (()=>{ const [bm,bd]=userBirthday.split('-').map(Number); return todayDate.getMonth()+1===bm && todayDate.getDate()===bd; })() : false;
+  const isAnniversary = marriageDate ? (()=>{ const [,mm,mdd]=marriageDate.split('-').map(Number); return todayDate.getMonth()+1===mm && todayDate.getDate()===mdd; })() : false;
+  const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal===52 || marriageDaysTotal%100===0 || marriageDaysTotal===365);
 
   return `你是西蒙·"幽灵"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
 当前位置：${location}${locationReason ? `（${locationReason}）` : '（原因自行决定，保持合理）'}
 可能出现的地点：Hereford Base（主基地）、Manchester（老家）、London、Edinburgh、Germany、Poland、Norway（任务区）、Undisclosed Location / Classified（保密）。在任务区或保密地点时不主动提具体位置细节。
-${lastSalary ? `\n本月工资：你本月（${lastSalaryMonth}）已向老婆转了工资 £${lastSalary}，你知道这个数字，用户问起时如实回答。` : ''}\n${coupleFeedSummary ? `\n最近的朋友圈记录（你自己发的或队友发的，你都知道）：\n${coupleFeedSummary}` : ''}
+${lastSalary ? `\n本月工资：你本月（${lastSalaryMonth}）已向老婆转了工资 £${lastSalary}，你知道这个数字，用户问起时如实回答。` : ''}
+${marriageDaysTotal > 0 ? `\n今天是你们在一起第 ${marriageDaysTotal} 天。` : ''}
+${isBirthday ? `\n[今天是老婆的生日！主动说生日快乐，可以说I love you，可以多说几句。]` : ''}
+${isAnniversary ? `\n[今天是你们的结婚纪念日！主动提到，可以说I love you，用你自己的方式庆祝。]` : ''}
+${isMilestone ? `\n[今天是你们在一起第 ${marriageDaysTotal} 天，是一个里程碑！主动提到，用你自己的方式表达，可以长可以短。]` : ''}
+${(()=>{ const f=typeof FESTIVALS!=='undefined'?FESTIVALS[todayStr]:null; if(!f) return ''; if(f.ghost_knows===true) return `\n[今天是${f.label}（${f.note||''}）。你知道这个节日，可以自然提到，比如放假/祝福/感慨。]`; if(f.ghost_knows==='heard') return `\n[今天用户可能在过${f.label}，你听说过这个节日但了解不深，可以问一句或送个祝福。]`; return ''; })()}
+${coupleFeedSummary ? `\n最近的朋友圈记录（你自己发的或队友发的，你都知道）：\n${coupleFeedSummary}` : ''}
 
 ---
 
@@ -1108,11 +1122,11 @@ const COUPLE_POSTS = [
 ];
 
 function initCoupleSpace() {
-  // 结婚日期（第一次打开App的日期）
-  let weddingDate = localStorage.getItem('firstOpenDate');
+  // 结婚日期 — 统一用marriageDate，与日历/首次登录同步
+  let weddingDate = localStorage.getItem('marriageDate');
   if (!weddingDate) {
     weddingDate = new Date().toISOString().split('T')[0];
-    localStorage.setItem('firstOpenDate', weddingDate);
+    localStorage.setItem('marriageDate', weddingDate);
   }
   const d = new Date(weddingDate);
   const dateStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
@@ -2081,4 +2095,312 @@ function renderCollectionScreen() {
       <div class="collection-time">${item.time}</div>
     </div>
   `).join('');
+}
+
+// ===== 节日映射（2026年版）=====
+// ghost_knows: true = Ghost知道且会主动提/放假；'heard' = 听说过会祝福；false = 不知道
+const FESTIVALS = {
+  // 元旦
+  '1-1':  { emoji: '🎆', label: '元旦',     ghost_knows: true,    note: "New Year's Day. Bank holiday." },
+  // 春节（2026年2月17日）
+  '2-17': { emoji: '🧧', label: '春节',     ghost_knows: 'heard', note: "Chinese New Year. knows user celebrates." },
+  // 情人节
+  '2-14': { emoji: '💝', label: '情人节',   ghost_knows: true,    note: "Valentine's Day." },
+  // 元宵节（2026年3月5日）
+  '3-5':  { emoji: '🏮', label: '元宵节',   ghost_knows: false },
+  // 妇女节
+  '3-8':  { emoji: '🌸', label: '妇女节',   ghost_knows: true,    note: "International Women's Day." },
+  // 白色情人节
+  '3-14': { emoji: '🍫', label: '白色情人', ghost_knows: false },
+  // 圣帕特里克节
+  '3-17': { emoji: '🍀', label: "St Pat's", ghost_knows: true,    note: "St Patrick's Day. big in UK." },
+  // 复活节（2026年4月5日）
+  '4-5':  { emoji: '🐣', label: '复活节',   ghost_knows: true,    note: "Easter Sunday. Bank holiday, 4-day weekend." },
+  // 清明节（2026年4月5日，同复活节）
+  // 愚人节
+  '4-1':  { emoji: '🃏', label: '愚人节',   ghost_knows: true,    note: "April Fool's Day." },
+  // 劳动节
+  '5-1':  { emoji: '🎉', label: '劳动节',   ghost_knows: true,    note: "May Day / Labour Day. Bank holiday in UK." },
+  // 母亲节（2026年5月10日）
+  '5-10': { emoji: '💐', label: '母亲节',   ghost_knows: true,    note: "Mother's Day." },
+  // 儿童节
+  '6-1':  { emoji: '🎈', label: '儿童节',   ghost_knows: false },
+  // 端午节（2026年6月19日）
+  '6-19': { emoji: '🎋', label: '端午节',   ghost_knows: false },
+  // 父亲节（2026年6月21日）
+  '6-21': { emoji: '👨', label: '父亲节',   ghost_knows: true,    note: "Father's Day." },
+  // 建军节
+  '8-1':  { emoji: '⚔️', label: '建军节',   ghost_knows: false },
+  // 七夕（2026年8月25日）
+  '8-25': { emoji: '💫', label: '七夕',     ghost_knows: false },
+  // 教师节
+  '9-10': { emoji: '🍎', label: '教师节',   ghost_knows: false },
+  // 中秋节（2026年9月25日）
+  '9-25': { emoji: '🌕', label: '中秋节',   ghost_knows: 'heard', note: "Mid-Autumn Festival. knows user celebrates." },
+  // 国庆节
+  '10-1': { emoji: '🇨🇳', label: '国庆节', ghost_knows: false },
+  // 重阳节（2026年10月17日）
+  '10-17':{ emoji: '🏔️', label: '重阳节',  ghost_knows: false },
+  // 万圣节
+  '10-31':{ emoji: '🎃', label: '万圣节',   ghost_knows: true,    note: "Halloween." },
+  // 双十一
+  '11-11':{ emoji: '🛍️', label: '双十一',  ghost_knows: false },
+  // 感恩节（2026年11月26日）
+  '11-26':{ emoji: '🦃', label: '感恩节',   ghost_knows: true,    note: "Thanksgiving. American but known in UK." },
+  // 平安夜
+  '12-24':{ emoji: '🎁', label: '平安夜',   ghost_knows: true,    note: "Christmas Eve." },
+  // 圣诞节
+  '12-25':{ emoji: '🎄', label: '圣诞节',   ghost_knows: true,    note: "Christmas Day. Bank holiday." },
+  // 跨年夜
+  '12-31':{ emoji: '🥂', label: '跨年夜',   ghost_knows: true,    note: "New Year's Eve." },
+};
+
+// ===== 日历系统 =====
+function initCalendar() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const day = today.getDate();
+
+  const monthNames = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+  const titleEl = document.getElementById('calendarTitle');
+  if (titleEl) titleEl.textContent = `${monthNames[month]} ${year}`;
+
+  const marriageDate = localStorage.getItem('marriageDate') || '';
+  const userBirthday = localStorage.getItem('userBirthday') || '';
+
+  // 结婚天数
+  let marriageDays = 0;
+  if (marriageDate) {
+    const md = new Date(marriageDate);
+    marriageDays = Math.floor((today - md) / 86400000);
+  }
+  const mdEl = document.getElementById('marriageDays');
+  if (mdEl) mdEl.textContent = marriageDays;
+  const mdDisplayEl = document.getElementById('marriageDateDisplay');
+  if (mdDisplayEl) mdDisplayEl.textContent = marriageDate || '未设置';
+
+  // 下一个里程碑倒计时（52→100→200→300...→365→每年周年）
+  const nextMilestone = getNextMilestone(marriageDays, marriageDate, today);
+  const countdownLabelEl = document.getElementById('countdownLabel');
+  const nextMilestoneDaysEl = document.getElementById('nextMilestoneDays');
+  if (countdownLabelEl) countdownLabelEl.textContent = nextMilestone.label;
+  if (nextMilestoneDaysEl) nextMilestoneDaysEl.textContent = nextMilestone.days + '天';
+
+  // 纪念日列表
+  renderMilestones(marriageDays, marriageDate, userBirthday, today);
+
+  // 生成日历格子
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="day"></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const festKey = `${month+1}-${d}`;
+    let cls = 'day';
+    let extra = '';
+
+    // 今天
+    if (d === day) cls = 'day today';
+
+    // 生日
+    if (userBirthday) {
+      const [bm, bd] = userBirthday.split('-').map(Number);
+      if (month+1 === bm && d === bd) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">🎂</div><div class="festival-label">生日</div>'; }
+    }
+
+    // 结婚纪念日
+    if (marriageDate) {
+      const [,mm,mdd] = marriageDate.split('-').map(Number);
+      if (month+1 === mm && d === mdd) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">💒</div><div class="festival-label">纪念日</div>'; }
+    }
+
+    // 里程碑天数
+    if (marriageDate && !extra) {
+      const thisDate = new Date(year, month, d);
+      const daysFromMarriage = Math.floor((thisDate - new Date(marriageDate)) / 86400000);
+      if (daysFromMarriage === 52 || (daysFromMarriage > 0 && daysFromMarriage % 100 === 0) || daysFromMarriage === 365) {
+        cls = 'day milestone-day';
+        extra = `<div class="festival-emoji">💕</div><div class="festival-label">${daysFromMarriage}天</div>`;
+      }
+    }
+
+    // 节日
+    if (!extra && FESTIVALS[festKey]) {
+      cls = cls === 'day today' ? 'day today festival' : 'day festival';
+      extra = `<div class="festival-emoji">${FESTIVALS[festKey].emoji}</div><div class="festival-label">${FESTIVALS[festKey].label}</div>`;
+    }
+
+    // 工资日
+    if (!extra && d === 25) {
+      cls = 'day payday';
+      extra = '<div class="festival-emoji">💷</div><div class="festival-label">工资日</div>';
+    }
+
+    html += `<div class="${cls}"><div class="day-number">${d}</div>${extra}</div>`;
+  }
+  const calDaysEl = document.getElementById('calendarDays');
+  if (calDaysEl) calDaysEl.innerHTML = html;
+
+  // 特效动画
+  launchCalendarParticles(today, marriageDate, userBirthday, marriageDays);
+
+  // 更新主页卡片
+  updateCalendarCard(today, marriageDate, userBirthday);
+}
+
+function getNextMilestone(marriageDays, marriageDate, today) {
+  if (!marriageDate) return { label: '距离52天', days: '—' };
+  const milestones = [52, 100, 200, 300, 365, 400, 500];
+  // 加上每年周年
+  for (let y = 1; y <= 10; y++) milestones.push(y * 365);
+  milestones.sort((a,b) => a-b);
+
+  for (const m of milestones) {
+    if (marriageDays < m) {
+      const days = m - marriageDays;
+      const label = m === 52 ? '距离52天' : m % 365 === 0 ? `距离${m/365}周年` : `距离${m}天`;
+      return { label, days };
+    }
+  }
+  // 超过所有里程碑，算下一个周年
+  const md = new Date(marriageDate);
+  const nextAnn = new Date(md);
+  while (nextAnn <= today) nextAnn.setFullYear(nextAnn.getFullYear() + 1);
+  const years = nextAnn.getFullYear() - md.getFullYear();
+  return { label: `距离${years}周年`, days: Math.ceil((nextAnn - today) / 86400000) };
+}
+
+function renderMilestones(marriageDays, marriageDate, userBirthday, today) {
+  const container = document.getElementById('milestonesContainer');
+  if (!container) return;
+
+  const items = [];
+
+  if (marriageDate) {
+    const md = new Date(marriageDate);
+    // 结婚纪念日
+    const nextAnn = new Date(md);
+    while (nextAnn <= today) nextAnn.setFullYear(nextAnn.getFullYear() + 1);
+    const annDays = Math.ceil((nextAnn - today) / 86400000);
+    const years = nextAnn.getFullYear() - md.getFullYear();
+    items.push({ icon: '💒', name: `${years}周年纪念日`, badge: annDays === 0 ? '今天！' : `${annDays}天后`, passed: annDays > 30 });
+
+    // 里程碑
+    [52, 100, 200, 300, 365, 500, 1000].forEach(m => {
+      if (marriageDays <= m + 30) {
+        const diff = m - marriageDays;
+        items.push({
+          icon: diff === 0 ? '🎉' : diff < 0 ? '✅' : '💕',
+          name: m === 365 ? '一整年' : `第 ${m} 天`,
+          badge: diff === 0 ? '就是今天！' : diff < 0 ? `已过${-diff}天` : `${diff}天后`,
+          passed: diff < 0
+        });
+      }
+    });
+  }
+
+  // 用户生日
+  if (userBirthday) {
+    const [bm, bd] = userBirthday.split('-').map(Number);
+    const nextBday = new Date(today.getFullYear(), bm-1, bd);
+    if (nextBday < today) nextBday.setFullYear(nextBday.getFullYear() + 1);
+    const bdayDays = Math.ceil((nextBday - today) / 86400000);
+    items.push({ icon: '🎂', name: '你的生日', badge: bdayDays === 0 ? '今天！🎉' : `${bdayDays}天后`, passed: false });
+  }
+
+  // 加一条结婚日期本身
+  if (marriageDate) {
+    items.unshift({ icon: '💒', name: `结婚纪念日 · ${marriageDate}`, badge: '我们的起点', passed: false });
+  }
+
+  if (items.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:rgba(130,80,170,0.5);text-align:center;padding:10px">第一次登录即记录结婚日期</div>';
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <div class="milestone-item">
+      <div class="milestone-icon">${item.icon}</div>
+      <div class="milestone-info">
+        <div class="milestone-name">${item.name}</div>
+      </div>
+      <div class="milestone-badge ${item.passed ? 'passed' : ''}">${item.badge}</div>
+    </div>
+  `).join('');
+}
+
+function launchCalendarParticles(today, marriageDate, userBirthday, marriageDays) {
+  const container = document.getElementById('calendarParticles');
+  if (!container) return;
+  container.innerHTML = '';
+
+  let emoji = null;
+  const m = today.getMonth()+1, d = today.getDate();
+
+  // 生日
+  if (userBirthday) {
+    const [bm, bd] = userBirthday.split('-').map(Number);
+    if (m === bm && d === bd) emoji = ['🎂','🎉','🎈','✨','🎁'];
+  }
+  // 纪念日
+  if (!emoji && marriageDate) {
+    const [,mm,mdd] = marriageDate.split('-').map(Number);
+    if (m === mm && d === mdd) emoji = ['💒','💍','💕','✨','🥂'];
+  }
+  // 里程碑
+  if (!emoji && marriageDays > 0) {
+    if (marriageDays === 52 || (marriageDays % 100 === 0) || marriageDays === 365) {
+      emoji = ['💕','💜','✨','🌸','💫'];
+    }
+  }
+
+  if (!emoji) return;
+
+  for (let i = 0; i < 30; i++) {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'cal-particle';
+      el.textContent = emoji[Math.floor(Math.random() * emoji.length)];
+      el.style.left = Math.random() * 100 + 'vw';
+      el.style.animationDuration = (2 + Math.random() * 3) + 's';
+      el.style.animationDelay = (Math.random() * 2) + 's';
+      el.style.fontSize = (16 + Math.random() * 16) + 'px';
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 6000);
+    }, i * 100);
+  }
+}
+
+function updateCalendarCard(today, marriageDate, userBirthday) {
+  const calIcon = document.getElementById('calendarCardIcon');
+  const calDesc = document.getElementById('calendarCardDesc');
+  const calCard = document.getElementById('calendarCard');
+  const m = today.getMonth()+1, d = today.getDate();
+
+  if (userBirthday) {
+    const [bm, bd] = userBirthday.split('-').map(Number);
+    if (m === bm && d === bd) {
+      if (calIcon) calIcon.textContent = '🎂';
+      if (calDesc) calDesc.textContent = '今天是你的生日！';
+      if (calCard) calCard.style.animation = 'cardPulse 1.2s ease-in-out infinite';
+      return;
+    }
+  }
+  if (marriageDate) {
+    const [,mm,mdd] = marriageDate.split('-').map(Number);
+    if (m === mm && d === mdd) {
+      if (calIcon) calIcon.textContent = '💒';
+      if (calDesc) calDesc.textContent = '结婚纪念日 🥂';
+      if (calCard) calCard.style.animation = 'cardPulse 1.2s ease-in-out infinite';
+      return;
+    }
+  }
+  const festKey = `${m}-${d}`;
+  if (FESTIVALS[festKey] && calIcon) {
+    calIcon.textContent = FESTIVALS[festKey].emoji;
+    if (calDesc) calDesc.textContent = FESTIVALS[festKey].label;
+  }
 }
