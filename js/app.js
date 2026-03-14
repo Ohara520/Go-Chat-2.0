@@ -42,6 +42,15 @@ function startChat() {
 
 // ===== 初始化（调试模式：每次显示启动页）=====
 window.onload = function() {
+    // 检查冷战是否超时（页面关闭后重新打开）
+    if (localStorage.getItem('coldWarMode') === 'true') {
+        const coldStart = parseInt(localStorage.getItem('coldWarStart') || Date.now());
+        const elapsed = Date.now() - coldStart;
+        if (elapsed >= 3 * 60 * 60 * 1000) {
+            // 超过3小时，等进聊天页再触发道歉
+            localStorage.setItem('pendingGhostApology', 'true');
+        }
+    }
     document.querySelectorAll('.screen').forEach(s => {
         s.classList.remove('active');
         s.style.display = 'none';

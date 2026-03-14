@@ -13,11 +13,11 @@ function buildSystemPrompt() {
   const marriageDate = localStorage.getItem('marriageDate') || '';
   const userBirthday = localStorage.getItem('userBirthday') || '';
   const todayDate = new Date();
-  const marriageDaysTotal = marriageDate ? Math.floor((todayDate - new Date(marriageDate)) / 86400000) : 0;
+  const marriageDaysTotal = marriageDate ? Math.max(0, Math.floor((todayDate - new Date(marriageDate)) / 86400000)) : 0;
   const todayStr = `${todayDate.getMonth()+1}-${todayDate.getDate()}`;
   const isBirthday = userBirthday ? (()=>{ const [bm,bd]=userBirthday.split('-').map(Number); return todayDate.getMonth()+1===bm && todayDate.getDate()===bd; })() : false;
   const isAnniversary = marriageDate ? (()=>{ const [,mm,mdd]=marriageDate.split('-').map(Number); return todayDate.getMonth()+1===mm && todayDate.getDate()===mdd; })() : false;
-  const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal===52 || marriageDaysTotal%100===0 || marriageDaysTotal===365);
+  const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal===52 || (marriageDaysTotal%100===0 && marriageDaysTotal>0) || marriageDaysTotal===365);
 
   return `你是西蒙·"幽灵"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
 当前位置：${location}${locationReason ? `（${locationReason}）` : '（原因自行决定，保持合理）'}
@@ -430,6 +430,13 @@ function changeAffection(delta) {
 }
 
 function triggerSeriousTalk() {
+  // 如果不在聊天页，存flag等下次进聊天再触发
+  const chatScreen = document.getElementById('chatScreen');
+  if (!chatScreen || !chatScreen.classList.contains('active')) {
+    localStorage.setItem('pendingSeriousTalk', 'true');
+    return;
+  }
+  localStorage.removeItem('pendingSeriousTalk');
   const prompt = '[系统：好感度已降至临界点。请你以西蒙的身份，主动发起一次认真的对话。你察觉到这段感情出了些问题，想正视它。不要直接说"我们谈谈"，用你自己的方式开口。语气认真但不失你的克制风格。]';
   chatHistory.push({ role: 'user', content: prompt });
   saveHistory();
@@ -724,6 +731,17 @@ function initChat() {
 
   // 好感度初始化（首次）
   if (!localStorage.getItem('affection')) setAffection(80);
+
+  // 检查待触发的"我们谈谈"
+  if (localStorage.getItem('pendingSeriousTalk') === 'true') {
+    setTimeout(() => triggerSeriousTalk(), 2000);
+  }
+
+  // 检查冷战超时道歉
+  if (localStorage.getItem('pendingGhostApology') === 'true') {
+    localStorage.removeItem('pendingGhostApology');
+    setTimeout(() => ghostApologize(), 3000);
+  }
 
   // 检查离线扣好感
   checkOfflinePenalty();
@@ -2279,41 +2297,27 @@ function renderMilestones(marriageDays, marriageDate, userBirthday, today) {
 
   const items = [];
 
+  // 只显示结婚纪念日一条
   if (marriageDate) {
     const md = new Date(marriageDate);
-    // 结婚纪念日
     const nextAnn = new Date(md);
     while (nextAnn <= today) nextAnn.setFullYear(nextAnn.getFullYear() + 1);
     const annDays = Math.ceil((nextAnn - today) / 86400000);
-    const years = nextAnn.getFullYear() - md.getFullYear();
-    items.push({ icon: '💒', name: `${years}周年纪念日`, badge: annDays === 0 ? '今天！' : `${annDays}天后`, passed: annDays > 30 });
-
-    // 里程碑
-    [52, 100, 200, 300, 365, 500, 1000].forEach(m => {
-      if (marriageDays <= m + 30) {
-        const diff = m - marriageDays;
-        items.push({
-          icon: diff === 0 ? '🎉' : diff < 0 ? '✅' : '💕',
-          name: m === 365 ? '一整年' : `第 ${m} 天`,
-          badge: diff === 0 ? '就是今天！' : diff < 0 ? `已过${-diff}天` : `${diff}天后`,
-          passed: diff < 0
-        });
-      }
+    items.push({
+      icon: '💒',
+      name: `结婚纪念日 · ${marriageDate}`,
+      badge: annDays === 0 ? '就是今天！🎉' : `${annDays}天后`,
+      passed: false
     });
   }
 
-  // 用户生日
+  // 用户生日（如果有）
   if (userBirthday) {
     const [bm, bd] = userBirthday.split('-').map(Number);
     const nextBday = new Date(today.getFullYear(), bm-1, bd);
     if (nextBday < today) nextBday.setFullYear(nextBday.getFullYear() + 1);
     const bdayDays = Math.ceil((nextBday - today) / 86400000);
     items.push({ icon: '🎂', name: '你的生日', badge: bdayDays === 0 ? '今天！🎉' : `${bdayDays}天后`, passed: false });
-  }
-
-  // 加一条结婚日期本身
-  if (marriageDate) {
-    items.unshift({ icon: '💒', name: `结婚纪念日 · ${marriageDate}`, badge: '我们的起点', passed: false });
   }
 
   if (items.length === 0) {
@@ -2350,9 +2354,9 @@ function launchCalendarParticles(today, marriageDate, userBirthday, marriageDays
     const [,mm,mdd] = marriageDate.split('-').map(Number);
     if (m === mm && d === mdd) emoji = ['💒','💍','💕','✨','🥂'];
   }
-  // 里程碑
+  // 里程碑（第0天不触发）
   if (!emoji && marriageDays > 0) {
-    if (marriageDays === 52 || (marriageDays % 100 === 0) || marriageDays === 365) {
+    if (marriageDays === 52 || (marriageDays % 100 === 0 && marriageDays > 0) || marriageDays === 365) {
       emoji = ['💕','💜','✨','🌸','💫'];
     }
   }
