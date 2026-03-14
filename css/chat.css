@@ -698,50 +698,68 @@
     margin-right: 34px;
 }
 
+/* 花瓣 */
+.couple-petal-container {
+    position: absolute; inset: 0;
+    pointer-events: none; z-index: 999; overflow: hidden;
+}
+.couple-petal {
+    position: absolute; top: -20px;
+    animation: couplePetalFall linear forwards;
+    opacity: 0.85;
+}
+@keyframes couplePetalFall {
+    0%   { transform: translateY(0) rotate(0deg) translateX(0); opacity: 0.9; }
+    50%  { transform: translateY(400px) rotate(180deg) translateX(30px); opacity: 0.7; }
+    100% { transform: translateY(900px) rotate(360deg) translateX(-20px); opacity: 0; }
+}
+
 /* 封面 */
 .couple-cover-section {
-    position: relative; height: 210px; overflow: hidden;
-    margin: 0 16px; border-radius: 22px;
-    box-shadow: 0 8px 32px rgba(40,20,80,0.18);
+    margin: 12px 16px 0;
+    border-radius: 22px;
+    overflow: hidden;
+    background: linear-gradient(135deg,
+        rgba(220,180,255,0.55) 0%,
+        rgba(230,180,240,0.5) 40%,
+        rgba(255,180,210,0.5) 70%,
+        rgba(255,200,220,0.48) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.7);
+    box-shadow: 0 8px 32px rgba(180,100,220,0.15);
+    padding: 22px 20px 18px;
     flex-shrink: 0;
 }
-.couple-cover-scene {
-    position: absolute; inset: 0;
-    background: linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%);
+.couple-cover-top {
+    display: flex; align-items: center;
+    justify-content: center; gap: 22px;
+    margin-bottom: 20px;
 }
-.couple-rain { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.couple-raindrop {
-    position: absolute; width: 1px;
-    background: linear-gradient(to bottom, transparent, rgba(180,210,240,0.55));
-    animation: coupleRainFall linear infinite;
+.couple-cover-avatar {
+    width: 62px; height: 62px; border-radius: 50%;
+    background: rgba(255,255,255,0.45);
+    border: 2.5px solid rgba(255,255,255,0.85);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    box-shadow: 0 4px 18px rgba(180,100,220,0.2);
 }
-@keyframes coupleRainFall {
-    0% { transform: translateY(-20px); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 0.3; }
-    100% { transform: translateY(230px); opacity: 0; }
+.couple-cover-heart {
+    font-size: 26px;
+    animation: coverHb 1.8s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px rgba(255,100,150,0.5));
 }
-.couple-cover-overlay {
-    position: absolute; inset: 0;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.55) 100%);
-}
-.couple-cover-weather {
-    position: absolute; top: 13px; right: 13px;
-    background: rgba(0,0,0,0.38); backdrop-filter: blur(10px);
-    border-radius: 20px; padding: 5px 11px;
-    color: rgba(255,255,255,0.92); font-size: 12px;
-    display: flex; align-items: center; gap: 4px;
-    border: 1px solid rgba(255,255,255,0.1);
+@keyframes coverHb {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
 }
 .couple-cover-bottom {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    padding: 14px 16px 15px;
     display: flex; align-items: flex-end; justify-content: space-between;
 }
-.couple-cover-main { font-size: 17px; font-weight: 700; color: white; text-shadow: 0 1px 10px rgba(0,0,0,0.6); }
-.couple-cover-sub { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 3px; }
-.couple-days-num { font-size: 32px; font-weight: 800; color: white; line-height: 1; text-shadow: 0 1px 10px rgba(0,0,0,0.5); }
-.couple-days-label { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 2px; text-align: right; }
+.couple-cover-main { font-size: 16px; font-weight: 700; color: #3d1f66; letter-spacing: 0.3px; }
+.couple-cover-sub { font-size: 11px; color: rgba(100,50,160,0.55); margin-top: 3px; }
+.couple-days-num { font-size: 30px; font-weight: 800; color: #3d1f66; line-height: 1; }
+.couple-days-label { font-size: 11px; color: rgba(100,50,160,0.55); margin-top: 2px; text-align: right; }
 
 /* Feed区 */
 .couple-feed-section { padding: 14px 16px 80px; overflow-y: auto; flex: 1; }
@@ -794,7 +812,7 @@
 .couple-post-name { font-size: 14px; font-weight: 700; color: #4a2880; }
 .couple-post-time { font-size: 11px; color: #ccc; margin-top: 1px; }
 .couple-post-en { font-size: 14px; line-height: 1.65; color: #222; margin-bottom: 3px; }
-.couple-post-zh { font-size: 12px; line-height: 1.55; color: #bbb; margin-bottom: 6px; }
+.couple-post-zh { font-size: 12px; line-height: 1.55; color: #8a7a9a; margin-bottom: 6px; }
 .couple-post-sig { font-size: 12px; color: #b090c0; font-style: italic; margin-bottom: 10px; }
 .couple-divider { height: 1px; background: rgba(200,160,240,0.2); margin: 10px 0; }
 
@@ -821,7 +839,7 @@
 .couple-gaz-name   { color: #2d7a4a; }
 .couple-price-name { color: #7c4daa; }
 .couple-comment-en { font-size: 13px; color: #444; line-height: 1.4; }
-.couple-comment-zh { font-size: 11px; color: #bbb; margin-top: 1px; }
+.couple-comment-zh { font-size: 11px; color: #8a7a9a; margin-top: 1px; }
 .couple-reply-to { font-size: 11px; color: #c0a0d0; margin-bottom: 2px; }
 
 /* 点赞+底部 */

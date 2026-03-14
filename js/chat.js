@@ -329,7 +329,7 @@ function confirmTransfer() {
       model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       system: buildSystemPrompt(),
-      messages: chatHistory.slice(-20)
+      messages: chatHistory.slice(-30)
     })
   }).then(r => r.json()).then(data => {
     hideTyping();
@@ -511,7 +511,7 @@ async function sendMessage() {
         model: 'claude-sonnet-4-6',
         max_tokens: 1000,
         system: buildSystemPrompt(),
-        messages: chatHistory.slice(-20)
+        messages: chatHistory.slice(-30)
       })
     });
 
@@ -718,73 +718,15 @@ function initCoupleSpace() {
   const userName = localStorage.getItem('userName') || '你';
   const userAvatarEl = document.getElementById('coupleUserAvatar');
   if (userAvatarEl) userAvatarEl.textContent = userName.charAt(0).toUpperCase();
+  const coverUserEl = document.getElementById('coupleCoverUserAvatar');
+  if (coverUserEl) coverUserEl.textContent = userName.charAt(0).toUpperCase();
   const mentionEl = document.getElementById('coupleUserMention');
   if (mentionEl) mentionEl.textContent = `@${userName}`;
   const mentionZhEl = document.getElementById('coupleUserMentionZh');
   if (mentionZhEl) mentionZhEl.textContent = `@${userName}`;
 
-  // 天气badge
-  const weatherDisplay = localStorage.getItem('lastWeatherDisplay') || '';
-  const weatherBadge = document.getElementById('coupleWeatherBadge');
-  if (weatherBadge && weatherDisplay) weatherBadge.textContent = weatherDisplay;
-
-  // 天气背景联动
-  const weatherDesc = (localStorage.getItem('lastWeatherDesc') || '').toLowerCase();
-  const scene = document.querySelector('.couple-cover-scene');
-  if (scene) {
-    if (isRaining) {
-      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%)';
-    } else if (isNight) {
-      scene.style.background = 'linear-gradient(160deg, #1a1028 0%, #221535 40%, #1e1230 100%)';
-    } else if (isSunny) {
-      scene.style.background = 'linear-gradient(160deg, #4a2060 0%, #6b3490 30%, #8b4aaa 60%, #7a3a99 100%)';
-    } else {
-      scene.style.background = 'linear-gradient(160deg, #3a1a55 0%, #4d2870 35%, #5a3080 60%, #4a2568 100%)';
-    }
-  }
-
-  // 雨滴动画 + 天气背景联动
-  const rainEl = document.getElementById('coupleRain');
-  const scene = document.querySelector('.couple-cover-scene');
-  const isRaining = weatherDesc.includes('rain') || weatherDesc.includes('drizzle') || weatherDesc.includes('shower') || weatherDesc.includes('snow') || weatherDesc.includes('sleet');
-  const isSunny = weatherDesc.includes('sun') || weatherDesc.includes('clear');
-  const ukHour = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false });
-  const isNight = parseInt(ukHour) >= 22 || parseInt(ukHour) < 6;
-
-  if (scene) {
-    if (isNight) {
-      scene.style.background = 'linear-gradient(160deg, #0a0a1a 0%, #111128 40%, #0d0d22 100%)';
-    } else if (isRaining) {
-      scene.style.background = 'linear-gradient(160deg, #1a2535 0%, #2d3f52 30%, #3a4f3a 60%, #2a3a2a 100%)';
-    } else if (isSunny) {
-      scene.style.background = 'linear-gradient(160deg, #2a1a3a 0%, #3d2555 30%, #4a3560 50%, #3a2550 100%)';
-    } else {
-      scene.style.background = 'linear-gradient(160deg, #1e1e2e 0%, #2a2a3e 40%, #252535 100%)';
-    }
-  }
-
-  // 只有雨雪才有雨滴，夜晚有星星，晴天有光晕
-  if (rainEl) {
-    rainEl.innerHTML = '';
-    if (isRaining) {
-      for (let i = 0; i < 40; i++) {
-        const drop = document.createElement('div');
-        drop.className = 'couple-raindrop';
-        drop.style.cssText = `left:${Math.random()*100}%;height:${Math.random()*14+7}px;animation-duration:${Math.random()*0.7+0.45}s;animation-delay:${Math.random()*2.5}s;`;
-        rainEl.appendChild(drop);
-      }
-    } else if (isNight) {
-      for (let i = 0; i < 30; i++) {
-        const star = document.createElement('div');
-        star.style.cssText = `position:absolute;width:${Math.random()*2+1}px;height:${Math.random()*2+1}px;border-radius:50%;background:white;left:${Math.random()*100}%;top:${Math.random()*100}%;opacity:${Math.random()*0.6+0.2};animation:coupleTwinkle ${Math.random()*3+2}s ease-in-out infinite;animation-delay:${Math.random()*3}s;`;
-        rainEl.appendChild(star);
-      }
-    } else if (isSunny) {
-      const glow = document.createElement('div');
-      glow.style.cssText = `position:absolute;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle, rgba(255,200,100,0.18), transparent 70%);top:10%;right:15%;animation:coupleGlow 4s ease-in-out infinite;`;
-      rainEl.appendChild(glow);
-    }
-  }
+  // 花瓣动画
+  spawnCouplePetals();
 
   // 生成朋友圈feed
   generateCoupleFeed();
@@ -1062,4 +1004,26 @@ function getSassyPost() {
     }
     return data;
   } catch(e) { return null; }
+}
+
+// ===== 花瓣动画 =====
+function spawnCouplePetals() {
+  const container = document.getElementById('couplePetalContainer');
+  if (!container) return;
+  container.innerHTML = '';
+  const petals = ['🌸', '🌺', '💮', '🌷', '🌼'];
+  const count = 18;
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      p.className = 'couple-petal';
+      p.textContent = petals[Math.floor(Math.random() * petals.length)];
+      p.style.left = Math.random() * 100 + '%';
+      p.style.fontSize = (Math.random() * 8 + 10) + 'px';
+      p.style.animationDuration = (Math.random() * 2 + 2.5) + 's';
+      p.style.animationDelay = (Math.random() * 1.5) + 's';
+      container.appendChild(p);
+      setTimeout(() => p.remove(), 5000);
+    }, i * 80);
+  }
 }

@@ -190,6 +190,9 @@
   </div>
   <!-- 情侣空间 -->
   <div class="screen" id="coupleScreen">
+    <!-- 花瓣容器 -->
+    <div class="couple-petal-container" id="couplePetalContainer"></div>
+
     <div class="couple-page-header">
       <button class="couple-back-btn" onclick="openScreen('profileScreen')">‹</button>
       <div class="couple-page-title">情侣空间</div>
@@ -197,11 +200,11 @@
 
     <!-- 封面 -->
     <div class="couple-cover-section">
-      <div class="couple-cover-scene">
-        <div class="couple-rain" id="coupleRain"></div>
+      <div class="couple-cover-top">
+        <div class="couple-cover-avatar" id="coupleCoverGhostAvatar">👻</div>
+        <div class="couple-cover-heart">❤️</div>
+        <div class="couple-cover-avatar" id="coupleCoverUserAvatar">🌸</div>
       </div>
-      <div class="couple-cover-overlay"></div>
-      <div class="couple-cover-weather" id="coupleWeatherBadge">☁️ —</div>
       <div class="couple-cover-bottom">
         <div class="couple-cover-names">
           <div class="couple-cover-main" id="coupleCoverNames">Ghost & 你</div>
@@ -261,6 +264,7 @@
           <div class="couple-comment">
             <div class="couple-avatar couple-avatar-sm">👻</div>
             <div class="couple-comment-body">
+              <div class="couple-reply-to">↩ 回复 <span class="couple-price-name">Price</span></div>
               <div class="couple-comment-en">always.</div>
               <div class="couple-comment-zh">一直会。</div>
             </div>
