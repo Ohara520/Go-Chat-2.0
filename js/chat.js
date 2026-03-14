@@ -616,8 +616,7 @@ function confirmTransfer() {
     setBalance(getBalance() + amount);
     addTransaction({ icon: '↩️', name: '退款（网络错误）', amount: amount });
     renderWallet();
-    appendMessage('bot', '...
-[网络不太好，等一下。]');
+    appendMessage('bot', '...\n[网络不太好，等一下。]');
   });
 }
 
@@ -647,9 +646,7 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
   const now = new Date();
   const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
   if (noteText) {
-    const parts = noteText.split(/
----
-/).filter(p => p.trim());
+    const parts = noteText.split(/\n---\n/).filter(p => p.trim());
     if (parts.length > 1) {
       parts.forEach((p, i) => setTimeout(() => appendMessage('bot', p.trim()), i * 600));
     } else {
@@ -867,7 +864,7 @@ async function sendMessage() {
     const reply = data.content?.[0]?.text || '...';
     updateToRead();
 
-    const parts = reply.split(/\n---\n/).filter(p => p.trim());
+    const parts = reply.split('\n---\n').filter(p => p.trim());
 
     if (parts.length > 1) {
       for (let i = 0; i < parts.length; i++) {
@@ -1499,8 +1496,7 @@ const JOB_INFO = {
   study:    { emoji: '📚', name: '学习',  slackMsg: null },
   exercise: { emoji: '💪', name: '运动',  slackMsg: null },
   create:   { emoji: '🎨', name: '创作',  slackMsg: null },
-  slack:    { emoji: '😴', name: '摸鱼',  slackMsg: "...That didn't look like work. But fine.
-看起来不像在工作。但算了。" },
+  slack:    { emoji: '😴', name: '摸鱼',  slackMsg: null },
 };
 
 function selectJob(el) {
