@@ -789,6 +789,17 @@ function appendMessage(role, text, animate = true) {
     status.className = 'message-status';
     status.textContent = '已发送';
     contentDiv.appendChild(status);
+  } else {
+    // bot消息加收藏按钮
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+    const collectBtn = document.createElement('button');
+    collectBtn.className = 'message-action-btn';
+    collectBtn.textContent = '⭐';
+    collectBtn.title = '收藏';
+    collectBtn.onclick = function() { collectMessage(this); };
+    actions.appendChild(collectBtn);
+    contentDiv.appendChild(actions);
   }
 
   msgDiv.appendChild(contentDiv);
@@ -1935,4 +1946,72 @@ const SLACK_QUOTES = [
 
 function getSlackQuote() {
   return SLACK_QUOTES[Math.floor(Math.random() * SLACK_QUOTES.length)];
+}
+
+// ===== 收藏系统 =====
+function collectMessage(button) {
+  // 不收藏转账卡片
+  const msgEl = button.closest('.message');
+  if (msgEl && msgEl.querySelector('.transfer-card')) return;
+
+  const bubble = button.closest('.message-content')?.querySelector('.message-bubble');
+  if (!bubble) return;
+
+  // 取英文+中文全文
+  const enEl = bubble.querySelector('.bubble-en');
+  const zhEl = bubble.querySelector('.bubble-zh');
+  const messageText = enEl
+    ? (enEl.textContent + (zhEl ? '\n' + zhEl.textContent : ''))
+    : bubble.textContent;
+
+  const now = new Date();
+  const dateStr = now.getFullYear() + '-' +
+    String(now.getMonth()+1).padStart(2,'0') + '-' +
+    String(now.getDate()).padStart(2,'0');
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0');
+
+  // 存入localStorage
+  const collections = JSON.parse(localStorage.getItem('collections') || '[]');
+  collections.unshift({ text: messageText, time: dateStr + ' ' + timeStr });
+  localStorage.setItem('collections', JSON.stringify(collections));
+
+  // 更新收藏页面
+  renderCollectionScreen();
+
+  // 按钮反馈
+  button.textContent = '✓';
+  button.style.background = 'linear-gradient(135deg, #ba55d3, #ff6b9d)';
+  button.style.color = 'white';
+  setTimeout(() => {
+    button.textContent = '⭐';
+    button.style.background = '';
+    button.style.color = '';
+  }, 1500);
+
+  showToast('已收藏 ⭐');
+}
+
+function deleteCollection(el, index) {
+  const collections = JSON.parse(localStorage.getItem('collections') || '[]');
+  collections.splice(index, 1);
+  localStorage.setItem('collections', JSON.stringify(collections));
+  renderCollectionScreen();
+}
+
+function renderCollectionScreen() {
+  const container = document.getElementById('collectionList');
+  if (!container) return;
+  const collections = JSON.parse(localStorage.getItem('collections') || '[]');
+  if (collections.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:rgba(130,80,170,0.45);padding:40px 20px;font-size:13px;">还没有收藏 ⭐<br><span style=\'font-size:11px;opacity:0.7\'>点击消息下方的星星收藏</span></div>';
+    return;
+  }
+  container.innerHTML = collections.map((item, i) => `
+    <div class="collection-item">
+      <div class="collection-delete" onclick="deleteCollection(this, ${i})">✕</div>
+      <div class="collection-message">${item.text.replace(/\n/g, '<br>')}</div>
+      <div class="collection-time">${item.time}</div>
+    </div>
+  `).join('');
 }

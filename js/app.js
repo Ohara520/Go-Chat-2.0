@@ -12,7 +12,8 @@ function openScreen(id) {
     if (id === 'coupleScreen'   && typeof initCoupleSpace   === 'function') initCoupleSpace();
     if (id === 'walletScreen'   && typeof renderWallet      === 'function') renderWallet();
     if (id === 'workScreen'     && typeof updateWorkUI      === 'function') updateWorkUI();
-    if (id === 'vocabScreen'    && typeof renderVocabScreen === 'function') renderVocabScreen();
+    if (id === 'vocabScreen'       && typeof renderVocabScreen    === 'function') renderVocabScreen();
+    if (id === 'collectionScreen'  && typeof renderCollectionScreen === 'function') renderCollectionScreen();
 }
 
 function goBack() {
