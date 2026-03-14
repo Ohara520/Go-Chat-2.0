@@ -16,7 +16,7 @@ function buildSystemPrompt() {
   const marriageDaysTotal = marriageDate ? Math.max(0, Math.floor((todayDate - new Date(marriageDate)) / 86400000)) : 0;
   const todayStr = `${todayDate.getMonth()+1}-${todayDate.getDate()}`;
   const isBirthday = userBirthday ? (()=>{ const [bm,bd]=userBirthday.split('-').map(Number); return todayDate.getMonth()+1===bm && todayDate.getDate()===bd; })() : false;
-  const isAnniversary = marriageDate ? (()=>{ const [,mm,mdd]=marriageDate.split('-').map(Number); return todayDate.getMonth()+1===mm && todayDate.getDate()===mdd; })() : false;
+  const isAnniversary = (marriageDate && marriageDaysTotal >= 365) ? (()=>{ const [,mm,mdd]=marriageDate.split('-').map(Number); return todayDate.getMonth()+1===mm && todayDate.getDate()===mdd; })() : false;
   const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal===52 || (marriageDaysTotal%100===0 && marriageDaysTotal>0) || marriageDaysTotal===365);
 
   return `你是西蒙·"幽灵"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
@@ -2232,7 +2232,7 @@ function initCalendar() {
     // 结婚纪念日
     if (marriageDate) {
       const [,mm,mdd] = marriageDate.split('-').map(Number);
-      if (month+1 === mm && d === mdd) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">💒</div><div class="festival-label">纪念日</div>'; }
+      if (month+1 === mm && d === mdd) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">💍</div><div class="festival-label">纪念日</div>'; }
     }
 
     // 里程碑天数
@@ -2304,7 +2304,7 @@ function renderMilestones(marriageDays, marriageDate, userBirthday, today) {
     while (nextAnn <= today) nextAnn.setFullYear(nextAnn.getFullYear() + 1);
     const annDays = Math.ceil((nextAnn - today) / 86400000);
     items.push({
-      icon: '💒',
+      icon: '💍',
       name: `结婚纪念日 · ${marriageDate}`,
       badge: annDays === 0 ? '就是今天！🎉' : `${annDays}天后`,
       passed: false
@@ -2349,10 +2349,10 @@ function launchCalendarParticles(today, marriageDate, userBirthday, marriageDays
     const [bm, bd] = userBirthday.split('-').map(Number);
     if (m === bm && d === bd) emoji = ['🎂','🎉','🎈','✨','🎁'];
   }
-  // 纪念日
-  if (!emoji && marriageDate) {
+  // 纪念日（至少过一年才触发动画）
+  if (!emoji && marriageDate && marriageDays >= 365) {
     const [,mm,mdd] = marriageDate.split('-').map(Number);
-    if (m === mm && d === mdd) emoji = ['💒','💍','💕','✨','🥂'];
+    if (m === mm && d === mdd) emoji = ['💍','💕','✨','🥂','🌹'];
   }
   // 里程碑（第0天不触发）
   if (!emoji && marriageDays > 0) {
@@ -2396,7 +2396,7 @@ function updateCalendarCard(today, marriageDate, userBirthday) {
   if (marriageDate) {
     const [,mm,mdd] = marriageDate.split('-').map(Number);
     if (m === mm && d === mdd) {
-      if (calIcon) calIcon.textContent = '💒';
+      if (calIcon) calIcon.textContent = '💍';
       if (calDesc) calDesc.textContent = '结婚纪念日 🥂';
       if (calCard) calCard.style.animation = 'cardPulse 1.2s ease-in-out infinite';
       return;
