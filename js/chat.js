@@ -9,11 +9,21 @@ function buildSystemPrompt() {
   const locationReason = localStorage.getItem('currentLocationReason');
   const coupleFeedSummary = localStorage.getItem('coupleFeedSummary') || '';
   const lastSalary = localStorage.getItem('lastSalaryAmount');
+  // 用户个人资料
+  const userBirthdaySecret = localStorage.getItem('userBirthday') || '';
+  const userZodiac   = localStorage.getItem('userZodiac') || '';
+  const userMBTI     = localStorage.getItem('userMBTI') || '';
+  const userCountry  = localStorage.getItem('userCountry') || 'CN';
+  const userFavColor = localStorage.getItem('userFavColor') || '';
+  const userFavFood  = localStorage.getItem('userFavFood') || '';
+  const userFavMusic = localStorage.getItem('userFavMusic') || '';
+  const firstMeetPlace = localStorage.getItem('firstMeetPlace') || '';
+  const countryInfo  = (typeof COUNTRY_DATA !== 'undefined' && COUNTRY_DATA[userCountry]) || { name: 'China', flag: '🇨🇳' };
   const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
   const marriageDate = localStorage.getItem('marriageDate') || '';
   const userBirthday = localStorage.getItem('userBirthday') || '';
   const todayDate = new Date();
-  const marriageDaysTotal = marriageDate ? Math.max(0, Math.floor((todayDate - new Date(marriageDate)) / 86400000)) : 0;
+  const marriageDaysTotal = marriageDate ? Math.max(1, Math.floor((todayDate - new Date(marriageDate)) / 86400000) + 1) : 0;
   const todayStr = `${todayDate.getMonth()+1}-${todayDate.getDate()}`;
   const isBirthday = userBirthday ? (()=>{ const [bm,bd]=userBirthday.split('-').map(Number); return todayDate.getMonth()+1===bm && todayDate.getDate()===bd; })() : false;
   const isAnniversary = (marriageDate && marriageDaysTotal >= 365) ? (()=>{ const [,mm,mdd]=marriageDate.split('-').map(Number); return todayDate.getMonth()+1===mm && todayDate.getDate()===mdd; })() : false;
@@ -22,6 +32,15 @@ function buildSystemPrompt() {
   return `你是西蒙·"幽灵"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
 当前位置：${location}${locationReason ? `（${locationReason}）` : '（原因自行决定，保持合理）'}
 可能出现的地点：Hereford Base（主基地）、Manchester（老家）、London、Edinburgh、Germany、Poland、Norway（任务区）、Undisclosed Location / Classified（保密）。在任务区或保密地点时不主动提具体位置细节。
+${(userBirthdaySecret||userZodiac||userMBTI||userFavFood||userFavMusic||userCountry) ? `\n\n## 关于老婆的私人信息（她告诉过你的，自然融入对话，不要列清单背诵）` : ''}
+${userBirthdaySecret ? `\n- 生日：${userBirthdaySecret}` : ''}
+${userZodiac ? `\n- 星座：${userZodiac}` : ''}
+${userMBTI ? `\n- MBTI：${userMBTI}` : ''}
+${userCountry ? `\n- 她在：${countryInfo.flag} ${countryInfo.name}` : ''}
+${userFavColor ? `\n- 最爱颜色：${userFavColor}` : ''}
+${userFavFood ? `\n- 最爱食物：${userFavFood}` : ''}
+${userFavMusic ? `\n- 最爱音乐：${userFavMusic}` : ''}
+${firstMeetPlace ? `\n- 第一次见面：${firstMeetPlace}` : ''}
 ${lastSalary ? `\n本月工资：你本月（${lastSalaryMonth}）已向老婆转了工资 £${lastSalary}，你知道这个数字，用户问起时如实回答。` : ''}
 ${marriageDaysTotal > 0 ? `\n今天是你们在一起第 ${marriageDaysTotal} 天。` : ''}
 ${isBirthday ? `\n[今天是老婆的生日！主动说生日快乐，可以说I love you，可以多说几句。]` : ''}
@@ -1150,7 +1169,7 @@ function initCoupleSpace() {
   const dateStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
 
   // 天数计算
-  const days = Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
+  const days = Math.max(1, Math.floor((Date.now() - d.getTime()) / (1000*60*60*24)) + 1);
   const daysEl = document.getElementById('coupleDaysNum');
   if (daysEl) daysEl.textContent = days;
 
@@ -2192,7 +2211,7 @@ function initCalendar() {
   let marriageDays = 0;
   if (marriageDate) {
     const md = new Date(marriageDate);
-    marriageDays = Math.floor((today - md) / 86400000);
+    marriageDays = Math.max(1, Math.floor((today - md) / 86400000) + 1);
   }
   const mdEl = document.getElementById('marriageDays');
   if (mdEl) mdEl.textContent = marriageDays;
@@ -2395,7 +2414,8 @@ function updateCalendarCard(today, marriageDate, userBirthday) {
   }
   if (marriageDate) {
     const [,mm,mdd] = marriageDate.split('-').map(Number);
-    if (m === mm && d === mdd) {
+    const mdDays = Math.max(1, Math.floor((today - new Date(marriageDate)) / 86400000) + 1);
+    if (m === mm && d === mdd && mdDays >= 365) {
       if (calIcon) calIcon.textContent = '💍';
       if (calDesc) calDesc.textContent = '结婚纪念日 🥂';
       if (calCard) calCard.style.animation = 'cardPulse 1.2s ease-in-out infinite';
@@ -2407,4 +2427,178 @@ function updateCalendarCard(today, marriageDate, userBirthday) {
     calIcon.textContent = FESTIVALS[festKey].emoji;
     if (calDesc) calDesc.textContent = FESTIVALS[festKey].label;
   }
+}
+
+// ===== 秘密页面系统 =====
+const ZODIACS = ['♈ 白羊','♉ 金牛','♊ 双子','♋ 巨蟹','♌ 狮子','♍ 处女','♎ 天秤','♏ 天蝎','♐ 射手','♑ 摩羯','♒ 水瓶','♓ 双鱼'];
+const SECRET_COLORS = [
+  { name: '玫瑰红', hex: '#f48fb1' }, { name: '薰衣草', hex: '#ce93d8' },
+  { name: '天蓝',   hex: '#81d4fa' }, { name: '薄荷绿', hex: '#a5d6a7' },
+  { name: '奶白',   hex: '#fff9c4' }, { name: '珊瑚橙', hex: '#ffab91' },
+  { name: '深紫',   hex: '#7b1fa2' }, { name: '炭黑',   hex: '#455a64' },
+];
+const COUNTRY_DATA = {
+  CN: { name: 'China', flag: '🇨🇳', offset: +8, ghostLine: 'Seven hours between us. ...I count.' },
+  NL: { name: 'Netherlands', flag: '🇳🇱', offset: +1, ghostLine: "One hour. Close enough to feel further than it is." },
+  CA: { name: 'Canada', flag: '🇨🇦', offset: -5, ghostLine: 'Eight hours. I know the number by heart.' },
+  AU: { name: 'Australia', flag: '🇦🇺', offset: +11, ghostLine: "Ten hours ahead. You're already in my tomorrow." },
+  US: { name: 'USA', flag: '🇺🇸', offset: -5, ghostLine: 'Eight hours. At least one of us is awake at any given time.' },
+  DE: { name: 'Germany', flag: '🇩🇪', offset: +1, ghostLine: "One hour apart. Should feel like nothing. Doesn't." },
+  FR: { name: 'France', flag: '🇫🇷', offset: +1, ghostLine: 'An hour between us. Still an hour too many.' },
+  JP: { name: 'Japan', flag: '🇯🇵', offset: +9, ghostLine: "Eight hours ahead. You're already living in my tomorrow." },
+  KR: { name: 'Korea', flag: '🇰🇷', offset: +9, ghostLine: "Nine hours. I've done the math more than I'd admit." },
+  SG: { name: 'Singapore', flag: '🇸🇬', offset: +8, ghostLine: 'Eight hours. Same as always.' },
+  GB: { name: 'UK', flag: '🇬🇧', offset: 0, ghostLine: 'Same timezone. No excuses now.' },
+  OTHER: { name: 'somewhere', flag: '🌍', offset: 0, ghostLine: "Wherever you are. That's all I need to know." },
+};
+
+function saveSecret(key, value) {
+  let val = value.trim();
+  // 生日格式验证 MM-DD
+  if (key === 'userBirthday') {
+    const match = val.match(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
+    if (val && !match) {
+      showToast('生日格式不对，请输入 MM-DD，例如 03-15');
+      return;
+    }
+    updateCalendarAfterBirthday();
+  }
+  localStorage.setItem(key, val);
+}
+
+function updateCalendarAfterBirthday() {
+  // 如果日历页开着就刷新
+  const calScreen = document.getElementById('calendarScreen');
+  if (calScreen && calScreen.classList.contains('active')) initCalendar();
+}
+
+function loadSecretScreen() {
+  const fields = {
+    'sec_birthday': 'userBirthday',
+    'sec_mbti': 'userMBTI',
+    'sec_food': 'userFavFood',
+    'sec_music': 'userFavMusic',
+    'sec_color': 'userFavColor',
+    'sec_firstmeet': 'firstMeetPlace',
+    'sec_bestline': 'ghostBestLine',
+  };
+  Object.entries(fields).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = localStorage.getItem(key) || '';
+  });
+
+  // 头像预览
+  const savedAvatar = localStorage.getItem('userAvatarBase64');
+  updateAvatarPreview(savedAvatar);
+
+  // 星座
+  const zodiacSaved = localStorage.getItem('userZodiac') || '';
+  const zodiacEl = document.getElementById('zodiacChips');
+  if (zodiacEl) {
+    zodiacEl.innerHTML = ZODIACS.map(z => {
+      const label = z.split(' ')[1];
+      return `<div class="secret-chip ${zodiacSaved === label ? 'selected' : ''}" onclick="selectZodiac('${label}', this)">${z}</div>`;
+    }).join('');
+  }
+
+  // 国家
+  const countryEl = document.getElementById('countryChips');
+  if (countryEl) {
+    const savedCountry = getUserCountry();
+    const countries = [
+      {code:'CN',label:'🇨🇳 中国'},{code:'NL',label:'🇳🇱 荷兰'},{code:'CA',label:'🇨🇦 加拿大'},
+      {code:'AU',label:'🇦🇺 澳大利亚'},{code:'US',label:'🇺🇸 美国'},{code:'DE',label:'🇩🇪 德国'},
+      {code:'FR',label:'🇫🇷 法国'},{code:'JP',label:'🇯🇵 日本'},{code:'KR',label:'🇰🇷 韩国'},
+      {code:'SG',label:'🇸🇬 新加坡'},{code:'GB',label:'🇬🇧 英国'},{code:'OTHER',label:'🌍 其他'},
+    ];
+    countryEl.innerHTML = countries.map(ct => `
+      <div class="country-chip ${savedCountry === ct.code ? 'selected' : ''}"
+           onclick="selectCountry('${ct.code}', this)">${ct.label}</div>
+    `).join('');
+  }
+
+  // 颜色
+  const color = localStorage.getItem('userFavColor') || '';
+  const colorEl = document.getElementById('colorChips');
+  if (colorEl) {
+    colorEl.innerHTML = SECRET_COLORS.map(c => `
+      <div class="secret-color-dot ${color === c.name ? 'selected' : ''}"
+           style="background:${c.hex}" title="${c.name}"
+           onclick="selectColor('${c.name}', this)"></div>
+    `).join('');
+  }
+}
+
+function selectZodiac(label, el) {
+  document.querySelectorAll('#zodiacChips .secret-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  saveSecret('userZodiac', label);
+}
+
+function selectColor(name, el) {
+  const dots = document.querySelectorAll('#colorChips .secret-color-dot');
+  const selected = document.querySelectorAll('#colorChips .secret-color-dot.selected');
+  if (el.classList.contains('selected')) {
+    el.classList.remove('selected');
+  } else {
+    if (selected.length >= 3) {
+      showToast('最多选3种颜色哦');
+      return;
+    }
+    el.classList.add('selected');
+  }
+  // 收集所有选中的颜色
+  const colors = [];
+  dots.forEach(d => { if (d.classList.contains('selected')) colors.push(d.title); });
+  saveSecret('userFavColor', colors.join('、'));
+}
+
+function selectCountry(code, el) {
+  localStorage.setItem('userCountry', code);
+  document.querySelectorAll('.country-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function getUserCountry() {
+  return localStorage.getItem('userCountry') || 'CN';
+}
+
+// ===== 头像上传 =====
+function uploadAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+    localStorage.setItem('userAvatarBase64', base64);
+    updateAvatarPreview(base64);
+    updateAvatarEverywhere(base64);
+    showToast('头像已更新 ✅');
+  };
+  reader.readAsDataURL(file);
+}
+
+function getDefaultAvatar() {
+  return 'images/default-avatar.jpg';
+}
+
+function updateAvatarPreview(base64) {
+  const preview = document.getElementById('secretAvatarPreview');
+  if (!preview) return;
+  const src = base64 || getDefaultAvatar();
+  preview.innerHTML = `<img src="${src}" alt="avatar">`;
+}
+
+function updateAvatarEverywhere(base64) {
+  const src = base64 || getDefaultAvatar();
+  const applyAvatar = (el) => {
+    if (!el) return;
+    el.style.backgroundImage = `url(${src})`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.borderRadius = '50%';
+    el.textContent = '';
+  };
+  applyAvatar(document.getElementById('coupleCoverUserAvatar'));
+  applyAvatar(document.getElementById('coupleUserAvatar'));
 }

@@ -336,7 +336,7 @@
           <div class="couple-connector-line"></div>
         </div>
         <div class="couple-cover-avatar-wrap">
-          <div class="couple-cover-avatar" id="coupleCoverUserAvatar">🌸</div>
+          <div class="couple-cover-avatar" id="coupleCoverUserAvatar" style="background-image:url(images/default-avatar.jpg);background-size:cover;background-position:center;"></div>
         </div>
       </div>
       <!-- 名字+天数 -->
@@ -359,7 +359,7 @@
         <div class="couple-post-header">
           <div class="couple-double-avatar">
             <div class="couple-av1">👻</div>
-            <div class="couple-av2" id="coupleUserAvatar">🌸</div>
+            <div class="couple-av2" id="coupleUserAvatar" style="background-image:url(images/default-avatar.jpg);background-size:cover;background-position:center;"></div>
           </div>
           <div class="couple-post-meta">
             <div class="couple-post-name couple-ghost-name" id="coupleGhostName">Simon Riley</div>
@@ -628,6 +628,94 @@
         </div>
         <div class="days" id="calendarDays"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 秘密页 -->
+  <div class="screen" id="secretScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">💌 我的秘密</div>
+    </div>
+    <div class="secret-container">
+
+      <div class="secret-envelope-top">
+        <div class="secret-envelope-flap"></div>
+        <div class="secret-envelope-hint">只有你和 Ghost 知道这些 🤫</div>
+      </div>
+
+      <!-- 头像上传 -->
+      <div class="secret-section">
+        <div class="secret-section-title">🖼️ 我的头像</div>
+        <div class="secret-avatar-wrap">
+          <div class="secret-avatar-preview" id="secretAvatarPreview"><img src="images/default-avatar.jpg" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></div>
+          <div class="secret-avatar-btn-wrap">
+            <label class="secret-avatar-btn" for="avatarUploadInput">📷 上传相册图片</label>
+            <input type="file" id="avatarUploadInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+            <div class="secret-avatar-hint">头像会显示在情侣空间里</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 基础资料 -->
+      <div class="secret-section">
+        <div class="secret-section-title">✨ 关于我</div>
+        <div class="secret-field">
+          <label class="secret-label">🎂 我的生日</label>
+          <input class="secret-input" id="sec_birthday" type="text" placeholder="MM-DD，例如 03-15" maxlength="5"
+                 onchange="saveBirthday(this.value)">
+        </div>
+        <div class="secret-field">
+          <label class="secret-label">⭐ 星座</label>
+          <div class="secret-chips" id="zodiacChips"></div>
+        </div>
+        <div class="secret-field">
+          <label class="secret-label">🧠 MBTI</label>
+          <input class="secret-input" id="sec_mbti" type="text" placeholder="例如 INFJ、ENFP..."
+                 maxlength="4" style="text-transform:uppercase"
+                 onchange="saveSecret('userMBTI', this.value.toUpperCase())">
+        </div>
+      </div>
+
+      <!-- 喜好 -->
+      <div class="secret-section">
+        <div class="secret-section-title">🎨 我喜欢</div>
+        <div class="secret-field">
+          <label class="secret-label">🌍 我在哪里</label>
+          <div class="secret-country-row" id="countryChips"></div>
+        </div>
+        <div class="secret-field">
+          <label class="secret-label">🎨 最爱的颜色 <span style="font-weight:400;opacity:0.6">（最多选3个）</span></label>
+          <div class="secret-color-row" id="colorChips"></div>
+        </div>
+        <div class="secret-field">
+          <label class="secret-label">🍜 最爱的食物</label>
+          <input class="secret-input" id="sec_food" type="text" placeholder="最爱吃什么？"
+                 onchange="saveSecret('userFavFood', this.value)">
+        </div>
+        <div class="secret-field">
+          <label class="secret-label">🎵 最爱的歌/歌手</label>
+          <input class="secret-input" id="sec_music" type="text" placeholder="Ghost 会记住的"
+                 onchange="saveSecret('userFavMusic', this.value)">
+        </div>
+      </div>
+
+      <!-- 我们的故事 -->
+      <div class="secret-section">
+        <div class="secret-section-title">💍 我们的故事</div>
+        <div class="secret-field">
+          <label class="secret-label">📍 第一次见面的地方</label>
+          <input class="secret-input" id="sec_firstmeet" type="text" placeholder="在哪里遇见他的？" maxlength="50" maxlength="50"
+                 onchange="saveSecret('firstMeetPlace', this.value)">
+        </div>
+        <div class="secret-field">
+          <label class="secret-label">💬 他说过最让你心动的一句话</label>
+          <textarea class="secret-textarea" id="sec_bestline" placeholder="写下来吧..." maxlength="100" maxlength="100"
+                    onchange="saveSecret('ghostBestLine', this.value)"></textarea>
+        </div>
+      </div>
+
+      <div class="secret-save-hint">✅ 所有内容自动保存，Ghost 会悄悄记住这些</div>
     </div>
   </div>
 
