@@ -16,6 +16,7 @@ function openScreen(id) {
     if (id === 'collectionScreen'  && typeof renderCollectionScreen === 'function') renderCollectionScreen();
     if (id === 'calendarScreen'     && typeof initCalendar           === 'function') initCalendar();
     if (id === 'secretScreen'       && typeof loadSecretScreen        === 'function') loadSecretScreen();
+    if (id === 'marketScreen'       && typeof initMarket             === 'function') { initMarket(); checkDeliveryUpdates(); }
 }
 
 function goBack() {
@@ -43,6 +44,12 @@ function startChat() {
 
 // ===== 初始化 =====
 window.onload = function() {
+    // 快递进度检查（每5分钟）
+    if (typeof checkDeliveryUpdates === 'function') {
+        checkDeliveryUpdates();
+        setInterval(checkDeliveryUpdates, 5 * 60 * 1000);
+    }
+
     // 恢复用户头像
     const savedAvatar = localStorage.getItem('userAvatarBase64');
     if (savedAvatar && typeof updateAvatarEverywhere === 'function') {

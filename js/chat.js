@@ -868,16 +868,27 @@ function appendMessage(role, text, animate = true) {
     status.textContent = '已发送';
     contentDiv.appendChild(status);
   } else {
-    // bot消息加收藏按钮
+    // bot消息：点击气泡才显示收藏按钮
     const actions = document.createElement('div');
     actions.className = 'message-actions';
+    actions.style.display = 'none';
     const collectBtn = document.createElement('button');
     collectBtn.className = 'message-action-btn';
     collectBtn.textContent = '⭐';
     collectBtn.title = '收藏';
-    collectBtn.onclick = function() { collectMessage(this); };
+    collectBtn.onclick = function(e) { e.stopPropagation(); collectMessage(this); };
     actions.appendChild(collectBtn);
     contentDiv.appendChild(actions);
+
+    // 点击气泡显示/隐藏收藏按钮
+    bubble.style.cursor = 'pointer';
+    bubble.onclick = function(e) {
+      // 隐藏其他所有收藏按钮
+      document.querySelectorAll('.message-actions').forEach(a => {
+        if (a !== actions) a.style.display = 'none';
+      });
+      actions.style.display = actions.style.display === 'none' ? 'flex' : 'none';
+    };
   }
 
   msgDiv.appendChild(contentDiv);
@@ -1012,6 +1023,10 @@ async function sendMessage() {
     chatHistory.push({ role: 'assistant', content: reply });
     saveHistory();
     checkSassyPost(text, reply);
+    // 合并触发：商城高亮+情绪反寄（一次Haiku）
+    checkTriggersAndEmotion(text, reply);
+    // 快递遗失赔偿检测
+    handleLostPackageClaim(text);
 
   } catch (err) {
     hideTyping();
@@ -2068,19 +2083,28 @@ function getSlackQuote() {
 
 // ===== 收藏系统 =====
 function collectMessage(button) {
-  // 不收藏转账卡片
   const msgEl = button.closest('.message');
   if (msgEl && msgEl.querySelector('.transfer-card')) return;
 
   const bubble = button.closest('.message-content')?.querySelector('.message-bubble');
   if (!bubble) return;
 
-  // 取英文+中文全文
   const enEl = bubble.querySelector('.bubble-en');
   const zhEl = bubble.querySelector('.bubble-zh');
   const messageText = enEl
     ? (enEl.textContent + (zhEl ? '\n' + zhEl.textContent : ''))
     : bubble.textContent;
+
+  // 检查是否已收藏
+  const collections = JSON.parse(localStorage.getItem('collections') || '[]');
+  const alreadyCollected = collections.some(c => c.text === messageText);
+  if (alreadyCollected) {
+    showToast('已经收藏过了 ⭐');
+    // 按钮隐藏
+    const actions = button.closest('.message-actions');
+    if (actions) setTimeout(() => { actions.style.display = 'none'; }, 800);
+    return;
+  }
 
   const now = new Date();
   const dateStr = now.getFullYear() + '-' +
@@ -2089,15 +2113,11 @@ function collectMessage(button) {
   const timeStr = String(now.getHours()).padStart(2,'0') + ':' +
     String(now.getMinutes()).padStart(2,'0');
 
-  // 存入localStorage
-  const collections = JSON.parse(localStorage.getItem('collections') || '[]');
   collections.unshift({ text: messageText, time: dateStr + ' ' + timeStr });
   localStorage.setItem('collections', JSON.stringify(collections));
-
-  // 更新收藏页面
   renderCollectionScreen();
 
-  // 按钮反馈
+  // 按钮反馈：✓出现后消失，整个actions隐藏
   button.textContent = '✓';
   button.style.background = 'linear-gradient(135deg, #ba55d3, #ff6b9d)';
   button.style.color = 'white';
@@ -2105,6 +2125,8 @@ function collectMessage(button) {
     button.textContent = '⭐';
     button.style.background = '';
     button.style.color = '';
+    const actions = button.closest('.message-actions');
+    if (actions) actions.style.display = 'none';
   }, 1500);
 
   showToast('已收藏 ⭐');
@@ -2601,4 +2623,787 @@ function updateAvatarEverywhere(base64) {
   };
   applyAvatar(document.getElementById('coupleCoverUserAvatar'));
   applyAvatar(document.getElementById('coupleUserAvatar'));
+}
+
+// ===== 商城系统 =====
+const MARKET_CATEGORIES = [
+  { id: 'clothing', label: '👕 服装' },
+  { id: 'food',     label: '🍫 食品' },
+  { id: 'gift',     label: '🎁 特别礼物' },
+  { id: 'luxury',   label: '💎 精品专柜' },
+  { id: 'wishlist', label: '💝 我的心愿' },
+];
+
+const MARKET_PRODUCTS = {
+  clothing: [
+    { emoji: '🧥', name: '羊毛大衣',   desc: '英伦风格羊毛大衣，曼城冬天必备', price: 85,  shipping: 15, lostReplace: { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: 'Ghost挑的，低调质感' } },
+    { emoji: '🧤', name: '毛线手套',   desc: '柔软保暖，适合在营地的他',        price: 22,  shipping: 15 },
+    { emoji: '🎩', name: '英伦绅士帽', desc: '经典圆顶礼帽，Ghost 专属风格',    price: 48,  shipping: 15 },
+    { emoji: '🧣', name: '格纹围巾',   desc: '苏格兰格纹，温暖又好看',          price: 35,  shipping: 15 },
+    { emoji: '🥾', name: '军靴',       desc: '结实耐穿的战术靴，任务首选',      price: 120, shipping: 15 },
+    { emoji: '🧦', name: '厚羊毛袜',   desc: '英国本地羊毛，超级暖和',          price: 15,  shipping: 15 },
+    { emoji: '🕶️', name: '墨镜',       desc: 'Ghost 标配，低调又帅气',          price: 68,  shipping: 15 },
+    { emoji: '🧤', name: '皮手套',     desc: '棕色皮质，英伦绅士风',            price: 55,  shipping: 15 },
+  ],
+  food: [
+    { emoji: '🍵', name: '英式早餐茶罐',       desc: '精美铁罐装，50包正宗 Yorkshire 红茶', price: 18, shipping: 15 },
+    { emoji: '🍫', name: 'Cadbury 巧克力礼盒', desc: '英国国民巧克力，密封礼盒装',          price: 22, shipping: 15 },
+    { emoji: '🍯', name: '苏格兰蜂蜜罐',       desc: '山区野花蜂蜜，玻璃密封罐装',          price: 25, shipping: 15 },
+    { emoji: '🍪', name: '黄油饼干礼盒',       desc: '英式铁罐装黄油饼干，保质一年',         price: 20, shipping: 15 },
+    { emoji: '🥃', name: '苏格兰威士忌',       desc: '单一麦芽，12年陈酿，送给他解压',       price: 65, shipping: 15 },
+    { emoji: '🍵', name: 'Earl Grey 伯爵茶',   desc: '佛手柑香气，精美礼盒装',              price: 28, shipping: 15 },
+    { emoji: '🍓', name: '草莓果酱礼盒',       desc: '英式手工果酱套装，三种口味',           price: 32, shipping: 15 },
+    { emoji: '🍫', name: '松露巧克力盒',       desc: '比利时手工松露，礼盒密封装',           price: 45, shipping: 15 },
+  ],
+  gift: [
+    { emoji: '💮', name: '永生玫瑰',    desc: '真花处理工艺，永不凋谢的爱意',    price: 88,  shipping: 15, lostReplace: { emoji: '🌹', name: '玫瑰香氛礼盒', desc: 'Ghost补寄的，换了形式但一样的心意' } },
+    { emoji: '🕯️', name: '香薰蜡烛',   desc: '玫瑰+雪松香，为他的营地添温暖',   price: 35,  shipping: 15 },
+    { emoji: '🖼️', name: '定制相框',    desc: '放上你们最美的合影，永久保存',    price: 45,  shipping: 15 },
+    { emoji: '💌', name: '手写信封套装', desc: '复古英式信纸，写下最深的思念',    price: 18,  shipping: 15 },
+    { emoji: '🎵', name: '音乐盒',      desc: '播放你们专属的那首歌',            price: 68,  shipping: 15 },
+    { emoji: '💎', name: '情侣吊坠',    desc: '925银，两颗心拼在一起的设计',    price: 120, shipping: 15 },
+    { emoji: '🧴', name: '男士护肤套装', desc: '让他好好保养自己，你看着放心',   price: 85,  shipping: 15 },
+    { emoji: '📖', name: '皮质笔记本',  desc: '让他把思念和秘密都写下来',        price: 38,  shipping: 15 },
+  ],
+  luxury: [
+    { emoji: '💍', name: 'Tiffany & Co. 项链', desc: '925纯银蝴蝶结项链，经典款', price: 2800, shipping: 35, isUserItem: true, lostReplace: { emoji: '💍', name: '名牌项链/戒指', desc: 'Ghost自己挑的，换了牌子但更合你' } },
+    { emoji: '🧥', name: 'Burberry 风衣', desc: '经典格纹衬里，英伦标志', price: 1650, shipping: 35, isUserItem: true, lostReplace: { emoji: '🧥', name: '名牌马甲/外套', desc: 'Ghost补寄，他亲自选的款式' } },
+    { emoji: '💄', name: 'La Mer 护肤礼盒', desc: '海蓝之谜限定套装，面霜+精华', price: 680, shipping: 35, isUserItem: true, lostReplace: { emoji: '💆', name: '昂贵面霜/面膜套装', desc: 'Ghost说护肤不能断' } },
+    { emoji: '🌹', name: '999朵永生玫瑰礼盒', desc: '永不凋谢的玫瑰，红色，像你一样固执', price: 1280, shipping: 35, isUserItem: true, lostReplace: { emoji: '🌸', name: '玫瑰香氛/玫瑰标本', desc: 'Ghost补的，不会再丢了' } },
+    { emoji: '✈️', name: '头等舱机票升级', desc: '先买去曼城的机票才能升级', price: 3200, shipping: 0, isUserItem: true, noLost: true, requiresItem: '去曼城找他的机票' },
+    { emoji: '💎', name: 'Cartier 戒指（情侣款）', desc: 'Love系列，你戴一枚，他戴一枚', price: 5800, shipping: 35, isUserItem: true, lostReplace: { emoji: '🎖️', name: '定制军牌', desc: 'Ghost刻了两个人的名字' } },
+    { emoji: '⌚', name: 'Rolex 劳力士（送 Ghost）', desc: 'Submariner 潜航者，他不会承认自己喜欢', price: 8500, shipping: 35, isGhostGift: true, lostReplace: { emoji: '👜', name: '名牌包包', desc: 'Ghost说抱歉，补了一个' } },
+    { emoji: '🥃', name: 'Macallan 18年威士忌礼盒', desc: '麦卡伦18年单一麦芽，限量礼盒装', price: 420, shipping: 35, isGhostGift: true, lostReplace: { emoji: '🏮', name: '燕窝/昂贵花茶', desc: 'Ghost说换点对你有用的' } },
+    { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: '英国经典户外品牌，低调有质感', price: 380, shipping: 35, isGhostGift: true },
+    { emoji: '📷', name: '徕卡相机', desc: '记录生活每一帧，Ghost亲选', price: 6800, shipping: 35, isGhostGift: true },
+    { emoji: '🪒', name: 'Tom Ford 剃须套装', desc: '低调有质感，让他好好保养', price: 180, shipping: 35, isGhostGift: true },
+  ],
+  wishlist: [
+    { emoji: '💄', name: '口红套装',       desc: '犒劳一下自己，你值得最美的颜色', price: 180,  badge: '精致女孩',   ghostMsg: 'Send me a picture. Now.\n发照片给我。现在。' },
+    { emoji: '👜', name: '小方包',         desc: '梦想中的那只包，终于攒够了',     price: 680,  badge: '包治百病',   ghostMsg: "You actually did it. I knew you would.\n你真的做到了。我就知道。" },
+    { emoji: '🧴', name: '高端护肤套装',   desc: 'La Mer 同款，好好爱护自己',      price: 450,  badge: '自我宠爱',   ghostMsg: "Good. Take care of yourself when I can't.\n很好。我不在的时候好好照顾自己。" },
+    { emoji: '💍', name: '情侣戒指',       desc: '925银情侣款，你戴着他戴着',      price: 350,  badge: '我们的约定', ghostMsg: 'Wear it. Do not take it off.\n戴上。别摘。' },
+    { emoji: '📸', name: '拍立得相机',     desc: '把每一刻都留下来，等他回来一起看', price: 520, badge: '记录我们',   ghostMsg: 'Take good photos. I want to see them all.\n好好拍。我要看所有的。' },
+    { emoji: '🎧', name: '降噪耳机',       desc: '等不到他消息的时候，用音乐填满', price: 1200, badge: '享受当下',   ghostMsg: "Good. Do not wait by the phone all day.\n很好。别整天守着手机。" },
+    { emoji: '📷', name: '相机',           desc: 'Sony Alpha，记录生活的每一帧',   price: 3800, badge: '用镜头记录爱', ghostMsg: 'Next time I am back, take a photo of us.\n下次我回来，给我们拍张照。' },
+    { emoji: '💻', name: '新电脑',         desc: '工作更顺，追剧更爽，攒钱更快',  price: 6500, badge: '独立女孩',   ghostMsg: 'Smart investment. I approve.\n聪明的投资。我支持。' },
+    { emoji: '✈️', name: '去曼城找他的机票', desc: '攒够了！终于可以飞去找他了！', price: 12000, badge: '跨越距离', isReunion: true, ghostMsg: "You are coming? ...Good. I will be at the airport.\n你要来了？……很好。我会在机场。" },
+    { emoji: '🏨', name: '曼彻斯特酒店',   desc: '订好了房间，等他任务结束',      price: 6000, badge: '我在等你', isReunion: true, ghostMsg: 'I will be there. Promise.\n我会在的。保证。' },
+    { emoji: '🗺️', name: '英国旅行计划',  desc: '伦敦、爱丁堡、曼城，全部去打卡', price: 8000, badge: '异国追爱', isReunion: true, ghostMsg: 'I will be your guide. Every city.\n我来带你。每一个城市。' },
+  ],
+};
+
+// 反寄商品池（情绪触发）
+const GHOST_REVERSE_POOL = {
+  '开心':    [{ emoji: '🍫', name: '精品巧克力礼盒', desc: 'Ghost说，开心就该吃好的' }, { emoji: '🥂', name: '起泡酒', desc: '庆祝一下' }],
+  '难过':    [{ emoji: '🧸', name: '毛绒玩具', desc: 'Ghost挑的，抱着睡' }, { emoji: '🍫', name: '零食礼包', desc: '难过就吃甜的' }, { emoji: '💌', name: '手写卡片套装', desc: 'Ghost写了字的' }],
+  '委屈':    [{ emoji: '🌸', name: '干花礼盒', desc: 'Ghost说，别委屈自己' }, { emoji: '🧁', name: '精致甜点礼盒', desc: '吃甜的' }],
+  '饥饿':    [{ emoji: '🫖', name: '英式下午茶礼盒', desc: 'Ghost寄的，别饿着' }, { emoji: '🍪', name: '精品饼干礼盒', desc: '先垫垫' }],
+  '劳累':    [{ emoji: '🕯️', name: '香薰蜡烛套装', desc: '好好休息' }, { emoji: '🛁', name: '沐浴礼盒', desc: 'Ghost说洗个澡放松一下' }],
+  '压力大':  [{ emoji: '🌿', name: '精油套装', desc: '放松用的' }, { emoji: '😴', name: '助眠喷雾', desc: '先睡好' }, { emoji: '🕯️', name: '舒缓神经蜡烛', desc: '点上，深呼吸' }],
+  '生病':    [{ emoji: '💊', name: '保健品礼盒', desc: 'Ghost寄的，好好吃' }, { emoji: '🍯', name: '蜂蜜姜茶', desc: '喝了暖身' }, { emoji: '🧣', name: '保暖礼包', desc: '别冻着' }],
+  '太冷':    [{ emoji: '🧣', name: '兔毛围巾耳罩套装', desc: 'Ghost挑的，软的' }, { emoji: '♨️', name: '暖手包', desc: '揣兜里' }, { emoji: '🧦', name: '厚袜子礼盒', desc: '从脚暖起来' }],
+  '太热':    [{ emoji: '🧊', name: '冷感毛巾', desc: '敷一下' }, { emoji: '🍃', name: '薄荷茶礼盒', desc: '喝了凉快' }],
+  '思念':    [{ emoji: '💌', name: '手写信套装', desc: 'Ghost写了信' }, { emoji: '🖼️', name: '定制相框', desc: '放张照片' }, { emoji: '🪖', name: '军牌钥匙扣', desc: 'Ghost的备用军牌，给你挂钥匙' }],
+};
+
+let currentCategory = 'clothing';
+let pendingProduct = null;
+let pendingCategory = null;
+
+function initMarket() {
+  const el = document.getElementById('marketBalanceDisplay');
+  if (el) el.textContent = '£' + getBalance().toFixed(2);
+  renderDeliveryTracker();
+  renderMarket('clothing');
+  // 检查快递进度
+  checkDeliveryUpdates();
+}
+
+function renderMarket(categoryId) {
+  currentCategory = categoryId;
+  const tabsEl = document.getElementById('categoryTabs');
+  if (tabsEl) {
+    tabsEl.innerHTML = MARKET_CATEGORIES.map(cat => `
+      <div class="category-tab ${cat.id === categoryId ? 'active' : ''}" onclick="renderMarket('${cat.id}')">${cat.label}</div>
+    `).join('');
+  }
+  const products = MARKET_PRODUCTS[categoryId] || [];
+  const gridEl = document.getElementById('productsGrid');
+  if (!gridEl) return;
+  const isWishlist = categoryId === 'wishlist';
+  const isLuxury = categoryId === 'luxury';
+  const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  const weeklySale = isLuxury ? getWeeklySale() : null;
+
+  gridEl.innerHTML = products.map((p, i) => {
+    const owned = purchased.includes(p.name);
+    const onSale = weeklySale && weeklySale.name === p.name;
+    const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+    const triggerReason = getProductTrigger(p.name);
+    const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
+    return `
+      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''}"
+           onclick="${owned||isLocked?'':  `openBuyModal(${i})`}">
+        ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">👻 ${triggerReason}</div>` : ''}
+        ${isLocked ? '<div class="ghost-mentioned-tag" style="background:#9ca3af">🔒 需先买机票</div>' : ''}
+        <div class="product-emoji">${p.emoji}</div>
+        <div class="product-name">${p.name}</div>
+        ${isWishlist&&p.badge ? `<div class="product-badge-preview">🏅 ${p.badge}</div>` : ''}
+        ${p.desc ? `<div class="product-desc">${p.desc}</div>` : ''}
+        <div class="product-price ${isWishlist?'wishlist-price':''}">
+          ${onSale ? `<span style="text-decoration:line-through;opacity:0.45;font-size:10px">£${p.price.toLocaleString()}</span> ` : ''}
+          £${displayPrice.toLocaleString()}
+        </div>
+        ${owned
+          ? `<div class="product-owned-tag">✅ 已寄出</div>`
+          : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''}">${isWishlist?'💝 加入宝贝':'🛒 购买'}</button>`
+        }
+      </div>`;
+  }).join('');
+}
+
+function openBuyModal(idx) {
+  const p = MARKET_PRODUCTS[currentCategory][idx];
+  if (!p) return;
+  pendingProduct = p;
+  pendingCategory = currentCategory;
+  const isLuxury = currentCategory === 'luxury';
+  const weeklySale = isLuxury ? getWeeklySale() : null;
+  const onSale = weeklySale && weeklySale.name === p.name;
+  const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+  const shipping = p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15);
+  const total = displayPrice + shipping;
+  const bal = getBalance();
+  const triggerReason = getProductTrigger(p.name);
+  const isWishlist = currentCategory === 'wishlist';
+
+  document.getElementById('buyModalEmoji').textContent = p.emoji;
+  document.getElementById('buyModalName').textContent = p.name;
+  document.getElementById('buyModalDesc').textContent = p.desc || '';
+  document.getElementById('buyModalPrice').innerHTML = `£${displayPrice.toLocaleString()}<span style="font-size:12px;color:#a07bc0;font-weight:500"> + £${shipping} 运费</span>`;
+  document.getElementById('buyModalBalance').innerHTML = `余额：£${bal.toFixed(2)}&nbsp;&nbsp;合计：<b style="color:#7c3fa0">£${total.toLocaleString()}</b>`;
+
+  const reasonEl = document.getElementById('buyModalReason');
+  if (reasonEl) {
+    if (triggerReason) { reasonEl.textContent = triggerReason; reasonEl.style.display = 'block'; }
+    else reasonEl.style.display = 'none';
+  }
+
+  const btn = document.getElementById('buyConfirmBtn');
+  const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  if (purchased.includes(p.name)) {
+    btn.disabled = true; btn.textContent = '✅ 已寄出过了';
+  } else if (bal < total) {
+    btn.disabled = true; btn.textContent = '💔 余额不足';
+  } else {
+    btn.disabled = false;
+    btn.textContent = isWishlist ? '💝 放进我的宝贝' : '💝 寄给 Ghost';
+  }
+  document.getElementById('buyModalOverlay').classList.add('show');
+}
+
+function closeBuyModal() {
+  document.getElementById('buyModalOverlay').classList.remove('show');
+  pendingProduct = null;
+}
+
+function confirmPurchase() {
+  if (!pendingProduct) return;
+  const p = pendingProduct;
+  const isWishlist = pendingCategory === 'wishlist';
+  const isLuxury = pendingCategory === 'luxury';
+  const weeklySale = isLuxury ? getWeeklySale() : null;
+  const onSale = weeklySale && weeklySale.name === p.name;
+  const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+  const shipping = p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15);
+  const total = displayPrice + shipping;
+  const bal = getBalance();
+  if (bal < total) { showToast('💔 余额不足！'); closeBuyModal(); return; }
+
+  setBalance(bal - total);
+  addTransaction({ icon: p.emoji, name: (isWishlist ? '心愿 · ' : '寄给Ghost · ') + p.name, amount: -total });
+  renderWallet();
+
+  const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  if (!purchased.includes(p.name)) { purchased.push(p.name); localStorage.setItem('purchasedItems', JSON.stringify(purchased)); }
+
+  clearProductTrigger(p.name);
+  closeBuyModal();
+  showToast('📦 已寄出！Ghost 会收到的～');
+
+  // 启动快递（不是心愿单才走快递）
+  if (!isWishlist) {
+    addDelivery(p, false, isLuxury);
+  } else {
+    // 心愿单：Ghost收到消息后说话
+    if (p.ghostMsg) {
+      setTimeout(() => {
+        if (typeof appendMessage === 'function') {
+          appendMessage('bot', p.ghostMsg);
+          chatHistory.push({ role: 'assistant', content: p.ghostMsg });
+          saveHistory();
+        }
+      }, 2000);
+    }
+  }
+
+  // 奢侈品自动发朋友圈
+  if (isLuxury) {
+    setTimeout(() => triggerLuxuryMoment(p, p.isGhostGift ? 'ghost' : 'user'), 1000);
+  }
+
+  renderMarket(currentCategory);
+}
+
+// ===== 每周折扣 =====
+function getWeeklySale() {
+  const weekKey = 'weeklySale_' + getWeekKey();
+  let sale = JSON.parse(localStorage.getItem(weekKey) || 'null');
+  if (!sale) {
+    const items = MARKET_PRODUCTS.luxury;
+    const pick = items[Math.floor(Math.random() * items.length)];
+    const discounts = [0.75, 0.8, 0.85];
+    sale = { name: pick.name, discount: discounts[Math.floor(Math.random() * discounts.length)] };
+    localStorage.setItem(weekKey, JSON.stringify(sale));
+  }
+  return sale;
+}
+
+// ===== 商城+情绪触发（合并Haiku调用）=====
+async function checkTriggersAndEmotion(userText, botText) {
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        system: '你是一个双重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n格式：{"market":{"triggered":false},"emotion":{"triggered":false}}\n或：{"market":{"triggered":true,"category":"保暖类"},"emotion":{"triggered":true,"type":"太冷","intensity":"中"}}\nmarket分类：保暖类/饮食类/疲惫类/思念类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
+        messages: [{ role: 'user', content: `Ghost说：${botText}\n用户说：${userText}` }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text?.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(raw);
+
+    // 处理商城触发
+    if (result.market?.triggered) {
+      const catMap = {
+        '保暖类':  { products: ['羊毛大衣','毛线手套','格纹围巾','厚羊毛袜','皮手套'], reason: '他说他冷 🧣' },
+        '饮食类':  { products: ['英式早餐茶罐','Cadbury 巧克力礼盒','苏格兰威士忌','黄油饼干礼盒'], reason: '他在抱怨伙食 🍫' },
+        '疲惫类':  { products: ['香薰蜡烛','男士护肤套装'], reason: '他说他累了 🕯️' },
+        '思念类':  { products: ['情侣吊坠','定制相框','永生玫瑰','音乐盒'], reason: '他说他在想你 💍' },
+      };
+      const cat = catMap[result.market.category];
+      if (cat) {
+        const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
+        const now = Date.now();
+        const alreadyTriggered = cat.products.some(name => triggered[name] && now - triggered[name].timestamp < 72 * 3600 * 1000);
+        if (!alreadyTriggered) {
+          cat.products.forEach(name => { triggered[name] = { reason: cat.reason, timestamp: now }; });
+          localStorage.setItem('marketTriggered', JSON.stringify(triggered));
+        }
+      }
+    }
+
+    // 处理情绪反寄
+    if (result.emotion?.triggered) {
+      const type = result.emotion.type;
+      const intensity = result.emotion.intensity;
+      const coolKey = 'reverseShipCool_' + type;
+      const lastTime = parseInt(localStorage.getItem(coolKey) || '0');
+      if (Date.now() - lastTime < 7 * 24 * 3600 * 1000) return; // 7天冷却
+
+      // 概率判断
+      const probMap = { '轻': 0.05, '中': 0.10, '重': 0.15 };
+      const prob = probMap[intensity] || 0.08;
+      if (Math.random() > prob) return;
+
+      // 触发反寄
+      const pool = GHOST_REVERSE_POOL[type];
+      if (!pool || pool.length === 0) return;
+      const item = pool[Math.floor(Math.random() * pool.length)];
+      localStorage.setItem(coolKey, Date.now());
+      // 3-5天后出现神秘包裹
+      const delay = (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000;
+      setTimeout(() => addGhostReverseDelivery(item, type), delay);
+    }
+  } catch(e) {}
+}
+
+function getProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
+  const item = triggered[name];
+  if (!item) return null;
+  if (Date.now() - item.timestamp > 72 * 3600 * 1000) return null;
+  return item.reason;
+}
+
+function clearProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
+  const reason = triggered[name]?.reason;
+  if (reason) Object.keys(triggered).forEach(k => { if (triggered[k]?.reason === reason) delete triggered[k]; });
+  localStorage.setItem('marketTriggered', JSON.stringify(triggered));
+}
+
+// ===== 奢侈品朋友圈 =====
+async function triggerLuxuryMoment(product, poster) {
+  try {
+    const userName = localStorage.getItem('userName') || '你';
+    const posterName = poster === 'ghost' ? 'Simon Riley' : userName;
+    const prompt = poster === 'ghost'
+      ? `西蒙·莱利刚收到老婆送的「${product.name}」，用他的风格发一条朋友圈（全小写，克制，1-2句话，可以带点情绪但不肉麻）。附中文翻译。只返回帖子内容，格式：英文\\n中文`
+      : `用户刚给自己买了「${product.name}」（${product.desc}），替她发一条朋友圈（1-2句话，带点小得意或幸福感，口语化）。附中文翻译。只返回帖子内容，格式：英文\\n中文`;
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text?.trim() || '';
+    const parts = text.split('\n').filter(p => p.trim());
+    const postEn = parts[0] || '';
+    const postZh = parts[1] || '';
+
+    // 生成评论（队友）
+    const commentPrompt = `这是${posterName}发的朋友圈："${postEn}"。生成2-3条队友评论，角色：Soap(🧼,风趣调侃)、Gaz(🎖️,温和支持)、Price(🚬,简短稳重)，Ghost(👻,克制但在意)可选出现。每条评论一行，格式：角色名|英文|中文。只返回评论，不要其他文字。`;
+
+    const res2 = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: commentPrompt }]
+      })
+    });
+    const data2 = await res2.json();
+    const commentText = data2.content?.[0]?.text?.trim() || '';
+    const comments = commentText.split('\n').filter(l => l.includes('|')).map(l => {
+      const [name, en, zh] = l.split('|');
+      return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() };
+    }).filter(c => c.name && c.en);
+
+    // 存入朋友圈
+    const avatarMap = { 'Ghost': '👻', 'Soap': '🧼', 'Gaz': '🎖️', 'Price': '🚬' };
+    const post = {
+      date: new Date().toISOString().slice(0, 10),
+      post: {
+        en: postEn, zh: postZh,
+        avatar: poster === 'ghost' ? '👻' : (localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0)),
+        name: posterName,
+        comments: comments.map(c => ({
+          avatar: avatarMap[c.name] || '👤',
+          name: c.name, en: c.en, zh: c.zh
+        }))
+      }
+    };
+
+    const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    history.unshift(post);
+    localStorage.setItem('coupleFeedHistory', JSON.stringify(history.slice(0, 21)));
+
+    // 如果在情侣空间就刷新
+    const coupleScreen = document.getElementById('coupleScreen');
+    if (coupleScreen?.classList.contains('active') && typeof initCoupleSpace === 'function') {
+      initCoupleSpace();
+    }
+  } catch(e) {}
+}
+
+// ===== 快递系统 =====
+const DELIVERY_STAGES_USER = [
+  { status: '📦 已打包',      en: 'Packed and ready to go.',         zh: '已打包，准备出发。' },
+  { status: '✈️ 已起飞',      en: 'Left. En route.',                  zh: '已离开。运输中。' },
+  { status: '🛃 海关清关中',  en: 'Stuck in customs. Typical.',       zh: '在海关清关中。典型。' },
+  { status: '🇬🇧 已到达英国', en: 'Landed in the UK.',                zh: '已到达英国。' },
+  { status: '🚚 配送中',      en: 'Out for delivery. Almost there.',  zh: '派送中。快到了。' },
+  { status: '✅ Ghost已签收', en: "Received it. ...Thanks.",           zh: '收到了。……谢谢。' },
+];
+
+const DELIVERY_STAGES_GHOST = [
+  { status: '📦 Ghost已寄出', en: 'Dispatched from UK.',              zh: '已从英国发出。' },
+  { status: '✈️ 已起飞',      en: 'In the air.',                      zh: '飞行中。' },
+  { status: '🛃 清关中',      en: 'Clearing customs.',                 zh: '清关中。' },
+  { status: '📍 已到达',      en: 'Arrived in your country.',          zh: '已到达你所在国家。' },
+  { status: '🚚 派送中',      en: 'Out for delivery.',                 zh: '派送中。' },
+  { status: '✅ 已签收',      en: 'Delivered.',                        zh: '已签收。' },
+];
+
+// 运费吐槽台词
+const SHIPPING_COMPLAINTS = [
+  "You paid £{fee} shipping for this. You're insane.\n你花了£{fee}运费寄这个。你疯了。",
+  "£{fee} in shipping. I hope it was worth it.\n£{fee}运费。我希望值得。",
+  "Next time just wire me the money. The shipping alone was £{fee}.\n下次直接给我转账算了。光运费就£{fee}了。",
+  "The shipping cost more than my dignity. £{fee}.\n运费比我的尊严还贵。£{fee}。",
+];
+
+function addDelivery(product, isGhostSend, isLuxury) {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const totalMs = isGhostSend
+    ? (Math.floor(Math.random() * 7) + 7) * 24 * 3600 * 1000  // Ghost反寄7-14天
+    : (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000; // 用户寄2-3天
+  const stages = isGhostSend ? DELIVERY_STAGES_GHOST : DELIVERY_STAGES_USER;
+  const now = Date.now();
+  const interval = totalMs / stages.length;
+
+  // 遗失逻辑（只有用户寄的，10%概率，头等舱不遗失）
+  const canLost = !isGhostSend && !product.noLost;
+  const isLost = canLost && Math.random() < 0.10;
+  const lostAtStage = isLost ? Math.floor(Math.random() * 3) + 1 : -1;
+
+  const delivery = {
+    id: now,
+    name: product.name,
+    emoji: product.emoji,
+    isGhostSend,
+    stages: stages.map((s, i) => ({ ...s, triggerAt: now + interval * (i + 1), done: false })),
+    currentStage: 0,
+    done: false,
+    isLost,
+    lostAtStage,
+    isLostConfirmed: false,
+    lostNotified: false,
+    productData: {
+      price: product.price || 0,
+      isLuxury: isLuxury || false,
+      isGhostGift: product.isGhostGift || false,
+      isUserItem: product.isUserItem || false,
+      lostReplace: product.lostReplace || null,
+      ghostMsg: product.ghostMsg || null,
+      shipping: product.shipping || 15,
+      name: product.name,
+      emoji: product.emoji,
+    }
+  };
+
+  deliveries.unshift(delivery);
+  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 10)));
+  renderDeliveryTracker();
+}
+
+function addGhostReverseDelivery(item, emotionType) {
+  // Ghost主动反寄，不显示小票，只在商城顶部显示神秘提示
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const totalMs = (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
+  const now = Date.now();
+  const interval = totalMs / DELIVERY_STAGES_GHOST.length;
+
+  deliveries.unshift({
+    id: now,
+    name: item.name,
+    emoji: item.emoji,
+    isGhostSend: true,
+    isEmotionReverse: true,
+    emotionType,
+    stages: DELIVERY_STAGES_GHOST.map((s, i) => ({ ...s, triggerAt: now + interval * (i + 1), done: false })),
+    currentStage: 0,
+    done: false,
+    isLost: false,
+    lostAtStage: -1,
+    isLostConfirmed: false,
+    productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc }
+  });
+  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 10)));
+  // 不调用renderDeliveryTracker，保持神秘
+}
+
+function checkDeliveryUpdates() {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  let updated = false;
+  const now = Date.now();
+
+  deliveries.forEach(d => {
+    if (d.done || d.isLostConfirmed) return;
+    d.stages.forEach((stage, i) => {
+      if (!stage.done && now >= stage.triggerAt) {
+        stage.done = true;
+        d.currentStage = i;
+        updated = true;
+
+        // 检测遗失
+        if (d.isLost && i === d.lostAtStage && !d.isLostConfirmed) {
+          d.isLostConfirmed = true;
+          // 商城页显示遗失状态，不在聊天框通知
+          showToast(`❌ ${d.name} 快递遗失了！去商城查看详情`);
+          renderDeliveryTracker();
+          // 48小时后小票消失
+          setTimeout(() => {
+            d.lostTicketExpired = true;
+            localStorage.setItem('deliveries', JSON.stringify(deliveries));
+            renderDeliveryTracker();
+          }, 48 * 3600 * 1000);
+          return;
+        }
+
+        // 签收
+        if (i === d.stages.length - 1 && !d.isLostConfirmed) {
+          d.done = true;
+          if (d.isGhostSend) {
+            // Ghost寄来的：商城显示神秘提示
+            showMysteryPackage(d);
+          } else {
+            // 用户寄的：Ghost签收，Haiku生成反应
+            onGhostReceived(d);
+          }
+        }
+      }
+    });
+  });
+
+  // 清除过期小票
+  const active = deliveries.filter(d => !d.done && !(d.isLostConfirmed && d.lostTicketExpired) && !d.isEmotionReverse);
+  if (active.length !== deliveries.filter(d => !d.done).length) updated = true;
+
+  if (updated) {
+    localStorage.setItem('deliveries', JSON.stringify(deliveries));
+    renderDeliveryTracker();
+  }
+}
+
+async function onGhostReceived(delivery) {
+  const container = document.getElementById('messagesContainer');
+  if (!container) return;
+  const pd = delivery.productData;
+  const fee = pd.shipping || 15;
+
+  showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
+
+  // Haiku生成签收反应
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        system: buildSystemPrompt(),
+        messages: [...chatHistory.slice(-10), {
+          role: 'user',
+          content: `[系统：你刚收到老婆寄来的「${delivery.name}」。用西蒙的风格说一句话，全小写，简短，真实，不要太肉麻。附中文翻译，格式：英文\\n中文翻译]`
+        }]
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text?.trim() || '';
+    if (reply) {
+      appendMessage('bot', reply);
+      chatHistory.push({ role: 'assistant', content: reply });
+      saveHistory();
+    }
+
+    // 30%概率吐槽运费
+    if (Math.random() < 0.3) {
+      const complaint = SHIPPING_COMPLAINTS[Math.floor(Math.random() * SHIPPING_COMPLAINTS.length)];
+      setTimeout(() => {
+        const msg = complaint.replace(/\{fee\}/g, fee);
+        appendMessage('bot', msg);
+        chatHistory.push({ role: 'assistant', content: msg });
+        saveHistory();
+      }, 3000);
+    }
+
+    // 精品专柜用Sonnet补充
+    if (pd.isLuxury) {
+      setTimeout(async () => {
+        const res2 = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 300,
+            system: buildSystemPrompt(),
+            messages: [...chatHistory.slice(-15), {
+              role: 'user',
+              content: `[系统：你收到了一件奢侈品「${delivery.name}」，这不是普通礼物，有分量。用西蒙的方式多说几句，可以破防一点，但还是他的风格。全小写，附中文翻译。]`
+            }]
+          })
+        });
+        const data2 = await res2.json();
+        const reply2 = data2.content?.[0]?.text?.trim() || '';
+        if (reply2) {
+          appendMessage('bot', reply2);
+          chatHistory.push({ role: 'assistant', content: reply2 });
+          saveHistory();
+          // 好感度
+          changeAffection(pd.price > 3000 ? 5 : 3);
+          // 精品专柜发朋友圈
+          triggerLuxuryMoment(pd, pd.isGhostGift ? 'ghost' : 'user');
+        }
+      }, 5000);
+    } else {
+      changeAffection(pd.price > 500 ? 2 : 1);
+    }
+  } catch(e) {}
+}
+
+function showMysteryPackage(delivery) {
+  // 商城顶部显示神秘包裹提示
+  const tracker = document.getElementById('deliveryTracker');
+  if (!tracker) return;
+  tracker.style.display = 'block';
+  // 添加神秘标签
+  const mysteryTag = document.createElement('span');
+  mysteryTag.className = 'delivery-tag';
+  mysteryTag.style.cssText = 'background:rgba(255,240,255,0.9);border-color:rgba(192,132,252,0.5);color:#7c3aed;';
+  mysteryTag.innerHTML = `<span class="delivery-tag-dot" style="background:#7c3aed"></span>📬 来自英国的包裹`;
+  mysteryTag.onclick = () => showToast('包裹正在派送，快收到啦～');
+  tracker.appendChild(mysteryTag);
+
+  // 签收后Sonnet生成台词
+  setTimeout(async () => {
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 300,
+          system: buildSystemPrompt(),
+          messages: [...chatHistory.slice(-10), {
+            role: 'user',
+            content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。你不主动提，但如果她问起，你知道是你寄的。现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，附中文翻译。]`
+          }]
+        })
+      });
+      const data = await res.json();
+      const reply = data.content?.[0]?.text?.trim() || '';
+      if (reply) {
+        appendMessage('bot', reply);
+        chatHistory.push({ role: 'assistant', content: reply });
+        saveHistory();
+      }
+    } catch(e) {}
+  }, 2000);
+}
+
+// 快递遗失赔偿（用户在聊天里提到）
+async function handleLostPackageClaim(userText) {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const lostItems = deliveries.filter(d => d.isLostConfirmed && !d.compensated);
+  if (lostItems.length === 0) return false;
+
+  const keywords = ['快递','丢了','遗失','没到','包裹','寄的'];
+  if (!keywords.some(k => userText.includes(k))) return false;
+
+  const d = lostItems[0];
+  const price = d.productData?.price || 0;
+
+  // Haiku判断Ghost是否知道这个快递
+  try {
+    const knewAbout = chatHistory.slice(-20).some(m =>
+      m.role === 'user' && (m.content.includes(d.name) || m.content.includes('快递') || m.content.includes('寄'))
+    );
+
+    const contextPrompt = knewAbout
+      ? `[系统：用户之前提过要寄「${d.name}」给你，现在告诉你快递遗失了。你之前知道有这个快递，现在得知丢失，用西蒙的方式反应——可以生气快递公司、可以愧疚、可以直接说赔。全小写，附中文翻译。]`
+      : `[系统：用户告诉你她寄给你的「${d.name}」快递遗失了，你之前完全不知道有这个快递，这是第一次听说。先反应这件事，再根据价值决定是否赔偿。全小写，附中文翻译。]`;
+
+    chatHistory.push({ role: 'user', content: contextPrompt });
+    showTyping();
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        system: buildSystemPrompt(),
+        messages: chatHistory.slice(-20)
+      })
+    });
+    const data = await res.json();
+    hideTyping();
+    const reply = data.content?.[0]?.text?.trim() || '';
+    appendMessage('bot', reply);
+    chatHistory.push({ role: 'assistant', content: reply });
+    saveHistory();
+
+    // 赔偿
+    if (price >= 500) {
+      const compensation = Math.round(price * 0.5);
+      setTimeout(() => {
+        setBalance(getBalance() + compensation);
+        addTransaction({ icon: '💷', name: `快递遗失赔偿 · ${d.name}`, amount: compensation });
+        renderWallet();
+        const container = document.getElementById('messagesContainer');
+        if (container) showGhostTransferCard(container, compensation, '', false);
+        d.compensated = true;
+        // 3000以上触发反寄
+        if (price >= 3000 && d.productData?.lostReplace) {
+          setTimeout(() => {
+            const replace = d.productData.lostReplace;
+            addDelivery({ ...replace, price: price, shipping: 35, noLost: true }, true, true);
+            showToast('📬 Ghost说他会补寄一个');
+          }, (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000);
+        }
+        localStorage.setItem('deliveries', JSON.stringify(deliveries));
+      }, 3000);
+    }
+    return true;
+  } catch(e) { hideTyping(); return false; }
+}
+
+function renderDeliveryTracker() {
+  const tracker = document.getElementById('deliveryTracker');
+  if (!tracker) return;
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  // 只显示用户寄出的、未完成的（不包含Ghost反寄和情绪反寄）
+  const active = deliveries.filter(d => !d.isGhostSend && !d.done && !d.lostTicketExpired).slice(0, 5);
+  if (active.length === 0) { tracker.style.display = 'none'; return; }
+  tracker.style.display = 'block';
+  tracker.innerHTML = active.map((d, idx) => {
+    if (d.isLostConfirmed) {
+      return `<span class="delivery-tag" onclick="openDeliveryModal(${idx})" style="background:rgba(255,235,235,0.9);border-color:rgba(240,100,100,0.5);color:#b91c1c;">
+        <span style="font-size:10px">❌</span>
+        ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
+      </span>`;
+    }
+    return `<span class="delivery-tag" onclick="openDeliveryModal(${idx})">
+      <div class="delivery-tag-dot"></div>
+      ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
+    </span>`;
+  }).join('');
+}
+
+function openDeliveryModal(idx) {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const active = deliveries.filter(d => !d.isGhostSend && !d.done && !d.lostTicketExpired).slice(0, 5);
+  const d = active[idx];
+  if (!d) return;
+  document.getElementById('deliveryModalTitle').textContent = d.emoji + ' ' + d.name;
+  let html = '';
+  if (d.isLostConfirmed) {
+    html += `<div style="background:rgba(255,220,220,0.8);border:1px solid rgba(220,80,80,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#b91c1c;text-align:center;">
+      ❌ 此包裹已在运输途中遗失<br><span style="font-size:11px;color:#ef4444;margin-top:4px;display:block;">告诉Ghost，可申请赔偿</span>
+    </div>`;
+  }
+  html += d.stages.map((stage, i) => {
+    const isDone = i <= d.currentStage;
+    const isCurrent = i === d.currentStage && !d.done;
+    const isLostHere = d.isLostConfirmed && i === d.lostAtStage;
+    const color = isLostHere ? '#ef4444' : isDone ? '#a855f7' : '#d1d5db';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;">
+      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
+        <div style="width:20px;height:20px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:10px;color:white;">${isLostHere?'✕':isDone?'✓':isCurrent?'●':'○'}</div>
+        ${i < d.stages.length-1 ? `<div style="width:2px;height:20px;background:${isDone?'#a855f7':'#e5e7eb'};margin-top:2px;"></div>` : ''}
+      </div>
+      <div style="flex:1;padding-top:2px;">
+        <div style="font-size:12px;font-weight:${isCurrent?700:500};color:${isCurrent?'#3a1a60':'#9ca3af'};">${stage.status}</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:2px;font-style:italic;">${stage.en}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('deliveryModalContent').innerHTML = html;
+  document.getElementById('deliveryModal').style.display = 'flex';
+}
+
+function closeDeliveryModal() {
+  document.getElementById('deliveryModal').style.display = 'none';
 }
