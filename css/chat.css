@@ -1002,8 +1002,8 @@
     font-size: 16px;
     font-weight: 700;
 }
-.wallet-stat-value.income { color: rgba(220,200,255,0.95); }
-.wallet-stat-value.expense { color: rgba(255,200,230,0.9); }
+.wallet-stat-value.income { color: rgba(255,255,255,0.95); }
+.wallet-stat-value.expense { color: rgba(255,220,235,0.9); }
 
 /* 交易记录 */
 .transaction-section {
