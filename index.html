@@ -8,6 +8,120 @@
 <link rel="stylesheet" href="css/welcome.css">
 <link rel="stylesheet" href="css/home.css">
 <link rel="stylesheet" href="css/chat.css">
+<style>
+/* ===== 情侣空间封面重设计 ===== */
+.couple-petal-container { display: none !important; }
+
+.couple-cover-section {
+  background: linear-gradient(160deg, #ede0f7 0%, #f5d6ed 50%, #fce4ec 100%);
+  border-radius: 0 0 28px 28px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.couple-cover-banner {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+}
+.couple-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  display: block;
+}
+.couple-banner-fade {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, #ede0f7);
+}
+
+.couple-cover-avatars-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -20px;
+  padding: 0 40px;
+  position: relative;
+  z-index: 2;
+}
+.couple-cover-avatar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.couple-cover-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 2.5px solid rgba(255,255,255,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  box-shadow: 0 4px 16px rgba(107,63,160,0.12);
+}
+
+.couple-cover-connector {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 90px;
+  padding: 0 6px;
+}
+.couple-connector-line {
+  flex: 1;
+  height: 1.5px;
+  background: rgba(160,124,192,0.4);
+}
+.couple-connector-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(160,124,192,0.65);
+  flex-shrink: 0;
+  margin: 0 3px;
+}
+
+.couple-cover-info {
+  text-align: center;
+  padding: 12px 20px 22px;
+}
+.couple-cover-main {
+  font-size: 17px;
+  font-weight: 600;
+  color: #6b3fa0;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.couple-cover-sub {
+  font-size: 12px;
+  color: rgba(107,63,160,0.5);
+  margin-bottom: 10px;
+}
+.couple-cover-days {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+.couple-days-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #6b3fa0;
+  line-height: 1;
+}
+.couple-days-label {
+  font-size: 13px;
+  color: rgba(107,63,160,0.65);
+}
+</style>
 </head>
 <body>
 <div class="container">
@@ -190,8 +304,6 @@
   </div>
   <!-- 情侣空间 -->
   <div class="screen" id="coupleScreen">
-    <!-- 花瓣容器 -->
-    <div class="couple-petal-container" id="couplePetalContainer"></div>
 
     <div class="couple-page-header">
       <button class="couple-back-btn" onclick="openScreen('profileScreen')">‹</button>
@@ -200,16 +312,29 @@
 
     <!-- 封面 -->
     <div class="couple-cover-section">
-      <div class="couple-cover-top">
-        <div class="couple-cover-avatar" id="coupleCoverGhostAvatar">👻</div>
-        <div class="couple-cover-heart">❤️</div>
-        <div class="couple-cover-avatar" id="coupleCoverUserAvatar">🌸</div>
+      <!-- 猫咪banner图 -->
+      <div class="couple-cover-banner">
+        <img src="images/couple/couple-banner.jpg" alt="banner" class="couple-banner-img">
+        <div class="couple-banner-fade"></div>
       </div>
-      <div class="couple-cover-bottom">
-        <div class="couple-cover-names">
-          <div class="couple-cover-main" id="coupleCoverNames">Ghost & 你</div>
-          <div class="couple-cover-sub" id="coupleWeddingDate">—</div>
+      <!-- 头像行：左Ghost — 细线 — 右用户 -->
+      <div class="couple-cover-avatars-row">
+        <div class="couple-cover-avatar-wrap">
+          <div class="couple-cover-avatar" id="coupleCoverGhostAvatar">👻</div>
         </div>
+        <div class="couple-cover-connector">
+          <div class="couple-connector-line"></div>
+          <div class="couple-connector-dot"></div>
+          <div class="couple-connector-line"></div>
+        </div>
+        <div class="couple-cover-avatar-wrap">
+          <div class="couple-cover-avatar" id="coupleCoverUserAvatar">🌸</div>
+        </div>
+      </div>
+      <!-- 名字+天数 -->
+      <div class="couple-cover-info">
+        <div class="couple-cover-main" id="coupleCoverNames">Ghost & 你</div>
+        <div class="couple-cover-sub" id="coupleWeddingDate">—</div>
         <div class="couple-cover-days">
           <div class="couple-days-num" id="coupleDaysNum">0</div>
           <div class="couple-days-label">天在一起</div>

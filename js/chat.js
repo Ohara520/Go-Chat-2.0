@@ -845,7 +845,7 @@ async function generateCoupleFeed() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -948,7 +948,7 @@ async function checkSassyPost(userText, ghostReply) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 100,
         system: '你是情绪判断器。只返回JSON，不要任何其他文字。',
         messages: [{
@@ -970,7 +970,7 @@ async function generateSassyPost() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
         system: '你是西蒙·莱利。只返回JSON，不要任何其他文字。',
         messages: [{
