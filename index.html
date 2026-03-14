@@ -414,6 +414,41 @@
     </div>
   </div>
 
+  <!-- 钱包页 -->
+  <div class="screen" id="walletScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">我的钱包</div>
+    </div>
+    <div class="wallet-container">
+      <!-- 余额卡片 -->
+      <div class="wallet-card">
+        <div class="wallet-card-label">💳 当前余额</div>
+        <div class="balance-display" id="walletBalance">£0</div>
+        <div class="wallet-stats">
+          <div class="wallet-stat">
+            <div class="wallet-stat-label">本月收入</div>
+            <div class="wallet-stat-value income" id="monthIncome">+£0</div>
+          </div>
+          <div class="wallet-stat-divider"></div>
+          <div class="wallet-stat">
+            <div class="wallet-stat-label">本月支出</div>
+            <div class="wallet-stat-value expense" id="monthExpense">-£0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 交易记录 -->
+      <div class="transaction-section">
+        <div class="transaction-header">📋 交易记录</div>
+        <div id="transactionList"></div>
+        <div id="transactionToggle" class="transaction-toggle" onclick="toggleTransactions()" style="display:none">
+          展开全部 <span id="transactionToggleCount"></span> <span class="toggle-arrow">▾</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 <script src="js/app.js"></script>
 <script src="js/chat.js"></script>

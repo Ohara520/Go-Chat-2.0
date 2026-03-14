@@ -906,3 +906,286 @@
     color: #7c4daa;
     font-weight: 600;
 }
+
+
+/* ===== 钱包页 ===== */
+.screen-header {
+    display: flex;
+    align-items: center;
+    padding: calc(52px + env(safe-area-inset-top)) 20px 14px;
+    flex-shrink: 0;
+}
+.screen-title {
+    flex: 1;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 600;
+    color: #4a2880;
+    margin-right: 34px;
+}
+#walletScreen {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.wallet-container {
+    padding: 0 16px calc(40px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.wallet-card {
+    background: linear-gradient(135deg, rgba(160,100,220,0.85) 0%, rgba(200,100,180,0.8) 100%);
+    border-radius: 22px;
+    padding: 24px 24px 20px;
+    box-shadow: 0 8px 32px rgba(140,80,200,0.25);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: white;
+}
+.wallet-card-label {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+.balance-display {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 20px;
+    font-family: 'Playfair Display', Georgia, serif;
+}
+.wallet-stats {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 12px 20px;
+    gap: 0;
+}
+.wallet-stat {
+    flex: 1;
+    text-align: center;
+}
+.wallet-stat-divider {
+    width: 1px;
+    height: 32px;
+    background: rgba(255,255,255,0.25);
+}
+.wallet-stat-label {
+    font-size: 11px;
+    opacity: 0.75;
+    margin-bottom: 4px;
+}
+.wallet-stat-value {
+    font-size: 16px;
+    font-weight: 700;
+}
+.wallet-stat-value.income { color: #a8ffca; }
+.wallet-stat-value.expense { color: #ffb3c6; }
+
+/* 交易记录 */
+.transaction-section {
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(180,120,200,0.1);
+    border: 1px solid rgba(255,255,255,0.8);
+}
+.transaction-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(200,160,240,0.2);
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b3fa0;
+}
+.transaction-item {
+    padding: 13px 18px;
+    border-bottom: 1px solid rgba(200,160,240,0.12);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.15s;
+}
+.transaction-item:last-child { border-bottom: none; }
+.transaction-item:active { background: rgba(200,160,240,0.08); }
+.transaction-icon { font-size: 26px; min-width: 38px; text-align: center; }
+.transaction-info { flex: 1; }
+.transaction-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #5a3a7a;
+    margin-bottom: 2px;
+}
+.transaction-time {
+    font-size: 11px;
+    color: rgba(130,80,170,0.55);
+}
+.transaction-amount {
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.transaction-amount.in { color: #16a34a; }
+.transaction-amount.out { color: #dc2626; }
+
+/* 折叠按钮 */
+.transaction-toggle {
+    padding: 13px 18px;
+    text-align: center;
+    font-size: 13px;
+    color: #8b5cf6;
+    cursor: pointer;
+    border-top: 1px solid rgba(200,160,240,0.15);
+    user-select: none;
+    transition: background 0.15s;
+}
+.transaction-toggle:active { background: rgba(200,160,240,0.08); }
+.toggle-arrow {
+    display: inline-block;
+    transition: transform 0.25s;
+    margin-left: 2px;
+}
+.toggle-arrow.open { transform: rotate(180deg); }
+
+
+/* ===== 转账卡片 ===== */
+.transfer-card {
+    width: 210px;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(255,150,200,0.15);
+}
+.transfer-card::before {
+    content: '· · · · · · · · · · · · · · · ·';
+    display: block;
+    font-size: 8px;
+    letter-spacing: 2px;
+    padding: 4px 14px;
+    text-align: center;
+    line-height: 1;
+    color: rgba(255,255,255,0.6);
+}
+
+/* 用户转账卡片（右侧，粉紫色） */
+.user-transfer-card {
+    background: #fff8fc;
+    border: 1.5px solid rgba(255,182,213,0.6);
+}
+.user-transfer-card::before {
+    background: linear-gradient(90deg, #fbc8dd, #e8b4f8, #fbc8dd);
+}
+
+/* Ghost转账/退款卡片（左侧，灰色调） */
+.ghost-transfer-card {
+    background: #f8f8fc;
+    border: 1.5px solid rgba(180,160,220,0.4);
+}
+.ghost-transfer-card::before {
+    background: linear-gradient(90deg, #c8c8e8, #d8c8f0, #c8c8e8);
+}
+
+/* 退款卡片（灰暗） */
+.refund-card {
+    background: #f5f5f8;
+    border: 1.5px solid rgba(160,160,180,0.35);
+    opacity: 0.85;
+}
+.refund-card::before {
+    background: linear-gradient(90deg, #b8b8c8, #c8c8d8, #b8b8c8);
+}
+
+.transfer-card-top {
+    padding: 10px 14px 8px;
+}
+.transfer-info { flex: 1; }
+.transfer-label {
+    font-size: 9px;
+    color: rgba(180,80,140,0.5);
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 1px;
+}
+.ghost-transfer-card .transfer-label,
+.refund-card .transfer-label {
+    color: rgba(120,100,160,0.5);
+}
+.transfer-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7a2d6e;
+}
+.ghost-transfer-card .transfer-name {
+    color: #4a3070;
+}
+
+.transfer-amount-block {
+    margin: 0 14px 10px;
+    background: linear-gradient(135deg, rgba(251,200,221,0.25), rgba(232,180,248,0.2));
+    border: 1px dashed rgba(255,150,200,0.4);
+    border-radius: 12px;
+    padding: 8px 14px;
+    text-align: center;
+}
+.ghost-transfer-card .transfer-amount-block {
+    background: linear-gradient(135deg, rgba(180,160,240,0.15), rgba(200,180,255,0.12));
+    border-color: rgba(160,140,220,0.3);
+}
+.refund-card .transfer-amount-block {
+    background: rgba(160,160,180,0.08);
+    border-color: rgba(140,140,160,0.25);
+}
+.transfer-amount-label {
+    font-size: 9px;
+    color: rgba(180,80,140,0.45);
+    letter-spacing: 1px;
+    margin-bottom: 1px;
+}
+.transfer-amount {
+    font-size: 26px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #c2185b, #ab47bc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+}
+.ghost-transfer-card .transfer-amount {
+    background: linear-gradient(135deg, #6b3fa0, #9c5fcc);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+.refund-card .transfer-amount {
+    background: linear-gradient(135deg, #888, #aaa);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+.transfer-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 14px 10px;
+    border-top: 1px dashed rgba(255,150,200,0.25);
+}
+.ghost-transfer-card .transfer-footer {
+    border-top-color: rgba(160,140,220,0.2);
+}
+.transfer-status {
+    font-size: 10px;
+    color: #c2185b;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+.transfer-status::before { content: '✿'; font-size: 9px; color: #f48fb1; }
+.refund-status { color: #888; }
+.refund-status::before { content: '↩'; color: #aaa; }
+.transfer-time {
+    font-size: 10px;
+    color: rgba(160,100,140,0.4);
+}
