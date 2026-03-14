@@ -666,7 +666,8 @@ function confirmTransfer() {
     let reply = data.content?.[0]?.text || '...';
     updateToRead();
     const shouldRefund = reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8));
-    reply = reply.replace(/(REFUND|KEEP)\s*$/gim, '').trim();
+    // 彻底清除REFUND/KEEP标记，不管在哪个位置
+    reply = reply.replace(/\b(REFUND|KEEP)\b/gi, '').replace(/\s{2,}/g, ' ').trim();
     if (shouldRefund) {
       setBalance(getBalance() + amount);
       addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amount });
@@ -3023,7 +3024,16 @@ async function triggerLuxuryMoment(product, poster) {
 
     const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
     history.unshift(post);
-    localStorage.setItem('coupleFeedHistory', JSON.stringify(history.slice(0, 21)));
+    // 只保留7天
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const filtered = history.filter(h => h.date >= sevenDaysAgo).slice(0, 21);
+    localStorage.setItem('coupleFeedHistory', JSON.stringify(filtered));
+
+    // 更新summary让Ghost知道自己发了什么
+    const summary = filtered.slice(0, 5).map(h =>
+      `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`
+    ).join('\n');
+    localStorage.setItem('coupleFeedSummary', summary);
 
     // 如果在情侣空间就刷新
     const coupleScreen = document.getElementById('coupleScreen');
