@@ -73,3 +73,4 @@ body::after {
 }
 .screen.active { display: flex; }
 #mainScreen { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#coupleScreen.active { display: block !important; overflow-y: auto; -webkit-overflow-scrolling: touch; }

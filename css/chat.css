@@ -683,19 +683,23 @@
 .couple-page-header {
     display: flex; align-items: center;
     padding: calc(52px + env(safe-area-inset-top)) 20px 14px;
-    position: relative; z-index: 10; flex-shrink: 0;
+    position: absolute; top: 0; left: 0; right: 0;
+    z-index: 10;
 }
 .couple-back-btn {
     width: 34px; height: 34px;
-    background: rgba(255,255,255,0.6); border-radius: 50%;
+    background: rgba(255,255,255,0.55); border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 20px; color: #6b3fa0;
     cursor: pointer; border: none; flex-shrink: 0;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 .couple-page-title {
     flex: 1; text-align: center;
-    font-size: 17px; font-weight: 600; color: #4a2880;
+    font-size: 17px; font-weight: 600; color: rgba(255,255,255,0.92);
     margin-right: 34px;
+    text-shadow: 0 1px 6px rgba(80,30,120,0.3);
 }
 
 /* 花瓣 */
@@ -716,9 +720,9 @@
 
 /* 封面 */
 .couple-cover-section {
-    margin: 12px 16px 0;
-    border-radius: 22px;
-    overflow: hidden;
+    margin: 0;
+    border-radius: 0 0 22px 22px;
+    overflow: visible;
     background: linear-gradient(135deg,
         rgba(220,180,255,0.55) 0%,
         rgba(230,180,240,0.5) 40%,
@@ -728,8 +732,7 @@
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255,255,255,0.7);
     box-shadow: 0 8px 32px rgba(180,100,220,0.15);
-    padding: 22px 20px 18px;
-    flex-shrink: 0;
+    position: relative;
 }
 .couple-cover-top {
     display: flex; align-items: center;
@@ -762,7 +765,7 @@
 .couple-days-label { font-size: 11px; color: rgba(100,50,160,0.55); margin-top: 2px; text-align: right; }
 
 /* Feed区 */
-.couple-feed-section { padding: 14px 16px 80px; overflow-y: auto; flex: 1; }
+.couple-feed-section { padding: 14px 16px 80px; }
 
 /* 帖子卡片 */
 .couple-post-card {
