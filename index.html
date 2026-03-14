@@ -35,8 +35,14 @@
 .couple-banner-fade {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  height: 80px;
-  background: linear-gradient(to bottom, transparent, #ede0f7);
+  height: 120px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(237,224,247,0.4) 40%,
+    rgba(237,224,247,0.85) 70%,
+    rgba(237,224,247,1) 100%
+  );
 }
 
 .couple-cover-avatars-row {
@@ -297,7 +303,7 @@
 
       <!-- 进入情侣空间 -->
       <button class="profile-btn" onclick="openScreen('coupleScreen')">
-        💑 进入情侣空间
+        💑 进入 Love Space
       </button>
 
     </div>
@@ -307,7 +313,7 @@
 
     <div class="couple-page-header">
       <button class="couple-back-btn" onclick="openScreen('profileScreen')">‹</button>
-      <div class="couple-page-title">情侣空间</div>
+      <div class="couple-page-title">Love Space</div>
     </div>
 
     <!-- 封面 -->
