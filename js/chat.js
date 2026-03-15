@@ -1450,7 +1450,7 @@ function renderCoupleFeed(posts) {
   const emojiMap = { Ghost: GHOST_AVATAR_HTML, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
   const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
 
-  posts.forEach(item => {
+  posts.forEach((item, idx) => {
     const commentsHTML = (item.comments || []).map(c => `
       <div class="couple-comment">
         <div class="couple-avatar couple-avatar-sm">${emojiMap[c.author] || '👤'}</div>
@@ -1460,6 +1460,16 @@ function renderCoupleFeed(posts) {
         </div>
       </div>
     `).join('');
+
+    const postKey = 'like_post_' + idx;
+    const isLiked = localStorage.getItem(postKey) === '1';
+    // 点赞数存在localStorage里，防止每次随机变化
+    const likeCountKey = 'likeCount_post_' + idx;
+    if (!localStorage.getItem(likeCountKey)) {
+      localStorage.setItem(likeCountKey, String(item.likes || Math.floor(Math.random()*60+5)));
+    }
+    const likeCount = parseInt(localStorage.getItem(likeCountKey));
+    const likeEmoji = isLiked ? '❤️' : '🤍';
 
     const div = document.createElement('div');
     div.className = 'couple-post-card';
@@ -1475,7 +1485,9 @@ function renderCoupleFeed(posts) {
       <div class="couple-post-zh">${item.zh}</div>
       ${commentsHTML ? `<div class="couple-divider"></div><div class="couple-comments">${commentsHTML}</div>` : ''}
       <div class="couple-post-footer">
-        <button class="couple-like-btn" onclick="toggleCoupleLike(this)">🤍 ${item.likes || Math.floor(Math.random()*60+5)}</button>
+        <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}" 
+          data-key="${postKey}" data-count="${likeCount}"
+          onclick="toggleCoupleLike(this)">${likeEmoji} ${isLiked ? likeCount : likeCount}</button>
       </div>
     `;
     feed.appendChild(div);
@@ -1483,23 +1495,22 @@ function renderCoupleFeed(posts) {
 }
 
 function toggleCoupleLike(btn, key) {
-  const storageKey = key || ('like_' + btn.closest('.couple-post-card')?.querySelector('.couple-post-en')?.textContent?.slice(0,10));
+  const storageKey = key || btn.dataset.key || ('like_' + btn.closest('.couple-post-card')?.querySelector('.couple-post-en')?.textContent?.slice(0,10));
   const isLiked = localStorage.getItem(storageKey) === '1';
-  const countEl = btn.querySelector('.like-count');
-  const count = countEl ? parseInt(countEl.textContent) || 0 : 0;
+  let count = parseInt(btn.dataset.count || '0');
   if (isLiked) {
     localStorage.removeItem(storageKey);
     btn.classList.remove('couple-liked');
-    if (countEl) countEl.textContent = Math.max(0, count - 1);
-    btn.querySelector('.like-count') ? btn.childNodes[0].textContent = '🤍 ' : btn.textContent = '🤍 ' + Math.max(0, count - 1);
+    count = Math.max(0, count - 1);
+    btn.dataset.count = count;
+    btn.textContent = '🤍 ' + count;
   } else {
     localStorage.setItem(storageKey, '1');
     btn.classList.add('couple-liked');
-    if (countEl) countEl.textContent = count + 1;
+    count = count + 1;
+    btn.dataset.count = count;
+    btn.textContent = '❤️ ' + count;
   }
-  // 同步emoji
-  const likeEmoji = btn.classList.contains('couple-liked') ? '❤️ ' : '🤍 ';
-  btn.childNodes[0].textContent = likeEmoji;
 }
 
 // ===== 阴阳帖系统 =====
