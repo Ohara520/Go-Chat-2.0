@@ -1594,7 +1594,7 @@
 
 
 /* ===== 商城页面 ===== */
-#marketScreen { flex-direction: column; overflow: hidden; }
+#marketScreen { display: flex; flex-direction: column; overflow: hidden; }
 .market-balance-bar {
     background: linear-gradient(135deg, rgba(216,180,254,0.4), rgba(249,168,212,0.35));
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -1691,6 +1691,55 @@
 .luxury-card .product-desc { color: rgba(245,232,192,0.6) !important; }
 .luxury-card .product-price { color: #fcd34d !important; }
 
+/* 限时打折卡片 */
+.on-sale-card {
+    border: 1px solid rgba(252,211,77,0.6) !important;
+    box-shadow: 0 0 16px rgba(252,180,30,0.25), inset 0 0 20px rgba(252,211,77,0.05) !important;
+    position: relative;
+    overflow: hidden;
+}
+.on-sale-card::before {
+    content: '';
+    position: absolute;
+    top: -1px; right: -1px;
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 0 52px 52px 0;
+    border-color: transparent rgba(252,180,30,0.9) transparent transparent;
+    z-index: 2;
+}
+.sale-corner-text {
+    position: absolute;
+    top: 6px; right: 2px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #1a1200;
+    letter-spacing: 0.3px;
+    z-index: 3;
+    transform: rotate(45deg);
+    text-align: center;
+    line-height: 1.2;
+    pointer-events: none;
+}
+.sale-discount-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #f59e0b, #fcd34d);
+    color: #1a1200;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 6px rgba(245,158,11,0.4);
+}
+.sale-original-price {
+    text-decoration: line-through;
+    opacity: 0.4;
+    font-size: 10px;
+    margin-right: 4px;
+}
+
 /* 购买弹窗 */
 .buy-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(80,40,120,0.35); backdrop-filter: blur(6px); z-index: 9999; justify-content: center; align-items: center; }
 .buy-modal-overlay.show { display: flex; }
@@ -1722,32 +1771,3 @@
 }
 .delivery-tag-dot { width: 6px; height: 6px; border-radius: 50%; background: #a855f7; animation: delivPulse 1.5s infinite; }
 @keyframes delivPulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-.delivery-tracker {
-  padding: 10px 14px 2px;
-  display: flex; flex-wrap: nowrap; overflow-x: auto;
-  gap: 6px; -webkit-overflow-scrolling: touch;
-}
-.delivery-modal-overlay {
-  position: fixed; inset: 0; background: rgba(80,40,120,0.4);
-  backdrop-filter: blur(6px); z-index: 9999;
-  display: flex; justify-content: center; align-items: center;
-}
-.delivery-modal {
-  background: rgba(255,255,255,0.95); border-radius: 20px;
-  padding: 24px 20px; width: 88%; max-width: 360px;
-  max-height: 70vh; display: flex; flex-direction: column;
-  box-shadow: 0 8px 32px rgba(120,60,200,0.2);
-}
-.delivery-modal-title {
-  font-size: 16px; font-weight: 700; color: #4a2d6e;
-  margin-bottom: 16px; text-align: center;
-}
-.delivery-modal-content {
-  flex: 1; overflow-y: auto; margin-bottom: 16px;
-}
-.delivery-modal-close {
-  background: linear-gradient(135deg, rgba(192,132,252,0.75), rgba(244,114,182,0.7));
-  color: white; border: none; border-radius: 12px;
-  padding: 10px; font-size: 14px; font-weight: 600;
-  cursor: pointer; width: 100%;
-}

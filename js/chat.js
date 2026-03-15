@@ -2831,17 +2831,20 @@ function renderMarket(categoryId) {
     const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
     const triggerReason = getProductTrigger(p.name);
     const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
+    const discountPct = onSale ? Math.round((1 - weeklySale.discount) * 100) : 0;
     return `
-      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''}"
-           onclick="${owned||isLocked?'':  `openBuyModal(${i})`}">
+      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
+           onclick="${owned||isLocked?'':'openBuyModal('+i+')'  }">
+        ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">👻 ${triggerReason}</div>` : ''}
         ${isLocked ? '<div class="ghost-mentioned-tag" style="background:#9ca3af">🔒 需先买机票</div>' : ''}
         <div class="product-emoji">${p.emoji}</div>
+        ${onSale&&!owned ? `<div class="sale-discount-badge">TODAY ONLY · ${discountPct}% OFF</div>` : ''}
         <div class="product-name">${p.name}</div>
         ${isWishlist&&p.badge ? `<div class="product-badge-preview">🏅 ${p.badge}</div>` : ''}
         ${p.desc ? `<div class="product-desc">${p.desc}</div>` : ''}
         <div class="product-price ${isWishlist?'wishlist-price':''}">
-          ${onSale ? `<span style="text-decoration:line-through;opacity:0.45;font-size:10px">£${p.price.toLocaleString()}</span> ` : ''}
+          ${onSale ? `<span class="sale-original-price">£${p.price.toLocaleString()}</span>` : ''}
           £${displayPrice.toLocaleString()}
         </div>
         ${owned
@@ -2946,15 +2949,27 @@ function confirmPurchase() {
 }
 
 // ===== 每周折扣 =====
+function getDayKey() {
+  const now = new Date();
+  return now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate();
+}
+
 function getWeeklySale() {
-  const weekKey = 'weeklySale_' + getWeekKey();
-  let sale = JSON.parse(localStorage.getItem(weekKey) || 'null');
+  const dayKey = 'dailySale_' + getDayKey();
+  let sale = JSON.parse(localStorage.getItem(dayKey) || 'null');
   if (!sale) {
-    const items = MARKET_PRODUCTS.luxury;
+    // 清除昨天的key（可选，防止localStorage堆积）
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+    const yKey = 'dailySale_' + yesterday.getFullYear() + '-' + (yesterday.getMonth()+1) + '-' + yesterday.getDate();
+    localStorage.removeItem(yKey);
+    // 只从未购买的商品里选打折
+    const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+    const items = MARKET_PRODUCTS.luxury.filter(p => !purchased.includes(p.name));
+    if (items.length === 0) return null; // 全买完了就没有打折
     const pick = items[Math.floor(Math.random() * items.length)];
-    const discounts = [0.75, 0.8, 0.85];
+    const discounts = [0.7, 0.75, 0.8, 0.85];
     sale = { name: pick.name, discount: discounts[Math.floor(Math.random() * discounts.length)] };
-    localStorage.setItem(weekKey, JSON.stringify(sale));
+    localStorage.setItem(dayKey, JSON.stringify(sale));
   }
   return sale;
 }
