@@ -598,31 +598,6 @@
     </div>
   </div>
 
-  <!-- 购买确认弹窗 -->
-  <div id="buyModalOverlay" class="buy-modal-overlay" onclick="closeBuyModal()">
-    <div class="buy-modal" onclick="event.stopPropagation()">
-      <div id="buyModalEmoji" class="buy-modal-emoji"></div>
-      <div id="buyModalName" class="buy-modal-name"></div>
-      <div id="buyModalDesc" class="buy-modal-desc"></div>
-      <div id="buyModalPrice" class="buy-modal-price"></div>
-      <div id="buyModalBalance" class="buy-modal-balance"></div>
-      <div id="buyModalReason" class="buy-modal-reason" style="display:none;"></div>
-      <div class="buy-modal-btns">
-        <button class="buy-modal-cancel" onclick="closeBuyModal()">取消</button>
-        <button class="buy-modal-confirm" onclick="confirmPurchase()">确认购买</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 快递详情弹窗 -->
-  <div id="deliveryModal" class="delivery-modal-overlay" style="display:none;" onclick="closeDeliveryModal()">
-    <div class="delivery-modal" onclick="event.stopPropagation()">
-      <div id="deliveryModalTitle" class="delivery-modal-title"></div>
-      <div id="deliveryModalContent" class="delivery-modal-content"></div>
-      <button class="delivery-modal-close" onclick="closeDeliveryModal()">关闭</button>
-    </div>
-  </div>
-
   <!-- 收藏页 -->
   <div class="screen" id="collectionScreen">
     <div class="screen-header">
@@ -760,6 +735,32 @@
       </div>
 
       <div class="secret-save-hint">✅ 所有内容自动保存，Ghost 会悄悄记住这些</div>
+    </div>
+  </div>
+
+
+  <!-- 购买确认弹窗 -->
+  <div id="buyModalOverlay" class="buy-modal-overlay" onclick="closeBuyModal()">
+    <div class="buy-modal" onclick="event.stopPropagation()">
+      <div id="buyModalEmoji" class="buy-modal-emoji"></div>
+      <div id="buyModalName" class="buy-modal-name"></div>
+      <div id="buyModalDesc" class="buy-modal-desc"></div>
+      <div id="buyModalPrice" class="buy-modal-price"></div>
+      <div id="buyModalBalance" class="buy-modal-balance"></div>
+      <div id="buyModalReason" class="buy-modal-reason" style="display:none;"></div>
+      <div class="buy-modal-btns">
+        <button class="buy-modal-cancel" onclick="closeBuyModal()">取消</button>
+        <button class="buy-modal-confirm" onclick="confirmPurchase()">确认购买</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快递详情弹窗 -->
+  <div id="deliveryModal" class="delivery-modal-overlay" style="display:none;" onclick="closeDeliveryModal()">
+    <div class="delivery-modal" onclick="event.stopPropagation()">
+      <div id="deliveryModalTitle" class="delivery-modal-title"></div>
+      <div id="deliveryModalContent" class="delivery-modal-content"></div>
+      <button class="delivery-modal-close" onclick="closeDeliveryModal()">关闭</button>
     </div>
   </div>
 

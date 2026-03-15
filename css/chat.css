@@ -1594,7 +1594,7 @@
 
 
 /* ===== 商城页面 ===== */
-#marketScreen { display: flex; flex-direction: column; overflow: hidden; }
+#marketScreen { flex-direction: column; overflow: hidden; }
 .market-balance-bar {
     background: linear-gradient(135deg, rgba(216,180,254,0.4), rgba(249,168,212,0.35));
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
