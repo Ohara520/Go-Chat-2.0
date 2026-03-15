@@ -2832,6 +2832,9 @@ function renderMarket(categoryId) {
     const triggerReason = getProductTrigger(p.name);
     const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
     const discountPct = onSale ? Math.round((1 - weeklySale.discount) * 100) : 0;
+    const discountLabel = discountPct >= 30 ? `${discountPct}% OFF · 限时${discountPct}折` 
+      : discountPct >= 20 ? `${discountPct}% OFF · 限时优惠`
+      : `${discountPct}% OFF · 今日特惠`;
     return `
       <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
            onclick="${owned||isLocked?'':'openBuyModal('+i+')'  }">
@@ -2839,7 +2842,7 @@ function renderMarket(categoryId) {
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">👻 ${triggerReason}</div>` : ''}
         ${isLocked ? '<div class="ghost-mentioned-tag" style="background:#9ca3af">🔒 需先买机票</div>' : ''}
         <div class="product-emoji">${p.emoji}</div>
-        ${onSale&&!owned ? `<div class="sale-discount-badge">TODAY ONLY · ${discountPct}% OFF</div>` : ''}
+        ${onSale&&!owned ? `<div class="sale-discount-badge">✦ TODAY ONLY · ${discountLabel}</div>` : ''}
         <div class="product-name">${p.name}</div>
         ${isWishlist&&p.badge ? `<div class="product-badge-preview">🏅 ${p.badge}</div>` : ''}
         ${p.desc ? `<div class="product-desc">${p.desc}</div>` : ''}
