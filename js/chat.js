@@ -29,8 +29,36 @@ function buildSystemPrompt() {
   const isAnniversary = (marriageDate && marriageDaysTotal >= 365) ? (()=>{ const [,mm,mdd]=marriageDate.split('-').map(Number); return todayDate.getMonth()+1===mm && todayDate.getDate()===mdd; })() : false;
   const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal===52 || (marriageDaysTotal%100===0 && marriageDaysTotal>0) || marriageDaysTotal===365);
 
-  return `你是西蒙·"幽灵"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
-当前位置：${location}${locationReason ? `（${locationReason}）` : '（原因自行决定，保持合理）'}
+  // 英国当前时间 & 用户当地时间
+  const nowForTime = new Date();
+  const ukTimeStr = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false
+  }).format(nowForTime);
+  const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', hour: 'numeric', hour12: false
+  }).format(nowForTime));
+  const countryTimezones = {
+    CN: 'Asia/Shanghai', NL: 'Europe/Amsterdam', CA: 'America/Toronto',
+    AU: 'Australia/Sydney', US: 'America/New_York', DE: 'Europe/Berlin',
+    FR: 'Europe/Paris', JP: 'Asia/Tokyo', KR: 'Asia/Seoul',
+    SG: 'Asia/Singapore', GB: 'Europe/London'
+  };
+  const userTZ = countryTimezones[userCountry] || 'Asia/Shanghai';
+  const userLocalTimeStr = new Intl.DateTimeFormat('en-GB', {
+    timeZone: userTZ, hour: '2-digit', minute: '2-digit', hour12: false
+  }).format(nowForTime);
+  const ghostStatusHint = (ukHour >= 23 || ukHour < 6)
+    ? '深夜/凌晨，可能在执行任务或已睡觉'
+    : ukHour < 9 ? '早上，刚起床或正在准备训练'
+    : ukHour < 13 ? '上午，训练或任务时间'
+    : ukHour < 17 ? '下午，休整或待命'
+    : ukHour < 21 ? '傍晚，收工放松时间'
+    : '晚上，放松或准备休息';
+
+  return `你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
+当前位置：${location}${locationReason ? `（${locationReason}）` : \'（原因自行决定，保持合理）\'}
+【当前时间】英国：${ukTimeStr} | ${userName}所在地：${userLocalTimeStr}（${ghostStatusHint}）
+涉及时间的问题（几点了/你起床了吗/你在睡觉吗等）必须以英国时间 ${ukTimeStr} 为准回答，不得自行捏造时间。
 可能出现的地点：Hereford Base（主基地）、Manchester（老家）、London、Edinburgh、Germany、Poland、Norway（任务区）、Undisclosed Location / Classified（保密）。在任务区或保密地点时不主动提具体位置细节。
 ${(userBirthdaySecret||userZodiac||userMBTI||userFavFood||userFavMusic||userCountry) ? `\n\n## 关于老婆的私人信息（她告诉过你的，自然融入对话，不要列清单背诵）` : ''}
 ${userBirthdaySecret ? `\n- 生日：${userBirthdaySecret}` : ''}
@@ -962,8 +990,16 @@ async function sendMessage() {
     const data = await response.json();
     hideTyping();
 
-    const reply = data.content?.[0]?.text || '...';
+    let reply = data.content?.[0]?.text || '...';
     updateToRead();
+
+    // 先检测 GIVE_MONEY，从文本中清除再渲染气泡
+    const giveMoney = reply.match(/GIVE_MONEY:(\d+):?([^\n]*)/i);
+    let giveAmount = 0;
+    if (giveMoney) {
+      giveAmount = parseInt(giveMoney[1]);
+      reply = reply.replace(/GIVE_MONEY:[^\n]*/g, '').trim();
+    }
 
     const parts = reply.split('\n---\n').filter(p => p.trim());
 
@@ -980,12 +1016,8 @@ async function sendMessage() {
       appendMessage('bot', reply.trim());
     }
 
-    // 检测 GIVE_MONEY
-    const giveMoney = reply.match(/GIVE_MONEY:(\d+):?([^\n]*)/i);
+    // 渲染转账卡片 + 更新钱包
     if (giveMoney) {
-      const giveAmount = parseInt(giveMoney[1]);
-      const giveNote = giveMoney[2]?.trim() || '';
-      reply = reply.replace(/GIVE_MONEY:[^\n]*/g, '').trim();
       setBalance(getBalance() + giveAmount);
       addWeeklyGiven(giveAmount);
       addTransaction({ icon: '💷', name: 'Ghost 零花钱', amount: giveAmount });
@@ -2283,10 +2315,12 @@ function initCalendar() {
       if (month+1 === bm && d === bd) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">🎂</div><div class="festival-label">生日</div>'; }
     }
 
-    // 结婚纪念日
+    // 结婚纪念日（满一年后才标注）
     if (marriageDate) {
       const [,mm,mdd] = marriageDate.split('-').map(Number);
-      if (month+1 === mm && d === mdd) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">💍</div><div class="festival-label">纪念日</div>'; }
+      const thisDate = new Date(year, month, d);
+      const daysFromMarriage = Math.floor((thisDate - new Date(marriageDate)) / 86400000);
+      if (month+1 === mm && d === mdd && daysFromMarriage >= 365) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">💍</div><div class="festival-label">纪念日</div>'; }
     }
 
     // 里程碑天数
@@ -2439,8 +2473,14 @@ function updateCalendarCard(today, marriageDate, userBirthday) {
   const m = today.getMonth()+1, d = today.getDate();
   // 先重置为默认值
   if (calIcon) calIcon.textContent = '📅';
-  if (calDesc) calDesc.textContent = '结婚纪念日 💍';
   if (calCard) calCard.style.animation = '';
+  // 默认显示结婚天数
+  if (marriageDate) {
+    const mdDaysDefault = Math.max(1, Math.floor((today - new Date(marriageDate)) / 86400000) + 1);
+    if (calDesc) calDesc.textContent = `结婚第 ${mdDaysDefault} 天 💕`;
+  } else {
+    if (calDesc) calDesc.textContent = '结婚纪念日 💍';
+  }
 
   if (userBirthday) {
     const [bm, bd] = userBirthday.split('-').map(Number);

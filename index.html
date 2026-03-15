@@ -579,6 +579,50 @@
     </div>
   </div>
 
+  <!-- 商城页 -->
+  <div class="screen" id="marketScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">🏪 商城</div>
+      <div id="marketBalanceDisplay" style="font-size:13px;color:#6b3fa0;font-weight:600;margin-left:auto;padding-right:4px;">£0</div>
+    </div>
+    <div class="market-container">
+      <!-- 快递追踪栏 -->
+      <div id="deliveryTracker" class="delivery-tracker" style="display:none;"></div>
+
+      <!-- 分类 Tab -->
+      <div id="categoryTabs" class="category-tabs"></div>
+
+      <!-- 商品网格 -->
+      <div id="productsGrid" class="products-grid"></div>
+    </div>
+  </div>
+
+  <!-- 购买确认弹窗 -->
+  <div id="buyModalOverlay" class="buy-modal-overlay" onclick="closeBuyModal()">
+    <div class="buy-modal" onclick="event.stopPropagation()">
+      <div id="buyModalEmoji" class="buy-modal-emoji"></div>
+      <div id="buyModalName" class="buy-modal-name"></div>
+      <div id="buyModalDesc" class="buy-modal-desc"></div>
+      <div id="buyModalPrice" class="buy-modal-price"></div>
+      <div id="buyModalBalance" class="buy-modal-balance"></div>
+      <div id="buyModalReason" class="buy-modal-reason" style="display:none;"></div>
+      <div class="buy-modal-btns">
+        <button class="buy-modal-cancel" onclick="closeBuyModal()">取消</button>
+        <button class="buy-modal-confirm" onclick="confirmPurchase()">确认购买</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快递详情弹窗 -->
+  <div id="deliveryModal" class="delivery-modal-overlay" style="display:none;" onclick="closeDeliveryModal()">
+    <div class="delivery-modal" onclick="event.stopPropagation()">
+      <div id="deliveryModalTitle" class="delivery-modal-title"></div>
+      <div id="deliveryModalContent" class="delivery-modal-content"></div>
+      <button class="delivery-modal-close" onclick="closeDeliveryModal()">关闭</button>
+    </div>
+  </div>
+
   <!-- 收藏页 -->
   <div class="screen" id="collectionScreen">
     <div class="screen-header">
