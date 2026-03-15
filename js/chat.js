@@ -1594,7 +1594,12 @@ function spawnCouplePetals() {
 
 // ===== 钱包系统 =====
 function getBalance() {
-  return parseFloat(localStorage.getItem('wallet') || '0');
+  // 首次使用初始化100英镑
+  if (localStorage.getItem('wallet') === null) {
+    localStorage.setItem('wallet', '100.00');
+    addTransaction({ icon: '🎁', name: '新婚礼金', amount: 100 });
+  }
+  return parseFloat(localStorage.getItem('wallet') || '100');
 }
 function setBalance(val) {
   localStorage.setItem('wallet', Math.max(0, val).toFixed(2));
@@ -2887,13 +2892,20 @@ function openBuyModal(idx) {
 
   const btn = document.getElementById('buyConfirmBtn');
   const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  const isGhostGift = !!p.isGhostGift;
+  const isUserItem = !!p.isUserItem;
+  // 按钮文案：送Ghost / 自己买 / 心愿单
+  const btnLabel = isWishlist ? '💝 放进我的宝贝'
+    : isGhostGift ? '🎁 寄给 Ghost'
+    : isUserItem ? '🛍️ 购买'
+    : '📦 寄给 Ghost';
   if (purchased.includes(p.name)) {
-    btn.disabled = true; btn.textContent = '✅ 已寄出过了';
+    btn.disabled = true; btn.textContent = isUserItem ? '✅ 已购买' : '✅ 已寄出';
   } else if (bal < total) {
     btn.disabled = true; btn.textContent = '💔 余额不足';
   } else {
     btn.disabled = false;
-    btn.textContent = isWishlist ? '💝 放进我的宝贝' : '💝 寄给 Ghost';
+    btn.textContent = btnLabel;
   }
   document.getElementById('buyModalOverlay').classList.add('show');
 }
@@ -2917,7 +2929,11 @@ function confirmPurchase() {
   if (bal < total) { showToast('💔 余额不足！'); closeBuyModal(); return; }
 
   setBalance(bal - total);
-  addTransaction({ icon: p.emoji, name: (isWishlist ? '心愿 · ' : '寄给Ghost · ') + p.name, amount: -total });
+  const txLabel = isWishlist ? '心愿 · '
+    : p.isGhostGift ? '寄给Ghost · '
+    : p.isUserItem ? '购买 · '
+    : '寄给Ghost · ';
+  addTransaction({ icon: p.emoji, name: txLabel + p.name, amount: -total });
   renderWallet();
 
   const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
@@ -2925,7 +2941,9 @@ function confirmPurchase() {
 
   clearProductTrigger(p.name);
   closeBuyModal();
-  showToast('📦 已寄出！Ghost 会收到的～');
+  if (isWishlist) showToast('💝 已加入心愿单！');
+  else if (p.isUserItem) showToast('🛍️ 购买成功！快递正在准备中～');
+  else showToast('📦 已寄出！Ghost 会收到的～');
 
   // 启动快递（不是心愿单才走快递）
   if (!isWishlist) {
