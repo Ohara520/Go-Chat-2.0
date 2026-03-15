@@ -1307,7 +1307,7 @@ function initCoupleSpace() {
       <div class="couple-sassy-bar" id="sassyBar"></div>
       <div class="couple-deleting-tag">🔥 ${remaining}分钟后删除</div>
       <div class="couple-post-header">
-        <div class="couple-avatar">👻</div>
+        <div class="couple-avatar"><img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
         <div class="couple-post-meta">
           <div class="couple-post-name couple-ghost-name" >${localStorage.getItem('botNickname') || 'Simon Riley'}</div>
           <div class="couple-post-time">刚刚</div>
@@ -1446,7 +1446,8 @@ function renderCoupleFeed(posts) {
     return;
   }
 
-  const emojiMap = { Ghost: '👻', Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
+  const GHOST_AVATAR_HTML = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+  const emojiMap = { Ghost: GHOST_AVATAR_HTML, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
   const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
 
   posts.forEach(item => {
@@ -3116,12 +3117,13 @@ async function triggerLuxuryMoment(product, poster) {
     }).filter(c => c.name && c.en);
 
     // 存入朋友圈
-    const avatarMap = { 'Ghost': '👻', 'Soap': '🧼', 'Gaz': '🎖️', 'Price': '🚬' };
+    const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+    const avatarMap = { 'Ghost': GHOST_AV, 'Soap': '🧼', 'Gaz': '🎖️', 'Price': '🚬' };
     const post = {
       date: new Date().toISOString().slice(0, 10),
       post: {
         en: postEn, zh: postZh,
-        avatar: poster === 'ghost' ? '👻' : (localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0)),
+        avatar: poster === 'ghost' ? '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' : (localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0)),
         name: posterName,
         comments: comments.map(c => ({
           avatar: avatarMap[c.name] || '👤',
