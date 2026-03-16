@@ -1282,10 +1282,29 @@ function initChat() {
       if (msg._recalled) return;
       const parts = msg.content.split(/\n---\n/);
       parts.forEach(part => appendMessage('bot', part.trim(), false));
-      // 重建转账卡片
+      // 重建转账卡片（静态版，不走setTimeout，防重复）
       if (msg._transfer) {
         const container = document.getElementById('messagesContainer');
-        if (container) showGhostTransferCard(container, msg._transfer.amount, '', msg._transfer.isRefund);
+        const cardId = 'transfer_' + chatHistory.indexOf(msg);
+        if (container && !document.getElementById(cardId)) {
+          const { amount, isRefund } = msg._transfer;
+          const divIn = document.createElement('div');
+          divIn.className = 'message user';
+          divIn.id = cardId;
+          divIn.innerHTML = `<div class="transfer-card user-transfer-card">
+            <div class="transfer-card-top">
+              <div class="transfer-label">RECEIVED</div>
+              <div class="transfer-name">${isRefund ? '已退款 ✓' : '已到账 ✓'}</div>
+            </div>
+            <div class="transfer-amount-block">
+              <div class="transfer-amount-label">AMOUNT</div>
+              <div class="transfer-amount">£${amount}</div>
+            </div>
+            <div class="transfer-footer">
+              <div class="transfer-status">${isRefund ? '已退款' : '已到账'}</div>
+            </div></div>`;
+          container.appendChild(divIn);
+        }
       }
     }
   });
