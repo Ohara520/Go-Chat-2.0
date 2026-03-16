@@ -1667,6 +1667,34 @@ function scrollToBottom() {
 // ===== 发送消息 =====
 
 // ===== 气泡内心独白 =====
+// 先判断是否口是心非，只有是才生成内心独白
+async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
+  if (!innerThoughtEl) return;
+  try {
+    // 口是心非关键词快速预判——有明显迹象才调Haiku做精确判断
+    const tsunderePatterns = /don't|not|no\.|nah|whatever|fine\.|sure\.|yeah\.|busy|later|need|forget|don't care|couldn't|wouldn't|barely|just|only|don't make|habit|not like|doesn't matter/i;
+    const hasTsundere = tsunderePatterns.test(replyText);
+
+    if (!hasTsundere) {
+      // 没有口是心非迹象，跳过，不生成独白
+      return;
+    }
+
+    // 有迹象，用Haiku精确判断
+    const judge = await callHaiku(
+      '判断这句话是否存在口是心非——嘴上拒绝心里想给、装淡定其实在意、嘴硬但破防了、说不在乎其实很在乎。只返回JSON：{"tsundere":true} 或 {"tsundere":false}',
+      [{ role: 'user', content: `Ghost说：${replyText.slice(0, 100)}` }]
+    );
+    const parsed = JSON.parse(judge.replace(/```json|```/g, '').trim());
+    if (!parsed.tsundere) return; // 不是口是心非，跳过
+  } catch(e) {
+    // 判断失败就跳过，不生成
+    return;
+  }
+  // 确认是口是心非，生成内心独白
+  generateInnerThought(replyText, innerThoughtEl);
+}
+
 async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0) {
   if (!innerThoughtEl) return;
   try {
@@ -1911,9 +1939,9 @@ async function sendMessage() {
     checkStoryOnMessage(text);
     // 长期记忆更新（每20条触发一次）
     updateLongTermMemory();
-    // 气泡内心独白（异步生成，给第一条消息——第一反应更有看头）
+    // 气泡内心独白——只在口是心非时生成，不是每条都有
     const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
-    if (itEl) generateInnerThought(parts[0] || reply, itEl);
+    if (itEl) checkAndGenerateInnerThought(parts[0] || reply, itEl);
     // 快递遗失赔偿检测
     handleLostPackageClaim(text);
 
@@ -4064,6 +4092,16 @@ function getWeeklySale() {
 
 // ===== 商城+情绪触发（合并Haiku调用）=====
 async function checkTriggersAndEmotion(userText, botText) {
+  // 关键词预筛选——没有相关词就不触发Haiku，节省成本
+  const marketKeywords = ['冷','冻','暖','饿','吃','伙食','食物','累了','疲惫','想你','想念','思念','tired','cold','hungry','miss'];
+  const emotionKeywords = ['开心','难过','委屈','饿','累','压力','生病','冷','热','想你','哭','不舒服','心情'];
+  const hasMarketHint = marketKeywords.some(k => (userText + botText).includes(k));
+  const hasEmotionHint = emotionKeywords.some(k => userText.includes(k));
+  if (!hasMarketHint && !hasEmotionHint) {
+    // 直接触发地点特产检测，跳过Haiku
+    checkLocationSpecial(userText, botText);
+    return;
+  }
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
