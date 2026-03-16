@@ -1677,7 +1677,12 @@ function renderCoupleFeed(posts) {
     if (!localStorage.getItem(likeCountKey)) {
       localStorage.setItem(likeCountKey, String(item.likes || Math.floor(Math.random()*60+5)));
     }
-    const likeCount = parseInt(localStorage.getItem(likeCountKey));
+    let likeCount = parseInt(localStorage.getItem(likeCountKey));
+    // 修复脏数据：如果存的是1（旧版本bug），重新随机
+    if (likeCount <= 1 && !isLiked) {
+      likeCount = item.likes || Math.floor(Math.random()*60+5);
+      localStorage.setItem(likeCountKey, String(likeCount));
+    }
     const likeEmoji = isLiked ? '❤️' : '🤍';
 
     const div = document.createElement('div');
