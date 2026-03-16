@@ -1011,17 +1011,15 @@ function appendMessage(role, text, animate = true) {
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
 
-  // 分离英文和中文翻译
+  // 分离英文和中文翻译：找到第一个含中文字符的行作为分界
   const lines = text.split('\n').filter(l => l.trim());
-  const isChinese = s => /[\u4e00-\u9fff]/.test(s);
-  const isMainlyChinese = s => {
-    const zhCount = (s.match(/[\u4e00-\u9fff]/g) || []).length;
-    return zhCount > s.length * 0.2;
-  };
-  if (role === 'bot' && lines.length > 0) {
-    const firstZhIdx = lines.findIndex(l => isMainlyChinese(l));
+  const isChinese = s => /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(s);
+  if (role === 'bot') {
+    const firstZhIdx = lines.findIndex(l => isChinese(l));
     if (firstZhIdx > 0) {
+      // 英文部分：第一个中文行之前的所有行
       const enLines = lines.slice(0, firstZhIdx);
+      // 中文部分：第一个中文行起的所有行
       const zhLines = lines.slice(firstZhIdx);
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
@@ -1032,9 +1030,6 @@ function appendMessage(role, text, animate = true) {
       zhLine.textContent = zhLines.join(' ');
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
-    } else if (firstZhIdx === 0 && lines.length > 1) {
-      // 第一行就是中文，全部当中文显示
-      bubble.textContent = text;
     } else {
       bubble.textContent = text;
     }
@@ -1718,14 +1713,14 @@ function toggleCoupleLike(btn, key) {
     btn.classList.remove('couple-liked');
     count = Math.max(0, count - 1);
     btn.dataset.count = count;
-    if (numEl) { btn.childNodes[0].textContent = '🤍 '; numEl.textContent = count; }
+    if (numEl) { btn.firstChild.textContent = '🤍 '; numEl.textContent = count; }
     else btn.textContent = '🤍 ' + count;
   } else {
     localStorage.setItem(storageKey, '1');
     btn.classList.add('couple-liked');
     count = count + 1;
     btn.dataset.count = count;
-    if (numEl) { btn.childNodes[0].textContent = '❤️ '; numEl.textContent = count; }
+    if (numEl) { btn.firstChild.textContent = '❤️ '; numEl.textContent = count; }
     else btn.textContent = '❤️ ' + count;
   }
 }
@@ -1746,7 +1741,7 @@ async function checkSassyPost(userText, ghostReply) {
         system: '你是情绪判断器。只返回JSON，不要任何其他文字。',
         messages: [{
           role: 'user',
-          content: `用户说："${userText}"\nGhost回复："${ghostReply}"\n\n判断这段对话是否触发了吵架、冷战、吃醋、被晾着、生气中的任意一种。只返回：{"triggered": true/false}`
+          content: `用户说："${userText}"\nGhost回复："${ghostReply}"\n\n严格判断：这段对话是否明显触发了以下情况之一：用户明确说吵架/不理/生气/讨厌/烦/冷战，或Ghost明显在吃醋/生气/冷漠回应争吵。日常聊天、撒娇、普通对话不算触发。只返回：{"triggered": true/false}`
         }]
       })
     });
