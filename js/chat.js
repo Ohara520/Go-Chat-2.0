@@ -1754,6 +1754,7 @@ async function sendMessage() {
 
     const parts = reply.split('\n---\n').filter(p => p.trim());
     let lastBotResult = null;
+    let firstBotResult = null;
 
     if (parts.length > 1) {
       for (let i = 0; i < parts.length; i++) {
@@ -1762,10 +1763,13 @@ async function sendMessage() {
           await new Promise(resolve => setTimeout(resolve, 1500));
           hideTyping();
         }
-        lastBotResult = appendMessage('bot', parts[i].trim());
+        const result = appendMessage('bot', parts[i].trim());
+        if (i === 0) firstBotResult = result;
+        lastBotResult = result;
       }
     } else {
       lastBotResult = appendMessage('bot', reply.trim());
+      firstBotResult = lastBotResult;
     }
 
     // 消息撤回：4%概率，发完3-6秒后撤回，重新打一条
@@ -1871,9 +1875,9 @@ async function sendMessage() {
     checkStoryOnMessage(text);
     // 长期记忆更新（每20条触发一次）
     updateLongTermMemory();
-    // 气泡内心独白（异步生成，不阻塞主流程）
-    const itEl = lastBotResult ? lastBotResult.innerThoughtEl : null;
-    if (itEl) generateInnerThought(reply, itEl);
+    // 气泡内心独白（异步生成，给第一条消息——第一反应更有看头）
+    const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
+    if (itEl) generateInnerThought(parts[0] || reply, itEl);
     // 快递遗失赔偿检测
     handleLostPackageClaim(text);
 
