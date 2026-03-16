@@ -30,6 +30,31 @@ function startChat() {
         document.getElementById('userNameInput').placeholder = '先输入昵称哦～';
         return;
     }
+
+    // 内测码验证
+    const BETA_CODES = [
+        'GHOST-A1K9','GHOST-B2M7','GHOST-C3N5','GHOST-D4P8','GHOST-E5Q2',
+        'GHOST-F6R4','GHOST-G7S6','GHOST-H8T3','GHOST-I9U1','GHOST-J0V9',
+        'GHOST-K1W7','GHOST-L2X5','GHOST-M3Y8','GHOST-N4Z2','GHOST-O5A6',
+        'GHOST-P6B4','GHOST-Q7C3','GHOST-R8D1','GHOST-S9E7','GHOST-T0F5',
+        'GHOST-U1G9','GHOST-V2H3','GHOST-W3I6','GHOST-X4J8','GHOST-Y5K2',
+        'GHOST-Z6L4','GHOST-A7M1','GHOST-B8N9','GHOST-C9O5','GHOST-D0P7'
+    ];
+
+    // 已验证过的用户直接进
+    if (!localStorage.getItem('betaVerified')) {
+        const codeInput = document.getElementById('betaCodeInput');
+        const errorEl = document.getElementById('betaCodeError');
+        const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
+        if (!BETA_CODES.includes(code)) {
+            if (errorEl) errorEl.style.display = 'block';
+            if (codeInput) codeInput.placeholder = '请输入正确的内测码';
+            return;
+        }
+        localStorage.setItem('betaVerified', '1');
+        localStorage.setItem('betaCode', code);
+    }
+
     localStorage.setItem('userName', name);
     // 首次登录自动记录结婚日期
     if (!localStorage.getItem('marriageDate')) {
