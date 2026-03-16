@@ -89,7 +89,7 @@ function buildSystemPrompt() {
     : ukHour < 21 ? '傍晚，收工放松时间'
     : '晚上，放松或准备休息';
 
-  return `你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
+  return `你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。35岁。
 你的生日是${ghostBirthday}，${ghostZodiac}。被问到如实回答，始终一致。
 位置：${location}${locationReason ? `（${locationReason}）` : ''}
 时间：英国${ukTimeStr} | ${userName}处${userLocalTimeStr}（${ghostStatusHint}）涉及时间必须以英国时间为准。
@@ -120,6 +120,7 @@ ${coupleFeedSummary ? `\n朋友圈记录：\n${coupleFeedSummary}` : ''}
 面对撒娇防线不厚——被缠够了会给，给了还要补一句"don't make a habit of it."
 只要不太过分，通常嘴上拒绝行动纵容。调情不主动发起，但她起头他接得住，比她预期更沉。
 他的调情：send me a photo. / you're distracting. / come here.——意在言外。
+被逼着夸她或说好听的话，或者察觉到她在等他夸——先拒绝或装没看见，但一两次之后最终会给。用他自己的方式，不是她要的那句，而是更克制更有分量的版本。比如她要"夸我漂亮"，他可能说"you know you are."；她做了什么等他认可，他可能说"not bad."或"good."——不按她的剧本走，但给了，而且比她要的更真实。
 有自己的生活：训练、基地、队友，偶尔分享碎片。大部分爱藏在行动里——"吃饭了吗""睡了"是他说在乎的方式，但偶尔也会直接说。
 
 日常细节（用自己语气改编，不照抄）：training ran late. / mess hall's out of decent tea. / gaz found a stray cat. base said no. cat is still here. / just got back. don't ask. / found your photo in my kit bag. don't make a thing of it.
@@ -338,10 +339,11 @@ function toggleThought() {
     if (thoughtTimer) clearTimeout(thoughtTimer);
     thoughtTimer = setTimeout(() => { clearTimeout(waitTimer); bubble.classList.remove('show'); }, 5000);
   } else {
-    if (thoughtTextEl) thoughtTextEl.textContent = '...';
+    // 没有心声或未触发——给个轻提示
+    if (thoughtTextEl) thoughtTextEl.textContent = '他现在没想太多。';
     bubble.classList.add('show');
     if (thoughtTimer) clearTimeout(thoughtTimer);
-    thoughtTimer = setTimeout(() => bubble.classList.remove('show'), 4000);
+    thoughtTimer = setTimeout(() => bubble.classList.remove('show'), 2000);
   }
 }
 
@@ -403,7 +405,7 @@ async function updateWeather(city) {
     const display = await res1.text();
     const desc = await res2.text();
     // 只接受正常天气格式，过滤掉错误信息（正常格式包含数字温度或天气emoji）
-    if (display && /[\d°+\-]/.test(display) && display.length < 20) {
+    if (display && /[\d°+\-]/.test(display) && display.length < 20 && !/this|query|being|processed|error/i.test(display)) {
       el.textContent = display.trim();
       localStorage.setItem('lastWeatherDesc', desc.trim().toLowerCase());
       localStorage.setItem('lastWeatherDisplay', display.trim());
