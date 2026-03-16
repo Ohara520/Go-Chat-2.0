@@ -416,11 +416,29 @@ function toggleThought() {
   if (bubble.classList.contains('show')) {
     bubble.classList.remove('show');
     if (thoughtTimer) clearTimeout(thoughtTimer);
-  } else {
-    bubble.classList.add('show');
-    if (thoughtTimer) clearTimeout(thoughtTimer);
-    thoughtTimer = setTimeout(() => bubble.classList.remove('show'), 3000);
+    return;
   }
+
+  // 找最后一条bot消息的内心独白内容
+  const allBotMsgs = document.querySelectorAll('.message.bot');
+  if (!allBotMsgs.length) return;
+  const lastBot = allBotMsgs[allBotMsgs.length - 1];
+  const itEl = lastBot ? lastBot.querySelector('.inner-thought') : null;
+  const thoughtTextEl = document.getElementById('thoughtText');
+
+  if (itEl && itEl.dataset.ready === '1') {
+    const enEl = itEl.querySelector('.it-en');
+    const zhEl = itEl.querySelector('.it-zh');
+    if (thoughtTextEl && enEl) {
+      thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${enEl.textContent}</div><div style="font-size:11px;opacity:0.6">${zhEl ? zhEl.textContent : ''}</div>`;
+    }
+  } else {
+    if (thoughtTextEl) thoughtTextEl.textContent = '...';
+  }
+
+  bubble.classList.add('show');
+  if (thoughtTimer) clearTimeout(thoughtTimer);
+  thoughtTimer = setTimeout(() => bubble.classList.remove('show'), 4000);
 }
 
 function updateThought(text) {
@@ -1068,18 +1086,11 @@ function appendMessage(role, text, animate = true) {
     // 点击气泡显示/隐藏收藏按钮
     bubble.style.cursor = 'pointer';
     bubble.onclick = function(e) {
-      // 隐藏其他所有收藏按钮和内心独白
+      // 隐藏其他所有收藏按钮
       document.querySelectorAll('.message-actions').forEach(a => {
         if (a !== actions) a.style.display = 'none';
       });
-      document.querySelectorAll('.inner-thought').forEach(t => {
-        if (t !== innerThought) t.style.display = 'none';
-      });
       actions.style.display = actions.style.display === 'none' ? 'flex' : 'none';
-      // 显示内心独白
-      if (innerThought && innerThought.dataset.ready === '1') {
-        innerThought.style.display = innerThought.style.display === 'none' ? 'block' : 'none';
-      }
     };
   }
 
