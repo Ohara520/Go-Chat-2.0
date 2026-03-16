@@ -1002,7 +1002,7 @@ function checkOfflinePenalty() {
     const todayKey = 'ghostInitMsg_' + new Date().toDateString();
     if (!localStorage.getItem(todayKey)) {
       localStorage.setItem(todayKey, '1');
-      setTimeout(() => ghostSendInitMessage(hours), 3000);
+      setTimeout(() => ghostSendInitMessage(hours), 6000);
     }
   }
   localStorage.setItem('lastOnlineTime', Date.now());
@@ -1514,7 +1514,7 @@ async function sendMessage() {
   saveHistory();
 
   // 已读不回：低心情且非冷战，5%概率触发，显示已读但延迟30-90秒才回
-  const mood = getMood ? getMood() : 5;
+  const mood = getMoodLevel ? getMoodLevel() : 5;
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const ghostReadDelay = !coldWar && mood <= 4 && Math.random() < 0.05
     ? (Math.floor(Math.random() * 60) + 30) * 1000
@@ -1579,6 +1579,13 @@ async function sendMessage() {
         const bubble = msgDiv.querySelector('.message-bubble');
         if (bubble) {
           bubble.innerHTML = '<span style="opacity:0.4;font-size:11px;font-style:italic">Ghost 撤回了一条消息</span>';
+        }
+        // 把chatHistory里最后一条assistant消息标记为已撤回，不删除（保留上下文）
+        const lastAssIdx = [...chatHistory].reverse().findIndex(m => m.role === 'assistant' && !m._recalled);
+        if (lastAssIdx !== -1) {
+          chatHistory[chatHistory.length - 1 - lastAssIdx]._recalled = true;
+          chatHistory[chatHistory.length - 1 - lastAssIdx].content = '[撤回的消息]';
+          saveHistory();
         }
         // 撤回后1.5秒重新打字发新消息
         await new Promise(r => setTimeout(r, 1500));
