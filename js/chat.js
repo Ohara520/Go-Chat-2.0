@@ -1279,6 +1279,9 @@ function appendMessage(role, text, animate = true) {
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
 
+  // 渲染前清理系统标记
+  text = text.replace(/\n?(REFUND|KEEP)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
+
   // 分离英文和中文翻译：找到第一个含中文字符的行作为分界
   const lines = text.split('\n').filter(l => l.trim());
   const isChinese = s => /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(s);
@@ -1287,8 +1290,8 @@ function appendMessage(role, text, animate = true) {
     if (firstZhIdx > 0) {
       // 英文部分：第一个中文行之前的所有行
       const enLines = lines.slice(0, firstZhIdx);
-      // 中文部分：第一个中文行起的所有行
-      const zhLines = lines.slice(firstZhIdx);
+      // 中文部分：第一个中文行起的所有行（清理掉混入的全大写英文词）
+      const zhLines = lines.slice(firstZhIdx).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l);
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
       enLine.textContent = enLines.join('\n');
