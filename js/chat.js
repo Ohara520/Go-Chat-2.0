@@ -3008,7 +3008,7 @@ function selectMeetType(key, el) {
   localStorage.setItem('meetType', key);
 }
 
-
+function selectColor(name, el) {
   const dots = document.querySelectorAll('#colorChips .secret-color-dot');
   const selected = document.querySelectorAll('#colorChips .secret-color-dot.selected');
   if (el.classList.contains('selected')) {
@@ -3136,6 +3136,7 @@ const MARKET_PRODUCTS = {
     { emoji: '🍵', name: '杭州龙井茶',       desc: '明前龙井，铁罐装，清香',               price: 58, shipping: 20, isFromHome: true },
     { emoji: '🥜', name: '新疆坚果礼盒',     desc: '核桃、红枣、巴旦木，产地直发',         price: 42, shipping: 20, isFromHome: true },
   ],
+  wishlist: [
     { emoji: '💄', name: '口红套装',       desc: '犒劳一下自己，你值得最美的颜色', price: 180,  badge: '精致女孩',   ghostMsg: 'Send me a picture. Now.\n发照片给我。现在。' },
     { emoji: '👜', name: '小方包',         desc: '梦想中的那只包，终于攒够了',     price: 680,  badge: '包治百病',   ghostMsg: "You actually did it. I knew you would.\n你真的做到了。我就知道。" },
     { emoji: '🧴', name: '高端护肤套装',   desc: 'La Mer 同款，好好爱护自己',      price: 450,  badge: '自我宠爱',   ghostMsg: "Good. Take care of yourself when I can't.\n很好。我不在的时候好好照顾自己。" },
