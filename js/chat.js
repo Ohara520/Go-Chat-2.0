@@ -1446,9 +1446,14 @@ function initChat() {
       if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') || /\b(REFUND|KEEP)\b/.test(msg.content)) return;
       appendMessage('user', msg.content, false);
     } else if (msg.role === 'assistant') {
-      if (msg._recalled) return; // 撤回的消息不渲染
+      if (msg._recalled) return;
       const parts = msg.content.split(/\n---\n/);
       parts.forEach(part => appendMessage('bot', part.trim(), false));
+      // 重建转账卡片
+      if (msg._transfer) {
+        const container = document.getElementById('messagesContainer');
+        if (container) showGhostTransferCard(container, msg._transfer.amount, '', msg._transfer.isRefund);
+      }
     }
   });
   scrollToBottom();
@@ -1897,7 +1902,7 @@ async function sendMessage() {
       });
     }
 
-    chatHistory.push({ role: 'assistant', content: reply });
+    chatHistory.push({ role: 'assistant', content: reply, ...(giveMoney ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
     saveHistory();
     checkSassyPost(text, reply);
     // 合并触发：商城高亮+情绪反寄（一次Haiku）
