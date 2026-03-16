@@ -2988,7 +2988,6 @@ const MARKET_PRODUCTS = {
     { emoji: '🧥', name: 'Burberry 风衣', desc: '经典格纹衬里，英伦标志', price: 1650, shipping: 35, isUserItem: true, lostReplace: { emoji: '🧥', name: '名牌马甲/外套', desc: 'Ghost补寄，他亲自选的款式' } },
     { emoji: '💄', name: 'La Mer 护肤礼盒', desc: '海蓝之谜限定套装，面霜+精华', price: 680, shipping: 35, isUserItem: true, lostReplace: { emoji: '💆', name: '昂贵面霜/面膜套装', desc: 'Ghost说护肤不能断' } },
     { emoji: '🌹', name: '999朵永生玫瑰礼盒', desc: '永不凋谢的玫瑰，红色，像你一样固执', price: 1280, shipping: 35, isUserItem: true, lostReplace: { emoji: '🌸', name: '玫瑰香氛/玫瑰标本', desc: 'Ghost补的，不会再丢了' } },
-    { emoji: '✈️', name: '头等舱机票升级', desc: '先买去曼城的机票才能升级', price: 3200, shipping: 0, isUserItem: true, noLost: true, requiresItem: '去曼城找他的机票' },
     { emoji: '💎', name: 'Cartier 戒指（情侣款）', desc: 'Love系列，你戴一枚，他戴一枚', price: 5800, shipping: 35, isUserItem: true, lostReplace: { emoji: '🎖️', name: '定制军牌', desc: 'Ghost刻了两个人的名字' } },
     { emoji: '⌚', name: 'Rolex 劳力士（送 Ghost）', desc: 'Submariner 潜航者，他不会承认自己喜欢', price: 8500, shipping: 35, isGhostGift: true, lostReplace: { emoji: '👜', name: '名牌包包', desc: 'Ghost说抱歉，补了一个' } },
     { emoji: '🥃', name: 'Macallan 18年威士忌礼盒', desc: '麦卡伦18年单一麦芽，限量礼盒装', price: 420, shipping: 35, isGhostGift: true, lostReplace: { emoji: '🏮', name: '燕窝/昂贵花茶', desc: 'Ghost说换点对你有用的' } },
