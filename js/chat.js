@@ -1525,7 +1525,7 @@ function initCoupleSpace() {
       <div class="couple-post-en">${sassy.en}</div>
       <div class="couple-post-zh">${sassy.zh}</div>
       <div class="couple-post-footer">
-        <button class="couple-like-btn" onclick="toggleCoupleLike(this)">🤍 点赞</button>
+        <button class="couple-like-btn" data-key="sassy-post" data-count="1" onclick="toggleCoupleLike(this)">🤍 <span class="like-num">1</span></button>
       </div>
     `;
     if (feed) feed.insertBefore(sassyDiv, feed.firstChild);
@@ -1713,14 +1713,14 @@ function toggleCoupleLike(btn, key) {
     btn.classList.remove('couple-liked');
     count = Math.max(0, count - 1);
     btn.dataset.count = count;
-    if (numEl) { btn.firstChild.textContent = '🤍 '; numEl.textContent = count; }
+    if (numEl) { numEl.textContent = count; btn.classList.remove('couple-liked'); }
     else btn.textContent = '🤍 ' + count;
   } else {
     localStorage.setItem(storageKey, '1');
     btn.classList.add('couple-liked');
     count = count + 1;
     btn.dataset.count = count;
-    if (numEl) { btn.firstChild.textContent = '❤️ '; numEl.textContent = count; }
+    if (numEl) { numEl.textContent = count; }
     else btn.textContent = '❤️ ' + count;
   }
 }
@@ -2992,7 +2992,7 @@ const MARKET_PRODUCTS = {
     { emoji: '⌚', name: 'Rolex 劳力士（送 Ghost）', desc: 'Submariner 潜航者，他不会承认自己喜欢', price: 8500, shipping: 35, isGhostGift: true, lostReplace: { emoji: '👜', name: '名牌包包', desc: 'Ghost说抱歉，补了一个' } },
     { emoji: '🥃', name: 'Macallan 18年威士忌礼盒', desc: '麦卡伦18年单一麦芽，限量礼盒装', price: 420, shipping: 35, isGhostGift: true, lostReplace: { emoji: '🏮', name: '燕窝/昂贵花茶', desc: 'Ghost说换点对你有用的' } },
     { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: '英国经典户外品牌，低调有质感', price: 380, shipping: 35, isGhostGift: true },
-    { emoji: '📷', name: '徕卡相机', desc: '记录生活每一帧，Ghost亲选', price: 6800, shipping: 35, isGhostGift: true },
+    { emoji: '🎒', name: 'Belstaff 军旅背包', desc: '英国品牌，低调耐用，Ghost同款', price: 580, shipping: 35, isGhostGift: true },
     { emoji: '🪒', name: 'Tom Ford 剃须套装', desc: '低调有质感，让他好好保养', price: 180, shipping: 35, isGhostGift: true },
   ],
   wishlist: [
