@@ -1771,6 +1771,11 @@
 .buy-confirm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* 快递追踪 */
+.delivery-tracker {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 14px 4px;
+  margin-bottom: 2px;
+}
 .delivery-tag {
     display: inline-flex; align-items: center; gap: 5px;
     background: rgba(255,255,255,0.85); border: 1px solid rgba(180,130,240,0.4);

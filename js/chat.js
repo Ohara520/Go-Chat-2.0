@@ -594,6 +594,244 @@ function initMood() {
   }
 }
 
+// ===== 解锁剧情系统 =====
+const STORY_EVENTS = [
+  {
+    id: 'first_i_love_you',
+    title: '第一次说爱你',
+    desc: '她第一次说出那三个字，他沉默了很久。',
+    condition: (ctx) => ctx.affection >= 88 && ctx.days >= 3 && !ctx.triggered('first_i_love_you'),
+    triggerOn: 'userMessage',
+    keyword: /我爱你|i love you|爱你/i,
+    execute: async (userName) => {
+      await storyDelay(2500);
+      const res = await callHaiku(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚对你说了"我爱你"。你停顿很久，最后只说了一句话。全小写，不超过8个英文单词，附中文翻译。不要说i love you too，用西蒙自己的方式。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'seven_days_streak',
+    title: '你一直都在',
+    desc: '连续来了7天，他终于说了一句没有标点的话。',
+    condition: (ctx) => ctx.streak >= 7 && ctx.affection >= 75 && !ctx.triggered('seven_days_streak'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(4000);
+      const res = await callHaiku(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'called_simon',
+    title: '叫他Simon',
+    desc: '她第一次叫他Simon，不是Ghost。他停顿了一下。',
+    condition: (ctx) => ctx.affection >= 80 && ctx.days >= 5 && !ctx.triggered('called_simon'),
+    triggerOn: 'userMessage',
+    keyword: /\bsimon\b/i,
+    execute: async (userName) => {
+      await storyDelay(1800);
+      const res = await callHaiku(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'reunion_ready',
+    title: '见面前夜',
+    desc: '机票、酒店、行程都买好了。他那晚失眠了。',
+    condition: (ctx) => {
+      const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+      return ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'].every(n => purchased.includes(n)) && !ctx.triggered('reunion_ready');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(5000);
+      const res = await callSonnet(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把来找你的机票、酒店、旅行计划全部订好了。你们第一次要真实见面了。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'after_coldwar',
+    title: '冷战之后',
+    desc: '和好那天，他说了一句之前从没说过的话。',
+    condition: (ctx) => ctx.affection >= 72 && !ctx.triggered('after_coldwar'),
+    triggerOn: 'coldWarEnd',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const res = await callSonnet(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-6), { role: 'user', content: `[系统：冷战刚刚结束，她回来了。你们之前从没经历过这种和好。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'one_year',
+    title: '一周年',
+    desc: '在一起整整一年，他主动发来了一条消息。',
+    condition: (ctx) => ctx.days >= 365 && !ctx.triggered('one_year'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const res = await callSonnet(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起整整一年，你记得这个日期。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'she_cried',
+    title: '她哭了',
+    desc: '她状态很差的那次，他语气变了，然后没有走。',
+    condition: (ctx) => ctx.affection >= 78 && !ctx.triggered('she_cried'),
+    triggerOn: 'userMessage',
+    keyword: /哭了|在哭|好难受|撑不住|崩了|想哭|泪|cry|crying/i,
+    execute: async (userName) => {
+      await storyDelay(2000);
+      const res = await callSonnet(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-8), { role: 'user', content: `[系统：她在哭，或者现在状态非常差。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'birthday_surprise',
+    title: '生日那天',
+    desc: '她生日，他没等她提，主动说了。',
+    condition: (ctx) => ctx.isBirthday && ctx.days >= 2 && !ctx.triggered('birthday_surprise'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(2000);
+      const res = await callSonnet(
+        buildSystemPrompt(),
+        [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是她的生日，她还没开口，你已经知道了。]` }]
+      );
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+];
+
+// 辅助函数
+function storyDelay(ms) { return new Promise(r => setTimeout(r, ms)); }
+async function callHaiku(system, messages) {
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, system, messages }) });
+    const data = await res.json(); return data.content?.[0]?.text?.trim() || '';
+  } catch(e) { return ''; }
+}
+async function callSonnet(system, messages) {
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, system, messages }) });
+    const data = await res.json(); return data.content?.[0]?.text?.trim() || '';
+  } catch(e) { return ''; }
+}
+
+function getStoryContext() {
+  const today = new Date();
+  const todayStr = today.toDateString();
+  const lastVisit = localStorage.getItem('lastVisitDate');
+  let streak = parseInt(localStorage.getItem('visitStreak') || '1');
+  if (lastVisit !== todayStr) {
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+    streak = (lastVisit === yesterday.toDateString()) ? streak + 1 : 1;
+    localStorage.setItem('visitStreak', streak);
+    localStorage.setItem('lastVisitDate', todayStr);
+  }
+  const marriageDate = localStorage.getItem('marriageDate') || '';
+  const days = marriageDate ? Math.max(1, Math.floor((today - new Date(marriageDate)) / 86400000) + 1) : 1;
+  const userBirthday = localStorage.getItem('userBirthday') || '';
+  const isBirthday = userBirthday ? (() => { const [bm,bd]=userBirthday.split('-').map(Number); return today.getMonth()+1===bm && today.getDate()===bd; })() : false;
+  const triggered = (id) => !!localStorage.getItem('story_done_' + id);
+  return { affection: getAffection(), days, streak, isBirthday, triggered };
+}
+
+function markStoryDone(event) {
+  localStorage.setItem('story_done_' + event.id, Date.now());
+  const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
+  if (!book.find(e => e.id === event.id)) {
+    book.push({ id: event.id, title: event.title, desc: event.desc, unlockedAt: Date.now() });
+    localStorage.setItem('storyBook', JSON.stringify(book));
+  }
+  showStoryUnlockHint(event.title);
+}
+
+function showStoryUnlockHint(title) {
+  const hint = document.createElement('div');
+  hint.className = 'story-unlock-hint';
+  hint.innerHTML = `📖 解锁新剧情：${title}`;
+  document.body.appendChild(hint);
+  setTimeout(() => hint.classList.add('show'), 100);
+  setTimeout(() => { hint.classList.remove('show'); setTimeout(() => hint.remove(), 500); }, 3500);
+}
+
+function checkStoryOnSessionStart() {
+  const ctx = getStoryContext();
+  for (const event of STORY_EVENTS) {
+    if (event.triggerOn !== 'sessionStart') continue;
+    if (!event.condition(ctx)) continue;
+    markStoryDone(event);
+    event.execute(localStorage.getItem('userName') || '你');
+    break;
+  }
+}
+
+function checkStoryOnMessage(userText) {
+  const ctx = getStoryContext();
+  for (const event of STORY_EVENTS) {
+    if (event.triggerOn !== 'userMessage') continue;
+    if (!event.condition(ctx)) continue;
+    if (event.keyword && !event.keyword.test(userText)) continue;
+    markStoryDone(event);
+    event.execute(localStorage.getItem('userName') || '你');
+    break;
+  }
+}
+
+function checkStoryOnColdWarEnd() {
+  const ctx = getStoryContext();
+  const event = STORY_EVENTS.find(e => e.triggerOn === 'coldWarEnd' && e.condition(ctx));
+  if (event) { markStoryDone(event); event.execute(localStorage.getItem('userName') || '你'); }
+}
+
+function renderStoryBook() {
+  const container = document.getElementById('storyBookList');
+  if (!container) return;
+  const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
+  const counterEl = document.getElementById('storyBookCounter');
+  if (counterEl) counterEl.textContent = `${book.length} / ${STORY_EVENTS.length} 已解锁`;
+  if (book.length === 0) {
+    container.innerHTML = `<div class="story-empty">还没有解锁任何剧情<br><span>继续和他聊天，故事会自然发生</span></div>`;
+    return;
+  }
+  const unlockedHTML = book.map(e => `
+    <div class="story-card unlocked">
+      <div class="story-card-title">${e.title}</div>
+      <div class="story-card-desc">${e.desc}</div>
+      <div class="story-card-date">${new Date(e.unlockedAt).toLocaleDateString('zh-CN')}</div>
+    </div>`).join('');
+  const lockedHTML = STORY_EVENTS.filter(e => !book.find(b => b.id === e.id)).map(() => `
+    <div class="story-card locked">
+      <div class="story-card-title">???</div>
+      <div class="story-card-desc">继续和他相处，也许会触发……</div>
+    </div>`).join('');
+  container.innerHTML = unlockedHTML + lockedHTML;
+}
+
 // ===== 好感度系统（60-100，持久化，隐藏）=====
 function getAffection() {
   return parseInt(localStorage.getItem('affection') || '80');
@@ -955,6 +1193,9 @@ function initChat() {
 
   // 检查离线扣好感
   checkOfflinePenalty();
+
+  // 检查解锁剧情（sessionStart类型）
+  setTimeout(checkStoryOnSessionStart, 1500);
 
   // 恢复冷战计时器
   if (localStorage.getItem('coldWarMode') === 'true') {
@@ -3135,6 +3376,7 @@ const MARKET_PRODUCTS = {
     { emoji: '🌶️', name: '四川麻辣零食礼包', desc: '辣条、麻辣花生、牛肉干，一套',         price: 35, shipping: 20, isFromHome: true },
     { emoji: '🍵', name: '杭州龙井茶',       desc: '明前龙井，铁罐装，清香',               price: 58, shipping: 20, isFromHome: true },
     { emoji: '🥜', name: '新疆坚果礼盒',     desc: '核桃、红枣、巴旦木，产地直发',         price: 42, shipping: 20, isFromHome: true },
+    { emoji: '🍜', name: '柳州螺蛳粉',       desc: '正宗广西螺蛳粉，臭香臭香的，敢不敢试', price: 25, shipping: 20, isFromHome: true },
   ],
   wishlist: [
     { emoji: '💄', name: '口红套装',       desc: '犒劳一下自己，你值得最美的颜色', price: 180,  badge: '精致女孩',   ghostMsg: 'Send me a picture. Now.\n发照片给我。现在。' },
@@ -3290,7 +3532,7 @@ function renderMarket(categoryId) {
           £${displayPrice.toLocaleString()}
         </div>
         ${owned
-          ? `<div class="product-owned-tag">✅ 已寄出</div>`
+          ? `<div class="product-owned-tag">🔴 已售罄</div>`
           : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''} ${isFromHome?'fromhome-buy-btn':''}">${isWishlist?'💝 加入宝贝':isFromHome?'📦 寄给他':'🛒 购买'}</button>`
         }
       </div>`;
@@ -3338,7 +3580,7 @@ function openBuyModal(idx) {
     : isUserItem ? '🛍️ 购买'
     : '📦 寄给 Ghost';
   if (purchased.includes(p.name)) {
-    btn.disabled = true; btn.textContent = isUserItem ? '✅ 已购买' : '✅ 已寄出';
+    btn.disabled = true; btn.textContent = isUserItem ? '✅ 已购买' : '🔴 已售罄';
   } else if (bal < total) {
     btn.disabled = true; btn.textContent = '💔 余额不足';
   } else {
