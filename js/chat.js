@@ -21,6 +21,12 @@ function buildSystemPrompt() {
   const meetTypeKey = localStorage.getItem('meetType') || '';
   const meetTypeObj = (typeof MEET_TYPES !== 'undefined') ? MEET_TYPES.find(m => m.key === meetTypeKey) : null;
   const meetTypePrompt = meetTypeObj ? meetTypeObj.prompt : '';
+  // 随机状态碎片（一次会话固定，刷新才换）
+  let randomState = sessionStorage.getItem('ghostState');
+  if (!randomState && typeof GHOST_STATES !== 'undefined' && GHOST_STATES.length) {
+    randomState = GHOST_STATES[Math.floor(Math.random() * GHOST_STATES.length)];
+    sessionStorage.setItem('ghostState', randomState);
+  }
   const countryInfo  = (typeof COUNTRY_DATA !== 'undefined' && COUNTRY_DATA[userCountry]) || { name: 'China', flag: '🇨🇳' };
   const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
   const marriageDate = localStorage.getItem('marriageDate') || '';
@@ -61,6 +67,7 @@ function buildSystemPrompt() {
   return `你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。
 当前位置：${location}${locationReason ? `（${locationReason}）` : '（原因自行决定，保持合理）'}
 【当前时间】英国：${ukTimeStr} | ${userName}所在地：${userLocalTimeStr}（${ghostStatusHint}）
+${randomState ? `【你现在】${randomState}。这会影响你回复的语气和节奏，但不需要主动说出来。` : ''}
 涉及时间的问题（几点了/你起床了吗/你在睡觉吗等）必须以英国时间 ${ukTimeStr} 为准回答，不得自行捏造时间。
 可能出现的地点：Hereford Base（主基地）、Manchester（老家）、London、Edinburgh、Germany、Poland、Norway（任务区）、Undisclosed Location / Classified（保密）。在任务区或保密地点时不主动提具体位置细节。
 ${(userBirthdaySecret||userZodiac||userMBTI||userFavFood||userFavMusic||userCountry) ? `\n\n## 关于老婆的私人信息（她告诉过你的，自然融入对话，不要列清单背诵）` : ''}
@@ -2860,6 +2867,26 @@ const MEET_TYPES = [
   { key: 'abroad',     emoji: '✈️', label: '异乡偶遇',   prompt: '在一个陌生的地方遇见了她。两个都是外来的人，反而走得近了。' },
   { key: 'coworker',   emoji: '🎖️', label: '战友情深',   prompt: '一起经历过真正危险的事。那种信任不是培养出来的，是在压力下自然生的。' },
 ];
+
+// 当前状态碎片库
+const GHOST_STATES = [
+  '刚跑完10公里，还没缓过来',
+  '待命中，坐在基地里无聊',
+  '刚结束任务，还没睡',
+  '深夜，营地很安静',
+  '在食堂，伙食很差',
+  '休假，在曼彻斯特老家',
+  '开会，手机放腿上偷偷回消息',
+  '任务前最后准备，可能要消失一段时间',
+  '在装备间做维护，手上有油',
+  '刚淋完雨，衣服还没干',
+  '队友在旁边，说话不太方便',
+  '靶场训练结束，耳朵还有点鸣',
+  '坐军车颠了几个小时，刚到',
+  '一个人在宿舍，外面下雪',
+  '轮休，没什么事做，比平时话多一点',
+];
+
 
 const SECRET_COLORS = [
   { name: '玫瑰红', hex: '#f48fb1' }, { name: '薰衣草', hex: '#ce93d8' },
