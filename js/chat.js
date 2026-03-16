@@ -997,7 +997,49 @@ function checkOfflinePenalty() {
     const days = Math.floor(hours / 24);
     changeAffection(-Math.min(days - 1, 5)); // 最多扣5
   }
+  // 离线超过12小时，Ghost主动发一条（每次回来只触发一次）
+  if (hours >= 12) {
+    const todayKey = 'ghostInitMsg_' + new Date().toDateString();
+    if (!localStorage.getItem(todayKey)) {
+      localStorage.setItem(todayKey, '1');
+      setTimeout(() => ghostSendInitMessage(hours), 3000);
+    }
+  }
   localStorage.setItem('lastOnlineTime', Date.now());
+}
+
+async function ghostSendInitMessage(offlineHours) {
+  const hintMap = [
+    { min: 12,  max: 24,  hint: '她离线了大半天，刚回来。' },
+    { min: 24,  max: 48,  hint: '她昨天不在，今天才回来。' },
+    { min: 48,  max: 96,  hint: '她消失了两天，刚出现。' },
+    { min: 96,  max: Infinity, hint: '她好几天没来，今天突然回来了。' },
+  ];
+  const hint = hintMap.find(h => offlineHours >= h.min && offlineHours < h.max)?.hint || '';
+  try {
+    showTyping();
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        system: buildSystemPrompt(),
+        messages: [...chatHistory.slice(-6), {
+          role: 'user',
+          content: `[系统：${hint}你注意到了，主动说一句——可以是质问、可以是随口一提、可以是什么都不说只是打个招呼。全小写，附中文翻译。]`
+        }]
+      })
+    });
+    const data = await res.json();
+    hideTyping();
+    const reply = data.content?.[0]?.text?.trim() || '';
+    if (reply) {
+      appendMessage('bot', reply);
+      chatHistory.push({ role: 'assistant', content: reply });
+      saveHistory();
+    }
+  } catch(e) { hideTyping(); }
 }
 
 // ===== 频繁要钱记录 =====
@@ -1470,6 +1512,19 @@ async function sendMessage() {
   appendMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
   saveHistory();
+
+  // 已读不回：低心情且非冷战，5%概率触发，显示已读但延迟30-90秒才回
+  const mood = getMood ? getMood() : 5;
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  const ghostReadDelay = !coldWar && mood <= 4 && Math.random() < 0.05
+    ? (Math.floor(Math.random() * 60) + 30) * 1000
+    : 0;
+
+  if (ghostReadDelay > 0) {
+    updateToRead(); // 立刻显示已读
+    await new Promise(r => setTimeout(r, ghostReadDelay));
+  }
+
   showTyping();
 
   try {
@@ -1512,6 +1567,46 @@ async function sendMessage() {
       }
     } else {
       lastBotResult = appendMessage('bot', reply.trim());
+    }
+
+    // 消息撤回：4%概率，发完3-6秒后撤回，重新打一条
+    if (lastBotResult && !giveMoney && Math.random() < 0.04) {
+      const recallDelay = (Math.floor(Math.random() * 4) + 3) * 1000;
+      setTimeout(async () => {
+        const { msgDiv } = lastBotResult;
+        if (!msgDiv || !msgDiv.parentNode) return;
+        // 替换气泡内容为撤回提示
+        const bubble = msgDiv.querySelector('.message-bubble');
+        if (bubble) {
+          bubble.innerHTML = '<span style="opacity:0.4;font-size:11px;font-style:italic">Ghost 撤回了一条消息</span>';
+        }
+        // 撤回后1.5秒重新打字发新消息
+        await new Promise(r => setTimeout(r, 1500));
+        showTyping();
+        try {
+          const res2 = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 150,
+              system: buildSystemPrompt(),
+              messages: [...chatHistory.slice(-8), {
+                role: 'user',
+                content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，附中文翻译。]'
+              }]
+            })
+          });
+          const d2 = await res2.json();
+          hideTyping();
+          const reply2 = d2.content?.[0]?.text?.trim() || '';
+          if (reply2) {
+            appendMessage('bot', reply2);
+            chatHistory.push({ role: 'assistant', content: reply2 });
+            saveHistory();
+          }
+        } catch(e) { hideTyping(); }
+      }, recallDelay);
     }
 
     // 渲染转账卡片 + 更新钱包
