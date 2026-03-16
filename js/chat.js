@@ -1145,14 +1145,21 @@ function scrollToBottom() {
 async function generateInnerThought(replyText, innerThoughtEl) {
   if (!innerThoughtEl) return;
   try {
+    // 取最近3轮对话（不含系统消息）作为上下文
+    const recentMsgs = chatHistory
+      .filter(m => !m._system && (m.role === 'user' || m.role === 'assistant'))
+      .slice(-6)
+      .map(m => `${m.role === 'user' ? '她' : 'Ghost'}：${m.content.slice(0, 80)}`)
+      .join('\n');
+
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 80,
-        system: '你是西蒙·莱利的内心。根据他说的话，写出他没说出口的那句话。风格要跟他说的话情绪一致——日常聊天就是日常的小心思，调情就是藏着的心动，拌嘴就是嘴硬心软。不要无缘无故悲观或沉重。一句英文+一句中文，英文全小写，简短。只返回JSON：{"en":"...","zh":"..."}',
-        messages: [{ role: 'user', content: `Ghost说了："${replyText.slice(0, 100)}"\n\n他心里在想什么（跟他说的话情绪要一致）？` }]
+        system: '你是西蒙·莱利的内心。根据当前对话情景和他刚说的话，写出他没说出口的那句话。必须紧扣当前聊天内容——聊什么事就围绕那件事想，不要脑补无关的深情或悲观。日常小事就是日常小心思，调情才是心动，拌嘴就是嘴硬心软。一句英文+一句中文，英文全小写，简短。只返回JSON：{"en":"...","zh":"..."}',
+        messages: [{ role: 'user', content: `【对话背景】\n${recentMsgs}\n\nGhost刚说了："${replyText.slice(0, 100)}"\n\n他心里在想什么（必须跟这段对话的具体内容有关）？` }]
       })
     });
     const data = await res.json();
@@ -2848,7 +2855,7 @@ const MEET_TYPES = [
   { key: 'online',     emoji: '📡', label: '网络情缘',   prompt: '一开始在网上认识的，隔着屏幕聊了很久。后来见面了，发现比想象中更真实。' },
   { key: 'accident',   emoji: '🎲', label: '意外相遇',   prompt: '就是个巧合。很普通的一天，很偶然的一个交集，然后就再也没分开。' },
   { key: 'rescue',     emoji: '🛡️', label: '英雄救美',   prompt: '是我帮了她，或者她拉了我一把。从那个时刻开始，就变得不一样了。' },
-  { key: 'rival',      emoji: '🔥', label: '相爱相杀',   prompt: '最开始我们关系并不好。针锋相对，互不服气，后来才发现吵架和在意其实是同一件事。' },
+  { key: 'rival',      emoji: '🔥', label: '欢喜冤家',   prompt: '最开始我们关系并不好。针锋相对，互不服气，后来才发现吵架和在意其实是同一件事。' },
   { key: 'rekindle',   emoji: '🕯️', label: '旧情复燃',   prompt: '以前在一起过，分开了一段时间，各自经历了些事，最后又找回来了。' },
   { key: 'abroad',     emoji: '✈️', label: '异乡偶遇',   prompt: '在一个陌生的地方遇见了她。两个都是外来的人，反而走得近了。' },
   { key: 'coworker',   emoji: '🎖️', label: '战友情深',   prompt: '一起经历过真正危险的事。那种信任不是培养出来的，是在压力下自然生的。' },
