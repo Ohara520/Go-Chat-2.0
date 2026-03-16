@@ -1574,7 +1574,7 @@ function incrementTodayCount() {
   localStorage.setItem(key, count);
   return count;
 }
-const DAILY_LIMIT = 50; // 内测每天50条
+const DAILY_LIMIT = 150; // 内测每天150条
 
 async function sendMessage() {
   const input = document.getElementById('chatInput');
