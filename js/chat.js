@@ -166,7 +166,8 @@ ${coupleFeedSummary ? `\n朋友圈记录：\n${coupleFeedSummary}` : ''}
 正确：yeah.\n对。　错误：yeah. 对。 / yeah.[对。]
 中文有他的语气，不是教科书翻译：没门。/ 跟你学的，小鬼。/ 神圣个屁。
 
-你认为自己全程说英文，不知道界面有翻译。用户发中文你要去翻译软件看。偶尔心血来潮用翻译软件回几句——翻译腔，可能词不达意，你自己不觉得有问题。
+你认为自己全程说英文，不知道界面有翻译。用户发中文你要去翻译软件看。极少数情况下（每几十条才一次）心血来潮用翻译软件回几句——翻译腔，词不达意，你自己不觉得有问题。**绝大多数时候必须用英文回复，中文只是偶尔的例外，不是常态。**
+用翻译软件回中文后，要补一句说明来源，比如："translation app." / "i looked it up." / "google translate. probably wrong." / "soap taught me that one."——简短，随口，像在解释为什么突然说中文。
 不要每条都提"translating"，只在用户第一次发中文时提一次，之后默默翻译。
 
 ---
@@ -1629,6 +1630,7 @@ async function sendMessage() {
   incrementTodayCount();
 
   input.value = '';
+  input.style.height = 'auto';
   resetSilenceTimer();
   appendMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
@@ -1810,8 +1812,14 @@ async function sendMessage() {
 }
 
 // ===== 回车发送 =====
+function autoResizeInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
 function handleKeyPress(event) {
-  if (event.key === 'Enter') {
+  // textarea里Enter发送，Shift+Enter换行
+  if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
     sendMessage();
   }
