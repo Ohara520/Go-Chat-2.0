@@ -1,3 +1,12 @@
+// ===== 修复移动端键盘收起后布局不恢复 =====
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        document.querySelectorAll('.screen.active').forEach(s => {
+            s.style.height = window.visualViewport.height + 'px';
+        });
+    });
+}
+
 // ===== 页面导航 =====
 function openScreen(id) {
     document.querySelectorAll('.screen').forEach(s => {
