@@ -1496,6 +1496,37 @@ function appendMessage(role, text, animate = true) {
   // 渲染前清理系统标记
   text = text.replace(/\n?(REFUND|KEEP)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
 
+  // 预处理：把英中混排重新整理成标准 "英文行\n中文行" 格式
+  if (role === 'bot') {
+    const hasChinese = /[\u4e00-\u9fff]/.test(text);
+    const hasEnglish = /[a-zA-Z]/.test(text);
+    if (hasChinese && hasEnglish) {
+      // 按句子拆分，分类归堆
+      const sentences = text.split(/(?<=[.!?。！？\n])\s*/);
+      const enParts = [];
+      const zhParts = [];
+      sentences.forEach(s => {
+        s = s.trim();
+        if (!s) return;
+        if (/[\u4e00-\u9fff]/.test(s)) {
+          // 中文句子，去掉里面夹的英文词
+          zhParts.push(s.replace(/[a-zA-Z][a-zA-Z\s\'\,\.\!\?\-]*/g, '').replace(/\s{2,}/g, ' ').trim());
+        } else {
+          enParts.push(s);
+        }
+      });
+      const enText = enParts.join(' ').trim();
+      const zhText = zhParts.join('').trim();
+      if (enText && zhText) {
+        text = enText + '\n' + zhText;
+      } else if (enText) {
+        text = enText;
+      } else if (zhText) {
+        text = zhText;
+      }
+    }
+  }
+
   // 分离英文和中文翻译：找到第一个含中文字符的行作为分界
   const lines = text.split('\n').filter(l => l.trim());
   const isChinese = s => /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(s);
