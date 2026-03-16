@@ -1,3 +1,6 @@
+/* 强制浅色模式，防止浏览器深色主题污染 */
+:root { color-scheme: light only; }
+
 /* ===== Chat Screen ===== */
 .chat-container {
     display: flex;
