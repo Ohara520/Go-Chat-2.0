@@ -2191,6 +2191,13 @@ async function generateCoupleFeed() {
     return;
   }
 
+  // 冷战中不生成新动态，只渲染历史
+  if (localStorage.getItem('coldWarMode') === 'true') {
+    const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    renderCoupleFeed(all.map(p => p.post));
+    return;
+  }
+
   // 随机决定今天发几条（0-3）
   const count = Math.floor(Math.random() * 4);
   localStorage.setItem('coupleFeedDate', today);
@@ -2205,6 +2212,12 @@ async function generateCoupleFeed() {
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
   const weather = localStorage.getItem('lastWeatherDesc') || '';
   const mood = localStorage.getItem('currentMood') || '平和';
+  // 读取最近聊天氛围，避免朋友圈跟聊天情绪冲突
+  const recentTone = (() => {
+    const h = chatHistory.filter(m => !m._system && m.role === 'assistant').slice(-3).map(m => m.content.slice(0, 60)).join(' ');
+    if (!h) return '';
+    return `最近聊天氛围参考（朋友圈内容要跟这个氛围不冲突）：${h}`;
+  })();
 
   feed.innerHTML = '<div class="couple-loading">加载中...</div>';
 
@@ -2215,6 +2228,7 @@ async function generateCoupleFeed() {
 - Ghost当前位置：${location}
 - 天气：${weather}
 - Ghost心情：${mood}
+${recentTone ? `- ${recentTone}` : ''}
 
 角色人设：
 - Ghost（西蒙·莱利）：话极少，发朋友圈也是一句话，冷淡克制，偶尔有点意外的温柔，全小写英文
