@@ -153,6 +153,16 @@
 }
 .thought-btn:active { transform: scale(0.92); }
 
+/* 心声就绪闪烁提示 */
+.thought-btn-pulse {
+  animation: thoughtPulse 0.6s ease-in-out 3;
+}
+@keyframes thoughtPulse {
+  0%   { background: rgba(255,255,255,0.4); transform: scale(1); box-shadow: none; }
+  50%  { background: rgba(216,180,254,0.7); transform: scale(1.15); box-shadow: 0 0 12px rgba(192,132,252,0.6); }
+  100% { background: rgba(255,255,255,0.4); transform: scale(1); box-shadow: none; }
+}
+
 /* ===== 思想气泡弹出 ===== */
 .thought-bubble {
     display: none;
@@ -2242,3 +2252,21 @@
   transform: translateX(-50%) translateY(0);
 }
 
+
+/* 朋友圈新动态提示 */
+.feed-new-badge {
+  font-size: 10px;
+  color: rgba(140,80,200,0.8);
+  background: rgba(216,180,254,0.25);
+  border: 1px solid rgba(192,132,252,0.35);
+  border-radius: 10px;
+  padding: 2px 8px;
+  margin-top: 3px;
+  cursor: pointer;
+  animation: feedBadgePop 0.3s ease;
+  letter-spacing: 0.3px;
+}
+@keyframes feedBadgePop {
+  from { opacity:0; transform: translateY(-4px); }
+  to   { opacity:1; transform: translateY(0); }
+}

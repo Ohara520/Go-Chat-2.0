@@ -18,7 +18,12 @@ function openScreen(id) {
     target.classList.add('active');
     if (id === 'profileScreen'  && typeof initProfile       === 'function') initProfile();
     if (id === 'chatScreen'     && typeof initChat          === 'function') initChat();
-    if (id === 'coupleScreen'   && typeof initCoupleSpace   === 'function') initCoupleSpace();
+    if (id === 'coupleScreen'   && typeof initCoupleSpace   === 'function') {
+      initCoupleSpace();
+      localStorage.removeItem('feedHasNew');
+      const badge = document.getElementById('feedNewBadge');
+      if (badge) badge.style.display = 'none';
+    }
     if (id === 'walletScreen'   && typeof renderWallet      === 'function') renderWallet();
     if (id === 'workScreen'     && typeof updateWorkUI      === 'function') updateWorkUI();
     if (id === 'vocabScreen'       && typeof renderVocabScreen    === 'function') renderVocabScreen();

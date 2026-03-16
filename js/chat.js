@@ -1231,6 +1231,12 @@ function initChat() {
     setTimeout(() => ghostApologize(), 3000);
   }
 
+  // 恢复朋友圈新动态提示
+  if (localStorage.getItem('feedHasNew') === '1') {
+    const badge = document.getElementById('feedNewBadge');
+    if (badge) badge.style.display = 'block';
+  }
+
   // 检查离线扣好感
   checkOfflinePenalty();
 
@@ -1499,7 +1505,7 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   if (!innerThoughtEl) return;
   try {
     // 口是心非关键词快速预判——有明显迹象才调Haiku做精确判断
-    const tsunderePatterns = /don't|not|no\.|nah|whatever|fine\.|sure\.|yeah\.|busy|later|need|forget|don't care|couldn't|wouldn't|barely|just|only|don't make|habit|not like|doesn't matter/i;
+    const tsunderePatterns = /don't|not |no\.|nah|whatever|fine\.|sure\.|yeah\.|busy|later|need|forget|don't care|couldn't|wouldn't|barely|just|only|don't make|habit|not like|doesn't matter|insufferable|annoying|ridiculous|impossible|brat|idiot|seriously|really\.|too bad|stop|leave|go|typical|always|never|still|somehow|strange|odd|whatever you|suit yourself|don't ask/i;
     const hasTsundere = tsunderePatterns.test(replyText);
 
     if (!hasTsundere) {
@@ -1509,7 +1515,7 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
 
     // 有迹象，用Haiku精确判断
     const judge = await callHaiku(
-      '判断这句话是否存在口是心非——嘴上拒绝心里想给、装淡定其实在意、嘴硬但破防了、说不在乎其实很在乎。只返回JSON：{"tsundere":true} 或 {"tsundere":false}',
+      '判断这句话是否存在口是心非或藏着情绪——包括：嘴上拒绝心里想给、装淡定其实在意、嘴硬但破防了、说不在乎其实很在乎、用骂人掩盖宠溺（如"你真没法没天"其实是在说"你让我没办法"）、嫌弃式关心、克制但明显藏着话。只返回JSON：{"tsundere":true} 或 {"tsundere":false}',
       [{ role: 'user', content: `Ghost说：${replyText.slice(0, 100)}` }]
     );
     const parsed = JSON.parse(judge.replace(/```json|```/g, '').trim());
@@ -1550,6 +1556,12 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0) {
       if (textEl) {
         textEl.innerHTML = `<div class="it-en">${result.en}</div><div class="it-zh">${result.zh}</div>`;
         innerThoughtEl.dataset.ready = '1';
+        // 💭按钮闪烁提示，3次后停止
+        const btn = document.getElementById('thoughtBtn');
+        if (btn) {
+          btn.classList.add('thought-btn-pulse');
+          setTimeout(() => btn.classList.remove('thought-btn-pulse'), 3000);
+        }
       }
     }
   } catch(e) {
@@ -4126,6 +4138,11 @@ async function triggerLuxuryMoment(product, poster) {
       `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`
     ).join('\n');
     localStorage.setItem('coupleFeedSummary', summary);
+
+    // 显示新动态提示
+    localStorage.setItem('feedHasNew', '1');
+    const badge = document.getElementById('feedNewBadge');
+    if (badge) badge.style.display = 'block';
 
     // 如果在情侣空间就刷新
     const coupleScreen = document.getElementById('coupleScreen');
