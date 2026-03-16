@@ -3141,6 +3141,49 @@ const MARKET_PRODUCTS = {
   ],
 };
 
+// 地点隐藏特产库
+const LOCATION_SPECIALS = {
+  'Germany': [
+    { emoji: '🔵', name: '妮维雅铁罐', desc: '德国本地买的。比你网购的版本大。', tip: '德国超市随手拿的。用上。' },
+    { emoji: '🌭', name: '纽伦堡香肠礼盒', desc: '纽伦堡当地香肠，真空包装。', tip: '纽伦堡的。比英国那边卖的强。' },
+    { emoji: '✏️', name: '辉柏嘉彩铅套装', desc: '辉柏嘉产地直购，颜色很全。', tip: '产地买的。比较便宜。' },
+  ],
+  'Norway': [
+    { emoji: '🍫', name: 'Freia巧克力礼盒', desc: '挪威国民巧克力，这边人手一盒。', tip: '挪威人爱吃这个。试试。' },
+    { emoji: '🧤', name: '驯鹿毛手套', desc: '本地手工，真的驯鹿毛。', tip: '挪威的冬天很冷。你那边也冷。' },
+    { emoji: '🌌', name: '北极光明信片', desc: '当地拍的，不是印刷图。', tip: '没拍到本人。明信片凑合。' },
+  ],
+  'Edinburgh': [
+    { emoji: '🥃', name: '单一麦芽威士忌小样', desc: '爱丁堡酒厂出的，试饮装。', tip: '产地买的。别一口闷。' },
+    { emoji: '🧣', name: '苏格兰羊绒围巾', desc: '正经苏格兰格纹，羊绒的。', tip: '苏格兰的。比较软。' },
+    { emoji: '🫙', name: '黄油饼干铁罐', desc: '爱丁堡老字号，比超市那种好吃。', tip: '本地买的。配茶。' },
+  ],
+  'Manchester': [
+    { emoji: '🫖', name: 'PG Tips红茶礼盒', desc: '曼彻斯特老牌，家里常喝这个。', tip: '从小喝这个长大的。' },
+    { emoji: '🥐', name: 'Eccles蛋糕', desc: '曼彻斯特特产，葡萄干酥皮。', tip: '本地的。不知道你喜不喜欢。' },
+    { emoji: '🍯', name: '老字号手工果酱', desc: '曼彻斯特老店，不加防腐剂。', tip: '家附近那家店买的。' },
+  ],
+  'Poland': [
+    { emoji: '🍯', name: '波兰蜂蜜礼盒', desc: '波兰山区蜂蜜，颜色很深，香。', tip: '波兰蜂蜜比英国的好。' },
+    { emoji: '🍫', name: 'Wedel巧克力', desc: '波兰百年老牌，黑巧系列。', tip: '这边老牌子。不腻。' },
+    { emoji: '🟡', name: '手工琥珀摆件', desc: '波兰琥珀，波罗的海产的。', tip: '波兰特产。放着看吧。' },
+  ],
+  'Hereford Base': [
+    { emoji: '🍵', name: '苹果茶礼盒', desc: 'Hereford苹果产区出的茶，清甜。', tip: '基地附近买的。' },
+    { emoji: '🍎', name: '苹果酒礼盒', desc: 'Hereford本地苹果酒，这边著名。', tip: 'Hereford苹果酒产区。别喝太多。' },
+  ],
+};
+
+// 地点key映射（location字段可能有多种写法）
+const LOCATION_KEY_MAP = {
+  'Germany': 'Germany', 'german': 'Germany',
+  'Norway': 'Norway', 'norwegian': 'Norway',
+  'Edinburgh': 'Edinburgh',
+  'Manchester': 'Manchester',
+  'Poland': 'Poland',
+  'Hereford Base': 'Hereford Base', 'Hereford': 'Hereford Base',
+};
+
 // 反寄商品池（情绪触发）
 const GHOST_REVERSE_POOL = {
   '开心':    [{ emoji: '🍫', name: '精品巧克力礼盒', desc: 'Ghost说，开心就该吃好的' }, { emoji: '🥂', name: '起泡酒', desc: '庆祝一下' }],
@@ -3408,6 +3451,51 @@ async function checkTriggersAndEmotion(userText, botText) {
       const delay = (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000;
       setTimeout(() => addGhostReverseDelivery(item, type), delay);
     }
+
+    // 地点隐藏特产触发
+    checkLocationSpecial(userText, botText);
+
+  } catch(e) {}
+}
+
+async function checkLocationSpecial(userText, botText) {
+  try {
+    // 获取当前地点
+    const rawLocation = localStorage.getItem('currentLocation') || 'Hereford Base';
+    const locationKey = LOCATION_KEY_MAP[rawLocation] || LOCATION_KEY_MAP[Object.keys(LOCATION_KEY_MAP).find(k => rawLocation.includes(k))] || null;
+    if (!locationKey) return;
+
+    // 该地点是否有特产
+    const specials = LOCATION_SPECIALS[locationKey];
+    if (!specials || specials.length === 0) return;
+
+    // 同一地点只触发一次
+    const sentKey = 'locationSpecialSent_' + locationKey;
+    if (localStorage.getItem(sentKey)) return;
+
+    // Haiku判断：用户聊到食物/想要/好奇某样东西
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 60,
+        system: '判断用户的消息是否包含：提到食物、想吃某样东西、好想要某东西、馋了、羡慕、好奇当地有什么、让他带东西回来。只返回JSON：{"triggered":true} 或 {"triggered":false}',
+        messages: [{ role: 'user', content: `用户说：${userText}\nGhost说：${botText}` }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text?.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(raw);
+    if (!result.triggered) return;
+
+    // 随机抽一件特产
+    const item = specials[Math.floor(Math.random() * specials.length)];
+    localStorage.setItem(sentKey, '1');
+
+    // 2-4天后出现包裹
+    const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+    setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: true }, 'location'), delay);
   } catch(e) {}
 }
 
@@ -3597,7 +3685,7 @@ function addGhostReverseDelivery(item, emotionType) {
     isLost: false,
     lostAtStage: -1,
     isLostConfirmed: false,
-    productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc }
+    productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 10)));
   // 不调用renderDeliveryTracker，保持神秘
@@ -3757,7 +3845,7 @@ function showMysteryPackage(delivery) {
           system: buildSystemPrompt(),
           messages: [...chatHistory.slice(-10), {
             role: 'user',
-            content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。你不主动提，但如果她问起，你知道是你寄的。现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，附中文翻译。]`
+            content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。如果她问是不是你寄的，你可以承认也可以否认，看你当下心情——否认的话要装得像，别穿帮太明显。你不主动提是从哪里寄的。${delivery.productData?.tip ? `参考语气：「${delivery.productData.tip}」——这是你的风格，不用照抄，意思到了就行。` : ''}现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，附中文翻译。]`
           }]
         })
       });
