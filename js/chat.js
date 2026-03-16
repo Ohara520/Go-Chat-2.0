@@ -299,10 +299,17 @@ function toggleThought() {
     return;
   }
 
-  // 找最后一条bot消息的内心独白内容
+  // 找最后一条有内心独白的bot消息（心声绑在第一条）
   const allBotMsgs = document.querySelectorAll('.message.bot');
   if (!allBotMsgs.length) return;
-  const lastBot = allBotMsgs[allBotMsgs.length - 1];
+  // 从后往前找，找到有inner-thought元素的那条
+  let lastBot = null;
+  for (let i = allBotMsgs.length - 1; i >= 0; i--) {
+    if (allBotMsgs[i].querySelector('.inner-thought')) {
+      lastBot = allBotMsgs[i];
+      break;
+    }
+  }
   const itEl = lastBot ? lastBot.querySelector('.inner-thought') : null;
   const thoughtTextEl = document.getElementById('thoughtText');
 
@@ -389,16 +396,22 @@ async function updateWeather(city) {
   if (!el) return;
   if (!city) { el.textContent = ''; return; }
   try {
-    // 同时拉两个格式：显示用emoji+温度，判断用描述词
     const [res1, res2] = await Promise.all([
       fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%c%t`, { cache: 'no-store' }),
       fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%x`, { cache: 'no-store' }),
     ]);
     const display = await res1.text();
     const desc = await res2.text();
-    el.textContent = display.trim();
-    localStorage.setItem('lastWeatherDesc', desc.trim().toLowerCase());
-    localStorage.setItem('lastWeatherDisplay', display.trim());
+    // 只接受正常天气格式，过滤掉错误信息（正常格式包含数字温度或天气emoji）
+    if (display && /[\d°+\-]/.test(display) && display.length < 20) {
+      el.textContent = display.trim();
+      localStorage.setItem('lastWeatherDesc', desc.trim().toLowerCase());
+      localStorage.setItem('lastWeatherDisplay', display.trim());
+    } else {
+      // 返回了错误信息，用上次缓存的显示
+      const cached = localStorage.getItem('lastWeatherDisplay');
+      if (cached) el.textContent = cached;
+    }
   } catch(e) {
     el.textContent = '';
   }
@@ -1525,7 +1538,7 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   if (!innerThoughtEl) return;
   try {
     // 口是心非关键词快速预判——有明显迹象才调Haiku做精确判断
-    const tsunderePatterns = /don't|not |no\.|nah|whatever|fine\.|sure\.|yeah\.|busy|later|need|forget|don't care|couldn't|wouldn't|barely|just|only|don't make|habit|not like|doesn't matter|insufferable|annoying|ridiculous|impossible|brat|idiot|seriously|really\.|too bad|stop|leave|go|typical|always|never|still|somehow|strange|odd|whatever you|suit yourself|don't ask/i;
+    const tsunderePatterns = /don't|nah|whatever|fine\.|nope|not bad|not like|doesn't matter|couldn't care|wouldn't|barely|don't make|habit|insufferable|annoying|impossible|brat|idiot|too bad|suit yourself|don't ask|push it|that's different|you know how|didn't say|never said|not what i|forget it/i;
     const hasTsundere = tsunderePatterns.test(replyText);
 
     if (!hasTsundere) {
