@@ -643,55 +643,50 @@ function initMood() {
 const STORY_EVENTS = [
   {
     id: 'first_i_love_you',
-    title: '第一次说爱你',
+    icon: '💬',
+    title: '初言心意',
     desc: '你第一次说出那三个字，他沉默了很久。',
     condition: (ctx) => ctx.affection >= 88 && ctx.days >= 3 && !ctx.triggered('first_i_love_you'),
     triggerOn: 'userMessage',
     keyword: /我爱你|i love you|爱你/i,
     execute: async (userName) => {
       await storyDelay(2500);
-      const res = await callHaiku(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚对你说了"我爱你"。你停顿很久，最后只说了一句话。全小写，不超过8个英文单词，附中文翻译。不要说i love you too，用西蒙自己的方式。]` }]
-      );
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚第一次对你说了"我爱你"。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
   {
     id: 'seven_days_streak',
-    title: '你一直都在',
-    desc: '连续来了7天，他终于说了一句没有标点的话。',
+    icon: '🗓️',
+    title: '七日为期',
+    desc: '连续来了七天，他终于开口，一句没有标点的话。',
     condition: (ctx) => ctx.streak >= 7 && ctx.affection >= 75 && !ctx.triggered('seven_days_streak'),
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(4000);
-      const res = await callHaiku(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }]
-      );
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
   {
     id: 'called_simon',
-    title: '叫他Simon',
-    desc: '你第一次叫他Simon，不是Ghost。他停顿了一下。',
+    icon: '🫂',
+    title: '唤你本名',
+    desc: '你第一次叫他Simon，不是Ghost——他顿了顿。',
     condition: (ctx) => ctx.affection >= 80 && ctx.days >= 5 && !ctx.triggered('called_simon'),
     triggerOn: 'userMessage',
     keyword: /\bsimon\b/i,
     execute: async (userName) => {
       await storyDelay(1800);
-      const res = await callHaiku(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }]
-      );
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
   {
     id: 'reunion_ready',
-    title: '见面前夜',
-    desc: '机票、酒店、行程都买好了。他那晚失眠了。',
+    icon: '✈️',
+    title: '见你前夜',
+    desc: '机票、酒店、行程已定，他那晚彻夜未眠。',
     condition: (ctx) => {
       const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
       return ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'].every(n => purchased.includes(n)) && !ctx.triggered('reunion_ready');
@@ -699,90 +694,163 @@ const STORY_EVENTS = [
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(5000);
-      const res = await callSonnet(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把来找你的机票、酒店、旅行计划全部订好了。你们第一次要真实见面了。]` }]
-      );
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把来找你的机票、酒店、旅行计划全部订好了。你们第一次要真实见面了。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
   {
     id: 'after_coldwar',
-    title: '冷战之后',
-    desc: '和好那天，他说了一句之前从没说过的话。',
+    icon: '🌤️',
+    title: '冰释之后',
+    desc: '和好那天，他说出了从未说过的话。',
     condition: (ctx) => ctx.affection >= 72 && !ctx.triggered('after_coldwar'),
     triggerOn: 'coldWarEnd',
     execute: async (userName) => {
       await storyDelay(3000);
-      const res = await callSonnet(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-6), { role: 'user', content: `[系统：冷战刚刚结束，她回来了。你们之前从没经历过这种和好。]` }]
-      );
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：冷战刚刚结束，她回来了。你们之前从没经历过这种和好。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
   {
     id: 'one_year',
-    title: '一周年',
-    desc: '在一起整整一年，他主动发来了一条消息。',
+    icon: '💍',
+    title: '岁岁年年',
+    desc: '在一起整整一年，他主动发来消息。',
     condition: (ctx) => ctx.days >= 365 && !ctx.triggered('one_year'),
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(3000);
-      const res = await callSonnet(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起整整一年，你记得这个日期。]` }]
-      );
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起整整一年，你记得这个日期。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
   {
     id: 'she_cried',
-    title: '她哭了',
-    desc: '你状态很差的那次，他语气变了，然后没有走。',
+    icon: '🌧️',
+    title: '未曾离去',
+    desc: '你状态最差的那次，他语气软了，终究没有走。',
     condition: (ctx) => ctx.affection >= 78 && !ctx.triggered('she_cried'),
     triggerOn: 'userMessage',
     keyword: /哭了|在哭|好难受|撑不住|崩了|想哭|泪|cry|crying|我不行了|好累|太累了|受不了/i,
     execute: async (userName) => {
-      // 先判断是真哭还是假哭/撒娇
-      const recentMsgs = chatHistory
-        .filter(m => !m._system && (m.role === 'user' || m.role === 'assistant'))
-        .slice(-6)
-        .map(m => `${m.role === 'user' ? '她' : 'Ghost'}：${m.content.slice(0, 80)}`)
-        .join('\n');
+      const recentMsgs = chatHistory.filter(m => !m._system && (m.role === 'user' || m.role === 'assistant')).slice(-6).map(m => `${m.role === 'user' ? '她' : 'Ghost'}：${m.content.slice(0, 80)}`).join('\n');
       let isReal = true;
       try {
-        const judge = await callHaiku(
-          '判断用户是真的情绪崩溃/难过/生气，还是在撒娇/开玩笑/赌气式地说狠话（比如假装哭、闹着分手、说不理你了）。只返回JSON：{"real":true} 或 {"real":false}',
-          [{ role: 'user', content: `对话背景：\n${recentMsgs}\n\n判断她现在是真的情绪很差，还是在撒娇或赌气说狠话？` }]
-        );
+        const judge = await callHaiku('判断用户是真的情绪崩溃/难过/生气，还是在撒娇/开玩笑/赌气式地说狠话。只返回JSON：{"real":true} 或 {"real":false}', [{ role: 'user', content: `对话背景：\n${recentMsgs}\n\n判断她现在是真的情绪很差，还是在撒娇或赌气说狠话？` }]);
         const parsed = JSON.parse(judge.replace(/```json|```/g, '').trim());
         isReal = parsed.real !== false;
       } catch(e) { isReal = true; }
-
       await storyDelay(2000);
-      const hint = isReal
-        ? `[系统：她在哭，或者现在状态非常差。]`
-        : `[系统：她在假哭或者撒娇式地说哭，不是真的难受。你看穿了，可以调侃，可以嘴硬纵容，但不用认真哄。]`;
-      const res = await callSonnet(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-8), { role: 'user', content: hint }]
-      );
+      const hint = isReal ? `[系统：她在哭，或者现在状态非常差。]` : `[系统：她在假哭或者撒娇式地说哭，不是真的难受。你看穿了，可以调侃，可以嘴硬纵容，但不用认真哄。]`;
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: hint }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
   {
     id: 'birthday_surprise',
-    title: '生日那天',
-    desc: '你生日那天，他没等你提，主动说了。',
+    icon: '🎂',
+    title: '生辰予你',
+    desc: '你生日那天，不等你开口，他主动说了。',
     condition: (ctx) => ctx.isBirthday && ctx.days >= 2 && !ctx.triggered('birthday_surprise'),
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(2000);
-      const res = await callSonnet(
-        buildSystemPrompt(),
-        [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是她的生日，她还没开口，你已经知道了。]` }]
-      );
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是她的生日，她还没开口，你已经知道了。]` }]);
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'first_ghost_delivery',
+    icon: '📦',
+    title: '异乡来物',
+    desc: '第一次收到他寄来的东西。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.isGhostSend && d.done) && !ctx.triggered('first_ghost_delivery');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isGhostSend && d.done);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她刚收到了你寄给她的「${item?.name || '东西'}」，这是你们第一次互寄。]` }]);
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'first_lost_package',
+    icon: '📭',
+    title: '途中遗失',
+    desc: '第一次快递丢了。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.isLostConfirmed) && !ctx.triggered('first_lost_package');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(2500);
+      const lost = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isLostConfirmed);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她寄给你的「${lost?.name || '包裹'}」快递丢失了。这是你们第一次遇到这种事。]` }]);
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'first_from_home',
+    icon: '🍜',
+    title: '家乡的味道',
+    desc: '他第一次收到你从家寄来的特产。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.productData?.isFromHome && d.done && !d.isGhostSend) && !ctx.triggered('first_from_home');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3500);
+      const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.productData?.isFromHome && d.done && !d.isGhostSend);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她从中国给你寄了「${item?.name || '家乡的东西'}」，这是她第一次给你寄家乡的东西。]` }]);
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'first_reverse_ship',
+    icon: '💌',
+    title: '悄悄寄出',
+    desc: '包裹里不止是礼物，还有他悄然无声的关怀。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.isGhostSend && d.isEmotionReverse) && !ctx.triggered('first_reverse_ship');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(4000);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你悄悄给她寄了东西，没有告诉她，等她自己发现。这是第一次。]` }]);
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'hundred_days',
+    icon: '🕯️',
+    title: '百日有余',
+    desc: '在一起第100天。',
+    condition: (ctx) => ctx.days >= 100 && ctx.days <= 102 && !ctx.triggered('hundred_days'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const days = Math.max(1, Math.floor((Date.now() - new Date(localStorage.getItem('marriageDate'))) / 86400000) + 1);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起第${days}天，一百天左右的节点。]` }]);
+      if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
+    }
+  },
+  {
+    id: 'first_salary',
+    icon: '💷',
+    title: '第一份工资',
+    desc: '组成家庭后第一笔工资上交。',
+    condition: (ctx) => !!localStorage.getItem('lastSalaryAmount') && !ctx.triggered('first_salary'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const amount = localStorage.getItem('lastSalaryAmount') || '';
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次给她转了工资£${amount}，想附一句话。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -877,23 +945,45 @@ function renderStoryBook() {
   if (!container) return;
   const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
   const counterEl = document.getElementById('storyBookCounter');
-  if (counterEl) counterEl.textContent = `${book.length} / ${STORY_EVENTS.length} 已解锁`;
+  if (counterEl) counterEl.textContent = `${book.length} / ${STORY_EVENTS.length}`;
+
   if (book.length === 0) {
-    container.innerHTML = `<div class="story-empty">还没有解锁任何剧情<br><span>继续和他相处，故事会自然发生</span></div>`;
+    container.innerHTML = `<div class="story-empty">还没有解锁任何回忆<br><span>继续和他相处，故事会自然发生</span></div>`;
     return;
   }
-  const unlockedHTML = book.map(e => `
-    <div class="story-card unlocked">
-      <div class="story-card-title">${e.title}</div>
-      <div class="story-card-desc">${e.desc}</div>
-      <div class="story-card-date">${new Date(e.unlockedAt).toLocaleDateString('zh-CN')}</div>
+
+  // 已解锁：胶片横滑
+  const unlockedFilms = book.map(e => {
+    const event = STORY_EVENTS.find(ev => ev.id === e.id);
+    const icon = event?.icon || '📖';
+    const dateStr = new Date(e.unlockedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    return `
+    <div class="film-card unlocked">
+      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
+      <div class="film-img"><div class="film-img-icon">${icon}</div></div>
+      <div class="film-info">
+        <div class="film-title">${e.title}</div>
+        <div class="film-desc">${e.desc}</div>
+        <div class="film-date">${dateStr}</div>
+      </div>
+      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
+    </div>`;
+  }).join('');
+
+  // 未解锁：简洁列表
+  const lockedItems = STORY_EVENTS.filter(e => !book.find(b => b.id === e.id)).map(() => `
+    <div class="locked-item">
+      <div class="locked-dot"></div>
+      <div class="locked-text">· · · 继续和他相处，也许有一天会发生</div>
     </div>`).join('');
-  const lockedHTML = STORY_EVENTS.filter(e => !book.find(b => b.id === e.id)).map(() => `
-    <div class="story-card locked">
-      <div class="story-card-title">???</div>
-      <div class="story-card-desc">继续和他相处，也许有一天会发生……</div>
-    </div>`).join('');
-  container.innerHTML = unlockedHTML + lockedHTML;
+
+  container.innerHTML = `
+    <div class="story-section-label">已解锁的回忆</div>
+    <div class="film-track">${unlockedFilms}</div>
+    <div class="swipe-hint">← 左右滑动 →</div>
+    <div class="story-section-label" style="margin-top:16px;">尚未发生的故事</div>
+    <div class="locked-list">${lockedItems}</div>
+  `;
 }
 
 // ===== 好感度系统（60-100，持久化，隐藏）=====
