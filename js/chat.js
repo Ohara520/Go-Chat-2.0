@@ -1011,15 +1011,17 @@ function appendMessage(role, text, animate = true) {
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
 
-  // 分离英文和中文翻译：找到第一个含中文字符的行作为分界
+  // 分离英文和中文翻译
   const lines = text.split('\n').filter(l => l.trim());
-  const isChinese = s => /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(s);
-  if (role === 'bot') {
-    const firstZhIdx = lines.findIndex(l => isChinese(l));
+  const isChinese = s => /[\u4e00-\u9fff]/.test(s);
+  const isMainlyChinese = s => {
+    const zhCount = (s.match(/[\u4e00-\u9fff]/g) || []).length;
+    return zhCount > s.length * 0.2;
+  };
+  if (role === 'bot' && lines.length > 0) {
+    const firstZhIdx = lines.findIndex(l => isMainlyChinese(l));
     if (firstZhIdx > 0) {
-      // 英文部分：第一个中文行之前的所有行
       const enLines = lines.slice(0, firstZhIdx);
-      // 中文部分：第一个中文行起的所有行
       const zhLines = lines.slice(firstZhIdx);
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
@@ -1030,6 +1032,9 @@ function appendMessage(role, text, animate = true) {
       zhLine.textContent = zhLines.join(' ');
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
+    } else if (firstZhIdx === 0 && lines.length > 1) {
+      // 第一行就是中文，全部当中文显示
+      bubble.textContent = text;
     } else {
       bubble.textContent = text;
     }
@@ -1696,7 +1701,7 @@ function renderCoupleFeed(posts) {
       <div class="couple-post-footer">
         <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}" 
           data-key="${postKey}" data-count="${likeCount}"
-          onclick="toggleCoupleLike(this)">${likeEmoji} ${isLiked ? likeCount : likeCount}</button>
+          onclick="toggleCoupleLike(this)">${likeEmoji} <span class="like-num">${likeCount}</span></button>
       </div>
     `;
     feed.appendChild(div);
@@ -1707,18 +1712,21 @@ function toggleCoupleLike(btn, key) {
   const storageKey = key || btn.dataset.key || ('like_' + btn.closest('.couple-post-card')?.querySelector('.couple-post-en')?.textContent?.slice(0,10));
   const isLiked = localStorage.getItem(storageKey) === '1';
   let count = parseInt(btn.dataset.count || '0');
+  const numEl = btn.querySelector('.like-num');
   if (isLiked) {
     localStorage.removeItem(storageKey);
     btn.classList.remove('couple-liked');
     count = Math.max(0, count - 1);
     btn.dataset.count = count;
-    btn.textContent = '🤍 ' + count;
+    if (numEl) { btn.childNodes[0].textContent = '🤍 '; numEl.textContent = count; }
+    else btn.textContent = '🤍 ' + count;
   } else {
     localStorage.setItem(storageKey, '1');
     btn.classList.add('couple-liked');
     count = count + 1;
     btn.dataset.count = count;
-    btn.textContent = '❤️ ' + count;
+    if (numEl) { btn.childNodes[0].textContent = '❤️ '; numEl.textContent = count; }
+    else btn.textContent = '❤️ ' + count;
   }
 }
 

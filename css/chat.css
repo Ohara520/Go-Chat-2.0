@@ -230,8 +230,12 @@
     padding: 12px 16px;
     border-radius: 15px;
     word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 78vw;
     line-height: 1.4;
     font-size: 13px;
+    white-space: pre-line;
 }
 
 .message.user .message-bubble {
@@ -932,7 +936,7 @@
 .screen-header {
     display: flex;
     align-items: center;
-    padding: calc(52px + env(safe-area-inset-top)) 20px 14px;
+    padding: calc(16px + env(safe-area-inset-top)) 20px 14px;
     flex-shrink: 0;
 }
 .screen-title {
