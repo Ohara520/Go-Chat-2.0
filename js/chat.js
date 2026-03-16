@@ -916,6 +916,8 @@ function endColdWar(userApologized = false) {
   if (Math.random() < 0.3) {
     setTimeout(() => ghostSendMakeupMoney(), 5 * 60 * 1000);
   }
+  // 冷战结束剧情检测
+  setTimeout(() => checkStoryOnColdWarEnd(), 8000);
 }
 
 function ghostApologize() {
@@ -1564,6 +1566,8 @@ async function sendMessage() {
     checkSassyPost(text, reply);
     // 合并触发：商城高亮+情绪反寄（一次Haiku）
     checkTriggersAndEmotion(text, reply);
+    // 解锁剧情检测
+    checkStoryOnMessage(text);
     // 长期记忆更新（每20条触发一次）
     updateLongTermMemory();
     // 气泡内心独白（异步生成，不阻塞主流程）

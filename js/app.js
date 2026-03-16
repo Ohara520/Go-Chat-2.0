@@ -17,6 +17,7 @@ function openScreen(id) {
     if (id === 'calendarScreen'     && typeof initCalendar           === 'function') initCalendar();
     if (id === 'secretScreen'       && typeof loadSecretScreen        === 'function') loadSecretScreen();
     if (id === 'marketScreen'       && typeof initMarket             === 'function') { initMarket(); checkDeliveryUpdates(); }
+    if (id === 'achievementScreen'  && typeof renderStoryBook        === 'function') renderStoryBook();
 }
 
 function goBack() {

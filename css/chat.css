@@ -1870,3 +1870,97 @@
   margin-top: 3px;
   line-height: 1.4;
 }
+
+/* ===== 故事书 ===== */
+.story-book-container {
+  padding: 16px 14px;
+  overflow-y: auto;
+  flex: 1;
+}
+.story-book-hint {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(130,80,170,0.45);
+  margin-bottom: 18px;
+  letter-spacing: 0.3px;
+}
+.story-book-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.story-card {
+  background: rgba(255,255,255,0.75);
+  border-radius: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(200,160,240,0.25);
+  backdrop-filter: blur(10px);
+}
+.story-card.unlocked {
+  border-color: rgba(192,132,252,0.4);
+  box-shadow: 0 2px 12px rgba(160,100,220,0.08);
+}
+.story-card.locked {
+  opacity: 0.45;
+  filter: blur(0.3px);
+}
+.story-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a2d6e;
+  margin-bottom: 5px;
+}
+.story-card.locked .story-card-title {
+  color: #9b8ab0;
+  letter-spacing: 2px;
+}
+.story-card-desc {
+  font-size: 12px;
+  color: rgba(90,50,130,0.7);
+  line-height: 1.6;
+}
+.story-card.locked .story-card-desc {
+  color: rgba(150,130,170,0.6);
+}
+.story-card-date {
+  font-size: 10px;
+  color: rgba(160,120,200,0.5);
+  margin-top: 8px;
+  text-align: right;
+}
+.story-empty {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 13px;
+  color: rgba(130,80,170,0.5);
+  line-height: 2;
+}
+.story-empty span {
+  font-size: 11px;
+  opacity: 0.7;
+  display: block;
+}
+
+/* 解锁提示浮层 */
+.story-unlock-hint {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(255,255,255,0.95);
+  border: 1px solid rgba(192,132,252,0.5);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b3fa0;
+  box-shadow: 0 4px 16px rgba(140,80,200,0.2);
+  opacity: 0;
+  transition: all 0.4s ease;
+  z-index: 9999;
+  white-space: nowrap;
+}
+.story-unlock-hint.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
