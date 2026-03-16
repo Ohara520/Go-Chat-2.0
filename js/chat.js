@@ -1516,7 +1516,7 @@ function initCoupleSpace() {
       <div class="couple-sassy-bar" id="sassyBar"></div>
       <div class="couple-deleting-tag">🔥 ${remaining}分钟后删除</div>
       <div class="couple-post-header">
-        <div class="couple-avatar"><img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
+        <div class="couple-avatar"><img src="images/ghost-avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
         <div class="couple-post-meta">
           <div class="couple-post-name couple-ghost-name" >${localStorage.getItem('botNickname') || 'Simon Riley'}</div>
           <div class="couple-post-time">刚刚</div>
@@ -1655,7 +1655,7 @@ function renderCoupleFeed(posts) {
     return;
   }
 
-  const GHOST_AVATAR_HTML = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+  const GHOST_AVATAR_HTML = '<img src="images/ghost-avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
   const emojiMap = { Ghost: GHOST_AVATAR_HTML, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
   const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
 
@@ -1707,21 +1707,18 @@ function toggleCoupleLike(btn, key) {
   const storageKey = key || btn.dataset.key || ('like_' + btn.closest('.couple-post-card')?.querySelector('.couple-post-en')?.textContent?.slice(0,10));
   const isLiked = localStorage.getItem(storageKey) === '1';
   let count = parseInt(btn.dataset.count || '0');
-  const numEl = btn.querySelector('.like-num');
   if (isLiked) {
     localStorage.removeItem(storageKey);
-    btn.classList.remove('couple-liked');
     count = Math.max(0, count - 1);
     btn.dataset.count = count;
-    if (numEl) { numEl.textContent = count; btn.classList.remove('couple-liked'); }
-    else btn.textContent = '🤍 ' + count;
+    btn.classList.remove('couple-liked');
+    btn.innerHTML = '🤍 <span class="like-num">' + count + '</span>';
   } else {
     localStorage.setItem(storageKey, '1');
-    btn.classList.add('couple-liked');
     count = count + 1;
     btn.dataset.count = count;
-    if (numEl) { numEl.textContent = count; }
-    else btn.textContent = '❤️ ' + count;
+    btn.classList.add('couple-liked');
+    btn.innerHTML = '❤️ <span class="like-num">' + count + '</span>';
   }
 }
 
@@ -1889,7 +1886,7 @@ function renderWallet() {
         <div class="transaction-time">${tx.time || ''}</div>
       </div>
       <div class="transaction-amount ${tx.amount > 0 ? 'in' : 'out'}">
-        ${tx.amount > 0 ? '+' : ''}£${Math.abs(tx.amount).toFixed(0)}
+        ${tx.amount > 0 ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}
       </div>
     </div>
   `).join('');
@@ -3339,13 +3336,13 @@ async function triggerLuxuryMoment(product, poster) {
     }).filter(c => c.name && c.en);
 
     // 存入朋友圈
-    const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+    const GHOST_AV = '<img src="images/ghost-avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
     const avatarMap = { 'Ghost': GHOST_AV, 'Soap': '🧼', 'Gaz': '🎖️', 'Price': '🚬' };
     const post = {
       date: new Date().toISOString().slice(0, 10),
       post: {
         en: postEn, zh: postZh,
-        avatar: poster === 'ghost' ? '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' : (localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0)),
+        avatar: poster === 'ghost' ? '<img src="images/ghost-avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' : (localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0)),
         name: posterName,
         comments: comments.map(c => ({
           avatar: avatarMap[c.name] || '👤',
