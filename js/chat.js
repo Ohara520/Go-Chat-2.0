@@ -2594,6 +2594,8 @@ const FESTIVALS = {
   '11-11':{ emoji: '🛍️', label: '双十一',  ghost_knows: false },
   // 感恩节（2026年11月26日）
   '11-26':{ emoji: '🦃', label: '感恩节',   ghost_knows: true,    note: "Thanksgiving. American but known in UK." },
+  // 冬至
+  '12-21':{ emoji: '🥟', label: '冬至',     ghost_knows: 'heard', note: "Winter Solstice. knows user eats dumplings or tangyuan." },
   // 平安夜
   '12-24':{ emoji: '🎁', label: '平安夜',   ghost_knows: true,    note: "Christmas Eve." },
   // 圣诞节
@@ -3079,6 +3081,7 @@ const MARKET_CATEGORIES = [
   { id: 'clothing', label: '👕 服装' },
   { id: 'food',     label: '🍫 食品' },
   { id: 'gift',     label: '🎁 特别礼物' },
+  { id: 'fromhome', label: '🏠 从家寄给他' },
   { id: 'luxury',   label: '💎 精品专柜' },
   { id: 'wishlist', label: '💝 我的心愿' },
 ];
@@ -3126,7 +3129,13 @@ const MARKET_PRODUCTS = {
     { emoji: '🎒', name: 'Belstaff 军旅背包', desc: '英国品牌，低调耐用，Ghost同款', price: 580, shipping: 35, isGhostGift: true },
     { emoji: '🪒', name: 'Tom Ford 剃须套装', desc: '低调有质感，让他好好保养', price: 180, shipping: 35, isGhostGift: true },
   ],
-  wishlist: [
+  fromhome: [
+    { emoji: '🦆', name: '北京烤鸭礼盒',     desc: '真空包装，附上饼和甜面酱，教他怎么吃', price: 45, shipping: 20, isFromHome: true },
+    { emoji: '🌸', name: '云南鲜花饼',       desc: '玫瑰馅，酥皮，甜而不腻',               price: 28, shipping: 20, isFromHome: true },
+    { emoji: '🌶️', name: '四川麻辣零食礼包', desc: '辣条、麻辣花生、牛肉干，一套',         price: 35, shipping: 20, isFromHome: true },
+    { emoji: '🍵', name: '杭州龙井茶',       desc: '明前龙井，铁罐装，清香',               price: 58, shipping: 20, isFromHome: true },
+    { emoji: '🥜', name: '新疆坚果礼盒',     desc: '核桃、红枣、巴旦木，产地直发',         price: 42, shipping: 20, isFromHome: true },
+  ],
     { emoji: '💄', name: '口红套装',       desc: '犒劳一下自己，你值得最美的颜色', price: 180,  badge: '精致女孩',   ghostMsg: 'Send me a picture. Now.\n发照片给我。现在。' },
     { emoji: '👜', name: '小方包',         desc: '梦想中的那只包，终于攒够了',     price: 680,  badge: '包治百病',   ghostMsg: "You actually did it. I knew you would.\n你真的做到了。我就知道。" },
     { emoji: '🧴', name: '高端护肤套装',   desc: 'La Mer 同款，好好爱护自己',      price: 450,  badge: '自我宠爱',   ghostMsg: "Good. Take care of yourself when I can't.\n很好。我不在的时候好好照顾自己。" },
@@ -3141,7 +3150,28 @@ const MARKET_PRODUCTS = {
   ],
 };
 
-// 地点隐藏特产库
+// 节日限定：从家寄给他（节日前3天解锁，过了消失）
+const SEASONAL_FROM_HOME = [
+  { month: 4,  day: 5,  emoji: '🍡', name: '青团礼盒',   desc: '清明时节，艾草青团，甜糯',               price: 32, shipping: 20, isFromHome: true, festival: '清明节' },
+  { month: 6,  day: 19, emoji: '🎋', name: '粽子礼盒',   desc: '端午五芳斋，红枣蛋黄各半箱',             price: 45, shipping: 20, isFromHome: true, festival: '端午节' },
+  { month: 9,  day: 25, emoji: '🥮', name: '月饼礼盒',   desc: '广式莲蓉蛋黄，精装铁盒，中秋限定',       price: 68, shipping: 20, isFromHome: true, festival: '中秋节' },
+  { month: 2,  day: 17, emoji: '🧧', name: '年货大礼包', desc: '糖果、坚果、肉干，满满一箱新年味道',       price: 88, shipping: 20, isFromHome: true, festival: '春节' },
+  { month: 12, day: 21, emoji: '🥟', name: '冬至饺子/汤圆礼包', desc: '速冻装，跟他说冬至要吃这个',     price: 38, shipping: 20, isFromHome: true, festival: '冬至' },
+];
+
+function getSeasonalFromHome() {
+  const today = new Date();
+  const m = today.getMonth() + 1;
+  const d = today.getDate();
+  return SEASONAL_FROM_HOME.filter(item => {
+    // 节日前3天到节日当天解锁
+    const festDate = new Date(today.getFullYear(), item.month - 1, item.day);
+    const diff = (festDate - today) / 86400000;
+    return diff >= 0 && diff <= 3;
+  });
+}
+
+
 const LOCATION_SPECIALS = {
   'Germany': [
     { emoji: '🔵', name: '妮维雅铁罐', desc: '德国本地买的。比你网购的版本大。', tip: '德国超市随手拿的。用上。' },
@@ -3219,7 +3249,12 @@ function renderMarket(categoryId) {
       <div class="category-tab ${cat.id === categoryId ? 'active' : ''}" onclick="renderMarket('${cat.id}')">${cat.label}</div>
     `).join('');
   }
-  const products = MARKET_PRODUCTS[categoryId] || [];
+  const isFromHome = categoryId === 'fromhome';
+  let products = MARKET_PRODUCTS[categoryId] || [];
+  if (isFromHome) {
+    const seasonal = getSeasonalFromHome();
+    products = [...products, ...seasonal];
+  }
   const gridEl = document.getElementById('productsGrid');
   if (!gridEl) return;
   const isWishlist = categoryId === 'wishlist';
@@ -3238,9 +3273,10 @@ function renderMarket(categoryId) {
       : discountPct >= 20 ? `${discountPct}% OFF · 限时优惠`
       : `${discountPct}% OFF · 今日特惠`;
     return `
-      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
+      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
            onclick="${owned||isLocked?'':'openBuyModal('+i+')'  }">
         ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
+        ${p.festival&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(255,200,100,0.15);border-color:rgba(255,180,50,0.4);color:#b45309;">🎋 ${p.festival}限定</div>` : ''}
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">👻 ${triggerReason}</div>` : ''}
         ${isLocked ? '<div class="ghost-mentioned-tag" style="background:#9ca3af">🔒 需先买机票</div>' : ''}
         <div class="product-emoji">${p.emoji}</div>
@@ -3254,14 +3290,18 @@ function renderMarket(categoryId) {
         </div>
         ${owned
           ? `<div class="product-owned-tag">✅ 已寄出</div>`
-          : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''}">${isWishlist?'💝 加入宝贝':'🛒 购买'}</button>`
+          : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''} ${isFromHome?'fromhome-buy-btn':''}">${isWishlist?'💝 加入宝贝':isFromHome?'📦 寄给他':'🛒 购买'}</button>`
         }
       </div>`;
   }).join('');
 }
 
 function openBuyModal(idx) {
-  const p = MARKET_PRODUCTS[currentCategory][idx];
+  let productList = MARKET_PRODUCTS[currentCategory] || [];
+  if (currentCategory === 'fromhome') {
+    productList = [...productList, ...getSeasonalFromHome()];
+  }
+  const p = productList[idx];
   if (!p) return;
   pendingProduct = p;
   pendingCategory = currentCategory;
@@ -3754,6 +3794,10 @@ async function onGhostReceived(delivery) {
 
   // Haiku生成签收反应
   try {
+    const isFromHome = !!pd.isFromHome;
+    const fromHomeHint = isFromHome
+      ? `这是中国特产，他没吃过很多中国食物，会好奇、可能不知道怎么吃、可能被辣到、可能安静品味。反应要真实，不夸张，符合西蒙性格。${pd.festival ? `这是${pd.festival}节日限定，他可能听说过这个节日但不太了解。` : ''}`
+      : '';
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3763,7 +3807,7 @@ async function onGhostReceived(delivery) {
         system: buildSystemPrompt(),
         messages: [...chatHistory.slice(-10), {
           role: 'user',
-          content: `[系统：你刚收到老婆寄来的「${delivery.name}」。用西蒙的风格说一句话，全小写，简短，真实，不要太肉麻。附中文翻译，格式：英文\\n中文翻译]`
+          content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || `用西蒙的风格说一句话，简短，真实，不要太肉麻。`}全小写，附中文翻译，格式：英文\\n中文翻译]`
         }]
       })
     });
@@ -3816,6 +3860,35 @@ async function onGhostReceived(delivery) {
       }, 5000);
     } else {
       changeAffection(pd.price > 500 ? 2 : 1);
+    }
+
+    // fromhome：2-3天后随机触发二次反应（吃完了/感受）
+    if (isFromHome && Math.random() < 0.6) {
+      const delay = (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
+      setTimeout(async () => {
+        try {
+          const res3 = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 100,
+              system: buildSystemPrompt(),
+              messages: [...chatHistory.slice(-6), {
+                role: 'user',
+                content: `[系统：几天前你收到了老婆寄来的「${delivery.name}」，现在你想起来说一句感受，可能是吃完了/试过了/还在想那个味道。简短，全小写，附中文翻译。不要太刻意，就是随口一提。]`
+              }]
+            })
+          });
+          const data3 = await res3.json();
+          const reply3 = data3.content?.[0]?.text?.trim() || '';
+          if (reply3) {
+            appendMessage('bot', reply3);
+            chatHistory.push({ role: 'assistant', content: reply3 });
+            saveHistory();
+          }
+        } catch(e) {}
+      }, delay);
     }
   } catch(e) {}
 }
