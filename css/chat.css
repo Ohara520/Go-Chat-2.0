@@ -1830,3 +1830,38 @@
   cursor: pointer; width: 100%;
   box-shadow: 0 4px 12px rgba(192,132,252,0.3);
 }
+
+/* ===== 气泡内心独白 ===== */
+.inner-thought {
+  background: rgba(30,15,50,0.82);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-top: 6px;
+  max-width: 78vw;
+  border: 1px solid rgba(168,85,247,0.25);
+  animation: fadeInThought 0.3s ease;
+}
+@keyframes fadeInThought {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.inner-thought-label {
+  font-size: 10px;
+  color: rgba(200,160,255,0.5);
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 6px;
+}
+.it-en {
+  font-size: 13px;
+  color: rgba(240,220,255,0.9);
+  line-height: 1.5;
+  font-style: italic;
+}
+.it-zh {
+  font-size: 11px;
+  color: rgba(180,140,240,0.6);
+  margin-top: 3px;
+  line-height: 1.4;
+}

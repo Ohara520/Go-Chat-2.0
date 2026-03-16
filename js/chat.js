@@ -1057,14 +1057,29 @@ function appendMessage(role, text, animate = true) {
     actions.appendChild(collectBtn);
     contentDiv.appendChild(actions);
 
+    // 内心独白浮窗（初始隐藏，异步填充）
+    const innerThought = document.createElement('div');
+    innerThought.className = 'inner-thought';
+    innerThought.style.display = 'none';
+    innerThought.dataset.ready = '0';
+    innerThought.innerHTML = '<span class="inner-thought-label">👁 只有你知道</span><div class="inner-thought-text"></div>';
+    contentDiv.appendChild(innerThought);
+
     // 点击气泡显示/隐藏收藏按钮
     bubble.style.cursor = 'pointer';
     bubble.onclick = function(e) {
-      // 隐藏其他所有收藏按钮
+      // 隐藏其他所有收藏按钮和内心独白
       document.querySelectorAll('.message-actions').forEach(a => {
         if (a !== actions) a.style.display = 'none';
       });
+      document.querySelectorAll('.inner-thought').forEach(t => {
+        if (t !== innerThought) t.style.display = 'none';
+      });
       actions.style.display = actions.style.display === 'none' ? 'flex' : 'none';
+      // 显示内心独白
+      if (innerThought && innerThought.dataset.ready === '1') {
+        innerThought.style.display = innerThought.style.display === 'none' ? 'block' : 'none';
+      }
     };
   }
 
@@ -1072,7 +1087,8 @@ function appendMessage(role, text, animate = true) {
   container.appendChild(msgDiv);
 
   if (animate) scrollToBottom();
-  return { msgDiv, bubble };
+  const innerThoughtEl = msgDiv.querySelector('.inner-thought');
+  return { msgDiv, bubble, innerThoughtEl };
 }
 
 // ===== 打字动画 =====
@@ -1111,6 +1127,34 @@ function scrollToBottom() {
 }
 
 // ===== 发送消息 =====
+
+// ===== 气泡内心独白 =====
+async function generateInnerThought(replyText, innerThoughtEl) {
+  if (!innerThoughtEl) return;
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 80,
+        system: '你是西蒙·莱利的内心。根据他说的话，写出他没说出口的那句话——可能是反差，可能是延伸，可能是藏着的情绪。一句英文+一句中文，加起来不超过两行。英文全小写，简短有力。只返回JSON：{"en":"...","zh":"..."}',
+        messages: [{ role: 'user', content: `Ghost说了："${replyText.slice(0, 100)}"\n\n他心里在想什么？` }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text?.replace(/\`\`\`json|\`\`\`/g, '').trim();
+    const result = JSON.parse(raw);
+    if (result.en && result.zh && innerThoughtEl) {
+      const textEl = innerThoughtEl.querySelector('.inner-thought-text');
+      if (textEl) {
+        textEl.innerHTML = `<div class="it-en">${result.en}</div><div class="it-zh">${result.zh}</div>`;
+        innerThoughtEl.dataset.ready = '1';
+      }
+    }
+  } catch(e) {}
+}
+
 // ===== 条数限制系统 =====
 function getTodayKey() {
   const d = new Date();
@@ -1240,6 +1284,10 @@ async function sendMessage() {
     checkTriggersAndEmotion(text, reply);
     // 长期记忆更新（每20条触发一次）
     updateLongTermMemory();
+    // 气泡内心独白（异步生成，不阻塞主流程）
+    const lastBotMsg = document.querySelector('.message.bot:last-child');
+    const itEl = lastBotMsg ? lastBotMsg.querySelector('.inner-thought') : null;
+    if (itEl) generateInnerThought(reply, itEl);
     // 快递遗失赔偿检测
     handleLostPackageClaim(text);
 
@@ -1677,12 +1725,7 @@ function renderCoupleFeed(posts) {
     if (!localStorage.getItem(likeCountKey)) {
       localStorage.setItem(likeCountKey, String(item.likes || Math.floor(Math.random()*60+5)));
     }
-    let likeCount = parseInt(localStorage.getItem(likeCountKey));
-    // 修复脏数据：如果存的是1（旧版本bug），重新随机
-    if (likeCount <= 1 && !isLiked) {
-      likeCount = item.likes || Math.floor(Math.random()*60+5);
-      localStorage.setItem(likeCountKey, String(likeCount));
-    }
+    const likeCount = parseInt(localStorage.getItem(likeCountKey));
     const likeEmoji = isLiked ? '❤️' : '🤍';
 
     const div = document.createElement('div');
