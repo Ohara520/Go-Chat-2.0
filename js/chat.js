@@ -1277,6 +1277,7 @@ function initChat() {
       if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') || /\b(REFUND|KEEP)\b/.test(msg.content)) return;
       appendMessage('user', msg.content, false);
     } else if (msg.role === 'assistant') {
+      if (msg._recalled) return; // 撤回的消息不渲染
       const parts = msg.content.split(/\n---\n/);
       parts.forEach(part => appendMessage('bot', part.trim(), false));
     }
@@ -4049,6 +4050,8 @@ function addDelivery(product, isGhostSend, isLuxury) {
       shipping: product.shipping || 15,
       name: product.name,
       emoji: product.emoji,
+      isFromHome: product.isFromHome || false,
+      festival: product.festival || '',
     }
   };
 
