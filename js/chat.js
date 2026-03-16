@@ -1149,8 +1149,8 @@ async function generateInnerThought(replyText, innerThoughtEl) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 80,
-        system: '你是西蒙·莱利的内心。根据他说的话，写出他没说出口的那句话——可能是反差，可能是延伸，可能是藏着的情绪。一句英文+一句中文，加起来不超过两行。英文全小写，简短有力。只返回JSON：{"en":"...","zh":"..."}',
-        messages: [{ role: 'user', content: `Ghost说了："${replyText.slice(0, 100)}"\n\n他心里在想什么？` }]
+        system: '你是西蒙·莱利的内心。根据他说的话，写出他没说出口的那句话。风格要跟他说的话情绪一致——日常聊天就是日常的小心思，调情就是藏着的心动，拌嘴就是嘴硬心软。不要无缘无故悲观或沉重。一句英文+一句中文，英文全小写，简短。只返回JSON：{"en":"...","zh":"..."}',
+        messages: [{ role: 'user', content: `Ghost说了："${replyText.slice(0, 100)}"\n\n他心里在想什么（跟他说的话情绪要一致）？` }]
       })
     });
     const data = await res.json();
@@ -1287,6 +1287,16 @@ async function sendMessage() {
     if (warmKeywords.some(k => text.includes(k))) {
       changeMood(1);
       changeAffection(1);
+    }
+
+    // 饮食健康关心触发（注入系统提示）
+    const foodCareKeywords = ['爆辣','很辣','辣死','吃辣','火锅','烧烤','熬夜','没吃饭','不吃','饿了','肚子疼'];
+    if (foodCareKeywords.some(k => text.includes(k))) {
+      chatHistory.push({
+        role: 'user',
+        content: '[系统提示：她提到了饮食/身体相关的事，Ghost应该表现出关心，用他自己的方式——不用大张旗鼓，一句话就够，但要让她感觉到他在意。]',
+        _system: true
+      });
     }
 
     chatHistory.push({ role: 'assistant', content: reply });
