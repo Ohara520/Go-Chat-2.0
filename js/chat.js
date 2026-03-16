@@ -1226,6 +1226,7 @@ async function sendMessage() {
     }
 
     const parts = reply.split('\n---\n').filter(p => p.trim());
+    let lastBotResult = null;
 
     if (parts.length > 1) {
       for (let i = 0; i < parts.length; i++) {
@@ -1234,10 +1235,10 @@ async function sendMessage() {
           await new Promise(resolve => setTimeout(resolve, 1500));
           hideTyping();
         }
-        appendMessage('bot', parts[i].trim());
+        lastBotResult = appendMessage('bot', parts[i].trim());
       }
     } else {
-      appendMessage('bot', reply.trim());
+      lastBotResult = appendMessage('bot', reply.trim());
     }
 
     // 渲染转账卡片 + 更新钱包
@@ -1285,8 +1286,7 @@ async function sendMessage() {
     // 长期记忆更新（每20条触发一次）
     updateLongTermMemory();
     // 气泡内心独白（异步生成，不阻塞主流程）
-    const lastBotMsg = document.querySelector('.message.bot:last-child');
-    const itEl = lastBotMsg ? lastBotMsg.querySelector('.inner-thought') : null;
+    const itEl = lastBotResult ? lastBotResult.innerThoughtEl : null;
     if (itEl) generateInnerThought(reply, itEl);
     // 快递遗失赔偿检测
     handleLostPackageClaim(text);
