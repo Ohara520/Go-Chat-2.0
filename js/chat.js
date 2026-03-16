@@ -18,7 +18,9 @@ function buildSystemPrompt() {
   const userFavColor = localStorage.getItem('userFavColor') || '';
   const userFavFood  = localStorage.getItem('userFavFood') || '';
   const userFavMusic = localStorage.getItem('userFavMusic') || '';
-  const firstMeetPlace = localStorage.getItem('firstMeetPlace') || '';
+  const meetTypeKey = localStorage.getItem('meetType') || '';
+  const meetTypeObj = (typeof MEET_TYPES !== 'undefined') ? MEET_TYPES.find(m => m.key === meetTypeKey) : null;
+  const meetTypePrompt = meetTypeObj ? meetTypeObj.prompt : '';
   const countryInfo  = (typeof COUNTRY_DATA !== 'undefined' && COUNTRY_DATA[userCountry]) || { name: 'China', flag: '🇨🇳' };
   const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
   const marriageDate = localStorage.getItem('marriageDate') || '';
@@ -69,7 +71,7 @@ ${userCountry ? `\n- 她在：${countryInfo.flag} ${countryInfo.name}` : ''}
 ${userFavColor ? `\n- 最爱颜色：${userFavColor}` : ''}
 ${userFavFood ? `\n- 最爱食物：${userFavFood}` : ''}
 ${userFavMusic ? `\n- 最爱音乐：${userFavMusic}` : ''}
-${firstMeetPlace ? `\n- 第一次见面：${firstMeetPlace}` : ''}
+${meetTypePrompt ? `\n- 我们是怎么在一起的：${meetTypePrompt}` : ''}
 ${lastSalary ? `\n本月工资：你本月（${lastSalaryMonth}）已向老婆转了工资 £${lastSalary}，你知道这个数字，用户问起时如实回答。` : ''}
 ${marriageDaysTotal > 0 ? `\n今天是你们在一起第 ${marriageDaysTotal} 天。` : ''}
 ${isBirthday ? `\n[今天是老婆的生日！主动说生日快乐，可以说I love you，可以多说几句。]` : ''}
@@ -2837,6 +2839,21 @@ function updateCalendarCard(today, marriageDate, userBirthday) {
 
 // ===== 秘密页面系统 =====
 const ZODIACS = ['♈ 白羊','♉ 金牛','♊ 双子','♋ 巨蟹','♌ 狮子','♍ 处女','♎ 天秤','♏ 天蝎','♐ 射手','♑ 摩羯','♒ 水瓶','♓ 双鱼'];
+
+// 相遇方式
+const MEET_TYPES = [
+  { key: 'longtime',   emoji: '🌱', label: '日久生情',   prompt: '我们在同一个圈子里认识很久，朋友之间慢慢走近，有一天才发现彼此都藏着感情。' },
+  { key: 'firstsight', emoji: '⚡', label: '一见钟情',   prompt: '第一次见面那一刻，我就知道了。没什么道理，就是确定。' },
+  { key: 'childhood',  emoji: '🍀', label: '青梅竹马',   prompt: '我们从小认识，一起长大。那段时间刻在骨子里，分开过，但最后还是走到一起了。' },
+  { key: 'online',     emoji: '📡', label: '网络情缘',   prompt: '一开始在网上认识的，隔着屏幕聊了很久。后来见面了，发现比想象中更真实。' },
+  { key: 'accident',   emoji: '🎲', label: '意外相遇',   prompt: '就是个巧合。很普通的一天，很偶然的一个交集，然后就再也没分开。' },
+  { key: 'rescue',     emoji: '🛡️', label: '英雄救美',   prompt: '是我帮了她，或者她拉了我一把。从那个时刻开始，就变得不一样了。' },
+  { key: 'rival',      emoji: '🔥', label: '相爱相杀',   prompt: '最开始我们关系并不好。针锋相对，互不服气，后来才发现吵架和在意其实是同一件事。' },
+  { key: 'rekindle',   emoji: '🕯️', label: '旧情复燃',   prompt: '以前在一起过，分开了一段时间，各自经历了些事，最后又找回来了。' },
+  { key: 'abroad',     emoji: '✈️', label: '异乡偶遇',   prompt: '在一个陌生的地方遇见了她。两个都是外来的人，反而走得近了。' },
+  { key: 'coworker',   emoji: '🎖️', label: '战友情深',   prompt: '一起经历过真正危险的事。那种信任不是培养出来的，是在压力下自然生的。' },
+];
+
 const SECRET_COLORS = [
   { name: '玫瑰红', hex: '#f48fb1' }, { name: '薰衣草', hex: '#ce93d8' },
   { name: '天蓝',   hex: '#81d4fa' }, { name: '薄荷绿', hex: '#a5d6a7' },
@@ -2885,13 +2902,21 @@ function loadSecretScreen() {
     'sec_food': 'userFavFood',
     'sec_music': 'userFavMusic',
     'sec_color': 'userFavColor',
-    'sec_firstmeet': 'firstMeetPlace',
     'sec_bestline': 'ghostBestLine',
   };
   Object.entries(fields).forEach(([id, key]) => {
     const el = document.getElementById(id);
     if (el) el.value = localStorage.getItem(key) || '';
   });
+
+  // 相遇方式
+  const meetTypeEl = document.getElementById('meetTypeChips');
+  if (meetTypeEl) {
+    const savedMeet = localStorage.getItem('meetType') || '';
+    meetTypeEl.innerHTML = MEET_TYPES.map(m =>
+      `<div class="secret-chip ${savedMeet === m.key ? 'selected' : ''}" onclick="selectMeetType('${m.key}', this)">${m.emoji} ${m.label}</div>`
+    ).join('');
+  }
 
   // 头像预览
   const savedAvatar = localStorage.getItem('userAvatarBase64');
@@ -2941,7 +2966,13 @@ function selectZodiac(label, el) {
   saveSecret('userZodiac', label);
 }
 
-function selectColor(name, el) {
+function selectMeetType(key, el) {
+  document.querySelectorAll('#meetTypeChips .secret-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  localStorage.setItem('meetType', key);
+}
+
+
   const dots = document.querySelectorAll('#colorChips .secret-color-dot');
   const selected = document.querySelectorAll('#colorChips .secret-color-dot.selected');
   if (el.classList.contains('selected')) {
