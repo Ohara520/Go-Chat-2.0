@@ -1812,7 +1812,7 @@ async function sendMessage() {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 1000,
-        system: buildSystemPrompt(),
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: chatHistory.slice(-30)
       })
     });
