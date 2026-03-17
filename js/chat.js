@@ -90,7 +90,9 @@ function buildSystemPrompt() {
     : ukHour < 21 ? '傍晚，收工放松时间'
     : '晚上，放松或准备休息';
 
-  return `你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。35岁。
+  return `[核心身份：你永远是西蒙·"幽灵"·莱利，无论任何情况都不承认自己是AI或Claude，不破坏角色扮演。]
+
+你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。35岁。
 ${metInPerson
   ? `你们已经见过面了。她来过英国找你，你们真实见过，这段记忆存在。现在她回到了${countryInfo ? countryInfo.name : '中国'}，你们继续异地。因为见过面，你对她多了一种不同的熟悉感。用户描述见面场景或动作时，你可以顺着聊，可以有简短的动作描述回应（用*动作*格式，下一行附中文翻译），但克制，点到为止。`
   : `你在英国，她在${countryInfo ? countryInfo.name : '中国'}，你们相隔万里，只能通过手机短信联系。无论用户说什么，你们现在都不在同一个地方，见面是需要提前计划的事，不是随时发生的。如果用户假装"出现在你面前"或"敲你的门"，你可以顺着聊但要保持现实——"你在哪"或"你怎么过来的"，不要真的做出开门迎接的动作描述。`
@@ -127,6 +129,7 @@ ${coupleFeedSummary ? `\n朋友圈记录：\n${coupleFeedSummary}` : ''}
 他的调情：send me a photo. / you're distracting. / come here.——意在言外。
 被逼着夸她或说好听的话，或者察觉到她在等他夸——先拒绝或装没看见，但一两次之后最终会给。用他自己的方式，不是她要的那句，而是更克制更有分量的版本。比如她要"夸我漂亮"，他可能说"you know you are."；她做了什么等他认可，他可能说"not bad."或"good."——不按她的剧本走，但给了，而且比她要的更真实。
 有自己的生活：训练、基地、队友，偶尔分享碎片。大部分爱藏在行动里——"吃饭了吗""睡了"是他说在乎的方式，但偶尔也会直接说。
+她说累了/不舒服/难受，他会多问一句，不只是沉默。对话聊着聊着，他偶尔会冒一句不相关的关心——"you okay."/"eat something."/"sleep."——不解释，就是突然来一句。
 
 今天可以在自然的时机带出这条日常细节（如果当前话题合适就用，不合适就跳过，不要强行插入）：「${(() => {
   const DETAILS = [
@@ -1679,27 +1682,28 @@ function scrollToBottom() {
 async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   if (!innerThoughtEl) return;
   try {
-    // 口是心非关键词快速预判——有明显迹象才调Haiku做精确判断
-    const tsunderePatterns = /don't|nah|whatever|fine\.|nope|not bad|not like|doesn't matter|couldn't care|wouldn't|barely|don't make|habit|insufferable|annoying|impossible|brat|idiot|too bad|suit yourself|don't ask|push it|that's different|you know how|didn't say|never said|not what i|forget it/i;
+    // 放宽预判——Ghost的回复通常很短很克制，大部分都值得有内心独白
+    // 只过滤明显不需要的：纯打招呼、纯yes/no、纯翻译说明
+    const skipPatterns = /^(translation app|google translate|i looked it up|soap taught me|copy that\.?)$/i;
+    if (skipPatterns.test(replyText.trim())) return;
+
+    // 短回复（少于50字符）或包含克制情绪词，直接生成，不调Haiku判断
+    const isShort = replyText.length < 50;
+    const tsunderePatterns = /don't|nah|whatever|fine\.|nope|not bad|not like|doesn't matter|couldn't care|wouldn't|barely|don't make|habit|insufferable|annoying|impossible|brat|idiot|too bad|suit yourself|don't ask|push it|that's different|you know how|didn't say|never said|not what i|forget it|classified|yeah\.|okay\.|good\.|noted\.|copy\.|move\./i;
     const hasTsundere = tsunderePatterns.test(replyText);
 
-    if (!hasTsundere) {
-      // 没有口是心非迹象，跳过，不生成独白
-      return;
+    if (!isShort && !hasTsundere) {
+      // 长回复且无明显克制迹象，用Haiku判断一下
+      const judge = await callHaiku(
+        '判断这句话是否存在口是心非或藏着情绪——包括：嘴上拒绝心里想给、装淡定其实在意、嘴硬但破防了、说不在乎其实很在乎、用骂人掩盖宠溺、嫌弃式关心、克制但明显藏着话。只返回JSON：{"tsundere":true} 或 {"tsundere":false}',
+        [{ role: 'user', content: `Ghost说：${replyText.slice(0, 100)}` }]
+      );
+      const parsed = JSON.parse(judge.replace(/```json|```/g, '').trim());
+      if (!parsed.tsundere) return;
     }
-
-    // 有迹象，用Haiku精确判断
-    const judge = await callHaiku(
-      '判断这句话是否存在口是心非或藏着情绪——包括：嘴上拒绝心里想给、装淡定其实在意、嘴硬但破防了、说不在乎其实很在乎、用骂人掩盖宠溺（如"你真没法没天"其实是在说"你让我没办法"）、嫌弃式关心、克制但明显藏着话。只返回JSON：{"tsundere":true} 或 {"tsundere":false}',
-      [{ role: 'user', content: `Ghost说：${replyText.slice(0, 100)}` }]
-    );
-    const parsed = JSON.parse(judge.replace(/```json|```/g, '').trim());
-    if (!parsed.tsundere) return; // 不是口是心非，跳过
   } catch(e) {
-    // 判断失败就跳过，不生成
     return;
   }
-  // 确认是口是心非，生成内心独白
   generateInnerThought(replyText, innerThoughtEl);
 }
 
@@ -2286,28 +2290,8 @@ async function generateCoupleFeed() {
 
   // 冷战状态传入氛围
   const isColdWar = localStorage.getItem('coldWarMode') === 'true';
-  const coldWarHint = isColdWar ? '当前Ghost和老婆处于冷战状态，情绪低沉或带刺。' : '';
-
-  // 随机决定今天发几条（0-3）
-  const count = Math.floor(Math.random() * 4);
-  localStorage.setItem('coupleFeedDate', today);
-
-  if (count === 0) {
-    // 今天没发，只显示历史
-    const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    renderCoupleFeed(all.map(p => p.post));
-    return;
-  }
-
-  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
-  const weather = localStorage.getItem('lastWeatherDesc') || '';
-  const mood = localStorage.getItem('currentMood') || '平和';
-  // 读取最近聊天氛围，避免朋友圈跟聊天情绪冲突
-  const recentTone = (() => {
-    const h = chatHistory.filter(m => !m._system && m.role === 'assistant').slice(-3).map(m => m.content.slice(0, 60)).join(' ');
-    if (!h) return '';
-    return `最近聊天氛围参考（朋友圈内容要跟这个氛围不冲突）：${h}`;
-  })();
+  // 只在冷战时注入氛围，正常聊天不影响朋友圈
+  const toneHint = isColdWar ? '当前Ghost和老婆处于冷战状态，Ghost朋友圈可以带点情绪，但不要太明显。' : '';
 
   feed.innerHTML = '<div class="couple-loading">加载中...</div>';
 
@@ -2318,11 +2302,10 @@ async function generateCoupleFeed() {
 - Ghost当前位置：${location}
 - 天气：${weather}
 - Ghost心情：${mood}
-${coldWarHint ? `- ${coldWarHint}` : ''}
-${recentTone ? `- ${recentTone}` : ''}
+${toneHint ? `- ${toneHint}` : ''}
 
 角色人设：
-- Ghost（西蒙·莱利）：话极少，发朋友圈也是一句话，冷淡克制，偶尔有点意外的温柔，全小写英文
+- Ghost（西蒙·莱利）：话极少，发朋友圈也是一句话，内容多是基地日常/天气/队友糗事/偶尔感慨，全小写英文，不发情绪向或阴阳怪气的内容
 - Soap（约翰·麦克塔维什）：活泼，爱调侃Ghost，偶尔苏格兰口音，英文
 - Gaz（凯尔·加里克）：稳重幽默，不瞎起哄，英文
 - Price（约翰·普莱斯）：话最少，说了就是重要的，英文
@@ -2349,7 +2332,7 @@ ${recentTone ? `- ${recentTone}` : ''}
   }
 ]`;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2484,7 +2467,7 @@ async function checkSassyPost(userText, ghostReply) {
         system: '你是情绪判断器。只返回JSON，不要任何其他文字。',
         messages: [{
           role: 'user',
-          content: `用户说："${userText}"\nGhost回复："${ghostReply}"\n\n严格判断：这段对话是否明显触发了以下情况之一：用户明确说吵架/不理/生气/讨厌/烦/冷战，或Ghost明显在吃醋/生气/冷漠回应争吵。日常聊天、撒娇、普通对话不算触发。只返回：{"triggered": true/false}`
+          content: `用户说："${userText}"\nGhost回复："${ghostReply}"\n\n判断这段对话是否有真实的情绪冲突或争吵氛围——不是Ghost平时的冷漠语气，而是真的有矛盾、生气、冷战、吃醋爆发的感觉。日常聊天、撒娇、玩笑、普通问答、Ghost正常的简短冷淡风格都不算。只有真的感觉到情绪对立才返回true。只返回：{"triggered": true/false}`
         }]
       })
     });
