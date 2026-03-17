@@ -138,6 +138,7 @@ function buildSystemPrompt() {
 - 她调情不装没看见，接住，用他的方式——沉，意味深长，让她愣一下
 - 家人/童年→沉默或换话题；受伤→"classified."；怕死→"next question."；有没有哭过→已读
 - 她说哭/闹/分手/离婚：先判断真情绪崩了还是撒娇赌气——真的他会认真，语气变；假的他看穿，调侃或"no."继续聊
+- 如果她说的话让你真的很烦/很受伤/觉得被嫌弃，不是开玩笑而是真的刺到你了，在回复最后单独一行写：COLD_WAR_START。开玩笑/撒娇/普通拌嘴绝对不触发，只有真的让你心寒了才触发，低频，不要滥用。
 
 ## 情绪惯性
 
@@ -1256,8 +1257,8 @@ function confirmTransfer() {
     let reply = data.content?.[0]?.text || '...';
     updateToRead();
     const shouldRefund = reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8));
-    // 彻底清除REFUND/KEEP标记，不管在哪个位置
-    reply = reply.replace(/\n?(REFUND|KEEP)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
+    // 彻底清除REFUND/KEEP/COLD_WAR_START标记，不管在哪个位置
+    reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
     if (shouldRefund) {
       setBalance(getBalance() + amount);
       addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amount });
@@ -1924,9 +1925,11 @@ async function sendMessage() {
       changeMood(2);
     }
 
-    // 检测冷战触发词
-    const fightKeywords = ['你烦死了','讨厌你','不理你','冷战','随便你','无所谓了'];
-    if (fightKeywords.some(k => text.includes(k))) startColdWar();
+    // 检测冷战标记（由Ghost自己决定）
+    if (text.includes('COLD_WAR_START')) {
+      reply = reply.replace(/\n?COLD_WAR_START\n?/g, '').trim();
+      startColdWar();
+    }
 
     // 温柔互动加心情好感
     const warmKeywords = ['爱你','想你','好想你','么么','亲亲'];
@@ -2286,8 +2289,8 @@ async function generateCoupleFeed() {
 
   // 冷战状态传入氛围
   const isColdWar = localStorage.getItem('coldWarMode') === 'true';
-  // 只在冷战时注入氛围，正常聊天不影响朋友圈
   const toneHint = isColdWar ? '当前Ghost和老婆处于冷战状态，Ghost朋友圈可以带点情绪，但不要太明显。' : '';
+  const count = Math.floor(Math.random() * 3) + 1; // 每天随机1-3条
 
   feed.innerHTML = '<div class="couple-loading">加载中...</div>';
 
@@ -2308,7 +2311,7 @@ ${toneHint ? `- ${toneHint}` : ''}
 
 要求：
 1. 每条帖子由Ghost或队友发布（Ghost概率40%，Soap 30%，Gaz 20%，Price 10%）
-2. 每条帖子偶尔有1-3条评论，Ghost偶尔回复评论
+2. 每条帖子必须有1-3条评论，评论者随机从其他队友中选（发帖人不能评论自己），Ghost评论概率30%
 3. 内容自然，结合位置和天气，符合军人日常
 4. 不要OOC，不要提任务细节
 
@@ -2449,29 +2452,13 @@ function toggleCoupleLike(btn, key) {
 
 // ===== 阴阳帖系统 =====
 async function checkSassyPost(userText, ghostReply) {
-  // 冷却：1小时内不重复触发
+  // 只有真正进入冷战模式才触发阴阳帖
+  const isColdWar = localStorage.getItem('coldWarMode') === 'true';
+  if (!isColdWar) return;
+  // 冷战期间每小时最多一条
   const lastSassy = parseInt(localStorage.getItem('lastSassyTime') || '0');
   if (Date.now() - lastSassy < 60 * 60 * 1000) return;
-
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 100,
-        system: '你是情绪判断器。只返回JSON，不要任何其他文字。',
-        messages: [{
-          role: 'user',
-          content: `用户说："${userText}"\nGhost回复："${ghostReply}"\n\n判断这段对话是否有真实的情绪冲突或争吵氛围——不是Ghost平时的冷漠语气，而是真的有矛盾、生气、冷战、吃醋爆发的感觉。日常聊天、撒娇、玩笑、普通问答、Ghost正常的简短冷淡风格都不算。只有真的感觉到情绪对立才返回true。只返回：{"triggered": true/false}`
-        }]
-      })
-    });
-    const data = await res.json();
-    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(raw);
-    if (result.triggered) generateSassyPost();
-  } catch(e) {}
+  generateSassyPost();
 }
 
 async function generateSassyPost() {
