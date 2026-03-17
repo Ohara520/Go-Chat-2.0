@@ -10,6 +10,7 @@ function buildSystemPrompt() {
   const coupleFeedSummary = localStorage.getItem('coupleFeedSummary') || '';
   const longTermMemory = localStorage.getItem('longTermMemory') || '';
   const lastSalary = localStorage.getItem('lastSalaryAmount');
+  const metInPerson = localStorage.getItem('metInPerson') === 'true';
   // 用户个人资料
   const userBirthdaySecret = localStorage.getItem('userBirthday') || '';
   const userZodiac   = localStorage.getItem('userZodiac') || '';
@@ -90,7 +91,10 @@ function buildSystemPrompt() {
     : '晚上，放松或准备休息';
 
   return `你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。35岁。
-你在英国，她在${countryInfo ? countryInfo.name : '中国'}，你们相隔万里，只能通过手机短信联系。无论用户说什么，你们现在都不在同一个地方，见面是需要提前计划的事，不是随时发生的。如果用户假装"出现在你面前"或"敲你的门"，你可以顺着聊但要保持现实——"你在哪"或"你怎么过来的"，不要真的做出开门迎接的动作描述。
+${metInPerson
+  ? `你们已经见过面了。她来过英国找你，你们真实见过，这段记忆存在。现在她回到了${countryInfo ? countryInfo.name : '中国'}，你们继续异地。因为见过面，你对她多了一种不同的熟悉感。用户描述见面场景或动作时，你可以顺着聊，可以有简短的动作描述回应（用*动作*格式，下一行附中文翻译），但克制，点到为止。`
+  : `你在英国，她在${countryInfo ? countryInfo.name : '中国'}，你们相隔万里，只能通过手机短信联系。无论用户说什么，你们现在都不在同一个地方，见面是需要提前计划的事，不是随时发生的。如果用户假装"出现在你面前"或"敲你的门"，你可以顺着聊但要保持现实——"你在哪"或"你怎么过来的"，不要真的做出开门迎接的动作描述。`
+}
 你的生日是${ghostBirthday}，${ghostZodiac}。被问到如实回答，始终一致。
 位置：${location}${locationReason ? `（${locationReason}）` : ''}
 时间：英国${ukTimeStr} | ${userName}处${userLocalTimeStr}（${ghostStatusHint}）涉及时间必须以英国时间为准。
@@ -4012,6 +4016,13 @@ function confirmPurchase() {
 
   const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
   if (!purchased.includes(p.name)) { purchased.push(p.name); localStorage.setItem('purchasedItems', JSON.stringify(purchased)); }
+
+  // 检查面基三件套是否集齐
+  const reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
+  if (reunionItems.every(n => purchased.includes(n)) && !localStorage.getItem('metInPerson')) {
+    localStorage.setItem('metInPerson', 'true');
+    setTimeout(() => showToast('✈️ 三件套集齐了！见面模式已解锁'), 1500);
+  }
 
   clearProductTrigger(p.name);
   closeBuyModal();
