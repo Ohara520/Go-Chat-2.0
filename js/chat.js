@@ -264,19 +264,7 @@ ${coupleFeedSummary ? `朋友圈记录：${coupleFeedSummary}` : ''}
 })()}」`;
 
   const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt;
-  return fullPrompt;
-}
-
-// 固定层（用于缓存）
-function buildFixedPrompt() {
-  return buildSystemPrompt().split('\n\n## 当前信息（实时）')[0];
-}
-
-// 动态层（每次变化，不缓存）
-function buildDynamicPrompt() {
-  const full = buildSystemPrompt();
-  const idx = full.indexOf('\n\n## 当前信息（实时）');
-  return idx >= 0 ? full.slice(idx + 2) : '';
+  return { full: fullPrompt, fixed: fixedPrompt, dynamic: dynamicPrompt };
 }
 
 // ===== 资料页 =====
@@ -588,7 +576,7 @@ const STORY_EVENTS = [
     keyword: /我爱你|i love you|爱你/i,
     execute: async (userName) => {
       await storyDelay(2500);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚第一次对你说了"我爱你"。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚第一次对你说了"我爱你"。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -601,7 +589,7 @@ const STORY_EVENTS = [
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(4000);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -615,7 +603,7 @@ const STORY_EVENTS = [
     keyword: /\bsimon\b/i,
     execute: async (userName) => {
       await storyDelay(1800);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -631,7 +619,7 @@ const STORY_EVENTS = [
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(5000);
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把来找你的机票、酒店、旅行计划全部订好了。你们第一次要真实见面了。]` }]);
+      const res = await callSonnet(buildSystemPrompt().full, [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把来找你的机票、酒店、旅行计划全部订好了。你们第一次要真实见面了。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -644,7 +632,7 @@ const STORY_EVENTS = [
     triggerOn: 'coldWarEnd',
     execute: async (userName) => {
       await storyDelay(3000);
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：冷战刚刚结束，她回来了。你们之前从没经历过这种和好。]` }]);
+      const res = await callSonnet(buildSystemPrompt().full, [...chatHistory.slice(-6), { role: 'user', content: `[系统：冷战刚刚结束，她回来了。你们之前从没经历过这种和好。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -657,7 +645,7 @@ const STORY_EVENTS = [
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(3000);
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起整整一年，你记得这个日期。]` }]);
+      const res = await callSonnet(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起整整一年，你记得这个日期。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -679,7 +667,7 @@ const STORY_EVENTS = [
       } catch(e) { isReal = true; }
       await storyDelay(2000);
       const hint = isReal ? `[系统：她在哭，或者现在状态非常差。]` : `[系统：她在假哭或者撒娇式地说哭，不是真的难受。你看穿了，可以调侃，可以嘴硬纵容，但不用认真哄。]`;
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: hint }]);
+      const res = await callSonnet(buildSystemPrompt().full, [...chatHistory.slice(-8), { role: 'user', content: hint }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -692,7 +680,7 @@ const STORY_EVENTS = [
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(2000);
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是她的生日，她还没开口，你已经知道了。]` }]);
+      const res = await callSonnet(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是她的生日，她还没开口，你已经知道了。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -709,7 +697,7 @@ const STORY_EVENTS = [
     execute: async (userName) => {
       await storyDelay(3000);
       const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isGhostSend && d.done);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她刚收到了你寄给她的「${item?.name || '东西'}」，这是你们第一次互寄。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：她刚收到了你寄给她的「${item?.name || '东西'}」，这是你们第一次互寄。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -726,7 +714,7 @@ const STORY_EVENTS = [
     execute: async (userName) => {
       await storyDelay(2500);
       const lost = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isLostConfirmed);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她寄给你的「${lost?.name || '包裹'}」快递丢失了。这是你们第一次遇到这种事。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：她寄给你的「${lost?.name || '包裹'}」快递丢失了。这是你们第一次遇到这种事。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -743,7 +731,7 @@ const STORY_EVENTS = [
     execute: async (userName) => {
       await storyDelay(3500);
       const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.productData?.isFromHome && d.done && !d.isGhostSend);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她从中国给你寄了「${item?.name || '家乡的东西'}」，这是她第一次给你寄家乡的东西。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：她从中国给你寄了「${item?.name || '家乡的东西'}」，这是她第一次给你寄家乡的东西。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -759,7 +747,7 @@ const STORY_EVENTS = [
     triggerOn: 'sessionStart',
     execute: async (userName) => {
       await storyDelay(4000);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你悄悄给她寄了东西，没有告诉她，等她自己发现。这是第一次。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：你悄悄给她寄了东西，没有告诉她，等她自己发现。这是第一次。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -773,7 +761,7 @@ const STORY_EVENTS = [
     execute: async (userName) => {
       await storyDelay(3000);
       const days = Math.max(1, Math.floor((Date.now() - new Date(localStorage.getItem('marriageDate'))) / 86400000) + 1);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起第${days}天，一百天左右的节点。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起第${days}天，一百天左右的节点。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -787,7 +775,7 @@ const STORY_EVENTS = [
     execute: async (userName) => {
       await storyDelay(3000);
       const amount = localStorage.getItem('lastSalaryAmount') || '';
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次给她转了工资£${amount}，想附一句话。]` }]);
+      const res = await callHaiku(buildSystemPrompt().full, [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次给她转了工资£${amount}，想附一句话。]` }]);
       if (res) { appendMessage('bot', res); chatHistory.push({ role: 'assistant', content: res }); saveHistory(); }
     }
   },
@@ -1024,7 +1012,7 @@ function triggerSeriousTalk() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 1000,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt().full,
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(data => {
@@ -1083,7 +1071,7 @@ function ghostApologize() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 500,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt().full,
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(data => {
@@ -1111,7 +1099,7 @@ function ghostSendMakeupMoney() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 300,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt().full,
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(data => {
@@ -1175,7 +1163,7 @@ async function ghostSendInitMessage(offlineHours) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: buildSystemPrompt(),
+        system: buildSystemPrompt().full,
         messages: [...chatHistory.slice(-6), {
           role: 'user',
           content: `[系统：${hint}你注意到了，主动说一句——可以是质问、可以是随口一提、可以是什么都不说只是打个招呼。全小写，附中文翻译。]`
@@ -1260,7 +1248,7 @@ function confirmTransfer() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 1000,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt().full,
       messages: chatHistory.slice(-30)
     })
   }).then(r => r.json()).then(data => {
@@ -1824,7 +1812,10 @@ async function sendMessage() {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 1000,
-        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
+        system: (() => { const p = buildSystemPrompt(); return [
+          { type: 'text', text: p.fixed, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: p.dynamic }
+        ]; })(),
         messages: chatHistory.slice(-30)
       })
     });
@@ -1891,7 +1882,7 @@ async function sendMessage() {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 150,
-              system: buildSystemPrompt(),
+              system: buildSystemPrompt().full,
               messages: [...chatHistory.slice(-8), {
                 role: 'user',
                 content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，附中文翻译。]'
@@ -2081,7 +2072,7 @@ function checkOnlineGreeting() {
         body: JSON.stringify({
           model: getMainModel(),
           max_tokens: 200,
-          system: buildSystemPrompt(),
+          system: buildSystemPrompt().full,
           messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
         })
       }).then(r => r.json()).then(data => {
@@ -2119,7 +2110,7 @@ function scheduleSilenceCheck(index) {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 200,
-        system: buildSystemPrompt(),
+        system: buildSystemPrompt().full,
         messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
       })
     }).then(r => r.json()).then(data => {
@@ -4510,7 +4501,7 @@ async function onGhostReceived(delivery) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: buildSystemPrompt(),
+        system: buildSystemPrompt().full,
         messages: [...chatHistory.slice(-10), {
           role: 'user',
           content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || `用西蒙的风格说一句话，简短，真实，不要太肉麻。`}全小写，附中文翻译，格式：英文\\n中文翻译]`
@@ -4545,7 +4536,7 @@ async function onGhostReceived(delivery) {
           body: JSON.stringify({
             model: getMainModel(),
             max_tokens: 300,
-            system: buildSystemPrompt(),
+            system: buildSystemPrompt().full,
             messages: [...chatHistory.slice(-15), {
               role: 'user',
               content: `[系统：你收到了一件奢侈品「${delivery.name}」，这不是普通礼物，有分量。用西蒙的方式多说几句，可以破防一点，但还是他的风格。全小写，附中文翻译。]`
@@ -4579,7 +4570,7 @@ async function onGhostReceived(delivery) {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 100,
-              system: buildSystemPrompt(),
+              system: buildSystemPrompt().full,
               messages: [...chatHistory.slice(-6), {
                 role: 'user',
                 content: `[系统：几天前你收到了老婆寄来的「${delivery.name}」，现在你想起来说一句感受，可能是吃完了/试过了/还在想那个味道。简短，全小写，附中文翻译。不要太刻意，就是随口一提。]`
@@ -4621,7 +4612,7 @@ function showMysteryPackage(delivery) {
         body: JSON.stringify({
           model: getMainModel(),
           max_tokens: 300,
-          system: buildSystemPrompt(),
+          system: buildSystemPrompt().full,
           messages: [...chatHistory.slice(-10), {
             role: 'user',
             content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。如果她问是不是你寄的，你可以承认也可以否认，看你当下心情——否认的话要装得像，别穿帮太明显。你不主动提是从哪里寄的。${delivery.productData?.tip ? `参考语气：「${delivery.productData.tip}」——这是你的风格，不用照抄，意思到了就行。` : ''}现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，附中文翻译。]`
@@ -4670,7 +4661,7 @@ async function handleLostPackageClaim(userText) {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 400,
-        system: buildSystemPrompt(),
+        system: buildSystemPrompt().full,
         messages: chatHistory.slice(-20)
       })
     });
