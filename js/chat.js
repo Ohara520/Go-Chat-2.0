@@ -1812,10 +1812,7 @@ async function sendMessage() {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 1000,
-        system: (() => { const p = buildSystemPrompt(); return [
-          { type: 'text', text: p.fixed, cache_control: { type: 'ephemeral' } },
-          { type: 'text', text: p.dynamic }
-        ]; })(),
+        system: buildSystemPrompt().full,
         messages: chatHistory.slice(-30)
       })
     });
