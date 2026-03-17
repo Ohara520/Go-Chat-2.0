@@ -170,7 +170,14 @@ ${coupleFeedSummary ? `\n朋友圈记录：\n${coupleFeedSummary}` : ''}
     'found your photo in my kit bag. don\'t make a thing of it.',
     'gaz found a stray cat. base said no. cat is still here.',
   ];
-  return DETAILS[Math.floor(Math.random() * DETAILS.length)];
+  const usedKey = 'usedDetails';
+  let used = JSON.parse(localStorage.getItem(usedKey) || '[]');
+  let available = DETAILS.filter(d => !used.includes(d));
+  if (available.length === 0) { used = []; available = DETAILS; localStorage.setItem(usedKey, '[]'); }
+  const pick = available[Math.floor(Math.random() * available.length)];
+  used.push(pick);
+  localStorage.setItem(usedKey, JSON.stringify(used));
+  return pick;
 })()}」
 
 ---
