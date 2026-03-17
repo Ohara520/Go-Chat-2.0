@@ -1015,7 +1015,7 @@ function triggerSeriousTalk() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 1000,
-      system: buildSystemPrompt(),
+      system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(data => {
@@ -1074,7 +1074,7 @@ function ghostApologize() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 500,
-      system: buildSystemPrompt(),
+      system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(data => {
@@ -1102,7 +1102,7 @@ function ghostSendMakeupMoney() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 300,
-      system: buildSystemPrompt(),
+      system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(data => {
@@ -1166,7 +1166,7 @@ async function ghostSendInitMessage(offlineHours) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: buildSystemPrompt(),
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: [...chatHistory.slice(-6), {
           role: 'user',
           content: `[系统：${hint}你注意到了，主动说一句——可以是质问、可以是随口一提、可以是什么都不说只是打个招呼。全小写，附中文翻译。]`
@@ -1251,7 +1251,7 @@ function confirmTransfer() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 1000,
-      system: buildSystemPrompt(),
+      system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
       messages: chatHistory.slice(-30)
     })
   }).then(r => r.json()).then(data => {
@@ -1816,7 +1816,7 @@ async function sendMessage() {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 1000,
-        system: buildSystemPrompt(),
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: chatHistory.slice(-30)
       })
     });
@@ -1883,7 +1883,7 @@ async function sendMessage() {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 150,
-              system: buildSystemPrompt(),
+              system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
               messages: [...chatHistory.slice(-8), {
                 role: 'user',
                 content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，附中文翻译。]'
@@ -2075,7 +2075,7 @@ function checkOnlineGreeting() {
         body: JSON.stringify({
           model: getMainModel(),
           max_tokens: 200,
-          system: buildSystemPrompt(),
+          system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
           messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
         })
       }).then(r => r.json()).then(data => {
@@ -2113,7 +2113,7 @@ function scheduleSilenceCheck(index) {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 200,
-        system: buildSystemPrompt(),
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
       })
     }).then(r => r.json()).then(data => {
@@ -4488,7 +4488,7 @@ async function onGhostReceived(delivery) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: buildSystemPrompt(),
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: [...chatHistory.slice(-10), {
           role: 'user',
           content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || `用西蒙的风格说一句话，简短，真实，不要太肉麻。`}全小写，附中文翻译，格式：英文\\n中文翻译]`
@@ -4523,7 +4523,7 @@ async function onGhostReceived(delivery) {
           body: JSON.stringify({
             model: getMainModel(),
             max_tokens: 300,
-            system: buildSystemPrompt(),
+            system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
             messages: [...chatHistory.slice(-15), {
               role: 'user',
               content: `[系统：你收到了一件奢侈品「${delivery.name}」，这不是普通礼物，有分量。用西蒙的方式多说几句，可以破防一点，但还是他的风格。全小写，附中文翻译。]`
@@ -4557,7 +4557,7 @@ async function onGhostReceived(delivery) {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 100,
-              system: buildSystemPrompt(),
+              system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
               messages: [...chatHistory.slice(-6), {
                 role: 'user',
                 content: `[系统：几天前你收到了老婆寄来的「${delivery.name}」，现在你想起来说一句感受，可能是吃完了/试过了/还在想那个味道。简短，全小写，附中文翻译。不要太刻意，就是随口一提。]`
@@ -4599,7 +4599,7 @@ function showMysteryPackage(delivery) {
         body: JSON.stringify({
           model: getMainModel(),
           max_tokens: 300,
-          system: buildSystemPrompt(),
+          system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
           messages: [...chatHistory.slice(-10), {
             role: 'user',
             content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。如果她问是不是你寄的，你可以承认也可以否认，看你当下心情——否认的话要装得像，别穿帮太明显。你不主动提是从哪里寄的。${delivery.productData?.tip ? `参考语气：「${delivery.productData.tip}」——这是你的风格，不用照抄，意思到了就行。` : ''}现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，附中文翻译。]`
@@ -4648,7 +4648,7 @@ async function handleLostPackageClaim(userText) {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 400,
-        system: buildSystemPrompt(),
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: chatHistory.slice(-20)
       })
     });
