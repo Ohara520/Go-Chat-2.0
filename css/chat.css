@@ -2291,3 +2291,89 @@
   from { opacity:0; transform: translateY(-4px); }
   to   { opacity:1; transform: translateY(0); }
 }
+
+/* ===== 故事书/相册标签 ===== */
+.achievement-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px 0;
+  border-bottom: 1px solid rgba(200,160,240,0.15);
+  flex-shrink: 0;
+}
+.achievement-tab {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(130,80,170,0.5);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+.achievement-tab.active {
+  color: #6b3fa0;
+  border-bottom-color: rgba(192,132,252,0.7);
+  font-weight: 700;
+}
+
+/* ===== 回忆相册 ===== */
+.album-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+.album-card {
+  background: rgba(255,255,255,0.7);
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(200,160,240,0.2);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgba(160,100,220,0.06);
+}
+.album-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.album-card-emoji {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.album-card-info { flex: 1; }
+.album-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a2d6e;
+  margin-bottom: 2px;
+}
+.album-card-from {
+  font-size: 11px;
+  color: rgba(130,80,170,0.5);
+  letter-spacing: 0.3px;
+}
+.album-card-date {
+  font-size: 10px;
+  color: rgba(160,120,200,0.45);
+  white-space: nowrap;
+}
+.album-card-note {
+  font-size: 11px;
+  color: rgba(90,50,130,0.6);
+  font-style: italic;
+  line-height: 1.6;
+  padding-top: 6px;
+  border-top: 1px solid rgba(200,160,240,0.12);
+}
+.album-empty {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 13px;
+  color: rgba(130,80,170,0.4);
+  line-height: 2.2;
+  font-style: italic;
+}

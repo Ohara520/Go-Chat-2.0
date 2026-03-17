@@ -818,6 +818,66 @@ function checkStoryOnColdWarEnd() {
   if (event) { markStoryDone(event); event.execute(localStorage.getItem('userName') || '你'); }
 }
 
+function switchAchievementTab(tab) {
+  const storyPanel = document.getElementById('storyBookPanel');
+  const albumPanel = document.getElementById('albumPanel');
+  const tabStory = document.getElementById('tabStory');
+  const tabAlbum = document.getElementById('tabAlbum');
+  const title = document.getElementById('achievementTitle');
+  const counter = document.getElementById('storyBookCounter');
+  if (tab === 'story') {
+    storyPanel.style.display = '';
+    albumPanel.style.display = 'none';
+    tabStory.classList.add('active');
+    tabAlbum.classList.remove('active');
+    title.textContent = '📖 我们的故事';
+    renderStoryBook();
+  } else {
+    storyPanel.style.display = 'none';
+    albumPanel.style.display = '';
+    tabStory.classList.remove('active');
+    tabAlbum.classList.add('active');
+    title.textContent = '📦 回忆相册';
+    if (counter) counter.textContent = '';
+    renderAlbum();
+  }
+}
+
+function renderAlbum() {
+  const container = document.getElementById('albumList');
+  if (!container) return;
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  // 收集所有已完成的快递（包括Ghost寄来的和用户寄给他的）
+  const done = deliveries.filter(d => d.done || d.isGhostSend);
+  if (done.length === 0) {
+    container.innerHTML = `<div class="album-empty">还没有收到任何东西<br>去商城给他寄点什么吧</div>`;
+    return;
+  }
+  // 按时间倒序
+  const sorted = [...done].sort((a, b) => (b.doneAt || b.addedAt || 0) - (a.doneAt || a.addedAt || 0));
+  container.innerHTML = sorted.map(d => {
+    const emoji = d.productData?.emoji || d.emoji || '📦';
+    const name = d.name || '神秘包裹';
+    const isFromGhost = d.isGhostSend || d.isLocationSpecial;
+    const isFromHome = d.productData?.isFromHome;
+    const from = isFromGhost ? '他寄来的' : isFromHome ? '你从家寄给他的' : '你寄给他的';
+    const dateStr = d.doneAt ? new Date(d.doneAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) :
+                    d.addedAt ? new Date(d.addedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+    const note = d.ghostNote || d.note || '';
+    return `<div class="album-card">
+      <div class="album-card-top">
+        <div class="album-card-emoji">${emoji}</div>
+        <div class="album-card-info">
+          <div class="album-card-name">${name}</div>
+          <div class="album-card-from">${from}</div>
+        </div>
+        <div class="album-card-date">${dateStr}</div>
+      </div>
+      ${note ? `<div class="album-card-note">"${note}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
 function renderStoryBook() {
   const container = document.getElementById('storyBookList');
   if (!container) return;

@@ -606,12 +606,23 @@
   <div class="screen" id="achievementScreen">
     <div class="screen-header">
       <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
-      <div class="screen-title">📖 我们的故事</div>
+      <div class="screen-title" id="achievementTitle">📖 我们的故事</div>
       <div id="storyBookCounter" style="font-size:12px;color:#9b59b6;margin-left:auto;padding-right:4px;"></div>
     </div>
-    <div class="story-book-container">
+    <!-- 标签切换 -->
+    <div class="achievement-tabs">
+      <button class="achievement-tab active" id="tabStory" onclick="switchAchievementTab('story')">📖 故事书</button>
+      <button class="achievement-tab" id="tabAlbum" onclick="switchAchievementTab('album')">📦 回忆相册</button>
+    </div>
+    <!-- 故事书 -->
+    <div class="story-book-container" id="storyBookPanel">
       <div class="story-book-hint">和他相处，故事会自然发生</div>
       <div id="storyBookList" class="story-book-list"></div>
+    </div>
+    <!-- 回忆相册 -->
+    <div class="story-book-container" id="albumPanel" style="display:none;">
+      <div class="story-book-hint">每一件寄来的东西，都是他在意你的证明</div>
+      <div id="albumList" class="album-list"></div>
     </div>
   </div>
 
