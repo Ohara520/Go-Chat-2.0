@@ -1241,12 +1241,7 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
 }
 let chatHistory = [];
 
-// ===== 模型选择（测试用）=====
-function getMainModel() {
-  return localStorage.getItem('useHaikuMode') === '1'
-    ? 'claude-haiku-4-5-20251001'
-    : 'claude-sonnet-4-6';
-}
+function getMainModel() { return 'claude-sonnet-4-6'; }
 let lastMessageTime = null;
 
 function initChat() {
@@ -1973,7 +1968,7 @@ function checkOnlineGreeting() {
 
 // ===== 页面沉默计时 =====
 let silenceTimer = null;
-const SILENCE_DELAYS = [5, 15, 30]; // 分钟
+const SILENCE_DELAYS = [15, 45, 90]; // 分钟
 
 function resetSilenceTimer() {
   if (silenceTimer) clearTimeout(silenceTimer);
@@ -4651,20 +4646,3 @@ function closeDeliveryModal() {
   document.getElementById('deliveryModal').style.display = 'none';
 }
 
-// ===== 开发者模式（隐藏开关）=====
-let devTapCount = 0;
-let devTapTimer = null;
-function handleDevTap() {
-  devTapCount++;
-  clearTimeout(devTapTimer);
-  devTapTimer = setTimeout(() => { devTapCount = 0; }, 2000);
-  if (devTapCount >= 5) {
-    devTapCount = 0;
-    const isHaiku = localStorage.getItem('useHaikuMode') === '1';
-    const newMode = isHaiku ? '0' : '1';
-    localStorage.setItem('useHaikuMode', newMode);
-    const el = document.getElementById('devModeTap');
-    if (el) el.textContent = newMode === '1' ? '⚡ Haiku 模式已开启' : '· Sonnet 模式已恢复';
-    setTimeout(() => { if (el) el.textContent = '·'; }, 3000);
-  }
-}
