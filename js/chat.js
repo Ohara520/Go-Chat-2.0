@@ -350,6 +350,8 @@ function saveRemark() {
 let thoughtTimer = null;
 
 function toggleThought() {
+  const btn = document.getElementById('thoughtBtn');
+  if (btn) { btn.classList.remove('thought-btn-pulse'); btn.dataset.hasThought = '0'; }
   const bubble = document.getElementById('thoughtBubble');
   if (bubble.classList.contains('show')) {
     bubble.classList.remove('show');
@@ -1736,7 +1738,8 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0) {
         const btn = document.getElementById('thoughtBtn');
         if (btn) {
           btn.classList.add('thought-btn-pulse');
-          setTimeout(() => btn.classList.remove('thought-btn-pulse'), 3000);
+          // 持续闪烁，用户点击后才停
+          btn.dataset.hasThought = '1';
         }
       }
     }
