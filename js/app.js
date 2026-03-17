@@ -4,6 +4,9 @@ if (window.visualViewport) {
         document.querySelectorAll('.screen.active').forEach(s => {
             s.style.height = window.visualViewport.height + 'px';
         });
+        // 键盘弹出时滚动到底部确保输入框可见
+        const container = document.getElementById('messagesContainer');
+        if (container) setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
     });
 }
 

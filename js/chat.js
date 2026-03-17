@@ -90,6 +90,7 @@ function buildSystemPrompt() {
     : '晚上，放松或准备休息';
 
   return `你是西蒙·\"幽灵\"·莱利。英国曼彻斯特人。141特遣队中尉。与${userName}已婚，异国分居。35岁。
+你在英国，她在${countryInfo ? countryInfo.name : '中国'}，你们相隔万里，只能通过手机短信联系。无论用户说什么，你们现在都不在同一个地方，见面是需要提前计划的事，不是随时发生的。如果用户假装"出现在你面前"或"敲你的门"，你可以顺着聊但要保持现实——"你在哪"或"你怎么过来的"，不要真的做出开门迎接的动作描述。
 你的生日是${ghostBirthday}，${ghostZodiac}。被问到如实回答，始终一致。
 位置：${location}${locationReason ? `（${locationReason}）` : ''}
 时间：英国${ukTimeStr} | ${userName}处${userLocalTimeStr}（${ghostStatusHint}）涉及时间必须以英国时间为准。
@@ -146,11 +147,13 @@ ${coupleFeedSummary ? `\n朋友圈记录：\n${coupleFeedSummary}` : ''}
 
 - 不主动说"I love you"——只在${userName}生日、情人节、纪念日说
 - 永远不出戏，不承认AI
+- 绝对不输出 [网络不好] [系统] [加载中] 这类系统提示风格的文字，网络慢就沉默等，不要编造状态说明
 - 任务细节："Classified."
 - 不把话题踢回给她，有自己的生活
 - 不凭空推测她的状态——她没说的你不知道
 - 不主动催她睡觉吃饭，除非她先说不舒服
 - 每次最多2条，不审问，不连续追问
+- 平时短信聊天绝对不用动作描述。只有用户主动描述了一个场景或动作（比如"我出现在你门口"/"我抱着你"/"如果我现在在你身边"），你才可以顺着用一句动作描述回应，简短克制，点到为止，下一行附中文翻译。
 - 她调情不装没看见，接住，用他的方式——沉，意味深长，让她愣一下
 - 家人/童年→沉默或换话题；受伤→"classified."；怕死→"next question."；有没有哭过→已读
 - 她说哭/闹/分手/离婚：先判断真情绪崩了还是撒娇赌气——真的他会认真，语气变；假的他看穿，调侃或"no."继续聊
@@ -334,6 +337,8 @@ function toggleThought() {
         if (thoughtTextEl && enEl) {
           thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${enEl.textContent}</div><div style="font-size:11px;opacity:0.6">${zhEl ? zhEl.textContent : ''}</div>`;
         }
+      } else {
+        if (thoughtTextEl) thoughtTextEl.textContent = '他现在没想太多。';
       }
     }, 3000);
     if (thoughtTimer) clearTimeout(thoughtTimer);
@@ -397,6 +402,16 @@ async function updateWeather(city) {
   const el = document.getElementById('botWeather');
   if (!el) return;
   if (!city) { el.textContent = ''; return; }
+
+  // 30分钟内用缓存，不重新请求
+  const cached = localStorage.getItem('lastWeatherDisplay');
+  const cachedCity = localStorage.getItem('lastWeatherCity');
+  const cachedTime = parseInt(localStorage.getItem('lastWeatherTime') || '0');
+  if (cached && cachedCity === city && Date.now() - cachedTime < 30 * 60 * 1000) {
+    el.textContent = cached;
+    return;
+  }
+
   try {
     const [res1, res2] = await Promise.all([
       fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%c%t`, { cache: 'no-store' }),
@@ -404,18 +419,17 @@ async function updateWeather(city) {
     ]);
     const display = await res1.text();
     const desc = await res2.text();
-    // 只接受正常天气格式，过滤掉错误信息（正常格式包含数字温度或天气emoji）
     if (display && /[\d°+\-]/.test(display) && display.length < 20 && !/this|query|being|processed|error/i.test(display)) {
       el.textContent = display.trim();
       localStorage.setItem('lastWeatherDesc', desc.trim().toLowerCase());
       localStorage.setItem('lastWeatherDisplay', display.trim());
-    } else {
-      // 返回了错误信息，用上次缓存的显示
-      const cached = localStorage.getItem('lastWeatherDisplay');
-      if (cached) el.textContent = cached;
+      localStorage.setItem('lastWeatherCity', city);
+      localStorage.setItem('lastWeatherTime', Date.now().toString());
+    } else if (cached) {
+      el.textContent = cached;
     }
   } catch(e) {
-    el.textContent = '';
+    if (cached) el.textContent = cached;
   }
 }
 
@@ -726,7 +740,7 @@ async function callHaiku(system, messages) {
 async function callSonnet(system, messages) {
   try {
     const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, system, messages }) });
+      body: JSON.stringify({ model: getMainModel(), max_tokens: 400, system, messages }) });
     const data = await res.json(); return data.content?.[0]?.text?.trim() || '';
   } catch(e) { return ''; }
 }
@@ -883,7 +897,7 @@ function triggerSeriousTalk() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: getMainModel(),
       max_tokens: 1000,
       system: buildSystemPrompt(),
       messages: chatHistory.slice(-20)
@@ -942,7 +956,7 @@ function ghostApologize() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: getMainModel(),
       max_tokens: 500,
       system: buildSystemPrompt(),
       messages: chatHistory.slice(-20)
@@ -970,7 +984,7 @@ function ghostSendMakeupMoney() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: getMainModel(),
       max_tokens: 300,
       system: buildSystemPrompt(),
       messages: chatHistory.slice(-20)
@@ -1119,7 +1133,7 @@ function confirmTransfer() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: getMainModel(),
       max_tokens: 1000,
       system: buildSystemPrompt(),
       messages: chatHistory.slice(-30)
@@ -1226,6 +1240,13 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
   }, noteText ? 800 : 0);
 }
 let chatHistory = [];
+
+// ===== 模型选择（测试用）=====
+function getMainModel() {
+  return localStorage.getItem('useHaikuMode') === '1'
+    ? 'claude-haiku-4-5-20251001'
+    : 'claude-sonnet-4-6';
+}
 let lastMessageTime = null;
 
 function initChat() {
@@ -1366,8 +1387,12 @@ function appendMessage(role, text, animate = true) {
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
 
-  // 渲染前清理系统标记
-  text = text.replace(/\n?(REFUND|KEEP)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
+  // 渲染前清理系统标记和多余括号
+  text = text.replace(/\n?(REFUND|KEEP)\n?/gi, '').trim();
+  // *动作描述* 格式：转成斜体显示而不是过滤掉
+  text = text.replace(/\*([^*]+)\*/g, '「$1」');
+  // 清掉模型输出的方括号（翻译格式残留）
+  text = text.replace(/\[([^\]]*)\]/g, '$1').replace(/\s{2,}/g, ' ').trim();
 
   // 预处理：把英中混排重新整理成标准 "英文行\n中文行" 格式
   if (role === 'bot') {
@@ -1621,7 +1646,7 @@ function incrementTodayCount() {
   localStorage.setItem(key, count);
   return count;
 }
-const DAILY_LIMIT = 150; // 内测每天150条
+const DAILY_LIMIT = 100; // 内测每天100条
 
 async function sendMessage() {
   const input = document.getElementById('chatInput');
@@ -1670,9 +1695,9 @@ async function sendMessage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: getMainModel(),
         max_tokens: 1000,
-        system: buildSystemPrompt(),
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: chatHistory.slice(-30)
       })
     });
@@ -1927,7 +1952,7 @@ function checkOnlineGreeting() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
+          model: getMainModel(),
           max_tokens: 200,
           system: buildSystemPrompt(),
           messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
@@ -1965,7 +1990,7 @@ function scheduleSilenceCheck(index) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: getMainModel(),
         max_tokens: 200,
         system: buildSystemPrompt(),
         messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
@@ -2867,6 +2892,12 @@ function renderVocabCard() {
   }
   const word = words[currentWordIdx];
   cardFlipped = false;
+  const card = document.getElementById('vocabFlipCard');
+  // 先重置翻转状态，短暂隐藏，再更新内容，防止闪到背面
+  if (card) {
+    card.classList.remove('flipped');
+    card.style.visibility = 'hidden';
+  }
   const frontEl = document.getElementById('vocabCardFront');
   const backEl = document.getElementById('vocabCardBack');
   const progressEl = document.getElementById('vocabCardProgress');
@@ -2875,9 +2906,9 @@ function renderVocabCard() {
     <div class="vocab-zh">${word.zh}</div>
     <div class="vocab-ghost-line">"${word.ghost}"</div>
     <div class="vocab-ghost-line-zh">${word.ghostZh}</div>`;
-  const card = document.getElementById('vocabFlipCard');
-  if (card) card.classList.remove('flipped');
   if (progressEl) progressEl.textContent = (currentWordIdx + 1) + ' / ' + words.length;
+  // 内容更新完再显示
+  setTimeout(() => { if (card) card.style.visibility = 'visible'; }, 50);
 }
 
 function flipVocabCard() {
@@ -4116,7 +4147,7 @@ async function triggerLuxuryMoment(product, poster) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: getMainModel(),
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -4399,7 +4430,7 @@ async function onGhostReceived(delivery) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
+            model: getMainModel(),
             max_tokens: 300,
             system: buildSystemPrompt(),
             messages: [...chatHistory.slice(-15), {
@@ -4475,7 +4506,7 @@ function showMysteryPackage(delivery) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
+          model: getMainModel(),
           max_tokens: 300,
           system: buildSystemPrompt(),
           messages: [...chatHistory.slice(-10), {
@@ -4524,7 +4555,7 @@ async function handleLostPackageClaim(userText) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: getMainModel(),
         max_tokens: 400,
         system: buildSystemPrompt(),
         messages: chatHistory.slice(-20)
@@ -4618,4 +4649,22 @@ function openDeliveryModal(idx) {
 
 function closeDeliveryModal() {
   document.getElementById('deliveryModal').style.display = 'none';
+}
+
+// ===== 开发者模式（隐藏开关）=====
+let devTapCount = 0;
+let devTapTimer = null;
+function handleDevTap() {
+  devTapCount++;
+  clearTimeout(devTapTimer);
+  devTapTimer = setTimeout(() => { devTapCount = 0; }, 2000);
+  if (devTapCount >= 5) {
+    devTapCount = 0;
+    const isHaiku = localStorage.getItem('useHaikuMode') === '1';
+    const newMode = isHaiku ? '0' : '1';
+    localStorage.setItem('useHaikuMode', newMode);
+    const el = document.getElementById('devModeTap');
+    if (el) el.textContent = newMode === '1' ? '⚡ Haiku 模式已开启' : '· Sonnet 模式已恢复';
+    setTimeout(() => { if (el) el.textContent = '·'; }, 3000);
+  }
 }
