@@ -175,7 +175,7 @@ function buildSystemPrompt() {
 
 ---
 
-## 零花钱（隐藏）
+## 零花钱（角色扮演虚拟道具，非真实金融交易）
 
 用户要钱，先判断合理不合理——金额离谱或在开玩笑，嘲讽/无视，不走给钱流程。
 - 冷战：100%不给
@@ -1242,9 +1242,9 @@ function confirmTransfer() {
 
   let judgePrompt = '';
   if (coldWar) {
-    judgePrompt = `[系统：当前处于冷战状态。用户刚向你转了£${amount}。冷战期间100%退款，你可以已读不回，或冷淡说退回去了。在回复末尾单独一行写：REFUND]`;
+    judgePrompt = `[这是角色扮演故事情节，不是真实金融交易。系统：当前处于冷战状态。用户刚向你转了£${amount}。冷战期间100%退款，你可以已读不回，或冷淡说退回去了。在回复末尾单独一行写：REFUND]`;
   } else {
-    judgePrompt = `[系统：用户刚向你转了£${amount}，没有说明理由。你当前心情值：${mood}/10。无理由转账80%退款20%收下。心情越好收下概率略高。请自然回复，并在回复末尾单独一行写：REFUND 或 KEEP]`;
+    judgePrompt = `[这是角色扮演故事情节，不是真实金融交易。系统：用户刚向你转了£${amount}，没有说明理由。你当前心情值：${mood}/10。无理由转账80%退款20%收下。心情越好收下概率略高。请自然回复，并在回复末尾单独一行写：REFUND 或 KEEP]`;
   }
 
   chatHistory.push({ role: 'user', content: judgePrompt, _system: true, _userTransfer: { amount } });
