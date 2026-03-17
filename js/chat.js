@@ -1824,10 +1824,7 @@ async function sendMessage() {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 1000,
-        system: [
-          { type: 'text', text: buildFixedPrompt(), cache_control: { type: 'ephemeral' } },
-          { type: 'text', text: buildDynamicPrompt() }
-        ],
+        system: [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }],
         messages: chatHistory.slice(-30)
       })
     });
