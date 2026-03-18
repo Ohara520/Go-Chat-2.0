@@ -769,6 +769,21 @@
       </div>
 
       <div class="secret-save-hint">✅ 所有内容自动保存，Ghost 会悄悄记住这些</div>
+
+      <!-- 离婚按钮 -->
+      <div class="secret-section" style="margin-top:24px;">
+        <div class="secret-section-title" style="color:#c0392b;">⚠️ 危险区域</div>
+        <div style="font-size:12px;color:#e07a7a;margin-bottom:12px;line-height:1.6;">
+          点击下方按钮将删除所有聊天记录、好感度、钱包余额和个人资料。<br>
+          <strong>此操作不可撤销，所有记忆将永远消失。</strong>
+        </div>
+        <button onclick="handleDivorce()" style="
+          width:100%; padding:12px; border:1.5px solid #e07a7a;
+          background:white; border-radius:12px; font-size:14px;
+          color:#c0392b; cursor:pointer; font-weight:600;
+        ">💔 离婚（删除所有数据重新开始）</button>
+      </div>
+
     </div>
   </div>
 
@@ -822,6 +837,29 @@ const sbClient = window.sbClient;
     if (mainEmailEl) mainEmailEl.textContent = session.user.email;
   }
 })();
+
+async function handleDivorce() {
+  const confirm1 = confirm('确定要离婚吗？所有聊天记录、好感度、钱包余额将永远消失。');
+  if (!confirm1) return;
+  const confirm2 = confirm('最后确认：这个操作无法撤销，Ghost 将忘记你们所有的一切。');
+  if (!confirm2) return;
+
+  // 清空云端数据
+  const userId = localStorage.getItem('sb_user_id');
+  if (userId && window.sbClient) {
+    await window.sbClient.from('user_data').delete().eq('user_id', userId);
+  }
+
+  // 清空所有localStorage（保留登录信息）
+  const keepKeys = ['sb_user_id', 'sb_user_email'];
+  const kept = {};
+  keepKeys.forEach(k => { kept[k] = localStorage.getItem(k); });
+  localStorage.clear();
+  keepKeys.forEach(k => { if (kept[k]) localStorage.setItem(k, kept[k]); });
+
+  alert('已离婚。Ghost 不记得你了。');
+  window.location.reload();
+}
 
 async function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
