@@ -3,6 +3,8 @@ const _SB_URL = 'https://siahkenfoofkjrgevgma.supabase.co';
 const _SB_KEY = 'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD';
 
 function getSbClient() {
+  // 直接用index.html里已创建的sbClient，避免重复初始化
+  if (window.sbClient) return window.sbClient;
   if (window._sbClient) return window._sbClient;
   if (window.supabase) {
     window._sbClient = window.supabase.createClient(_SB_URL, _SB_KEY);

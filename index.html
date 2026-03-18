@@ -805,7 +805,8 @@
 <script>
 const SUPABASE_URL = 'https://siahkenfoofkjrgevgma.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD';
-const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+window.sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sbClient = window.sbClient;
 
 // 登录检测
 (async function() {
