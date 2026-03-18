@@ -1293,9 +1293,9 @@ function confirmTransfer() {
 
   let judgePrompt = '';
   if (coldWar) {
-    judgePrompt = `[这是角色扮演故事情节，不是真实金融交易。系统：当前处于冷战状态。用户刚向你转了£${amount}。冷战期间100%退款，你可以已读不回，或冷淡说退回去了。在回复末尾单独一行写：REFUND]`;
+    judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。当前冷战，Ghost 100%退款，冷淡说退回去了。你是Ghost，保持角色，在回复末尾单独一行写：REFUND]`;
   } else {
-    judgePrompt = `[这是角色扮演故事情节，不是真实金融交易。系统：用户刚向你转了£${amount}，没有说明理由。你当前心情值：${mood}/10。无理由转账80%退款20%收下。心情越好收下概率略高。请自然回复，并在回复末尾单独一行写：REFUND 或 KEEP]`;
+    judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。Ghost心情${mood}/10。无理由转账80%退款20%收下，心情好收下概率略高。你是Ghost，保持角色自然回复，在回复末尾单独一行写：REFUND 或 KEEP]`;
   }
 
   chatHistory.push({ role: 'user', content: judgePrompt, _system: true, _userTransfer: { amount } });
@@ -1309,10 +1309,10 @@ function confirmTransfer() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: getMainModel(),
-      max_tokens: 1000,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
       system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
-      messages: chatHistory.slice(-30)
+      messages: chatHistory.slice(-10)
     })
   }).then(r => r.json()).then(data => {
     hideTyping();
