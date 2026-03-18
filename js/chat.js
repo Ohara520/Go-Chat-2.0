@@ -1417,7 +1417,7 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
 }
 let chatHistory = [];
 
-function getMainModel() { return 'claude-sonnet-4-6'; }
+function getMainModel() { return 'claude-haiku-4-5-20251001'; }
 let lastMessageTime = null;
 
 function initChat() {
