@@ -185,7 +185,9 @@ function buildSystemPrompt() {
 - 心情6-7：给£20-40，克制温柔
 - 心情8-10：给£20-50，被撒娇可能多给
 - 抱怨给少了：按心情决定是否补，最多补£20
-- 本周已给超£150：不给，"没了"
+- 本周已给超£150：不给，用他的方式说没了——"spent it." / "nothing left this week." / "next week."，克制，不解释太多
+- 买机票/来英国找我/旅行费用：绝对不给，这不是零花钱范围。用Ghost的方式回——"sort your own ticket. i'll be at the gate." / "not funding that. just come." / "i'll figure it out on this end."——不是拒绝见面，是拒绝给这笔钱，甚至可能暗示他会想办法
+- 大额（超£100单次）：必问用途，通常不给或只给一部分
 
 决定给时，回复正文后另起一行：
 GIVE_MONEY:金额:一句话备注
@@ -1208,6 +1210,14 @@ function incrementMoneyRequest() {
   if (count >= 3) changeAffection(-1);
   return count;
 }
+function getTodayGivenCount() {
+  const key = 'givenCount_' + new Date().toISOString().slice(0,10);
+  return parseInt(localStorage.getItem(key) || '0');
+}
+function incrementTodayGivenCount() {
+  const key = 'givenCount_' + new Date().toISOString().slice(0,10);
+  localStorage.setItem(key, getTodayGivenCount() + 1);
+}
 
 // ===== 转账弹窗 =====
 function openTransfer() {
@@ -1916,16 +1926,26 @@ async function sendMessage() {
 
     // 渲染转账卡片 + 更新钱包（每周£150上限强制执行）
     if (giveMoney && giveAmount > 0) {
-      const weeklyUsed = getWeeklyGiven();
-      if (weeklyUsed >= 150) {
-        giveAmount = 0; // 已超限，不执行
-      } else if (weeklyUsed + giveAmount > 150) {
-        giveAmount = 150 - weeklyUsed; // 截断到上限
+      // 每天最多成功给3次
+      const todayGivenCount = getTodayGivenCount();
+      if (todayGivenCount >= 3) {
+        giveAmount = 0;
+        chatHistory.push({ role: 'user', content: '[系统：今日零花钱次数已达上限，本次转账未执行，你没有成功转钱，可以用你的方式说今天不行了。]', _system: true });
+      } else {
+        // 每周£150总额限制
+        const weeklyUsed = getWeeklyGiven();
+        if (weeklyUsed >= 150) {
+          giveAmount = 0;
+          chatHistory.push({ role: 'user', content: '[系统：本周零花钱已达上限£150，本次转账未执行，你没有成功转钱。]', _system: true });
+        } else if (weeklyUsed + giveAmount > 150) {
+          giveAmount = 150 - weeklyUsed;
+        }
       }
     }
     if (giveMoney && giveAmount > 0) {
       setBalance(getBalance() + giveAmount);
       addWeeklyGiven(giveAmount);
+      incrementTodayGivenCount();
       addTransaction({ icon: '💷', name: 'Ghost 零花钱', amount: giveAmount });
       renderWallet();
       changeAffection(1);
