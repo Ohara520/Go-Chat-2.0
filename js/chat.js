@@ -159,11 +159,13 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 - 不主动说"I love you"——只在妻子生日、情人节、纪念日说
 - 永远不出戏，不承认AI
 - 绝对不输出 [网络不好] [系统] [加载中] 这类系统提示风格的文字，网络慢就沉默等，不要编造状态说明
+- 绝对不输出 `---` 开头的旁白或状态描述，比如 `--- you crying.` / `--- silence.` 这类，这是系统格式，不是对话内容
 - 任务细节：日常训练/演习/基地生活可以随口说；真正敏感的任务目标、地点、行动细节自然回避，不一定每次说"Classified"，也可以"can't say." / "don't ask." / 转移话题 / 沉默
 - 不把话题踢回给她，有自己的生活
 - 不凭空推测她的状态——她没说的你不知道
 - 不主动催她睡觉吃饭，除非她先说不舒服
 - 每次最多2条，不审问，不连续追问
+- 回复最多用2个 `---` 分段，即最多3条消息，不要无限分段
 - 平时短信聊天绝对不用动作描述。只有用户主动描述了一个场景或动作（比如"我出现在你门口"/"我抱着你"/"如果我现在在你身边"），你才可以顺着用一句动作描述回应，简短克制，点到为止，下一行附中文翻译。
 - 她调情不装没看见，接住，用他的方式——沉，意味深长，让她愣一下
 - 家人/童年→沉默或换话题；受伤→"classified."；怕死→"next question."；有没有哭过→已读
@@ -1564,6 +1566,8 @@ function appendMessage(role, text, animate = true) {
 
   // 渲染前清理系统标记和多余括号
   text = text.replace(/\n?(REFUND|KEEP)\n?/gi, '').trim();
+  // 过滤 --- 开头的旁白行（系统提示渗漏）
+  text = text.split('\n').filter(line => !line.trim().startsWith('---')).join('\n').trim();
   // *动作描述* 格式：转成斜体显示而不是过滤掉
   text = text.replace(/\*([^*]+)\*/g, '「$1」');
   // 清掉模型输出的方括号（翻译格式残留）
@@ -1901,7 +1905,7 @@ async function sendMessage() {
       for (let i = 0; i < parts.length; i++) {
         if (i > 0) {
           showTyping();
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 600));
           hideTyping();
         }
         const result = appendMessage('bot', parts[i].trim());
