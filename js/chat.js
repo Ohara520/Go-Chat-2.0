@@ -1,3 +1,102 @@
+// ===== Supabase 云端同步 =====
+const _SB_URL = 'https://siahkenfoofkjrgevgma.supabase.co';
+const _SB_KEY = 'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD';
+
+function getSbClient() {
+  if (window._sbClient) return window._sbClient;
+  if (window.supabase) {
+    window._sbClient = window.supabase.createClient(_SB_URL, _SB_KEY);
+    return window._sbClient;
+  }
+  return null;
+}
+
+function getSbUserId() {
+  return localStorage.getItem('sb_user_id');
+}
+
+// 从云端加载数据到localStorage
+async function loadFromCloud() {
+  const sb = getSbClient();
+  const userId = getSbUserId();
+  if (!sb || !userId) return;
+  try {
+    const { data, error } = await sb
+      .from('user_data')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error || !data) return;
+    // 恢复数据到localStorage
+    if (data.chat_history && data.chat_history.length > 0) {
+      localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
+    }
+    if (data.mood !== null) localStorage.setItem('moodLevel', data.mood);
+    if (data.affection !== null) localStorage.setItem('affection', data.affection);
+    if (data.balance !== null) localStorage.setItem('balance', data.balance);
+    if (data.long_term_memory) localStorage.setItem('longTermMemory', data.long_term_memory);
+    if (data.profile) {
+      const p = data.profile;
+      if (p.userName) localStorage.setItem('userName', p.userName);
+      if (p.userBirthday) localStorage.setItem('userBirthday', p.userBirthday);
+      if (p.userZodiac) localStorage.setItem('userZodiac', p.userZodiac);
+      if (p.userMBTI) localStorage.setItem('userMBTI', p.userMBTI);
+      if (p.userCountry) localStorage.setItem('userCountry', p.userCountry);
+      if (p.userFavFood) localStorage.setItem('userFavFood', p.userFavFood);
+      if (p.userFavMusic) localStorage.setItem('userFavMusic', p.userFavMusic);
+      if (p.marriageDate) localStorage.setItem('marriageDate', p.marriageDate);
+      if (p.ghostBirthday) localStorage.setItem('ghostBirthday', p.ghostBirthday);
+      if (p.ghostZodiac) localStorage.setItem('ghostZodiac', p.ghostZodiac);
+      if (p.coldWarMode) localStorage.setItem('coldWarMode', p.coldWarMode);
+      if (p.metInPerson) localStorage.setItem('metInPerson', p.metInPerson);
+    }
+    console.log('云端数据已加载');
+  } catch(e) {
+    console.log('云端加载失败，使用本地数据', e);
+  }
+}
+
+// 保存数据到云端（节流，最多每30秒一次）
+let _lastSyncTime = 0;
+async function saveToCloud() {
+  const sb = getSbClient();
+  const userId = getSbUserId();
+  if (!sb || !userId) return;
+  const now = Date.now();
+  if (now - _lastSyncTime < 30000) return; // 30秒节流
+  _lastSyncTime = now;
+  try {
+    const profile = {
+      userName: localStorage.getItem('userName') || '',
+      userBirthday: localStorage.getItem('userBirthday') || '',
+      userZodiac: localStorage.getItem('userZodiac') || '',
+      userMBTI: localStorage.getItem('userMBTI') || '',
+      userCountry: localStorage.getItem('userCountry') || 'CN',
+      userFavFood: localStorage.getItem('userFavFood') || '',
+      userFavMusic: localStorage.getItem('userFavMusic') || '',
+      marriageDate: localStorage.getItem('marriageDate') || '',
+      ghostBirthday: localStorage.getItem('ghostBirthday') || '',
+      ghostZodiac: localStorage.getItem('ghostZodiac') || '',
+      coldWarMode: localStorage.getItem('coldWarMode') || 'false',
+      metInPerson: localStorage.getItem('metInPerson') || 'false',
+    };
+    const chatHistoryRaw = localStorage.getItem('chatHistory');
+    const chatHistoryData = chatHistoryRaw ? JSON.parse(chatHistoryRaw).slice(-50) : [];
+    await sb.from('user_data').upsert({
+      user_id: userId,
+      chat_history: chatHistoryData,
+      mood: parseInt(localStorage.getItem('moodLevel') || '7'),
+      affection: parseInt(localStorage.getItem('affection') || '50'),
+      balance: parseFloat(localStorage.getItem('balance') || '0'),
+      long_term_memory: localStorage.getItem('longTermMemory') || '',
+      profile: profile,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+  } catch(e) {
+    console.log('云端保存失败', e);
+  }
+}
+
 // ========================================
 // Go Chat — chat.js
 // ========================================
@@ -1427,7 +1526,7 @@ let chatHistory = [];
 function getMainModel() { return 'claude-sonnet-4-6'; }
 let lastMessageTime = null;
 
-function initChat() {
+async function initChat() {
   // 更新header名字
   const nameEl = document.getElementById('chatBotName');
   if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
@@ -1478,7 +1577,8 @@ function initChat() {
   if (window._ukTimeInterval) clearInterval(window._ukTimeInterval);
   window._ukTimeInterval = setInterval(updateUKTime, 60000);
 
-  // 读取历史记录
+  // 先从云端加载数据，再读取历史记录
+  await loadFromCloud();
   const saved = localStorage.getItem('chatHistory');
   if (saved) {
     try { chatHistory = JSON.parse(saved); } catch(e) { chatHistory = []; }
@@ -2119,6 +2219,7 @@ function saveHistory() {
     chatHistory = chatHistory.slice(-100);
   }
   localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+  saveToCloud(); // 云端同步（有节流）
 }
 
 // ===== 重新上线问候 =====
