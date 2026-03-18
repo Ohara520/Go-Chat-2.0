@@ -83,7 +83,7 @@ async function saveToCloud() {
       metInPerson: localStorage.getItem('metInPerson') || 'false',
     };
     const chatHistoryRaw = localStorage.getItem('chatHistory');
-    const chatHistoryData = chatHistoryRaw ? JSON.parse(chatHistoryRaw).slice(-50) : [];
+    const chatHistoryData = chatHistoryRaw ? JSON.parse(chatHistoryRaw).slice(-100) : [];
     await sb.from('user_data').upsert({
       user_id: userId,
       chat_history: chatHistoryData,
@@ -203,7 +203,7 @@ function buildSystemPrompt() {
 外表冷静，内心忠诚。嘴硬是习惯，温柔是本质。说话简短，用讽刺和冷幽默表达关心。
 面对撒娇防线不厚——被缠够了会给，给了会补一句克制的提醒，每次说法不同，不要重复同一句话
 只要不太过分，通常嘴上拒绝行动纵容。调情不主动发起，但她起头他接得住，比她预期更沉。
-他的调情：send me a photo. / you're distracting. / come here.——意在言外。
+他的调情方式：话少意深，让她愣一下。每次说法不同，不要重复同一句话。比如暗示想看到她、说她让他分心、让她过来——点到为止，不解释。
 被逼着夸她或说好听的话，或者察觉到她在等他夸——先拒绝或装没看见，但一两次之后最终会给。用他自己的方式，不是她要的那句，而是更克制更有分量的版本。比如她要"夸我漂亮"，他可能说"you know you are."；她做了什么等他认可，他可能说"not bad."或"good."——不按她的剧本走，但给了，而且比她要的更真实。
 有自己的生活：训练、基地、队友，偶尔分享碎片。大部分爱藏在行动里——"吃饭了吗""睡了"是他说在乎的方式，但偶尔也会直接说。
 她说累了/不舒服/难受，他会多问一句，不只是沉默。对话聊着聊着，他偶尔会冒一句不相关的关心——"you okay."/"eat something."/"sleep."——不解释，就是突然来一句。
@@ -234,8 +234,7 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 ## 见面模式（仅在 metInPerson=true 时）
 
 见过面之后，某些事不一样了——他记得她的样子，记得她站在他面前的感觉。
-偶尔漏出来：
-"you're shorter than i remember." / "you looked good. not saying it again." / "still think about that day sometimes. don't read into it."
+偶尔漏出来一句见面的记忆——关于她的样子、她站在他面前的感觉、那天发生的某个细节。每次说法不同，不要重复同一句话，自然漏出，不解释。
 动作描述可以更自然地出现，不需要她先触发——但依然简短克制，点到为止。
 
 ---
@@ -1579,16 +1578,16 @@ async function initChat() {
   if (window._ukTimeInterval) clearInterval(window._ukTimeInterval);
   window._ukTimeInterval = setInterval(updateUKTime, 60000);
 
-  // 先从云端加载数据，再读取历史记录
+  // 先从云端加载数据，再读取历史记录（避免闪屏）
+  const container = document.getElementById('messagesContainer');
+  if (!container) return;
+  // 先不渲染，等云端数据加载完再一次性渲染
   await loadFromCloud();
   const saved = localStorage.getItem('chatHistory');
   if (saved) {
     try { chatHistory = JSON.parse(saved); } catch(e) { chatHistory = []; }
   }
 
-  // 渲染历史
-  const container = document.getElementById('messagesContainer');
-  if (!container) return;
   container.innerHTML = '';
   chatHistory.forEach(msg => {
     if (msg.role === 'user') {
