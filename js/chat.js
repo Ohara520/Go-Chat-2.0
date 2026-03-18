@@ -1528,6 +1528,7 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
   }, noteText ? 800 : 0);
 }
 let chatHistory = [];
+let _isSending = false; // 防止切页面时重新渲染吞掉正在等待的bot回复
 
 function getMainModel() { return 'claude-sonnet-4-6'; }
 let lastMessageTime = null;
@@ -1593,6 +1594,8 @@ async function initChat() {
     try { chatHistory = JSON.parse(saved); } catch(e) { chatHistory = []; }
   }
 
+  // 如果正在等bot回复，不清空重渲染（否则会吞掉还没存进chatHistory的消息）
+  if (_isSending) return;
   container.innerHTML = '';
   chatHistory.forEach(msg => {
     if (msg.role === 'user') {
@@ -1967,6 +1970,7 @@ async function sendMessage() {
   }
 
   showTyping();
+  _isSending = true;
 
   try {
     const response = await fetch('/api/chat', {
@@ -2130,6 +2134,7 @@ async function sendMessage() {
 
     chatHistory.push({ role: 'assistant', content: reply, ...(giveMoney && giveAmount > 0 ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
     saveHistory();
+    _isSending = false; // bot回复已完整存入，可以安全切页面了
     checkSassyPost(text, reply);
     // 合并触发：商城高亮+情绪反寄（一次Haiku）
     checkTriggersAndEmotion(text, reply);
@@ -2145,6 +2150,7 @@ async function sendMessage() {
 
   } catch (err) {
     hideTyping();
+    _isSending = false; // 出错也要重置，不然后续切页面会一直不渲染
     appendMessage('bot', "...\n[网络不太好，等一下。]");
   }
 }
