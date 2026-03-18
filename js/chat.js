@@ -1366,6 +1366,11 @@ function incrementTodayGivenCount() {
 
 // ===== 转账弹窗 =====
 function openTransfer() {
+  // 条数上限检查
+  if (getTodayCount() >= DAILY_LIMIT) {
+    showToast('今天的消息条数已用完，明天再来哦 💌');
+    return;
+  }
   const balance = getBalance();
   const balEl = document.getElementById('transferBalance');
   if (balEl) balEl.textContent = '£' + Math.floor(balance);
