@@ -1914,8 +1914,16 @@ async function sendMessage() {
       }, recallDelay);
     }
 
-    // 渲染转账卡片 + 更新钱包
-    if (giveMoney) {
+    // 渲染转账卡片 + 更新钱包（每周£150上限强制执行）
+    if (giveMoney && giveAmount > 0) {
+      const weeklyUsed = getWeeklyGiven();
+      if (weeklyUsed >= 150) {
+        giveAmount = 0; // 已超限，不执行
+      } else if (weeklyUsed + giveAmount > 150) {
+        giveAmount = 150 - weeklyUsed; // 截断到上限
+      }
+    }
+    if (giveMoney && giveAmount > 0) {
       setBalance(getBalance() + giveAmount);
       addWeeklyGiven(giveAmount);
       addTransaction({ icon: '💷', name: 'Ghost 零花钱', amount: giveAmount });
@@ -1963,7 +1971,7 @@ async function sendMessage() {
       });
     }
 
-    chatHistory.push({ role: 'assistant', content: reply, ...(giveMoney ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
+    chatHistory.push({ role: 'assistant', content: reply, ...(giveMoney && giveAmount > 0 ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
     saveHistory();
     checkSassyPost(text, reply);
     // 合并触发：商城高亮+情绪反寄（一次Haiku）
