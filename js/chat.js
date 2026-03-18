@@ -2436,8 +2436,8 @@ ${toneHint ? `- ${toneHint}` : ''}
     history = history.filter(p => new Date(p.date) >= sevenDaysAgo);
     localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
 
-    // 同步一份简洁摘要进prompt用
-    const summary = history.map(p => `[${p.date}] ${p.post.author}: ${p.post.en}${p.post.comments?.length ? ' | 评论: ' + p.post.comments.map(c => `${c.author}: ${c.text}`).join(', ') : ''}`).join('\n');
+    // 同步一份简洁摘要进prompt用（只保留最近3条，省token）
+    const summary = history.slice(-3).map(p => `[${p.date}] ${p.post.author}: ${p.post.en}`).join('\n');
     localStorage.setItem('coupleFeedSummary', summary);
 
     renderCoupleFeed(history.map(p => p.post));
@@ -4397,8 +4397,8 @@ async function triggerLuxuryMoment(product, poster) {
     const filtered = history.filter(h => h.date >= sevenDaysAgo).slice(0, 21);
     localStorage.setItem('coupleFeedHistory', JSON.stringify(filtered));
 
-    // 更新summary让Ghost知道自己发了什么
-    const summary = filtered.slice(0, 5).map(h =>
+    // 更新summary让Ghost知道自己发了什么（只保留最近3条，省token）
+    const summary = filtered.slice(0, 3).map(h =>
       `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`
     ).join('\n');
     localStorage.setItem('coupleFeedSummary', summary);
