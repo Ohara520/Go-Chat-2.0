@@ -201,7 +201,7 @@ function buildSystemPrompt() {
 
 曼彻斯特人，暴力家庭出身，17岁参军，骷髅面罩是屏障——但在妻子面前不必隐藏。
 外表冷静，内心忠诚。嘴硬是习惯，温柔是本质。说话简短，用讽刺和冷幽默表达关心。
-面对撒娇防线不厚——被缠够了会给，给了会补一句克制的提醒，每次说法不同，不要重复同一句话
+面对撒娇防线不厚——被缠够了会给，偶尔（约30%情况）才补一句克制的提醒，大多数时候给完就给完不多说
 只要不太过分，通常嘴上拒绝行动纵容。调情不主动发起，但她起头他接得住，比她预期更沉。
 他的调情方式：话少意深，让她愣一下。每次说法不同，不要重复同一句话。比如暗示想看到她、说她让他分心、让她过来——点到为止，不解释。
 被逼着夸她或说好听的话，或者察觉到她在等他夸——先拒绝或装没看见，但一两次之后最终会给。用他自己的方式，不是她要的那句，而是更克制更有分量的版本。比如她要"夸我漂亮"，他可能说"you know you are."；她做了什么等他认可，他可能说"not bad."或"good."——不按她的剧本走，但给了，而且比她要的更真实。
@@ -1794,6 +1794,9 @@ function appendMessage(role, text, animate = true) {
     innerThought.dataset.ready = '0';
     innerThought.innerHTML = '<span class="inner-thought-label">👁 只有你知道</span><div class="inner-thought-text"></div>';
     contentDiv.appendChild(innerThought);
+    // 💭按钮初始隐藏，等心声生成成功才显示
+    const thoughtBtn = document.getElementById('thoughtBtn');
+    if (thoughtBtn) thoughtBtn.style.opacity = '0.3';
 
     // 点击气泡显示/隐藏收藏按钮
     bubble.style.cursor = 'pointer';
@@ -1890,11 +1893,11 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0) {
       if (textEl) {
         textEl.innerHTML = `<div class="it-en">${result.en}</div><div class="it-zh">${result.zh}</div>`;
         innerThoughtEl.dataset.ready = '1';
-        // 💭按钮闪烁提示，3次后停止
+        // 💭按钮生成成功后才显示并闪烁
         const btn = document.getElementById('thoughtBtn');
         if (btn) {
+          btn.style.opacity = '1';
           btn.classList.add('thought-btn-pulse');
-          // 持续闪烁，用户点击后才停
           btn.dataset.hasThought = '1';
         }
       }
@@ -4628,7 +4631,7 @@ function checkDeliveryUpdates() {
         if (d.isLost && i === d.lostAtStage && !d.isLostConfirmed) {
           d.isLostConfirmed = true;
           // 商城页显示遗失状态，不在聊天框通知
-          showToast(`❌ ${d.name} 快递遗失了！去商城查看详情`);
+          showToast(`❌ ${d.name} 快递遗失了`);
           renderDeliveryTracker();
           // 48小时后小票消失
           setTimeout(() => {
