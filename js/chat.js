@@ -1742,29 +1742,10 @@ function scrollToBottom() {
 // 先判断是否口是心非，只有是才生成内心独白
 async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   if (!innerThoughtEl) return;
-  try {
-    // 放宽预判——Ghost的回复通常很短很克制，大部分都值得有内心独白
-    // 只过滤明显不需要的：纯打招呼、纯yes/no、纯翻译说明
-    const skipPatterns = /^(translation app|google translate|i looked it up|soap taught me|copy that\.?)$/i;
-    if (skipPatterns.test(replyText.trim())) return;
-
-    // 短回复（少于50字符）或包含克制情绪词，直接生成，不调Haiku判断
-    const isShort = replyText.length < 50;
-    const tsunderePatterns = /don't|nah|whatever|fine\.|nope|not bad|not like|doesn't matter|couldn't care|wouldn't|barely|don't make|habit|insufferable|annoying|impossible|brat|idiot|too bad|suit yourself|don't ask|push it|that's different|you know how|didn't say|never said|not what i|forget it|classified|yeah\.|okay\.|good\.|noted\.|copy\.|move\./i;
-    const hasTsundere = tsunderePatterns.test(replyText);
-
-    if (!isShort && !hasTsundere) {
-      // 长回复且无明显克制迹象，用Haiku判断一下
-      const judge = await callHaiku(
-        '判断这句话是否存在口是心非或藏着情绪——包括：嘴上拒绝心里想给、装淡定其实在意、嘴硬但破防了、说不在乎其实很在乎、用骂人掩盖宠溺、嫌弃式关心、克制但明显藏着话。只返回JSON：{"tsundere":true} 或 {"tsundere":false}',
-        [{ role: 'user', content: `Ghost说：${replyText.slice(0, 100)}` }]
-      );
-      const parsed = JSON.parse(judge.replace(/```json|```/g, '').trim());
-      if (!parsed.tsundere) return;
-    }
-  } catch(e) {
-    return;
-  }
+  // 过滤明显不需要的
+  const skipPatterns = /^(translation app|google translate|i looked it up|soap taught me|copy that\.?)$/i;
+  if (skipPatterns.test(replyText.trim())) return;
+  // 直接合并判断+生成，一次H搞定
   generateInnerThought(replyText, innerThoughtEl);
 }
 
@@ -2037,7 +2018,7 @@ async function sendMessage() {
     // 合并触发：商城高亮+情绪反寄（一次Haiku）
     checkTriggersAndEmotion(text, reply);
     // 解锁剧情检测
-    checkStoryOnMessage(text);
+    if (Math.random() < 0.5) checkStoryOnMessage(text); // 50%概率触发，节省资源
     // 长期记忆更新（每20条触发一次）
     updateLongTermMemory();
     // 气泡内心独白——只在口是心非时生成，不是每条都有
@@ -2090,7 +2071,7 @@ function incrementMemoryCount() {
 async function updateLongTermMemory() {
   // 每20条对话更新一次记忆
   const count = incrementMemoryCount();
-  if (count % 20 !== 0) return;
+  if (count % 30 !== 0) return;
 
   const existingMemory = getLongTermMemory();
   // 取最近20条非系统消息
