@@ -807,21 +807,32 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL = 'https://siahkenfoofkjrgevgma.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // 登录检测
 (async function() {
-  const sbClient = window.supabase.createClient(
-    'https://siahkenfoofkjrgevgma.supabase.co',
-    'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD'
-  );
   const { data: { session } } = await sbClient.auth.getSession();
   if (!session) {
     window.location.href = '/login.html';
   } else {
-    // 把用户信息存到localStorage供chat.js使用
     localStorage.setItem('sb_user_id', session.user.id);
     localStorage.setItem('sb_user_email', session.user.email);
+    const emailEl = document.getElementById('account-email');
+    if (emailEl) emailEl.textContent = '📧 ' + session.user.email;
+    const mainEmailEl = document.getElementById('main-account-email');
+    if (mainEmailEl) mainEmailEl.textContent = session.user.email;
   }
 })();
+
+async function handleLogout() {
+  if (!confirm('确定要退出登录吗？')) return;
+  await sbClient.auth.signOut();
+  localStorage.removeItem('sb_user_id');
+  localStorage.removeItem('sb_user_email');
+  window.location.href = '/login.html';
+}
 </script>
 <script src="js/app.js"></script>
 <script src="js/chat.js"></script>
