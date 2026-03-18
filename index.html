@@ -136,17 +136,7 @@
 <div class="container">
 
   <!-- 启动页 -->
-  <div class="screen" id="welcomeScreen">
-    <div class="welcome-avatar">👻</div>
-    <div class="welcome-title">Go Chat</div>
-    <div class="welcome-subtitle">异国恋虚拟伴侣 💕</div>
-    <div class="welcome-input-group">
-      <input type="text" class="welcome-input" id="userNameInput" placeholder="输入你的昵称...">
-      <input type="text" class="welcome-input" id="betaCodeInput" placeholder="输入内测码..." style="margin-top:10px;letter-spacing:2px;">
-      <button class="welcome-button" onclick="startChat()">开始聊天</button>
-      <div id="betaCodeError" style="color:rgba(220,80,80,0.8);font-size:12px;margin-top:6px;display:none;">内测码无效，请检查后重试</div>
-    </div>
-  </div>
+
 
   <!-- 主页 -->
   <div class="screen" id="mainScreen">
@@ -718,6 +708,12 @@
       <!-- 基础资料 -->
       <div class="secret-section">
         <div class="secret-section-title">✨ 关于我</div>
+        <div class="secret-field">
+          <label class="secret-label">💬 我的昵称</label>
+          <input class="secret-input" id="sec_username" type="text" placeholder="Ghost 叫你什么？"
+                 maxlength="10" onchange="saveSecret('userName', this.value)">
+          <div style="font-size:11px;color:#c9aee0;margin-top:4px;">Ghost 会用这个名字叫你</div>
+        </div>
         <div class="secret-field">
           <label class="secret-label">🎂 我的生日</label>
           <input class="secret-input" id="sec_birthday" type="text" placeholder="MM-DD，例如 03-15" maxlength="5"

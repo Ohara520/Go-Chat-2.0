@@ -113,12 +113,8 @@ window.onload = function() {
         s.style.display = 'none';
     });
 
-    // 有昵称直接进主页，否则显示欢迎页
-    if (localStorage.getItem('userName')) {
-        openScreen('mainScreen');
-    } else {
-        openScreen('welcomeScreen');
-    }
+    // 直接进主页（登录检测已在index.html处理）
+    openScreen('mainScreen');
 }
 
 // ===== Toast 提示 =====

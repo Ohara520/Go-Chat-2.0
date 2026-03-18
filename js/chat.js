@@ -3657,6 +3657,7 @@ function updateCalendarAfterBirthday() {
 
 function loadSecretScreen() {
   const fields = {
+    'sec_username': 'userName',
     'sec_birthday': 'userBirthday',
     'sec_mbti': 'userMBTI',
     'sec_food': 'userFavFood',
