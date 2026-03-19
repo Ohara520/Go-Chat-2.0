@@ -1827,7 +1827,11 @@ function appendMessage(role, text, animate = true) {
     contentDiv.appendChild(innerThought);
     // 💭按钮初始隐藏，等心声生成成功才显示
     const thoughtBtn = document.getElementById('thoughtBtn');
-    if (thoughtBtn) thoughtBtn.style.opacity = '0.3';
+    if (thoughtBtn) {
+      thoughtBtn.style.opacity = '0.3';
+      thoughtBtn.classList.remove('thought-btn-pulse');
+      thoughtBtn.dataset.hasThought = '0';
+    }
 
     // 点击气泡显示/隐藏收藏按钮
     bubble.style.cursor = 'pointer';
