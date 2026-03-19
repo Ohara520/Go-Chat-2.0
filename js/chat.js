@@ -2325,22 +2325,6 @@ function scheduleSilenceCheck(index) {
   }, delay * 60 * 1000);
 }
 
-// ===== 键盘弹出时确保输入框可见 =====
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    const chatScreen = document.getElementById('chatScreen');
-    if (!chatScreen || !chatScreen.classList.contains('active')) return;
-    const inputArea = document.querySelector('.input-area');
-    if (!inputArea) return;
-    // 键盘弹出时把输入框滚动到可视区域
-    const viewportHeight = window.visualViewport.height;
-    const inputBottom = inputArea.getBoundingClientRect().bottom;
-    if (inputBottom > viewportHeight) {
-      inputArea.scrollIntoView({ block: 'end', behavior: 'smooth' });
-    }
-  });
-}
-
 // ===== 页面加载时初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
   const observer = new MutationObserver(() => {
