@@ -1870,13 +1870,13 @@
 
 /* ===== 气泡内心独白 ===== */
 .inner-thought {
-  background: rgba(30,15,50,0.82);
+  background: rgba(20,8,40,0.92);
   backdrop-filter: blur(12px);
   border-radius: 12px;
   padding: 10px 14px;
   margin-top: 6px;
   max-width: 78vw;
-  border: 1px solid rgba(168,85,247,0.25);
+  border: 1px solid rgba(168,85,247,0.35);
   animation: fadeInThought 0.3s ease;
 }
 @keyframes fadeInThought {
@@ -1885,20 +1885,20 @@
 }
 .inner-thought-label {
   font-size: 10px;
-  color: rgba(200,160,255,0.5);
+  color: rgba(200,160,255,0.7);
   letter-spacing: 1px;
   display: block;
   margin-bottom: 6px;
 }
 .it-en {
   font-size: 13px;
-  color: rgba(240,220,255,0.9);
+  color: rgba(245,225,255,0.95);
   line-height: 1.5;
   font-style: italic;
 }
 .it-zh {
   font-size: 11px;
-  color: rgba(180,140,240,0.6);
+  color: rgba(200,170,255,0.85);
   margin-top: 3px;
   line-height: 1.4;
 }

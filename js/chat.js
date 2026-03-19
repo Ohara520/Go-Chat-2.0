@@ -1539,6 +1539,7 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
 let chatHistory = [];
 let _isSending = false; // 防止切页面时重新渲染吞掉正在等待的bot回复
 let _chatInited = false; // 防止重复初始化导致闪屏
+let _renderedMsgCount = 0; // 已渲染的消息数量，用于增量渲染
 
 function getMainModel() { return 'claude-sonnet-4-6'; }
 let lastMessageTime = null;
@@ -1602,9 +1603,24 @@ async function initChat() {
 
   // 如果正在等bot回复，不清空重渲染（否则会吞掉还没存进chatHistory的消息）
   if (_isSending) return;
-  // 已经渲染过且有内容，不重复清空（防止切页面闪屏）
+  // 已经渲染过——只渲染新增的消息，不清空重来
   if (_chatInited && container.children.length > 0) {
-    scrollToBottom();
+    const realMsgs = chatHistory.filter(m => !m._system && !m._recalled);
+    if (realMsgs.length > _renderedMsgCount) {
+      // 有新消息，追加渲染
+      realMsgs.slice(_renderedMsgCount).forEach(msg => {
+        if (msg.role === 'user') {
+          appendMessage('user', msg.content, false);
+        } else if (msg.role === 'assistant') {
+          const parts = msg.content.split(/\n---\n/);
+          parts.forEach(part => appendMessage('bot', part.trim(), false));
+        }
+        _renderedMsgCount++;
+      });
+      scrollToBottom();
+    } else {
+      scrollToBottom();
+    }
     return;
   }
   _chatInited = true;
@@ -1612,6 +1628,7 @@ async function initChat() {
   const nameEl = document.getElementById('chatBotName');
   if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
   container.innerHTML = '';
+  _renderedMsgCount = 0;
   chatHistory.forEach(msg => {
     if (msg.role === 'user') {
       if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') || /\b(REFUND|KEEP)\b/.test(msg.content)) {
@@ -1653,6 +1670,7 @@ async function initChat() {
       }
     }
   });
+  _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
   scrollToBottom();
 }
 
