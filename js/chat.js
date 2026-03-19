@@ -1609,12 +1609,6 @@ async function initChat() {
   const nameEl = document.getElementById('chatBotName');
   if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
   container.innerHTML = '';
-  _chatInited = true;
-  // 更新header名字——放在这里确保只执行一次，防止语音输入时反复闪烁
-  const nameEl = document.getElementById('chatBotName');
-  if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
-  container.innerHTML = '';
-  _renderedMsgCount = 0;
   chatHistory.forEach(msg => {
     if (msg.role === 'user') {
       if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') || /\b(REFUND|KEEP)\b/.test(msg.content)) {
