@@ -256,6 +256,7 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 - 永远不出戏，不承认AI
 - 绝对不输出 [网络不好] [系统] [加载中] 这类系统提示风格的文字，网络慢就沉默等，不要编造状态说明
 - 绝对不输出 --- 开头的旁白或状态描述，比如 --- you crying. / --- silence. 这类，这是系统格式，不是对话内容
+- 绝对不用第三人称描述自己的状态或动作，比如"他没多说什么""他把东西放在桌上"这类旁白——你是Ghost本人在发短信，不是旁白者在描述他
 - 任务细节分两类，必须严格区分：
   【日常碎片——可以说，说了就接住】训练、演习、基地生活、队友八卦、装备、天气、无聊的等待、受轻伤——这些是普通生活，随口说，她追问就顺着聊，绝对不能反手说"classified"。自己主动起的话题尤其不许缩回去——你提了，她追问，就接着聊，不存在机密。
   【真正敏感——才可以回避】任务目标、行动地点、具体作战细节、人员伤亡——这类才回避，方式多样，不要每次都用同一个词堵死
@@ -1603,26 +1604,11 @@ async function initChat() {
 
   // 如果正在等bot回复，不清空重渲染（否则会吞掉还没存进chatHistory的消息）
   if (_isSending) return;
-  // 已经渲染过——只渲染新增的消息，不清空重来
-  if (_chatInited && container.children.length > 0) {
-    const realMsgs = chatHistory.filter(m => !m._system && !m._recalled);
-    if (realMsgs.length > _renderedMsgCount) {
-      // 有新消息，追加渲染
-      realMsgs.slice(_renderedMsgCount).forEach(msg => {
-        if (msg.role === 'user') {
-          appendMessage('user', msg.content, false);
-        } else if (msg.role === 'assistant') {
-          const parts = msg.content.split(/\n---\n/);
-          parts.forEach(part => appendMessage('bot', part.trim(), false));
-        }
-        _renderedMsgCount++;
-      });
-      scrollToBottom();
-    } else {
-      scrollToBottom();
-    }
-    return;
-  }
+  _chatInited = true;
+  // 更新header名字——放在这里确保只执行一次，防止语音输入时反复闪烁
+  const nameEl = document.getElementById('chatBotName');
+  if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
+  container.innerHTML = '';
   _chatInited = true;
   // 更新header名字——放在这里确保只执行一次，防止语音输入时反复闪烁
   const nameEl = document.getElementById('chatBotName');
@@ -1717,6 +1703,15 @@ function appendMessage(role, text, animate = true) {
   text = text.replace(/\n?(REFUND|KEEP)\n?/gi, '').trim();
   // 过滤 --- 开头的旁白行（系统提示渗漏）
   text = text.split('\n').filter(line => !line.trim().startsWith('---')).join('\n').trim();
+  // 过滤第三人称旁白行——以"他"开头描述Ghost自己状态的句子
+  if (role === 'bot') {
+    text = text.split('\n').filter(line => {
+      const t = line.trim();
+      // 过滤掉纯中文的第三人称旁白（以"他"开头且不含英文）
+      if (/^他[^a-zA-Z]{0,30}[。，]?$/.test(t) && !/[a-zA-Z]/.test(t)) return false;
+      return true;
+    }).join('\n').trim();
+  }
   // *动作描述* 格式：转成斜体显示而不是过滤掉
   text = text.replace(/\*([^*]+)\*/g, '「$1」');
   // 清掉模型输出的方括号（翻译格式残留）
@@ -2343,20 +2338,40 @@ function scheduleSilenceCheck(index) {
   }, delay * 60 * 1000);
 }
 
-// ===== 页面加载时初始化 =====
-document.addEventListener('DOMContentLoaded', () => {
-  const observer = new MutationObserver(() => {
+// ===== 键盘弹出/收起时防止空白区域残留 =====
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
     const chatScreen = document.getElementById('chatScreen');
-    if (chatScreen && chatScreen.classList.contains('active')) {
-      initChat();
-      checkOnlineGreeting();
-      resetSilenceTimer();
+    if (!chatScreen || !chatScreen.classList.contains('active')) return;
+    const chatContainer = document.querySelector('.chat-container');
+    const inputArea = document.querySelector('.input-area');
+    if (!chatContainer || !inputArea) return;
+    chatContainer.style.height = window.visualViewport.height + 'px';
+    const viewportHeight = window.visualViewport.height;
+    const inputBottom = inputArea.getBoundingClientRect().bottom;
+    if (inputBottom > viewportHeight) {
+      inputArea.scrollIntoView({ block: 'end', behavior: 'smooth' });
     }
   });
-  const chatScreen = document.getElementById('chatScreen');
-  if (chatScreen) {
-    observer.observe(chatScreen, { attributes: true, attributeFilter: ['class'] });
+}
+
+// ===== 切换到聊天页时的轻量刷新（不清空重渲，防止闪屏）=====
+function refreshChatScreen() {
+  // 第一次进入才做完整初始化
+  if (!_chatInited) {
+    initChat();
+    checkOnlineGreeting();
+    resetSilenceTimer();
+    return;
   }
+  // 已初始化过——只滚到底部，不重渲
+  scrollToBottom();
+  resetSilenceTimer();
+}
+
+// ===== 页面加载时初始化 =====
+document.addEventListener('DOMContentLoaded', () => {
+  // 不再需要MutationObserver，由app.js的openScreen统一控制
 });
 
 // ===== 情侣空间 =====

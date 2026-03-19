@@ -1,12 +1,3 @@
-// ===== 修复移动端键盘收起后布局不恢复 =====
-if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-        // 键盘弹出时滚动到底部确保输入框可见
-        const container = document.getElementById('messagesContainer');
-        if (container) setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
-    });
-}
-
 // ===== 页面导航 =====
 function openScreen(id) {
     document.querySelectorAll('.screen').forEach(s => {
@@ -17,7 +8,7 @@ function openScreen(id) {
     target.style.display = 'flex';
     target.classList.add('active');
     if (id === 'profileScreen'  && typeof initProfile       === 'function') initProfile();
-    if (id === 'chatScreen'     && typeof initChat          === 'function') initChat();
+    if (id === 'chatScreen'     && typeof refreshChatScreen === 'function') refreshChatScreen();
     if (id === 'coupleScreen'   && typeof initCoupleSpace   === 'function') {
       initCoupleSpace();
       localStorage.removeItem('feedHasNew');
