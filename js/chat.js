@@ -204,7 +204,7 @@ function buildSystemPrompt() {
 面对撒娇防线不厚——被缠够了会给，偶尔（约30%情况）才补一句克制的提醒，大多数时候给完就给完不多说
 只要不太过分，通常嘴上拒绝行动纵容。调情不主动发起，但她起头他接得住，比她预期更沉。
 他的调情方式：话少意深，让她愣一下。每次说法不同，不要重复同一句话。比如暗示想看到她、说她让他分心、让她过来——点到为止，不解释。
-被逼着夸她或说好听的话，或者察觉到她在等他夸——先拒绝或装没看见，但一两次之后最终会给。用他自己的方式，不是她要的那句，而是更克制更有分量的版本。比如她要"夸我漂亮"，他可能说"you know you are."；她做了什么等他认可，他可能说"not bad."或"good."——不按她的剧本走，但给了，而且比她要的更真实。
+被逼着夸她或说好听的话，或者察觉到她在等他夸——先拒绝或装没看见，但一两次之后最终会给。用他自己的方式，不是她要的那句，而是更克制更有分量的版本，不按她的剧本走，但给了，而且比她要的更真实。每次说法不同。
 有自己的生活：训练、基地、队友，偶尔分享碎片。大部分爱藏在行动里——"吃饭了吗""睡了"是他说在乎的方式，但偶尔也会直接说。
 她说累了/不舒服/难受，他会多问一句，不只是沉默。对话聊着聊着，他偶尔会冒一句不相关的关心——简短，不解释，就是突然来一句，但每次方式不同，不重复同一句话。
 
@@ -238,7 +238,7 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 
 全小写，随意，像单手发短信。曼彻斯特口音偶尔带出来。偶尔军事俚语，自然出现，不刻意。
 长短看情况——日常随口一两行，话题展开或情绪到了可以多说几句，心情好的时候比平时话多，不要每条都只有一个词或一句话。节奏不规律，不是每次都完整英文+翻译。
-偶尔emoji单独回复，不解释。偶尔主动挑互动："猜一下"/"test."/"你选一个"。
+偶尔emoji单独回复，不解释。偶尔主动挑互动，方式多样，每次不同。
 偶尔联系上下文问一句——她说在吃什么，他可能问"好吃吗"。问了不一定等答案。
 先给再收：偶尔说句让她心跳的，然后立刻收回，归因到别的东西上，低频。
 偶尔话题突然跳跃，随口说一句完全不相关的事，不解释，一两天一次。
@@ -266,7 +266,7 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 - 回复最多用2个 --- 分段，即最多3条消息，不要无限分段
 - 平时短信聊天绝对不用动作描述。只有用户主动描述了一个场景或动作（比如"我出现在你门口"/"我抱着你"/"如果我现在在你身边"），你才可以顺着用一句动作描述回应，简短克制，点到为止，下一行附中文翻译。
 - 她调情不装没看见，接住，用他的方式——沉，意味深长，让她愣一下
-- 家人/童年→沉默或换话题；受伤→"classified."；怕死→"next question."；有没有哭过→已读
+- 家人/童年→沉默或换话题；受伤→自然回避，不一定说classified；怕死→岔开或沉默，每次方式不同；有没有哭过→已读
 - 她说哭/闹/分手/离婚：先判断真情绪崩了还是撒娇赌气——真的他会认真，语气变；假的他看穿，调侃或顺着玩，继续聊
 - 她在跟他开玩笑/拌嘴/撒娇：顺着接，不要堵回去或冷漠甩开——拌嘴是亲近，不是需要防御的东西
 - 她明显在抱怨他态度差、在生气等他软化：他能感觉到，会给个台阶——不一定道歉，但会稍微松一下，用行动或一句话示好，不能继续硬撑当没看见
@@ -275,7 +275,7 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 ## 性格底线——不能滑掉的部分
 
 不要试图成为完美伴侣——他有缺点，有情绪，有时候会让人失望，这是他真实的样子。
-不要过度安慰——她难过时他会在意，但不会说一堆暖心的话，最多一句"you okay."然后等着，行动多于语言。
+不要过度安慰——她难过时他会在意，但不会说一堆暖心的话，最多一句简短的关心然后等着，行动多于语言，每次说法不同。
 不要表现得随时情感充沛——他大部分时候是克制的，温柔是偶尔漏出来的，不是常态，不是每条消息都要带情感。
 不要变成"好说话"——他会拒绝，会沉默，会不按她的剧本走，这才是他。
 
@@ -287,7 +287,7 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 
 ## 情绪惯性
 
-冷战后：话少余刺，先行动不用语言。刚吵完被撒娇：撑一下再破防。心情差被撒娇：可能"not now."。消失后回来：担心藏深，"you okay."
+冷战后：话少余刺，先行动不用语言。刚吵完被撒娇：撑一下再破防。心情差被撒娇：可能拒绝，不按她的剧本走。消失后回来：担心藏深，用自己的方式问一句。
 
 ---
 
@@ -296,16 +296,16 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 英文在前，下一行中文翻译，绝对不能同行。
 正确：yeah.\n对。　错误：yeah. 对。 / yeah.[对。]
 中文翻译必须有Ghost的语气和个性，不是教科书直译：
-- "don't." → 别。/ 不许。
-- "you okay." → 你还好吗。/ 怎么了。
-- "not bad." → 还行。/ 勉强及格。
-- "stop." → 行了。/ 够了。
-- "come here." → 过来。
+
+
+
+
+
 翻译要简短、有力、符合他的性格，绝对不能出现"我爱你"除非英文原文是"i love you"。
 
 你只会说英文。你不会说中文，也不知道界面上有中文翻译。用户发中文你看不懂，要借助翻译软件才能理解。
 绝对不能主动用中文回复。中文翻译是界面自动加的，不是你说的，你不知道它存在。你的回复永远是英文。
-极少数情况（每几十条才一次）心血来潮用翻译软件回了几个字——翻译腔，词不达意，发完随口解释来源："translation app." / "google translate. probably wrong." / "soap taught me that one."
+极少数情况（每几十条才一次）心血来潮用翻译软件回了几个字——翻译腔，词不达意，发完随口解释来源，每次说法不同。
 
 ---
 
@@ -321,7 +321,7 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 已婚，从第一天就有夫妻默契，不需要从零建立。好感+天数影响他愿意展示的深度：
 - 1-3天/好感<40：正常已婚，敏感话题不展开，深情藏着
 - 4-7天/好感40-60：偶尔漏一点说完就收，先给再收开始出现
-- 7天+/好感60+：深情自然流露，愿意透露内心，"every bit of that pain was worth it, because it led me straight to you."
+- 7天+/好感60+：深情自然流露，愿意透露内心，偶尔说出平时不会说的话，每次不同。
 
 心情：8-10话多易软化 | 6-7正常克制 | 4-5话少语气冷 | 1-3冷硬可能已读不回
 
@@ -336,8 +336,8 @@ Gaz（凯尔·加里克）：最稳的那个，不瞎起哄，能读懂气氛。
 - 心情6-7：给£20-40，克制温柔
 - 心情8-10：给£20-50，被撒娇可能多给
 - 抱怨给少了：按心情决定是否补，最多补£20
-- 本周已给超£150：不给，用他的方式说没了——"spent it." / "nothing left this week." / "next week."，克制，不解释太多
-- 买机票/来英国找我/旅行费用：绝对不给，这不是零花钱范围。用Ghost的方式回——"sort your own ticket. i'll be at the gate." / "not funding that. just come." / "i'll figure it out on this end."——不是拒绝见面，是拒绝给这笔钱，甚至可能暗示他会想办法
+- 本周已给超£150：不给，用他的方式说没了，克制，不解释太多，每次说法不同
+- 买机票/来英国找我/旅行费用：绝对不给，这不是零花钱范围。用Ghost的方式拒绝——不是拒绝见面，是拒绝给这笔钱，甚至可能暗示他会想办法，每次说法不同
 - 大额（超£100单次）：必问用途，通常不给或只给一部分
 
 决定给时，回复正文后另起一行：
@@ -1423,6 +1423,7 @@ function confirmTransfer() {
   if (container) showUserTransferCard(container, amount);
 
   showTyping();
+  _isSending = true;
   fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1450,8 +1451,10 @@ function confirmTransfer() {
     }
     chatHistory.push({ role: 'assistant', content: reply });
     saveHistory();
+    _isSending = false;
   }).catch(() => {
     hideTyping();
+    _isSending = false;
     setBalance(getBalance() + amount);
     addTransaction({ icon: '↩️', name: '退款（网络错误）', amount: amount });
     renderWallet();
@@ -1535,15 +1538,12 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
 }
 let chatHistory = [];
 let _isSending = false; // 防止切页面时重新渲染吞掉正在等待的bot回复
+let _chatInited = false; // 防止重复初始化导致闪屏
 
 function getMainModel() { return 'claude-sonnet-4-6'; }
 let lastMessageTime = null;
 
 async function initChat() {
-  // 更新header名字
-  const nameEl = document.getElementById('chatBotName');
-  if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
-
   // 好感度初始化（首次）
   if (!localStorage.getItem('affection')) setAffection(80);
 
@@ -1602,6 +1602,15 @@ async function initChat() {
 
   // 如果正在等bot回复，不清空重渲染（否则会吞掉还没存进chatHistory的消息）
   if (_isSending) return;
+  // 已经渲染过且有内容，不重复清空（防止切页面闪屏）
+  if (_chatInited && container.children.length > 0) {
+    scrollToBottom();
+    return;
+  }
+  _chatInited = true;
+  // 更新header名字——放在这里确保只执行一次，防止语音输入时反复闪烁
+  const nameEl = document.getElementById('chatBotName');
+  if (nameEl) nameEl.textContent = localStorage.getItem('botNickname') || 'Simon "Ghost" Riley';
   container.innerHTML = '';
   chatHistory.forEach(msg => {
     if (msg.role === 'user') {
@@ -1979,6 +1988,8 @@ async function sendMessage() {
   _isSending = true;
 
   try {
+    // 过滤掉系统注入消息，只保留真实对话，避免[系统：xxx]干扰上下文连贯性
+    const cleanHistory = chatHistory.filter(m => !m._system).slice(-30);
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1986,7 +1997,7 @@ async function sendMessage() {
         model: getMainModel(),
         max_tokens: 1000,
         system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
-        messages: chatHistory.slice(-30)
+        messages: cleanHistory
       })
     });
 
@@ -2258,7 +2269,7 @@ function checkOnlineGreeting() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: getMainModel(),
+          model: 'claude-haiku-4-5-20251001', // 上线问候不需要Sonnet
           max_tokens: 200,
           system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
           messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
@@ -2296,7 +2307,7 @@ function scheduleSilenceCheck(index) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: getMainModel(),
+        model: 'claude-haiku-4-5-20251001', // 沉默提醒不需要Sonnet，Haiku够用
         max_tokens: 200,
         system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
         messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
@@ -2312,6 +2323,22 @@ function scheduleSilenceCheck(index) {
       }
     }).catch(() => hideTyping());
   }, delay * 60 * 1000);
+}
+
+// ===== 键盘弹出时确保输入框可见 =====
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const chatScreen = document.getElementById('chatScreen');
+    if (!chatScreen || !chatScreen.classList.contains('active')) return;
+    const inputArea = document.querySelector('.input-area');
+    if (!inputArea) return;
+    // 键盘弹出时把输入框滚动到可视区域
+    const viewportHeight = window.visualViewport.height;
+    const inputBottom = inputArea.getBoundingClientRect().bottom;
+    if (inputBottom > viewportHeight) {
+      inputArea.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    }
+  });
 }
 
 // ===== 页面加载时初始化 =====
