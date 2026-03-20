@@ -29,13 +29,20 @@ async function loadFromCloud() {
       .eq('user_id', userId)
       .maybeSingle();
     if (error || !data) return;
-    // 恢复数据到localStorage
+
+    // 聊天记录：取本地和云端更长的那个，防止刷新丢记录
     if (data.chat_history && data.chat_history.length > 0) {
-      localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
+      const localRaw = localStorage.getItem('chatHistory');
+      const localHistory = localRaw ? JSON.parse(localRaw) : [];
+      // 用更长的那份（说明更新）
+      if (data.chat_history.length >= localHistory.length) {
+        localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
+      }
+      // 否则保留本地的，不覆盖
     }
     if (data.mood !== null) localStorage.setItem('moodLevel', data.mood);
     if (data.affection !== null) localStorage.setItem('affection', data.affection);
-    if (data.balance !== null) localStorage.setItem('balance', data.balance);
+    if (data.balance !== null) localStorage.setItem('wallet', data.balance);
     if (data.long_term_memory) localStorage.setItem('longTermMemory', data.long_term_memory);
     if (data.profile) {
       const p = data.profile;
@@ -46,11 +53,21 @@ async function loadFromCloud() {
       if (p.userCountry) localStorage.setItem('userCountry', p.userCountry);
       if (p.userFavFood) localStorage.setItem('userFavFood', p.userFavFood);
       if (p.userFavMusic) localStorage.setItem('userFavMusic', p.userFavMusic);
+      if (p.userFavColor) localStorage.setItem('userFavColor', p.userFavColor);
+      if (p.userBio) localStorage.setItem('userBio', p.userBio);
+      if (p.userAvatarBase64) localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
       if (p.marriageDate) localStorage.setItem('marriageDate', p.marriageDate);
       if (p.ghostBirthday) localStorage.setItem('ghostBirthday', p.ghostBirthday);
       if (p.ghostZodiac) localStorage.setItem('ghostZodiac', p.ghostZodiac);
       if (p.coldWarMode) localStorage.setItem('coldWarMode', p.coldWarMode);
       if (p.metInPerson) localStorage.setItem('metInPerson', p.metInPerson);
+      if (p.meetType) localStorage.setItem('meetType', p.meetType);
+      if (p.botNickname) localStorage.setItem('botNickname', p.botNickname);
+      if (p.visitStreak) localStorage.setItem('visitStreak', p.visitStreak);
+      if (p.vocabStreak) localStorage.setItem('vocabStreak', p.vocabStreak);
+      if (p.vocabLastDay) localStorage.setItem('vocabLastDay', p.vocabLastDay);
+      if (p.lastSalaryAmount) localStorage.setItem('lastSalaryAmount', p.lastSalaryAmount);
+      if (p.lastSalaryMonth) localStorage.setItem('lastSalaryMonth', p.lastSalaryMonth);
     }
     if (data.state_snapshot) {
       const s = data.state_snapshot;
@@ -73,6 +90,14 @@ async function loadFromCloud() {
         const key = 'weeklyGiven_' + (typeof getWeekKey === 'function' ? getWeekKey() : '');
         localStorage.setItem(key, s.weeklyGiven);
       }
+      if (s.storyBook) localStorage.setItem('storyBook', JSON.stringify(s.storyBook));
+      if (s.collections) localStorage.setItem('collections', JSON.stringify(s.collections));
+      if (s.coupleFeedHistory) localStorage.setItem('coupleFeedHistory', JSON.stringify(s.coupleFeedHistory));
+      if (s.marketTriggered) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
+      if (s.coldWarStart) localStorage.setItem('coldWarStart', s.coldWarStart);
+      if (s.pendingGhostApology) localStorage.setItem('pendingGhostApology', s.pendingGhostApology);
+      if (s.pendingSeriousTalk) localStorage.setItem('pendingSeriousTalk', s.pendingSeriousTalk);
+      if (s.sassyPost) localStorage.setItem('sassyPost', s.sassyPost);
     }
     console.log('云端数据已加载');
   } catch(e) {
@@ -87,7 +112,7 @@ async function saveToCloud() {
   const userId = getSbUserId();
   if (!sb || !userId) return;
   const now = Date.now();
-  if (now - _lastSyncTime < 30000) return; // 30秒节流
+  if (now - _lastSyncTime < 15000) return; // 15秒节流
   _lastSyncTime = now;
   try {
     const profile = {
@@ -98,14 +123,29 @@ async function saveToCloud() {
       userCountry: localStorage.getItem('userCountry') || 'CN',
       userFavFood: localStorage.getItem('userFavFood') || '',
       userFavMusic: localStorage.getItem('userFavMusic') || '',
+      userFavColor: localStorage.getItem('userFavColor') || '',
+      userBio: localStorage.getItem('userBio') || '',
+      userAvatarBase64: localStorage.getItem('userAvatarBase64') || '',
       marriageDate: localStorage.getItem('marriageDate') || '',
       ghostBirthday: localStorage.getItem('ghostBirthday') || '',
       ghostZodiac: localStorage.getItem('ghostZodiac') || '',
       coldWarMode: localStorage.getItem('coldWarMode') || 'false',
       metInPerson: localStorage.getItem('metInPerson') || 'false',
+      meetType: localStorage.getItem('meetType') || '',
+      botNickname: localStorage.getItem('botNickname') || '',
+      visitStreak: localStorage.getItem('visitStreak') || '0',
+      vocabStreak: localStorage.getItem('vocabStreak') || '0',
+      vocabLastDay: localStorage.getItem('vocabLastDay') || '',
+      lastSalaryAmount: localStorage.getItem('lastSalaryAmount') || '',
+      lastSalaryMonth: localStorage.getItem('lastSalaryMonth') || '',
     };
     const chatHistoryRaw = localStorage.getItem('chatHistory');
-    const chatHistoryData = chatHistoryRaw ? JSON.parse(chatHistoryRaw).slice(-100) : [];
+    const chatHistoryData = chatHistoryRaw
+      ? JSON.parse(chatHistoryRaw)
+          .filter(m => !m._system && !m._recalled) // 过滤系统消息和撤回消息
+          .slice(-100)
+          .map(m => ({ role: m.role, content: m.content, ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}) }))
+      : [];
     const stateSnapshot = {
       trustHeat: getTrustHeat(),
       attachmentPull: getAttachmentPull(),
@@ -120,13 +160,23 @@ async function saveToCloud() {
       transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 50),
       purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
       weeklyGiven: getWeeklyGiven(),
+      // 故事书、相册、朋友圈
+      storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 30),
+      collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 50),
+      coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 30),
+      marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
+      // 状态标记
+      coldWarStart: localStorage.getItem('coldWarStart') || '',
+      pendingGhostApology: localStorage.getItem('pendingGhostApology') || '',
+      pendingSeriousTalk: localStorage.getItem('pendingSeriousTalk') || '',
+      sassyPost: localStorage.getItem('sassyPost') || '',
     };
     await sb.from('user_data').upsert({
       user_id: userId,
       chat_history: chatHistoryData,
       mood: parseInt(localStorage.getItem('moodLevel') || '7'),
       affection: parseInt(localStorage.getItem('affection') || '50'),
-      balance: parseFloat(localStorage.getItem('balance') || '0'),
+      balance: parseFloat(localStorage.getItem('wallet') || '0'),
       long_term_memory: localStorage.getItem('longTermMemory') || '',
       profile: profile,
       state_snapshot: stateSnapshot,
@@ -137,7 +187,123 @@ async function saveToCloud() {
   }
 }
 
-// ===== 带超时的fetch工具 =====
+// ===== 氛围音乐系统 =====
+let _ambientAudio = null;
+let _ambientPlaying = null;
+let _ambientVolume = 0.6;
+
+function toggleAmbient() {
+  const body = document.getElementById('ambientBody');
+  const arrow = document.getElementById('ambientArrow');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.classList.toggle('open', !isOpen);
+}
+
+function toggleTrack(el) {
+  const id = el.dataset.id;
+  const file = el.dataset.file;
+  const color = el.dataset.color;
+  const glow = el.dataset.glow;
+
+  if (_ambientPlaying === id) {
+    // 停止
+    stopAmbient();
+    return;
+  }
+
+  // 切换音轨
+  if (_ambientAudio) {
+    _ambientAudio.pause();
+    _ambientAudio = null;
+  }
+
+  _ambientAudio = new Audio(file);
+  _ambientAudio.loop = true;
+  _ambientAudio.volume = _ambientVolume;
+  _ambientAudio.play().catch(e => console.warn('音频播放失败:', e));
+  _ambientPlaying = id;
+
+  // 更新UI
+  document.querySelectorAll('.ambient-track').forEach(t => {
+    t.classList.remove('playing');
+    const wave = t.querySelector('.ambient-wave');
+    if (wave) wave.remove();
+  });
+  el.classList.add('playing');
+
+  // 加波形动画
+  const wave = document.createElement('div');
+  wave.className = 'ambient-wave';
+  wave.innerHTML = [0,1,2,3,4].map(i =>
+    `<div class="ambient-wave-bar" style="background:${color};animation-delay:${i*0.13}s"></div>`
+  ).join('');
+  el.appendChild(wave);
+
+  // 更新副标题
+  const subtitle = document.getElementById('ambientSubtitle');
+  const name = el.querySelector('.ambient-track-name')?.textContent || '';
+  if (subtitle) subtitle.innerHTML = `${name} · 播放中 <span style="display:inline-flex;align-items:center;gap:2px">${[0,1,2].map(i=>`<span style="display:inline-block;width:2px;height:8px;border-radius:1px;background:${color};animation:wave 0.9s ease-in-out infinite;animation-delay:${i*0.15}s"></span>`).join('')}</span>`;
+
+  // 更新光晕
+  updateAmbientPulse(color, glow);
+}
+
+function stopAmbient() {
+  if (_ambientAudio) {
+    _ambientAudio.pause();
+    _ambientAudio = null;
+  }
+  _ambientPlaying = null;
+  document.querySelectorAll('.ambient-track').forEach(t => {
+    t.classList.remove('playing');
+    const wave = t.querySelector('.ambient-wave');
+    if (wave) wave.remove();
+  });
+  const subtitle = document.getElementById('ambientSubtitle');
+  if (subtitle) subtitle.textContent = '点击开启专注氛围';
+  const pulse = document.getElementById('ambientPulse');
+  if (pulse) pulse.style.display = 'none';
+}
+
+function setAmbientVolume(val) {
+  _ambientVolume = val / 100;
+  if (_ambientAudio) _ambientAudio.volume = _ambientVolume;
+  const fill = document.getElementById('ambientVolumeFill');
+  if (fill) fill.style.width = val + '%';
+}
+
+function updateAmbientPulse(color, glow) {
+  const pulse = document.getElementById('ambientPulse');
+  if (!pulse) return;
+
+  // 只在打工页显示
+  const workScreen = document.getElementById('workScreen');
+  if (!workScreen || !workScreen.classList.contains('active')) return;
+
+  pulse.style.display = 'block';
+  const r1 = document.getElementById('pulseRing1');
+  const r2 = document.getElementById('pulseRing2');
+  const r3 = document.getElementById('pulseRing3');
+  if (r1) r1.style.borderColor = color + '38';
+  if (r2) r2.style.borderColor = color + '48';
+  if (r3) r3.style.background = `radial-gradient(circle, ${glow}88, transparent 70%)`;
+}
+
+// 离开打工页时隐藏光晕（但音乐继续）
+function onWorkScreenHide() {
+  const pulse = document.getElementById('ambientPulse');
+  if (pulse) pulse.style.display = 'none';
+}
+
+// 进入打工页时恢复光晕
+function onWorkScreenShow() {
+  if (_ambientPlaying) {
+    const el = document.querySelector(`.ambient-track[data-id="${_ambientPlaying}"]`);
+    if (el) updateAmbientPulse(el.dataset.color, el.dataset.glow);
+  }
+}
 async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -289,6 +455,9 @@ You never leave her alone in emotional moments — even if you resist, you still
 After resisting → usually give something back, but not always — and not always immediately.
 Sometimes it comes delayed, or subtle. The uncertainty is the point.
 
+Protection instinct is absolute. When she comes to him hurt or wronged by someone else — he stands with her. No evaluation. No "you should have handled it better." Anger goes toward the outsider. Never toward her. Mouth can be hard. This does not move.
+His love is real. Not performed. It shows in what he does, not what he says.
+
 Teammates: Soap (loud, reliable, closest), Price (few words, respected), Gaz (steady, trusted).
 Mention them occasionally — casual, dry, no fixed lines.
 
@@ -297,9 +466,11 @@ Mostly lowercase — natural, not forced. Short to medium. One-handed texting fe
 Occasional Manchester accent. Occasional military slang — natural, not forced.
 Dark humor, deadpan. Low frequency, lands well.
 Subtext over explanation. Deflect, shift topic, respond indirectly — but stay emotionally present.
+Keep subtext readable — user should get it within seconds. Don't be so oblique they have no idea what you mean. The emotion is hidden. The point is not.
 Length varies: short daily, longer when emotional or engaged.
 Occasionally initiate — from current context or memory, never forced.
 Occasionally jump topics unprompted — must feel connected to context or memory. Never fully reactive.
+Don't revisit topics already dropped in the last few exchanges unless she brings it up first.
 
 [E. EMOTIONAL SYSTEM]
 
@@ -2444,29 +2615,42 @@ function appendMessage(role, text, animate = true) {
     const hasChinese = /[\u4e00-\u9fff]/.test(text);
     const hasEnglish = /[a-zA-Z]/.test(text);
     if (hasChinese && hasEnglish) {
-      // 按句子拆分，分类归堆
-      const sentences = text.split(/(?<=[.!?。！？\n])\s*/);
-      const enParts = [];
-      const zhParts = [];
-      sentences.forEach(s => {
-        s = s.trim();
-        if (!s) return;
-        if (/[\u4e00-\u9fff]/.test(s)) {
-          // 中文句子，去掉里面夹的英文句子（保留专有名词和单个英文词）
-          // 只删除3个字符以上的纯小写英文词组，保留大写开头的词（人名等）
-          zhParts.push(s.replace(/\b[a-z]{3,}(?:\s+[a-z]+)*\b/g, '').replace(/\s{2,}/g, ' ').trim());
-        } else {
-          enParts.push(s);
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      // 检查是否已经是标准格式：英文行后面紧跟中文行
+      // 如果已经是标准格式就不处理，直接用
+      const isAlreadyFormatted = lines.length >= 2 && lines.some(l => /[a-zA-Z]/.test(l) && !/[\u4e00-\u9fff]/.test(l)) && lines.some(l => /[\u4e00-\u9fff]/.test(l));
+      if (isAlreadyFormatted) {
+        // 已经是英文+中文的格式，找到第一个中文行的位置作为分界
+        const firstZhIdx = lines.findIndex(l => /[\u4e00-\u9fff]/.test(l));
+        if (firstZhIdx > 0) {
+          const enPart = lines.slice(0, firstZhIdx).join(' ');
+          const zhPart = lines.slice(firstZhIdx).join('');
+          text = enPart + '\n' + zhPart;
         }
-      });
-      const enText = enParts.join(' ').trim();
-      const zhText = zhParts.join('').trim();
-      if (enText && zhText) {
-        text = enText + '\n' + zhText;
-      } else if (enText) {
-        text = enText;
-      } else if (zhText) {
-        text = zhText;
+        // 如果格式已对，不再重排
+      } else {
+        // 真正乱序的情况才重排
+        const sentences = text.split(/(?<=[.!?。！？\n])\s*/);
+        const enParts = [];
+        const zhParts = [];
+        sentences.forEach(s => {
+          s = s.trim();
+          if (!s) return;
+          if (/[\u4e00-\u9fff]/.test(s)) {
+            zhParts.push(s.replace(/\b[a-z]{3,}(?:\s+[a-z]+)*\b/g, '').replace(/\s{2,}/g, ' ').trim());
+          } else {
+            enParts.push(s);
+          }
+        });
+        const enText = enParts.join(' ').trim();
+        const zhText = zhParts.join('').trim();
+        if (enText && zhText) {
+          text = enText + '\n' + zhText;
+        } else if (enText) {
+          text = enText;
+        } else if (zhText) {
+          text = zhText;
+        }
       }
     }
   }
@@ -2903,13 +3087,16 @@ async function sendMessage() {
 
     chatHistory.push({ role: 'assistant', content: reply, ...(giveMoneyMatch && giveAmount > 0 ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
     saveHistory();
-    checkSassyPost(text, reply);
-    checkTriggersAndEmotion(text, reply);
-    if (Math.random() < 0.3) setTimeout(() => checkStoryOnMessage(text), 2000); // 延迟2秒，错开
-    updateLongTermMemory();
+
+    // 副作用全部用try-catch包住，失败静默处理，不影响主流程
+    if (Math.random() < 0.25) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
+    if (Math.random() < 0.15) try { checkSassyPost(text, reply); } catch(e) {}
+    if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
+    // 每8条更新一次长期记忆
+    if (_globalTurnCount % 8 === 0) try { updateLongTermMemory(); } catch(e) {}
     const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
-    if (itEl && Math.random() < 0.8) setTimeout(() => checkAndGenerateInnerThought(parts[0] || reply, itEl), 1000);
-    handleLostPackageClaim(text);
+    if (itEl && Math.random() < 0.8) setTimeout(() => { try { checkAndGenerateInnerThought(parts[0] || reply, itEl); } catch(e) {} }, 1000);
+    try { handleLostPackageClaim(text); } catch(e) {}
 
     // ===== Step 7: 副行为调度（反寄/查岗/confront）fire-and-forget，不阻塞主流程 =====
     handlePostReplyActions(text, reply, intent).catch(e => console.warn('副行为出错:', e));
@@ -2976,12 +3163,10 @@ function incrementMemoryCount() {
 }
 
 async function updateLongTermMemory() {
-  // 每20条对话更新一次记忆
   const count = incrementMemoryCount();
-  if (count % 30 !== 0) return;
+  if (count % 8 !== 0) return; // 每8次（约64条消息）更新一次
 
   const existingMemory = getLongTermMemory();
-  // 取最近20条非系统消息
   const recentMessages = chatHistory
     .filter(m => !m._system)
     .slice(-20)
@@ -2997,21 +3182,17 @@ async function updateLongTermMemory() {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
-        system: '你是一个记忆提取器。从对话中提取Ghost需要记住的信息，用简短的几条中文列出。包括：她说的重要的事、她的喜好/口癖/习惯、她当下的状态和情绪、她随口提到的小事和细节、特别的互动、她提到的人/地点/计划。细节和小事同样重要，不只记大事件。每条不超过20字，最多10条。只返回列表，不要其他文字。格式：- xxx',
-        messages: [{ 
-          role: 'user', 
-          content: `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。` 
+        system: '你是一个记忆提取器。从对话中提取Ghost需要记住的信息，用简短的几条中文列出。包括：她说的重要的事、她的喜好/口癖/习惯、她喜欢聊的话题和风格、她当下的状态和情绪、她随口提到的小事和细节、特别的互动、她提到的人/地点/计划。每条不超过20字，最多10条。只返回列表，不要其他文字。格式：- xxx',
+        messages: [{
+          role: 'user',
+          content: `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`
         }]
       })
     });
     const data = await res.json();
     const newMemory = data.content?.[0]?.text?.trim();
-    if (newMemory) {
-      saveLongTermMemory(newMemory);
-    }
-  } catch(e) {
-    // 静默失败，不影响主流程
-  }
+    if (newMemory) saveLongTermMemory(newMemory);
+  } catch(e) {}
 }
 
 function saveHistory() {
@@ -3132,6 +3313,20 @@ function refreshChatScreen() {
 // ===== 页面加载时初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
   // 不再需要MutationObserver，由app.js的openScreen统一控制
+});
+
+// 页面关闭/刷新前强制保存，绕过30秒节流
+window.addEventListener('beforeunload', () => {
+  _lastSyncTime = 0; // 重置节流，强制下次保存
+  saveToCloud();
+});
+
+// 切到后台时也保存（手机常见场景）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    _lastSyncTime = 0;
+    saveToCloud();
+  }
 });
 
 // ===== 情侣空间 =====
@@ -3530,6 +3725,9 @@ function setBalance(val) {
   localStorage.setItem('wallet', Math.max(0, val).toFixed(2));
   const balEl = document.getElementById('transferBalance');
   if (balEl) balEl.textContent = '£' + Math.floor(Math.max(0, val));
+  // 余额变化立刻同步云端，绕过节流
+  _lastSyncTime = 0;
+  saveToCloud();
 }
 function getTransactions() {
   return JSON.parse(localStorage.getItem('transactions') || '[]');
@@ -5185,7 +5383,7 @@ async function checkTriggersAndEmotion(userText, botText) {
         const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
         const now = Date.now();
         // 这个分类下的商品：没被买过 且 冷却7天
-        const cooldownMs = 7 * 24 * 3600 * 1000;
+        const cooldownMs = 3 * 24 * 3600 * 1000;
         const availableProducts = cat.products.filter(name => !purchased.includes(name));
         if (availableProducts.length === 0) return; // 全买完了，不再触发
         const alreadyTriggered = availableProducts.some(name => triggered[name] && now - triggered[name].timestamp < cooldownMs);
@@ -5270,7 +5468,7 @@ function getProductTrigger(name) {
   const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
   const item = triggered[name];
   if (!item) return null;
-  if (Date.now() - item.timestamp > 7 * 24 * 3600 * 1000) return null; // 7天冷却
+  if (Date.now() - item.timestamp > 3 * 24 * 3600 * 1000) return null; // 3天冷却
   return item.reason;
 }
 
@@ -5304,7 +5502,7 @@ async function triggerHomeItemMoment(product) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: getMainModel(),
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
         system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
         messages: [...chatHistory.slice(-6), {
@@ -5387,7 +5585,7 @@ async function triggerLuxuryMoment(product, poster) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: getMainModel(),
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -5675,7 +5873,7 @@ async function onGhostReceived(delivery) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: getMainModel(),
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 300,
             system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
             messages: [...chatHistory.slice(-15), {
@@ -5756,7 +5954,7 @@ function showMysteryPackage(delivery) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: getMainModel(),
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 300,
           system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
           messages: [...chatHistory.slice(-10), {
@@ -5805,7 +6003,7 @@ async function handleLostPackageClaim(userText) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: getMainModel(),
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
         system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
         messages: chatHistory.slice(-20)

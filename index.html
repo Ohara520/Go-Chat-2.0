@@ -226,6 +226,164 @@
       80% { opacity: 0.8; }
       100% { transform: translateY(-80vh) rotate(360deg) scale(0.5); opacity: 0; }
     }
+
+    /* ===== 氛围音乐系统 ===== */
+    .ambient-section {
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1.5px solid rgba(255,255,255,0.88);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
+      margin-bottom: 12px;
+    }
+    .ambient-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      cursor: pointer;
+    }
+    .ambient-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ambient-icon { font-size: 18px; }
+    .ambient-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #4c1d95;
+    }
+    .ambient-subtitle {
+      font-size: 10px;
+      color: rgba(139,92,246,0.5);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ambient-arrow {
+      font-size: 13px;
+      color: rgba(139,92,246,0.4);
+      transition: transform 0.25s;
+    }
+    .ambient-arrow.open { transform: rotate(180deg); }
+    .ambient-body {
+      padding: 0 14px 14px;
+      animation: slideDown 0.2s ease;
+    }
+    .ambient-volume-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .ambient-volume-track {
+      flex: 1;
+      position: relative;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(139,92,246,0.08);
+    }
+    .ambient-volume-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      border-radius: 2px;
+      background: linear-gradient(90deg,#a855f7,#ec4899);
+      transition: width 0.1s;
+      pointer-events: none;
+    }
+    .ambient-volume-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      opacity: 0;
+      cursor: pointer;
+      height: 20px;
+      top: -8px;
+    }
+    .ambient-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .ambient-track {
+      background: rgba(139,92,246,0.05);
+      border: 1.5px solid rgba(255,255,255,0.7);
+      border-radius: 14px;
+      padding: 10px 6px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ambient-track.playing {
+      background: rgba(255,255,255,0.9);
+      border-color: rgba(168,85,247,0.45);
+      box-shadow: 0 4px 14px rgba(168,85,247,0.15);
+      transform: translateY(-2px);
+    }
+    .ambient-track-emoji { font-size: 18px; margin-bottom: 4px; }
+    .ambient-track-name {
+      font-size: 10px;
+      font-weight: 700;
+      color: #6b21a8;
+    }
+    .ambient-track.playing .ambient-track-name { color: #3b0764; }
+    .ambient-wave {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 2px;
+      height: 14px;
+      margin-top: 4px;
+    }
+    .ambient-wave-bar {
+      width: 2.5px;
+      border-radius: 2px;
+      animation: wave 0.9s ease-in-out infinite;
+    }
+
+    /* 光晕脉冲环 */
+    .pulse-ring {
+      position: fixed;
+      top: 45%; left: 50%;
+      border-radius: 50%;
+      transform: translate(-50%,-50%);
+      pointer-events: none;
+    }
+    .pulse-ring-1 {
+      width: 440px; height: 440px;
+      border: 2px solid transparent;
+      animation: ring1 3.2s ease-in-out infinite;
+    }
+    .pulse-ring-2 {
+      width: 280px; height: 280px;
+      border: 1.5px solid transparent;
+      animation: ring2 2.6s ease-in-out infinite;
+      animation-delay: 0.5s;
+    }
+    .pulse-ring-3 {
+      width: 160px; height: 160px;
+      animation: ring3 2.1s ease-in-out infinite;
+      animation-delay: 0.25s;
+    }
+    @keyframes ring1 {
+      0%,100% { transform:translate(-50%,-50%) scale(1); opacity:0.45; }
+      50%      { transform:translate(-50%,-50%) scale(1.4); opacity:0.05; }
+    }
+    @keyframes ring2 {
+      0%,100% { transform:translate(-50%,-50%) scale(1); opacity:0.35; }
+      50%      { transform:translate(-50%,-50%) scale(1.5); opacity:0.04; }
+    }
+    @keyframes ring3 {
+      0%,100% { transform:translate(-50%,-50%) scale(1); opacity:0.6; }
+      50%      { transform:translate(-50%,-50%) scale(1.25); opacity:0.2; }
+    }
+    @keyframes slideDown {
+      from { opacity:0; transform:translateY(-8px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
 </style>
 </head>
 <body>
@@ -604,8 +762,51 @@
         </div>
       </div>
       <div class="work-log" id="workLog"></div>
+
+      <!-- 氛围音乐折叠区 -->
+      <div class="ambient-section" id="ambientSection">
+        <div class="ambient-header" onclick="toggleAmbient()">
+          <div class="ambient-header-left">
+            <span class="ambient-icon">🎵</span>
+            <div>
+              <div class="ambient-title">氛围音乐</div>
+              <div class="ambient-subtitle" id="ambientSubtitle">点击开启专注氛围</div>
+            </div>
+          </div>
+          <div class="ambient-arrow" id="ambientArrow">▾</div>
+        </div>
+        <div class="ambient-body" id="ambientBody" style="display:none">
+          <div class="ambient-volume-row">
+            <span style="font-size:11px;opacity:0.45">🔈</span>
+            <div class="ambient-volume-track">
+              <div class="ambient-volume-fill" id="ambientVolumeFill" style="width:60%"></div>
+              <input type="range" min="0" max="100" value="60" class="ambient-volume-input"
+                oninput="setAmbientVolume(this.value)">
+            </div>
+            <span style="font-size:11px;opacity:0.45">🔊</span>
+          </div>
+          <div class="ambient-grid" id="ambientGrid">
+            <div class="ambient-track" data-id="rain"      data-file="/audio/rain.mp3"      data-color="#a78bfa" data-glow="#60a5fa" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🌧️</div><div class="ambient-track-name">雨声</div></div>
+            <div class="ambient-track" data-id="fireplace" data-file="/audio/fireplace.mp3" data-color="#f0abfc" data-glow="#fb923c" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🔥</div><div class="ambient-track-name">壁炉</div></div>
+            <div class="ambient-track" data-id="story"     data-file="/audio/story.mp3"     data-color="#f9a8d4" data-glow="#f472b6" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎙️</div><div class="ambient-track-name">哄睡</div></div>
+            <div class="ambient-track" data-id="piano"     data-file="/audio/piano.mp3"     data-color="#fde68a" data-glow="#fbbf24" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎹</div><div class="ambient-track-name">钢琴</div></div>
+            <div class="ambient-track" data-id="cafe"      data-file="/audio/cafe.mp3"      data-color="#f9a8d4" data-glow="#b4835f" onclick="toggleTrack(this)"><div class="ambient-track-emoji">☕</div><div class="ambient-track-name">咖啡馆</div></div>
+            <div class="ambient-track" data-id="base"      data-file="/audio/base.mp3"      data-color="#cbd5e1" data-glow="#475569" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎖️</div><div class="ambient-track-name">基地环境</div></div>
+            <div class="ambient-track" data-id="cricket"   data-file="/audio/cricket.mp3"   data-color="#86efac" data-glow="#22c55e" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🌙</div><div class="ambient-track-name">深夜虫鸣</div></div>
+            <div class="ambient-track" data-id="sleep"     data-file="/audio/sleep.mp3"     data-color="#bae6fd" data-glow="#7dd3fc" onclick="toggleTrack(this)"><div class="ambient-track-emoji">😴</div><div class="ambient-track-name">深眠呼吸</div></div>
+          </div>
+        </div>
+      </div>
+
       <div class="noah-tag">👤 诺亚工作室 · 按时发薪，童叟无欺</div>
     </div>
+  </div>
+
+  <!-- 光晕脉冲容器（打工页专用）-->
+  <div id="ambientPulse" style="display:none;pointer-events:none;position:fixed;inset:0;z-index:0;">
+    <div class="pulse-ring pulse-ring-1" id="pulseRing1"></div>
+    <div class="pulse-ring pulse-ring-2" id="pulseRing2"></div>
+    <div class="pulse-ring pulse-ring-3" id="pulseRing3"></div>
   </div>
 
   <!-- 单词页 -->
