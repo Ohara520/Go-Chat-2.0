@@ -65,6 +65,14 @@ async function loadFromCloud() {
       if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
       if (s.lastReversePackageTurn != null) localStorage.setItem('lastReversePackageTurn', s.lastReversePackageTurn);
       if (s.relationshipFlags) localStorage.setItem('relationshipFlags', JSON.stringify(s.relationshipFlags));
+      // 钱包和快递数据恢复
+      if (s.deliveries) localStorage.setItem('deliveries', JSON.stringify(s.deliveries));
+      if (s.transactions) localStorage.setItem('transactions', JSON.stringify(s.transactions));
+      if (s.purchasedItems) localStorage.setItem('purchasedItems', JSON.stringify(s.purchasedItems));
+      if (s.weeklyGiven != null) {
+        const key = 'weeklyGiven_' + (typeof getWeekKey === 'function' ? getWeekKey() : '');
+        localStorage.setItem(key, s.weeklyGiven);
+      }
     }
     console.log('云端数据已加载');
   } catch(e) {
@@ -106,7 +114,12 @@ async function saveToCloud() {
       pendingReversePackages: getPendingReversePackages(),
       emotionalHurt: parseInt(localStorage.getItem('emotionalHurt') || '0'),
       lastReversePackageTurn: getLastReversePackageTurn(),
-      relationshipFlags: getRelationshipFlags()
+      relationshipFlags: getRelationshipFlags(),
+      // 钱包和快递数据
+      deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]').slice(0, 20),
+      transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 50),
+      purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
+      weeklyGiven: getWeeklyGiven(),
     };
     await sb.from('user_data').upsert({
       user_id: userId,
@@ -121,6 +134,20 @@ async function saveToCloud() {
     }, { onConflict: 'user_id' });
   } catch(e) {
     console.log('云端保存失败', e);
+  }
+}
+
+// ===== 带超时的fetch工具 =====
+async function fetchWithTimeout(url, options, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
   }
 }
 
@@ -914,7 +941,7 @@ async function emitGhostEvent(eventType, payload = {}) {
           .slice(-4)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 60)}`)
           .join('\n');
-        const res = await fetch('/api/chat', {
+        const res = await fetchWithTimeout('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -966,7 +993,7 @@ async function emitGhostEvent(eventType, payload = {}) {
       try {
         const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,60)}`).join('\n');
-        const res = await fetch('/api/chat', {
+        const res = await fetchWithTimeout('/api/chat', {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 50,
@@ -986,7 +1013,7 @@ async function emitGhostEvent(eventType, payload = {}) {
       try {
         const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,60)}`).join('\n');
-        const res = await fetch('/api/chat', {
+        const res = await fetchWithTimeout('/api/chat', {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 50,
@@ -1008,7 +1035,7 @@ async function emitGhostEvent(eventType, payload = {}) {
       try {
         const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,60)}`).join('\n');
-        const res = await fetch('/api/chat', {
+        const res = await fetchWithTimeout('/api/chat', {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 40,
@@ -1442,17 +1469,23 @@ const STORY_EVENTS = [
 
 // 辅助函数
 function storyDelay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function cleanMessages(messages) {
+  // 过滤掉系统消息和撤回消息，只保留role和content
+  return messages
+    .filter(m => !m._system && !m._recalled)
+    .map(m => ({ role: m.role, content: m.content }));
+}
 async function callHaiku(system, messages) {
   try {
-    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, system, messages }) });
+    const res = await fetchWithTimeout('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, system, messages: cleanMessages(messages) }) });
     const data = await res.json(); return data.content?.[0]?.text?.trim() || '';
   } catch(e) { return ''; }
 }
 async function callSonnet(system, messages) {
   try {
-    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: getMainModel(), max_tokens: 400, system, messages }) });
+    const res = await fetchWithTimeout('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: getMainModel(), max_tokens: 400, system, messages: cleanMessages(messages) }) });
     const data = await res.json(); return data.content?.[0]?.text?.trim() || '';
   } catch(e) { return ''; }
 }
@@ -1555,7 +1588,31 @@ function doCheckin() {
 
   showToast(rewardMsg + milestoneMsg);
   renderCheckin();
+  initCalendar(); // 刷新日历显示今天的花
+  launchCheckinFlowers(); // 花朵动画
   saveToCloud();
+}
+
+function launchCheckinFlowers() {
+  const container = document.getElementById('calendarParticles');
+  if (!container) return;
+  const flowers = ['🌸', '🌺', '🌼', '💮', '🌷', '✨'];
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.textContent = flowers[Math.floor(Math.random() * flowers.length)];
+    el.style.cssText = `
+      position: absolute;
+      font-size: ${Math.random() * 14 + 12}px;
+      left: ${Math.random() * 100}%;
+      top: 100%;
+      opacity: 1;
+      animation: flowerRise ${Math.random() * 1.5 + 1.5}s ease-out forwards;
+      animation-delay: ${Math.random() * 0.8}s;
+      pointer-events: none;
+    `;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
 }
 
 function markStoryDone(event) {
@@ -1923,7 +1980,7 @@ async function ghostSendInitMessage(offlineHours) {
   const hint = hintMap.find(h => offlineHours >= h.min && offlineHours < h.max)?.hint || '';
   try {
     showTyping();
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2502,7 +2559,7 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0) {
       .map(m => `${m.role === 'user' ? '她' : 'Ghost'}：${m.content.slice(0, 80)}`)
       .join('\n');
 
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2607,8 +2664,11 @@ async function sendMessage() {
     // ===== Step 3: 预判本轮主行为意图 =====
     const intent = decideMainIntent(text, pendingEvent);
 
-    // 过滤掉系统注入消息，只保留真实对话，避免[系统：xxx]干扰上下文连贯性
-    const cleanHistory = chatHistory.filter(m => !m._system).slice(-30);
+    // 过滤掉系统注入消息和撤回消息，只保留真实对话内容
+    const cleanHistory = chatHistory
+      .filter(m => !m._system && !m._recalled)
+      .slice(-30)
+      .map(m => ({ role: m.role, content: m.content })); // 只传role和content，去掉所有内部标记字段
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2750,16 +2810,23 @@ async function sendMessage() {
     if (itEl) checkAndGenerateInnerThought(parts[0] || reply, itEl);
     handleLostPackageClaim(text);
 
-    // ===== Step 7: 副行为调度（反寄/查岗/confront） =====
-    await handlePostReplyActions(text, reply, intent);
+    // ===== Step 7: 副行为调度（反寄/查岗/confront）fire-and-forget，不阻塞主流程 =====
+    handlePostReplyActions(text, reply, intent).catch(e => console.warn('副行为出错:', e));
 
     // 所有同步后续处理完，才释放保护
     _isSending = false;
 
   } catch (err) {
     hideTyping();
-    _isSending = false; // 出错也要重置，不然后续切页面会一直不渲染
-    appendMessage('bot', "...\n[网络不太好，等一下。]");
+    _isSending = false;
+    console.error('sendMessage error:', err);
+    // 判断是真网络错误还是API报错
+    const errMsg = err?.message || '';
+    const isNetworkErr = errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('Failed to fetch');
+    appendMessage('bot', isNetworkErr
+      ? "...\n[网络不太好，等一下。]"
+      : "...\n[出了点问题，再试一次。]"
+    );
   }
 }
 
@@ -2814,7 +2881,7 @@ async function updateLongTermMemory() {
   if (!recentMessages) return;
 
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3146,7 +3213,7 @@ ${toneHint ? `- ${toneHint}` : ''}
   }
 ]`;
 
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3278,7 +3345,7 @@ async function checkSassyPost(userText, ghostReply) {
 
 async function generateSassyPost() {
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4093,6 +4160,8 @@ function initCalendar() {
   // 生成日历格子
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayCheckinKey = 'checkin_' + today.toDateString();
+  const checkedInToday = !!localStorage.getItem(todayCheckinKey);
   let html = '';
   for (let i = 0; i < firstDay; i++) html += '<div class="day"></div>';
 
@@ -4100,9 +4169,23 @@ function initCalendar() {
     const festKey = `${month+1}-${d}`;
     let cls = 'day';
     let extra = '';
+    const isPast = d < day;
+    const isToday = d === day;
+
+    // 已签到的历史日期显示小圆点
+    const pastCheckinKey = 'checkin_' + new Date(year, month, d).toDateString();
+    const wasCheckedIn = !!localStorage.getItem(pastCheckinKey);
+    if (wasCheckedIn && !isToday) {
+      extra += '<div class="checkin-dot-mark"></div>';
+    }
 
     // 今天
-    if (d === day) cls = 'day today';
+    if (isToday) {
+      cls = checkedInToday ? 'day today checked-in' : 'day today can-checkin';
+      extra += checkedInToday
+        ? '<div class="checkin-dot-mark done"></div>'
+        : '<div class="checkin-pulse-dot"></div>';
+    }
 
     // 生日
     if (userBirthday) {
@@ -4119,7 +4202,7 @@ function initCalendar() {
     }
 
     // 里程碑天数
-    if (marriageDate && !extra) {
+    if (marriageDate && !extra.includes('festival-emoji')) {
       const thisDate = new Date(year, month, d);
       const daysFromMarriage = Math.floor((thisDate - new Date(marriageDate)) / 86400000);
       if (daysFromMarriage === 52 || (daysFromMarriage > 0 && daysFromMarriage % 100 === 0) || daysFromMarriage === 365) {
@@ -4129,18 +4212,19 @@ function initCalendar() {
     }
 
     // 节日
-    if (!extra && FESTIVALS[festKey]) {
-      cls = cls === 'day today' ? 'day today festival' : 'day festival';
-      extra = `<div class="festival-emoji">${FESTIVALS[festKey].emoji}</div><div class="festival-label">${FESTIVALS[festKey].label}</div>`;
+    if (!extra.includes('festival-emoji') && FESTIVALS[festKey]) {
+      cls = cls.includes('today') ? cls + ' festival' : (cls === 'day' ? 'day festival' : cls);
+      extra += `<div class="festival-emoji">${FESTIVALS[festKey].emoji}</div><div class="festival-label">${FESTIVALS[festKey].label}</div>`;
     }
 
     // 工资日
-    if (!extra && d === 25) {
+    if (!extra.includes('festival-emoji') && d === 25) {
       cls = 'day payday';
       extra = '<div class="festival-emoji">💷</div><div class="festival-label">工资日</div>';
     }
 
-    html += `<div class="${cls}"><div class="day-number">${d}</div>${extra}</div>`;
+    const clickHandler = isToday && !checkedInToday ? 'onclick="doCheckin()"' : '';
+    html += `<div class="${cls}" ${clickHandler}><div class="day-number">${d}</div>${extra}</div>`;
   }
   const calDaysEl = document.getElementById('calendarDays');
   if (calDaysEl) calDaysEl.innerHTML = html;
@@ -4631,14 +4715,14 @@ const MARKET_PRODUCTS = {
     { emoji: '🗺️', name: '英国旅行计划',  desc: '伦敦、爱丁堡、曼城，全部去打卡', price: 8000, badge: '异国追爱', isReunion: true, ghostMsg: 'I will be your guide. Every city.\n我来带你。每一个城市。' },
   ],
   home: [
-    { emoji: '🚗', name: '代步小车',     desc: '实用城市代步，低调不张扬',        price: 15000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 1 },
-    { emoji: '🚙', name: '越野SUV',      desc: '适合长途，载她去任何地方',        price: 35000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 2 },
-    { emoji: '🏎️', name: '豪华跑车',     desc: '他说太张扬，但朋友圈发了',        price: 80000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 3 },
-    { emoji: '🏠', name: '曼彻斯特公寓', desc: '靠近基地，他说"practical"',       price: 120000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 1 },
-    { emoji: '🏡', name: '赫里福德独栋', desc: '有院子，够他们两个人住',          price: 300000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 2 },
-    { emoji: '🏰', name: '苏格兰庄园',   desc: 'Soap说Ghost软了，他已读不回',     price: 800000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 3 },
-    { emoji: '🌿', name: '英国一块地',   desc: '有了地，才算有了根',              price: 500000, shipping: 0, isHomeItem: true, homeType: 'land',  tier: 1 },
-    { emoji: '🏔️', name: '苏格兰高地',   desc: '极少数情况下他会说那三个字',      price: 1500000,shipping: 0, isHomeItem: true, homeType: 'land',  tier: 2 },
+    { emoji: '🚗', name: '代步小车',     desc: '城市代步，低调实用',              price: 15000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 1 },
+    { emoji: '🚙', name: '越野SUV',      desc: '宽敞舒适，长途短途都合适',        price: 35000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 2 },
+    { emoji: '🏎️', name: '豪华跑车',     desc: '顶配限量，不是人人都敢买',        price: 80000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 3 },
+    { emoji: '🏠', name: '曼彻斯特公寓', desc: '靠近市中心，交通方便',            price: 120000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 1 },
+    { emoji: '🏡', name: '赫里福德独栋', desc: '有院子，安静，空间够大',          price: 300000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 2 },
+    { emoji: '🏰', name: '苏格兰庄园',   desc: '占地广阔，风景绝美',              price: 800000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 3 },
+    { emoji: '🌿', name: '英国一块地',   desc: '属于自己的一片土地',              price: 500000, shipping: 0, isHomeItem: true, homeType: 'land',  tier: 1 },
+    { emoji: '🏔️', name: '苏格兰高地',   desc: '远离喧嚣，只有风和你',            price: 1500000,shipping: 0, isHomeItem: true, homeType: 'land',  tier: 2 },
     { emoji: '🐾', name: '宠物系统',     desc: '养一只属于你们的小动物',          price: 0,      shipping: 0, isHomeItem: true, homeType: 'pet',   comingSoon: true },
   ],
 };
@@ -4963,7 +5047,7 @@ async function checkTriggersAndEmotion(userText, botText) {
     return;
   }
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5042,7 +5126,7 @@ async function checkLocationSpecial(userText, botText) {
     if (localStorage.getItem(sentKey)) return;
 
     // Haiku判断：用户聊到食物/想要/好奇某样东西
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5101,7 +5185,7 @@ async function triggerHomeItemMoment(product) {
 
   // Ghost反应
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5184,7 +5268,7 @@ async function triggerLuxuryMoment(product, poster) {
       ? `西蒙·莱利刚收到老婆送的「${product.name}」，用他当下的心情发一条朋友圈（1-2句话，自然真实，不肉麻，符合他的性格就行）。附中文翻译。只返回帖子内容，格式：英文\\n中文`
       : `用户刚给自己买了「${product.name}」（${product.desc}），替她发一条朋友圈（1-2句话，带点小得意或幸福感，口语化）。附中文翻译。只返回帖子内容，格式：英文\\n中文`;
 
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5432,7 +5516,7 @@ async function onGhostReceived(delivery) {
     const fromHomeHint = isFromHome
       ? `这是中国特产，他没吃过很多中国食物，会好奇、可能不知道怎么吃、可能被辣到、可能安静品味。反应要真实，不夸张，符合西蒙性格。${pd.festival ? `这是${pd.festival}节日限定，他可能听说过这个节日但不太了解。` : ''}`
       : '';
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5553,7 +5637,7 @@ function showMysteryPackage(delivery) {
   // 签收后Sonnet生成台词
   setTimeout(async () => {
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetchWithTimeout('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -5602,7 +5686,7 @@ async function handleLostPackageClaim(userText) {
     chatHistory.push({ role: 'user', content: contextPrompt });
     showTyping();
 
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5675,7 +5759,7 @@ function openDeliveryModal(idx) {
   let html = '';
   if (d.isLostConfirmed) {
     html += `<div style="background:rgba(255,220,220,0.8);border:1px solid rgba(220,80,80,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#b91c1c;text-align:center;">
-      ❌ 此包裹已在运输途中遗失<br><span style="font-size:11px;color:#ef4444;margin-top:4px;display:block;">告诉Ghost，可申请赔偿</span>
+      ❌ 此包裹已在运输途中遗失
     </div>`;
   }
   html += d.stages.map((stage, i) => {

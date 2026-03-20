@@ -133,8 +133,8 @@
 
     /* ===== 签到系统 ===== */
     .checkin-section {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(120,60,180,0.18);
+      border: 1px solid rgba(168,85,247,0.35);
       border-radius: 16px;
       padding: 16px;
       margin: 12px 0;
@@ -153,17 +153,17 @@
     }
     .checkin-label {
       font-size: 11px;
-      color: rgba(255,255,255,0.5);
+      color: rgba(220,180,255,0.85);
       letter-spacing: 0.5px;
     }
     .checkin-value {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 700;
-      color: #e8d5f5;
+      color: #f0e0ff;
     }
     .checkin-unit {
       font-size: 11px;
-      color: rgba(255,255,255,0.4);
+      color: rgba(220,180,255,0.7);
     }
     .checkin-btn {
       width: 100%;
@@ -177,17 +177,75 @@
       cursor: pointer;
       transition: all 0.2s;
       letter-spacing: 0.5px;
+      box-shadow: 0 4px 15px rgba(124,58,237,0.4);
     }
     .checkin-btn:active { transform: scale(0.97); }
     .checkin-btn.done {
-      background: rgba(255,255,255,0.08);
-      color: rgba(255,255,255,0.4);
+      background: rgba(120,60,180,0.25);
+      color: rgba(220,180,255,0.5);
       cursor: default;
+      box-shadow: none;
     }
     .checkin-hint {
       font-size: 11px;
-      color: rgba(255,255,255,0.35);
+      color: rgba(220,180,255,0.6);
       margin-top: 8px;
+    }
+
+    /* ===== 签到日历样式 ===== */
+    .day.can-checkin {
+      cursor: pointer;
+      background: linear-gradient(135deg, rgba(168,85,247,0.3), rgba(124,58,237,0.2));
+      border: 2px solid rgba(168,85,247,0.6);
+      border-radius: 10px;
+      position: relative;
+    }
+    .day.can-checkin:active { transform: scale(0.92); }
+    .day.checked-in {
+      background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(236,72,153,0.1));
+      border-radius: 10px;
+    }
+    /* 确保日期格子能定位子元素 */
+    .day { position: relative !important; }
+
+    /* 签到小圆点——左上角叠加，不干扰其他内容 */
+    .checkin-dot-mark {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(168,85,247,0.55);
+      pointer-events: none;
+    }
+    .checkin-dot-mark.done {
+      background: rgba(168,85,247,0.85);
+      box-shadow: 0 0 4px rgba(168,85,247,0.5);
+    }
+    .checkin-pulse-dot {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(168,85,247,0.9);
+      animation: pulse 1.2s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
+    @keyframes flowerRise {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(-85vh) rotate(${Math.random() * 360}deg); opacity: 0; }
+    }
+    @keyframes flowerRise {
+      0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+      80% { opacity: 0.8; }
+      100% { transform: translateY(-80vh) rotate(360deg) scale(0.5); opacity: 0; }
     }
 </style>
 </head>
@@ -738,10 +796,7 @@
             <span class="checkin-value" id="checkinBalance">£0</span>
           </div>
         </div>
-        <button class="checkin-btn" id="checkinBtn" onclick="doCheckin()">
-          <span id="checkinBtnText">📅 今日签到</span>
-        </button>
-        <div class="checkin-hint" id="checkinHint">签到可获得条数或英镑奖励 ✨</div>
+        <div class="checkin-hint" id="checkinHint">点击今天的日期签到 ✨</div>
       </div>
 
       <div class="calendar">
