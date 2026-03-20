@@ -1551,12 +1551,15 @@ function renderCheckin() {
     }
   }
   if (hintEl) {
-    const milestoneRewards = { 1: 10, 3: 20, 7: 50, 14: 100, 30: 200 };
-    const nextMilestone = [1,3,7,14,30].find(m => m > streak);
+    const milestoneMap = { 1: 10, 3: 20, 7: 50, 14: 100, 30: 200 };
+    const monthKey = 'monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth()+1);
+    const monthlyCount = parseInt(localStorage.getItem(monthKey) || '0');
+    const nextMilestone = [1,3,7,14,30].find(m => m > monthlyCount);
     if (!doneToday) {
-      hintEl.textContent = nextMilestone
-        ? `距第${nextMilestone}天里程碑还差${nextMilestone - streak}天 🎯`
-        : '签到可获得条数或英镑奖励 ✨';
+      const bonus = nextMilestone ? milestoneMap[nextMilestone] : null;
+      hintEl.textContent = bonus
+        ? `本月第${monthlyCount+1}次签到，距里程碑还差${nextMilestone-monthlyCount}次，奖励+${bonus}条 🎯`
+        : '点击今天的日期签到 ✨';
     } else {
       hintEl.textContent = '明天再来签到吧 🌸';
     }
@@ -1573,9 +1576,14 @@ function doCheckin() {
 
   const streak = parseInt(localStorage.getItem('visitStreak') || '1');
 
-  // 里程碑额外奖励（条数）
+  // 本月签到次数（每月1号重置）
+  const monthKey = 'monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth()+1);
+  const monthlyCount = parseInt(localStorage.getItem(monthKey) || '0') + 1;
+  localStorage.setItem(monthKey, monthlyCount);
+
+  // 里程碑奖励（条数）——每月循环
   const milestoneRewards = { 1: 10, 3: 20, 7: 50, 14: 100, 30: 200 };
-  const milestoneBonus = milestoneRewards[streak] || 0;
+  const milestoneBonus = milestoneRewards[monthlyCount] || 0;
 
   // 随机奖励：5%欧气大奖，47.5%英镑，47.5%条数
   const rand = Math.random();
@@ -1602,13 +1610,13 @@ function doCheckin() {
     rewardMsg = `💬 签到奖励：+${msgCount}条`;
   }
 
-  // 里程碑额外条数
+  // 里程碑额外条数奖励
   let milestoneMsg = '';
   if (milestoneBonus > 0) {
     const key = getTodayKey();
     const current = parseInt(localStorage.getItem(key) || '0');
     localStorage.setItem(key, Math.max(0, current - milestoneBonus).toString());
-    milestoneMsg = `\n🎉 第${streak}天里程碑：额外+${milestoneBonus}条！`;
+    milestoneMsg = `\n🏆 本月第${monthlyCount}次签到：额外+${milestoneBonus}条！`;
   }
 
   showCheckinResult(rewardMsg + milestoneMsg, streak);
@@ -2900,7 +2908,7 @@ async function sendMessage() {
     if (Math.random() < 0.3) setTimeout(() => checkStoryOnMessage(text), 2000); // 延迟2秒，错开
     updateLongTermMemory();
     const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
-    if (itEl && Math.random() < 0.6) setTimeout(() => checkAndGenerateInnerThought(parts[0] || reply, itEl), 3000); // 延迟3秒
+    if (itEl && Math.random() < 0.8) setTimeout(() => checkAndGenerateInnerThought(parts[0] || reply, itEl), 1000);
     handleLostPackageClaim(text);
 
     // ===== Step 7: 副行为调度（反寄/查岗/confront）fire-and-forget，不阻塞主流程 =====
