@@ -18,15 +18,23 @@ export default async function handler(req, res) {
       }),
     });
 
-    const data = await response.json();
+    // 先读文本再解析，避免HTML响应导致JSON报错
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(e) {
+      console.error('DeepSeek non-JSON response:', text.slice(0, 200));
+      return res.status(500).json({ error: 'Invalid response', raw: text.slice(0, 200) });
+    }
 
     if (!response.ok) {
       console.error('DeepSeek API error:', response.status, JSON.stringify(data));
       return res.status(500).json({ error: `API error ${response.status}`, detail: data });
     }
 
-    const text = data.choices?.[0]?.message?.content?.trim() || '';
-    res.status(200).json({ text });
+    const result = data.choices?.[0]?.message?.content?.trim() || '';
+    res.status(200).json({ text: result });
   } catch (err) {
     console.error('DeepSeek handler error:', err.message);
     res.status(500).json({ error: err.message });
