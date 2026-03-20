@@ -2075,7 +2075,7 @@ function confirmTransfer() {
   saveHistory();
 
   const container = document.getElementById('messagesContainer');
-  if (container) showUserTransferCard(container, amount);
+  const cardId = container ? showUserTransferCard(container, amount) : null;
 
   showTyping();
   _isSending = true;
@@ -2086,23 +2086,28 @@ function confirmTransfer() {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
       system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
-      messages: chatHistory.slice(-10)
+      messages: cleanMessages(chatHistory.slice(-10))
     })
   }).then(r => r.json()).then(data => {
     hideTyping();
     let reply = data.content?.[0]?.text || '...';
     updateToRead();
     const shouldRefund = reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8));
-    // 彻底清除REFUND/KEEP/COLD_WAR_START标记，不管在哪个位置
     reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
     if (shouldRefund) {
+      // 退款：加回余额，更新卡片状态，显示退款卡片
       setBalance(getBalance() + amount);
       addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amount });
       renderWallet();
+      updateUserTransferCard(cardId, false);
       if (container) showGhostTransferCard(container, amount, reply, true);
     } else {
+      // Ghost收下：更新卡片状态为已收到，只显示回复
       changeAffection(1);
-      if (container) showGhostTransferCard(container, amount, reply, false);
+      updateUserTransferCard(cardId, true);
+      if (reply) {
+        appendMessage('bot', reply);
+      }
     }
     chatHistory.push({ role: 'assistant', content: reply });
     saveHistory();
@@ -2113,6 +2118,7 @@ function confirmTransfer() {
     setBalance(getBalance() + amount);
     addTransaction({ icon: '↩️', name: '退款（网络错误）', amount: amount });
     renderWallet();
+    updateUserTransferCard(cardId, false);
     appendMessage('bot', '...\n[网络不太好，等一下。]');
   });
 }
@@ -2120,9 +2126,10 @@ function confirmTransfer() {
 function showUserTransferCard(container, amount) {
   const now = new Date();
   const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const cardId = 'utc_' + Date.now();
   const div = document.createElement('div');
   div.className = 'message user';
-  div.innerHTML = `<div class="transfer-card user-transfer-card">
+  div.innerHTML = `<div class="transfer-card user-transfer-card" id="${cardId}">
     <div class="transfer-card-top">
       <div class="transfer-label">TRANSFER TO</div>
       <div class="transfer-name">Simon Riley</div>
@@ -2132,11 +2139,19 @@ function showUserTransferCard(container, amount) {
       <div class="transfer-amount">£${amount}</div>
     </div>
     <div class="transfer-footer">
-      <div class="transfer-status">待确认</div>
+      <div class="transfer-status" id="${cardId}_status">🌸 待确认</div>
       <div class="transfer-time">${timeStr}</div>
     </div></div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
+  return cardId;
+}
+
+function updateUserTransferCard(cardId, kept) {
+  const statusEl = document.getElementById(cardId + '_status');
+  if (!statusEl) return;
+  statusEl.textContent = kept ? '✅ 已收到' : '↩️ 已退回';
+  statusEl.style.color = kept ? '#a855f7' : '#9ca3af';
 }
 
 function showGhostTransferCard(container, amount, noteText, isRefund) {
@@ -2669,7 +2684,7 @@ async function sendMessage() {
       .filter(m => !m._system && !m._recalled)
       .slice(-30)
       .map(m => ({ role: m.role, content: m.content })); // 只传role和content，去掉所有内部标记字段
-    const response = await fetch('/api/chat', {
+    const response = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2678,7 +2693,7 @@ async function sendMessage() {
         system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
         messages: cleanHistory
       })
-    });
+    }, 30000); // 主回复给30秒
 
     const data = await response.json();
     hideTyping();
@@ -2736,7 +2751,7 @@ async function sendMessage() {
         showTyping();
         _isSending = true;
         try {
-          const res2 = await fetch('/api/chat', {
+          const res2 = await fetchWithTimeout('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2819,14 +2834,16 @@ async function sendMessage() {
   } catch (err) {
     hideTyping();
     _isSending = false;
-    console.error('sendMessage error:', err);
-    // 判断是真网络错误还是API报错
-    const errMsg = err?.message || '';
-    const isNetworkErr = errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('Failed to fetch');
-    appendMessage('bot', isNetworkErr
-      ? "...\n[网络不太好，等一下。]"
-      : "...\n[出了点问题，再试一次。]"
-    );
+    console.error('sendMessage error:', err?.name, err?.message);
+    const isTimeout = err?.name === 'AbortError';
+    const isNetwork = err?.message?.includes('fetch') || err?.message?.includes('Failed');
+    if (isTimeout) {
+      appendMessage('bot', "...\n[回复超时了，再发一次试试。]");
+    } else if (isNetwork) {
+      appendMessage('bot', "...\n[网络不太好，等一下再试。]");
+    } else {
+      appendMessage('bot', "...\n[出了点问题，再试一次。]");
+    }
   }
 }
 
@@ -5212,7 +5229,7 @@ async function triggerHomeItemMoment(product) {
   // 发朋友圈（用户视角，@Ghost，带成就感）
   try {
     const feedPrompt = `${userName}刚${desc}，心情很好，发一条朋友圈（1-2句话，带点得意和幸福感，可以@Simon Riley）。附中文翻译。只返回帖子内容，格式：英文\\n中文`;
-    const res2 = await fetch('/api/chat', {
+    const res2 = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5230,7 +5247,7 @@ async function triggerHomeItemMoment(product) {
 
     // 生成评论——队友羡慕类型
     const commentPrompt = `这是${userName}发的朋友圈："${postEn}"（她刚${desc}）。生成2-3条评论，角色：Soap(🧼,调侃羡慕)、Gaz(🎖️,真心祝贺)、Price(🚬,简短认可)，Ghost(👻,嘴硬但在意)。格式：角色名|英文|中文。只返回评论。`;
-    const res3 = await fetch('/api/chat', {
+    const res3 = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5289,7 +5306,7 @@ async function triggerLuxuryMoment(product, poster) {
       const commentCount = Math.floor(Math.random() * 3) + 1; // 1-3条
       const commentPrompt = `这是${posterName}发的朋友圈："${postEn}"。生成${commentCount}条队友评论，角色：Soap(🧼,风趣调侃)、Gaz(🎖️,温和支持)、Price(🚬,简短稳重)，Ghost(👻,克制但在意)可选出现。每条评论一行，格式：角色名|英文|中文。只返回评论，不要其他文字。`;
 
-      const res2 = await fetch('/api/chat', {
+      const res2 = await fetchWithTimeout('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -5556,7 +5573,7 @@ async function onGhostReceived(delivery) {
     // 精品专柜用Sonnet补充
     if (pd.isLuxury) {
       setTimeout(async () => {
-        const res2 = await fetch('/api/chat', {
+        const res2 = await fetchWithTimeout('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -5595,7 +5612,7 @@ async function onGhostReceived(delivery) {
       const delay = (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
       setTimeout(async () => {
         try {
-          const res3 = await fetch('/api/chat', {
+          const res3 = await fetchWithTimeout('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
