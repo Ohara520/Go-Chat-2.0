@@ -130,6 +130,65 @@
   font-size: 13px;
   color: rgba(107,63,160,0.65);
 }
+
+    /* ===== 签到系统 ===== */
+    .checkin-section {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 16px;
+      margin: 12px 0;
+      text-align: center;
+    }
+    .checkin-info {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 14px;
+    }
+    .checkin-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .checkin-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.5px;
+    }
+    .checkin-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #e8d5f5;
+    }
+    .checkin-unit {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+    .checkin-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #a855f7, #7c3aed);
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .checkin-btn:active { transform: scale(0.97); }
+    .checkin-btn.done {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.4);
+      cursor: default;
+    }
+    .checkin-hint {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      margin-top: 8px;
+    }
 </style>
 </head>
 <body>
@@ -664,6 +723,25 @@
 
       <div class="marriage-date-display">
         结婚日期：<strong id="marriageDateDisplay">—</strong>
+      </div>
+
+      <!-- 签到区域 -->
+      <div class="checkin-section">
+        <div class="checkin-info">
+          <div class="checkin-stat">
+            <span class="checkin-label">连续签到</span>
+            <span class="checkin-value" id="checkinStreak">0</span>
+            <span class="checkin-unit">天</span>
+          </div>
+          <div class="checkin-stat">
+            <span class="checkin-label">余额</span>
+            <span class="checkin-value" id="checkinBalance">£0</span>
+          </div>
+        </div>
+        <button class="checkin-btn" id="checkinBtn" onclick="doCheckin()">
+          <span id="checkinBtnText">📅 今日签到</span>
+        </button>
+        <div class="checkin-hint" id="checkinHint">签到可获得条数或英镑奖励 ✨</div>
       </div>
 
       <div class="calendar">

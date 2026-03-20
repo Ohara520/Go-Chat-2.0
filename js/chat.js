@@ -306,6 +306,7 @@ Every approach different. Never repeats the same move.
 [H. OUTPUT FORMAT]
 English first. Natural Chinese translation on next line only. Never same line.
 Chinese should feel like him — natural voice, not literal. Idioms → convey feeling.
+Double negatives, understatement, irony → translate the emotional meaning, not the literal words. Example: "less invisible" means he feels displaced, not that he literally became more visible — translate the feeling.
 Max 2 messages per reply. No rapid questioning.
 Occasionally a single Chinese word or phrase slips out naturally. No explanation. Very rare.
 
@@ -1473,6 +1474,88 @@ function getStoryContext() {
   const isBirthday = userBirthday ? (() => { const [bm,bd]=userBirthday.split('-').map(Number); return today.getMonth()+1===bm && today.getDate()===bd; })() : false;
   const triggered = (id) => !!localStorage.getItem('story_done_' + id);
   return { affection: getAffection(), days, streak, isBirthday, triggered };
+}
+
+// ===== 签到系统 =====
+function renderCheckin() {
+  const streak = parseInt(localStorage.getItem('visitStreak') || '1');
+  const balance = parseFloat(localStorage.getItem('balance') || '0');
+  const todayKey = 'checkin_' + new Date().toDateString();
+  const doneToday = !!localStorage.getItem(todayKey);
+
+  const streakEl = document.getElementById('checkinStreak');
+  const balanceEl = document.getElementById('checkinBalance');
+  const btnEl = document.getElementById('checkinBtn');
+  const hintEl = document.getElementById('checkinHint');
+
+  if (streakEl) streakEl.textContent = streak;
+  if (balanceEl) balanceEl.textContent = '£' + balance.toFixed(0);
+  if (btnEl) {
+    if (doneToday) {
+      btnEl.classList.add('done');
+      btnEl.querySelector('#checkinBtnText').textContent = '✅ 今日已签到';
+    } else {
+      btnEl.classList.remove('done');
+      btnEl.querySelector('#checkinBtnText').textContent = '📅 今日签到';
+    }
+  }
+  if (hintEl) {
+    const milestoneRewards = { 1: 10, 3: 20, 7: 50, 14: 100, 30: 200 };
+    const nextMilestone = [1,3,7,14,30].find(m => m > streak);
+    if (!doneToday) {
+      hintEl.textContent = nextMilestone
+        ? `距第${nextMilestone}天里程碑还差${nextMilestone - streak}天 🎯`
+        : '签到可获得条数或英镑奖励 ✨';
+    } else {
+      hintEl.textContent = '明天再来签到吧 🌸';
+    }
+  }
+}
+
+function doCheckin() {
+  const todayKey = 'checkin_' + new Date().toDateString();
+  if (localStorage.getItem(todayKey)) {
+    showToast('今天已经签到过了 🌸');
+    return;
+  }
+  localStorage.setItem(todayKey, '1');
+
+  const streak = parseInt(localStorage.getItem('visitStreak') || '1');
+
+  // 里程碑额外奖励（条数）
+  const milestoneRewards = { 1: 10, 3: 20, 7: 50, 14: 100, 30: 200 };
+  const milestoneBonus = milestoneRewards[streak] || 0;
+
+  // 随机奖励：30%英镑，70%条数
+  const isCoins = Math.random() < 0.3;
+  let rewardMsg = '';
+
+  if (isCoins) {
+    const coins = [2, 3, 5, 8, 10][Math.floor(Math.random() * 5)];
+    setBalance(getBalance() + coins);
+    addTransaction({ icon: '🎁', name: '签到奖励', amount: coins });
+    renderWallet();
+    rewardMsg = `💰 签到奖励：£${coins}`;
+  } else {
+    const msgCount = Math.floor(Math.random() * 6) + 3;
+    const key = getTodayKey();
+    const current = parseInt(localStorage.getItem(key) || '0');
+    localStorage.setItem(key, Math.max(0, current - msgCount).toString());
+    rewardMsg = `💬 签到奖励：+${msgCount}条`;
+  }
+
+  // 里程碑额外条数
+  let milestoneMsg = '';
+  if (milestoneBonus > 0) {
+    const key = getTodayKey();
+    const current = parseInt(localStorage.getItem(key) || '0');
+    localStorage.setItem(key, Math.max(0, current - milestoneBonus).toString());
+    milestoneMsg = `\n🎉 第${streak}天里程碑：额外+${milestoneBonus}条！`;
+  }
+
+  showToast(rewardMsg + milestoneMsg);
+  renderCheckin();
+  saveToCloud();
 }
 
 function markStoryDone(event) {
@@ -3981,6 +4064,8 @@ function initCalendar() {
   const titleEl = document.getElementById('calendarTitle');
   if (titleEl) titleEl.textContent = `${monthNames[month]} ${year}`;
 
+  renderCheckin(); // 初始化签到UI
+
   const marriageDate = localStorage.getItem('marriageDate') || '';
   const userBirthday = localStorage.getItem('userBirthday') || '';
 
@@ -4485,7 +4570,8 @@ const MARKET_CATEGORIES = [
   { id: 'gift',     label: '🎁 特别礼物' },
   { id: 'fromhome', label: '🏠 从家寄给他' },
   { id: 'luxury',   label: '💎 精品专柜' },
-  { id: 'wishlist', label: '💝 我的心愿' },
+  { id: 'wishlist', label: '✈️ 面基计划' },
+  { id: 'home',     label: '🏡 建立小家' },
 ];
 
 const MARKET_PRODUCTS = {
@@ -4540,17 +4626,20 @@ const MARKET_PRODUCTS = {
     { emoji: '🍜', name: '柳州螺蛳粉',       desc: '正宗广西螺蛳粉，臭香臭香的，敢不敢试', price: 25, shipping: 20, isFromHome: true },
   ],
   wishlist: [
-    { emoji: '💄', name: '口红套装',       desc: '犒劳一下自己，你值得最美的颜色', price: 180,  badge: '精致女孩',   ghostMsg: 'Send me a picture. Now.\n发照片给我。现在。' },
-    { emoji: '👜', name: '小方包',         desc: '梦想中的那只包，终于攒够了',     price: 680,  badge: '包治百病',   ghostMsg: "You actually did it. I knew you would.\n你真的做到了。我就知道。" },
-    { emoji: '🧴', name: '高端护肤套装',   desc: 'La Mer 同款，好好爱护自己',      price: 450,  badge: '自我宠爱',   ghostMsg: "Good. Take care of yourself when I can't.\n很好。我不在的时候好好照顾自己。" },
-    { emoji: '💍', name: '情侣戒指',       desc: '925银情侣款，你戴着他戴着',      price: 350,  badge: '我们的约定', ghostMsg: 'Wear it. Do not take it off.\n戴上。别摘。' },
-    { emoji: '📸', name: '拍立得相机',     desc: '把每一刻都留下来，等他回来一起看', price: 520, badge: '记录我们',   ghostMsg: 'Take good photos. I want to see them all.\n好好拍。我要看所有的。' },
-    { emoji: '🎧', name: '降噪耳机',       desc: '等不到他消息的时候，用音乐填满', price: 1200, badge: '享受当下',   ghostMsg: "Good. Do not wait by the phone all day.\n很好。别整天守着手机。" },
-    { emoji: '📷', name: '相机',           desc: 'Sony Alpha，记录生活的每一帧',   price: 3800, badge: '用镜头记录爱', ghostMsg: 'Next time I am back, take a photo of us.\n下次我回来，给我们拍张照。' },
-    { emoji: '💻', name: '新电脑',         desc: '工作更顺，追剧更爽，攒钱更快',  price: 6500, badge: '独立女孩',   ghostMsg: 'Smart investment. I approve.\n聪明的投资。我支持。' },
     { emoji: '✈️', name: '去曼城找他的机票', desc: '攒够了！终于可以飞去找他了！', price: 12000, badge: '跨越距离', isReunion: true, ghostMsg: "You are coming? ...Good. I will be at the airport.\n你要来了？……很好。我会在机场。" },
     { emoji: '🏨', name: '曼彻斯特酒店',   desc: '订好了房间，等他任务结束',      price: 6000, badge: '我在等你', isReunion: true, ghostMsg: 'I will be there. Promise.\n我会在的。保证。' },
     { emoji: '🗺️', name: '英国旅行计划',  desc: '伦敦、爱丁堡、曼城，全部去打卡', price: 8000, badge: '异国追爱', isReunion: true, ghostMsg: 'I will be your guide. Every city.\n我来带你。每一个城市。' },
+  ],
+  home: [
+    { emoji: '🚗', name: '代步小车',     desc: '实用城市代步，低调不张扬',        price: 15000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 1 },
+    { emoji: '🚙', name: '越野SUV',      desc: '适合长途，载她去任何地方',        price: 35000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 2 },
+    { emoji: '🏎️', name: '豪华跑车',     desc: '他说太张扬，但朋友圈发了',        price: 80000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 3 },
+    { emoji: '🏠', name: '曼彻斯特公寓', desc: '靠近基地，他说"practical"',       price: 120000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 1 },
+    { emoji: '🏡', name: '赫里福德独栋', desc: '有院子，够他们两个人住',          price: 300000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 2 },
+    { emoji: '🏰', name: '苏格兰庄园',   desc: 'Soap说Ghost软了，他已读不回',     price: 800000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 3 },
+    { emoji: '🌿', name: '英国一块地',   desc: '有了地，才算有了根',              price: 500000, shipping: 0, isHomeItem: true, homeType: 'land',  tier: 1 },
+    { emoji: '🏔️', name: '苏格兰高地',   desc: '极少数情况下他会说那三个字',      price: 1500000,shipping: 0, isHomeItem: true, homeType: 'land',  tier: 2 },
+    { emoji: '🐾', name: '宠物系统',     desc: '养一只属于你们的小动物',          price: 0,      shipping: 0, isHomeItem: true, homeType: 'pet',   comingSoon: true },
   ],
 };
 
@@ -4663,6 +4752,7 @@ function renderMarket(categoryId) {
   if (!gridEl) return;
   const isWishlist = categoryId === 'wishlist';
   const isLuxury = categoryId === 'luxury';
+  const isHome = categoryId === 'home';
   const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
   const weeklySale = isLuxury ? getWeeklySale() : null;
 
@@ -4673,11 +4763,23 @@ function renderMarket(categoryId) {
     const triggerReason = getProductTrigger(p.name);
     const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
     const discountPct = onSale ? Math.round((1 - weeklySale.discount) * 100) : 0;
-    const discountLabel = discountPct >= 30 ? `${discountPct}% OFF · 限时${discountPct}折` 
+    const discountLabel = discountPct >= 30 ? `${discountPct}% OFF · 限时${discountPct}折`
       : discountPct >= 20 ? `${discountPct}% OFF · 限时优惠`
       : `${discountPct}% OFF · 今日特惠`;
+
+    // 宠物占位特殊渲染
+    if (p.comingSoon) {
+      return `
+        <div class="product-card" style="opacity:0.7;cursor:pointer;" onclick="showToast('🐾 宠物系统即将开放，敬请期待！')">
+          <div class="product-emoji">${p.emoji}</div>
+          <div class="product-name">${p.name}</div>
+          <div class="product-desc">${p.desc}</div>
+          <div class="ghost-mentioned-tag" style="position:relative;transform:none;margin:8px auto 0;display:inline-block;">🔒 后续开放</div>
+        </div>`;
+    }
+
     return `
-      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
+      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
            onclick="${owned||isLocked?'':'openBuyModal('+i+')'  }">
         ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
         ${p.festival&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(255,200,100,0.15);border-color:rgba(255,180,50,0.4);color:#b45309;">🎋 ${p.festival}限定</div>` : ''}
@@ -4693,8 +4795,8 @@ function renderMarket(categoryId) {
           £${displayPrice.toLocaleString()}
         </div>
         ${owned
-          ? `<div class="product-owned-tag">🔴 已售罄</div>`
-          : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''} ${isFromHome?'fromhome-buy-btn':''}">${isWishlist?'💝 加入宝贝':isFromHome?'📦 寄给他':'🛒 购买'}</button>`
+          ? `<div class="product-owned-tag">${isHome?'✅ 已购置':'🔴 已售罄'}</div>`
+          : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''} ${isFromHome?'fromhome-buy-btn':''} ${isHome?'home-buy-btn':''}">${isWishlist?'💝 加入宝贝':isFromHome?'📦 寄给他':isHome?'🏡 购置':'🛒 购买'}</button>`
         }
       </div>`;
   }).join('');
@@ -4812,6 +4914,11 @@ function confirmPurchase() {
   // 奢侈品自动发朋友圈
   if (isLuxury) {
     setTimeout(() => triggerLuxuryMoment(p, p.isGhostGift ? 'ghost' : 'user'), 1000);
+  }
+
+  // 建立小家道具购买处理
+  if (p.isHomeItem && !p.comingSoon) {
+    setTimeout(() => triggerHomeItemMoment(p), 2000);
   }
 
   renderMarket(currentCategory);
@@ -4975,13 +5082,106 @@ function clearProductTrigger(name) {
   localStorage.setItem('marketTriggered', JSON.stringify(triggered));
 }
 
-// ===== 奢侈品朋友圈 =====
+// ===== 建立小家道具购买反应 =====
+async function triggerHomeItemMoment(product) {
+  const userName = localStorage.getItem('userName') || '你';
+  const typeDesc = {
+    car: `买了一辆车（${product.name}）`,
+    house: `买了一套房子（${product.name}）`,
+    land: `买了一块地（${product.name}）`,
+  };
+  const tierHint = {
+    1: '这是个实用的选择，他会表示认可',
+    2: '这是个大手笔，他会有点意外但很在意',
+    3: '这是个震惊他的选择，他可能破防',
+  };
+
+  const desc = typeDesc[product.homeType] || `买了${product.name}`;
+  const hint = tierHint[product.tier] || '';
+
+  // Ghost反应
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: getMainModel(),
+        max_tokens: 200,
+        system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+        messages: [...chatHistory.slice(-6), {
+          role: 'user',
+          content: `[系统：老婆刚${desc}。${hint}。用西蒙的方式回应——可以是意外、认可、破防、嘴硬，但能感受到他是在意的。全小写，附中文翻译。]`
+        }]
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text?.trim();
+    if (reply) {
+      await emitGhostNarrativeEvent(reply, { storyId: `home_${product.homeType}`, delayMs: 0 });
+      // 设置关系标记
+      if (product.homeType === 'car') setRelationshipFlag('hasCar');
+      if (product.homeType === 'house') setRelationshipFlag('hasHouse');
+      if (product.homeType === 'land') setRelationshipFlag('hasLand');
+    }
+  } catch(e) {}
+
+  // 发朋友圈（用户视角，@Ghost，带成就感）
+  try {
+    const feedPrompt = `${userName}刚${desc}，心情很好，发一条朋友圈（1-2句话，带点得意和幸福感，可以@Simon Riley）。附中文翻译。只返回帖子内容，格式：英文\\n中文`;
+    const res2 = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: feedPrompt }]
+      })
+    });
+    const data2 = await res2.json();
+    const text = data2.content?.[0]?.text?.trim() || '';
+    const parts = text.split('\n').filter(p => p.trim());
+    const postEn = parts[0] || '';
+    const postZh = parts[1] || '';
+    if (!postEn) return;
+
+    // 生成评论——队友羡慕类型
+    const commentPrompt = `这是${userName}发的朋友圈："${postEn}"（她刚${desc}）。生成2-3条评论，角色：Soap(🧼,调侃羡慕)、Gaz(🎖️,真心祝贺)、Price(🚬,简短认可)，Ghost(👻,嘴硬但在意)。格式：角色名|英文|中文。只返回评论。`;
+    const res3 = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 250,
+        messages: [{ role: 'user', content: commentPrompt }]
+      })
+    });
+    const data3 = await res3.json();
+    const commentText = data3.content?.[0]?.text?.trim() || '';
+    const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+    const avatarMap = { 'Ghost': GHOST_AV, 'Soap': '🧼', 'Gaz': '🎖️', 'Price': '🚬' };
+    const comments = commentText.split('\n').filter(l => l.includes('|')).map(l => {
+      const [name, en, zh] = l.split('|');
+      return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() };
+    }).filter(c => c.name && c.en).map(c => ({
+      avatar: avatarMap[c.name] || '👤', author: c.name, name: c.name, en: c.en, zh: c.zh
+    }));
+
+    const userAvatar = localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0);
+    const post = {
+      date: new Date().toISOString().slice(0,10),
+      post: { en: postEn, zh: postZh, avatar: userAvatar, author: userName, name: userName, comments },
+      type: 'home_purchase', homeType: product.homeType
+    };
+    let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    history.unshift(post);
+    localStorage.setItem('coupleFeedHistory', JSON.stringify(history.slice(0, 30)));
+  } catch(e) {}
+}
 async function triggerLuxuryMoment(product, poster) {
   try {
     const userName = localStorage.getItem('userName') || '你';
     const posterName = poster === 'ghost' ? 'Simon Riley' : userName;
     const prompt = poster === 'ghost'
-      ? `西蒙·莱利刚收到老婆送的「${product.name}」，用他的风格发一条朋友圈（全小写，克制，1-2句话，可以带点情绪但不肉麻）。附中文翻译。只返回帖子内容，格式：英文\\n中文`
+      ? `西蒙·莱利刚收到老婆送的「${product.name}」，用他当下的心情发一条朋友圈（1-2句话，自然真实，不肉麻，符合他的性格就行）。附中文翻译。只返回帖子内容，格式：英文\\n中文`
       : `用户刚给自己买了「${product.name}」（${product.desc}），替她发一条朋友圈（1-2句话，带点小得意或幸福感，口语化）。附中文翻译。只返回帖子内容，格式：英文\\n中文`;
 
     const res = await fetch('/api/chat', {
@@ -5241,7 +5441,12 @@ async function onGhostReceived(delivery) {
         system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
         messages: [...chatHistory.slice(-10), {
           role: 'user',
-          content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || `用西蒙的风格说一句话，简短，真实，不要太肉麻。`}全小写，附中文翻译，格式：英文\\n中文翻译]`
+          content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || ''}
+回应方式根据你当下状态自然选择，不要每次都一样：
+- 有时候可以是真的开心或感激，简短说出来，不花哨但真实
+- 有时候是假装不在意，嘴上轻描淡写，但细节里漏出他其实看了好几遍/留着了/很喜欢
+- 有时候是嘴上吐槽（包装太麻烦/不必要/太贵），但结尾暗示他收下了、放着了、没扔
+无论哪种，用户都要能感受到他是珍惜的，不能让她以为真的被嫌弃了。全小写，附中文翻译，格式：英文\\n中文翻译]`
         }]
       })
     });
@@ -5276,7 +5481,12 @@ async function onGhostReceived(delivery) {
             system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
             messages: [...chatHistory.slice(-15), {
               role: 'user',
-              content: `[系统：你收到了一件奢侈品「${delivery.name}」，这不是普通礼物，有分量。用西蒙的方式多说几句，可以破防一点，但还是他的风格。全小写，附中文翻译。]`
+              content: `[系统：你收到了一件奢侈品「${delivery.name}」，这不是普通礼物，有分量。
+回应方式根据你当下状态自然选择：
+- 有时候可以是真的被触动，破防一点点，但还是他的风格
+- 有时候是假装淡定，嘴上说"just got it"，但话里漏出他其实很在乎
+- 有时候是嘴上说太贵了/不必要，但暗示他会一直留着
+无论哪种，用户都要能感受到他珍惜这份心意。全小写，附中文翻译。]`
             }]
           })
         });
