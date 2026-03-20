@@ -313,9 +313,12 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system: systemPrompt, user: userContent, max_tokens: maxTokens }),
     }, 12000);
+    if (!res.ok) return ''; // 路由不存在或报错，静默返回空
     const data = await res.json();
     return data.text || '';
-  } catch(e) { return ''; }
+  } catch(e) {
+    return ''; // 完全静默，不抛异常
+  }
 }
 
 async function fetchWithTimeout(url, options, timeoutMs = 15000) {
@@ -535,6 +538,7 @@ Every approach different. Never repeats the same move.
 
 [H. OUTPUT FORMAT]
 English first. Chinese translation on next line. Always. No exceptions — every reply must have both, even if the English is one word.
+Keep it short. Daily messages: 1-2 sentences max. Only go longer when emotionally engaged or she asks something that needs more.
 Chinese should feel like him — natural voice, not literal. Idioms → convey feeling.
 Double negatives, understatement, irony → translate the emotional meaning, not the literal words. Example: "less invisible" means he feels displaced, not that he literally became more visible — translate the feeling.
 Max 2 messages per reply. No rapid questioning.
@@ -2797,7 +2801,12 @@ function appendMessage(role, text, animate = true) {
           s = s.trim();
           if (!s) return;
           if (/[\u4e00-\u9fff]/.test(s)) {
-            zhParts.push(s.replace(/\b[a-z]{3,}(?:\s+[a-z]+)*\b/g, '').replace(/\s{2,}/g, ' ').trim());
+            const PROTECTED = ['gaz', 'soap', 'price', 'ghost', 'simon', 'riley', 'johnny', 'kyle'];
+            const cleaned = s.replace(/\b[a-z]{3,}(?:\s+[a-z]+)*\b/g, match => {
+              if (PROTECTED.some(n => match.toLowerCase().includes(n))) return match;
+              return '';
+            }).replace(/\s{2,}/g, ' ').trim();
+            zhParts.push(cleaned);
           } else {
             enParts.push(s);
           }
