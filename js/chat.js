@@ -534,7 +534,7 @@ Responds, does not perform. If she pushes → hold first → then soften slightl
 Every approach different. Never repeats the same move.
 
 [H. OUTPUT FORMAT]
-English first. Natural Chinese translation on next line only. Never same line.
+English first. Chinese translation on next line. Always. No exceptions — every reply must have both, even if the English is one word.
 Chinese should feel like him — natural voice, not literal. Idioms → convey feeling.
 Double negatives, understatement, irony → translate the emotional meaning, not the literal words. Example: "less invisible" means he feels displaced, not that he literally became more visible — translate the feeling.
 Max 2 messages per reply. No rapid questioning.
@@ -2272,31 +2272,47 @@ function incrementTodayGivenCount() {
 // ===== 转账弹窗 =====
 // ===== 表情包系统 =====
 const STICKER_META = {
-  cry:   { label: '哭',   emotion: 'sad',    ghostContext: '用户发了一个哭/撒娇/委屈的表情包' },
-  shy:   { label: '害羞', emotion: 'shy',    ghostContext: '用户发了一个害羞的表情包' },
-  angry: { label: '生气', emotion: 'angry',  ghostContext: '用户发了一个生气/闹脾气的表情包' },
-  meh:   { label: '无语', emotion: 'meh',    ghostContext: '用户发了一个无语/嫌弃的表情包' },
-  star:  { label: '星星眼', emotion: 'want', ghostContext: '用户发了一个星星眼/渴望/期待的表情包' },
-  kiss:  { label: '亲亲', emotion: 'love',   ghostContext: '用户发了一个亲亲/撒娇示爱的表情包' },
+  cry:   { label: '哭',    emotion: 'sad',   ghostHint: '用户发了哭/撒娇/委屈的表情包，她可能在撒娇或者有点难过，根据对话语境判断，给出对应回应。' },
+  shy:   { label: '害羞',  emotion: 'shy',   ghostHint: '用户发了害羞的表情包，被说中了什么或者有点不好意思，简短自然回应。' },
+  angry: { label: '生气',  emotion: 'angry', ghostHint: '用户发了生气/闹脾气的表情包，根据上下文判断是真生气还是撒娇式生气，回应要对。' },
+  meh:   { label: '无语',  emotion: 'meh',   ghostHint: '用户发了无语/嫌弃的表情包，可能觉得他说的话很欠揍，干脆回应。' },
+  star:  { label: '星星眼',emotion: 'want',  ghostHint: '用户发了星星眼/渴望/期待的表情包，她在期待或者想要什么，顺着语境回应。' },
+  kiss:  { label: '亲亲',  emotion: 'love',  ghostHint: '用户发了亲亲/示爱的表情包，她在撒娇或表达亲热，Ghost可以嘴硬但不能冷漠。' },
 };
 
-function toggleStickerPanel() {
-  const panel = document.getElementById('stickerPanel');
+function togglePlusPanel() {
+  const panel = document.getElementById('plusPanel');
   if (!panel) return;
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if (isOpen) {
+    const sub = document.getElementById('stickerSubPanel');
+    if (sub) sub.style.display = 'none';
+  }
 }
 
-function closeStickerPanel() {
-  const panel = document.getElementById('stickerPanel');
+function closePlusPanel() {
+  const panel = document.getElementById('plusPanel');
   if (panel) panel.style.display = 'none';
+  const sub = document.getElementById('stickerSubPanel');
+  if (sub) sub.style.display = 'none';
 }
+
+function toggleStickerFromPlus() {
+  const sub = document.getElementById('stickerSubPanel');
+  if (!sub) return;
+  sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleStickerPanel() { togglePlusPanel(); }
+function closeStickerPanel() { closePlusPanel(); }
 
 async function sendSticker(id) {
-  closeStickerPanel();
+  closePlusPanel();
   const meta = STICKER_META[id];
   if (!meta) return;
 
-  // 渲染用户表情包消息
+  // 渲染用户表情包
   const container = document.getElementById('messagesContainer');
   if (container) {
     const div = document.createElement('div');
@@ -2306,22 +2322,23 @@ async function sendSticker(id) {
     container.scrollTop = container.scrollHeight;
   }
 
-  // 存进历史
-  const stickerMsg = `[表情包：${meta.label}]`;
+  // 存进历史——带情绪描述让Ghost理解
+  const stickerMsg = `[用户发了表情包：${meta.label}]`;
   chatHistory.push({ role: 'user', content: stickerMsg });
   saveHistory();
 
-  // Ghost回复
   if (_isSending) return;
   _isSending = true;
   showTyping();
 
   try {
-    const systemHint = `[${meta.ghostContext}。根据表情包的情绪自然回应，不要提到"表情包"三个字，就像真实收到一样反应。]`;
     const cleanHistory = chatHistory
       .filter(m => !m._system && !m._recalled)
       .slice(-30)
       .map(m => ({ role: m.role, content: m.content }));
+
+    // 把表情包情绪提示注入system
+    const stickerSystem = buildSystemPrompt() + `\n\n[本轮提示：${meta.ghostHint}不要提"表情包"三个字，自然回应就好。]`;
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
@@ -2329,7 +2346,7 @@ async function sendSticker(id) {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 300,
-        system: buildSystemPrompt() + '\n' + systemHint,
+        system: stickerSystem,
         systemParts: buildSystemPromptParts(),
         messages: cleanHistory,
       })
@@ -2339,16 +2356,14 @@ async function sendSticker(id) {
     hideTyping();
     let reply = data.content?.[0]?.text?.trim() || '';
     if (!reply) throw new Error('EMPTY_REPLY');
-
     reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
 
-    // Ghost偶尔也发表情包回应（kiss→5%，meh→10%，kiss对cry→3%）
-    const ghostStickerChance = { kiss: 0.05, meh: 0.10 };
-    if (Math.random() < (ghostStickerChance[id] || 0)) {
-      appendMessage('bot', reply);
-      setTimeout(() => appendGhostSticker(id === 'kiss' ? 'kiss' : 'meh'), 1200);
-    } else {
-      appendMessage('bot', reply);
+    // Ghost偶尔也发表情包
+    appendMessage('bot', reply);
+    if (id === 'kiss' && Math.random() < 0.08) {
+      setTimeout(() => appendGhostSticker('kiss'), 1500);
+    } else if (id === 'meh' && Math.random() < 0.12) {
+      setTimeout(() => appendGhostSticker('meh'), 1200);
     }
 
     chatHistory.push({ role: 'assistant', content: reply });
@@ -2370,9 +2385,7 @@ function appendGhostSticker(id) {
   div.innerHTML = `<div class="sticker-message"><img src="images/stickers/${id}.png" alt="${meta?.label || ''}"></div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
-
-  // 存进历史
-  chatHistory.push({ role: 'assistant', content: `[表情包：${meta?.label || id}]` });
+  chatHistory.push({ role: 'assistant', content: `[Ghost发了表情包：${meta?.label || id}]` });
   saveHistory();
 }
 
@@ -3119,6 +3132,18 @@ async function sendMessage() {
     // ===== Step 4: 解析模型tag =====
     const { cleanedReply, giveMoney: parsedMoney, coldWarStart } = parseAssistantTags(reply);
     reply = cleanedReply;
+
+    // 兜底翻译检查——如果只有英文没有中文，用D老师补翻译
+    if (reply && /[a-zA-Z]/.test(reply) && !/[\u4e00-\u9fff]/.test(reply)) {
+      try {
+        const zhTranslation = await fetchDeepSeek(
+          '你是翻译。把Ghost(西蒙·莱利)说的英文翻译成中文，保持他的语气——克制、干、偶尔冷幽默。只返回中文翻译，不要任何其他内容。',
+          reply,
+          150
+        );
+        if (zhTranslation) reply = reply + '\n' + zhTranslation;
+      } catch(e) {}
+    }
     const giveMoneyMatch = parsedMoney;
     let giveAmount = giveMoneyMatch ? giveMoneyMatch.amount : 0;
 

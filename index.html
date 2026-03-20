@@ -385,20 +385,27 @@
       to   { opacity:1; transform:translateY(0); }
     }
 
-    /* ===== 表情包系统 ===== */
-    .sticker-btn {
-      background: none;
-      border: none;
+    /* ===== 表情包 & +号系统 ===== */
+    .plus-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 2px solid rgba(168,85,247,0.4);
+      background: rgba(168,85,247,0.06);
+      color: #7c3aed;
       font-size: 20px;
+      font-weight: 300;
       cursor: pointer;
-      padding: 4px;
       flex-shrink: 0;
-      opacity: 0.7;
-      transition: opacity 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      line-height: 1;
     }
-    .sticker-btn:active { opacity: 1; transform: scale(0.9); }
+    .plus-btn:active { transform: scale(0.9); background: rgba(168,85,247,0.15); }
 
-    .sticker-panel {
+    .plus-panel {
       position: absolute;
       bottom: 70px;
       left: 12px;
@@ -411,6 +418,32 @@
       box-shadow: 0 8px 32px rgba(139,92,246,0.15);
       z-index: 100;
       animation: fadeUp 0.2s ease;
+      min-width: 160px;
+    }
+    .plus-panel-actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 0;
+    }
+    .plus-action-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 12px;
+      transition: background 0.15s;
+    }
+    .plus-action-btn:active { background: rgba(168,85,247,0.08); }
+    .plus-action-icon { font-size: 26px; }
+    .plus-action-label { font-size: 11px; color: #6b21a8; font-weight: 600; }
+
+    .sticker-sub-panel {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(168,85,247,0.1);
+      animation: fadeUp 0.15s ease;
     }
     .sticker-grid {
       display: grid;
@@ -418,8 +451,8 @@
       gap: 8px;
     }
     .sticker-item {
-      width: 72px;
-      height: 72px;
+      width: 66px;
+      height: 66px;
       border-radius: 14px;
       overflow: hidden;
       cursor: pointer;
@@ -431,11 +464,7 @@
       transition: all 0.15s;
     }
     .sticker-item:active { transform: scale(0.88); }
-    .sticker-item img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .sticker-item img { width: 100%; height: 100%; object-fit: cover; }
 
     /* 聊天里的表情包消息 */
     .sticker-message {
@@ -450,12 +479,8 @@
       object-fit: cover;
       display: block;
     }
-    .message.user .sticker-message {
-      margin-left: auto;
-    }
-    .message.bot .sticker-message {
-      margin-right: auto;
-    }
+    .message.user .sticker-message { margin-left: auto; }
+    .message.bot .sticker-message { margin-right: auto; }
 </style>
 </head>
 <body>
@@ -558,11 +583,10 @@
         <span id="thoughtText">...</span>
       </div>
 
-      <div class="messages" id="messagesContainer" onclick="closeStickerPanel()"></div>
+      <div class="messages" id="messagesContainer" onclick="closePlusPanel()"></div>
 
       <div class="input-area">
-        <button class="transfer-btn" onclick="openTransfer()" title="转账">💸</button>
-        <button class="sticker-btn" onclick="toggleStickerPanel()" title="表情包">🖼️</button>
+        <button class="plus-btn" onclick="togglePlusPanel()" title="更多">+</button>
         <textarea class="input-field" id="chatInput" placeholder="输入消息..." rows="1" onkeypress="handleKeyPress(event)" oninput="autoResizeInput(this)"></textarea>
         <button class="send-btn" onclick="sendMessage()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -572,15 +596,28 @@
         </button>
       </div>
 
-      <!-- 表情包面板 -->
-      <div class="sticker-panel" id="stickerPanel" style="display:none">
-        <div class="sticker-grid">
-          <div class="sticker-item" onclick="sendSticker('cry')"><img src="images/stickers/cry.png" alt="哭"></div>
-          <div class="sticker-item" onclick="sendSticker('shy')"><img src="images/stickers/shy.png" alt="害羞"></div>
-          <div class="sticker-item" onclick="sendSticker('angry')"><img src="images/stickers/angry.png" alt="生气"></div>
-          <div class="sticker-item" onclick="sendSticker('meh')"><img src="images/stickers/meh.png" alt="无语"></div>
-          <div class="sticker-item" onclick="sendSticker('star')"><img src="images/stickers/star.png" alt="星星眼"></div>
-          <div class="sticker-item" onclick="sendSticker('kiss')"><img src="images/stickers/kiss.png" alt="亲亲"></div>
+      <!-- +号展开面板 -->
+      <div class="plus-panel" id="plusPanel" style="display:none">
+        <div class="plus-panel-actions">
+          <div class="plus-action-btn" onclick="closePlusPanel(); openTransfer();">
+            <div class="plus-action-icon">💸</div>
+            <div class="plus-action-label">转账</div>
+          </div>
+          <div class="plus-action-btn" onclick="toggleStickerFromPlus()">
+            <div class="plus-action-icon">🖼️</div>
+            <div class="plus-action-label">表情包</div>
+          </div>
+        </div>
+        <!-- 表情包子面板 -->
+        <div class="sticker-sub-panel" id="stickerSubPanel" style="display:none">
+          <div class="sticker-grid">
+            <div class="sticker-item" onclick="sendSticker('cry')"><img src="images/stickers/cry.png" alt="哭"></div>
+            <div class="sticker-item" onclick="sendSticker('shy')"><img src="images/stickers/shy.png" alt="害羞"></div>
+            <div class="sticker-item" onclick="sendSticker('angry')"><img src="images/stickers/angry.png" alt="生气"></div>
+            <div class="sticker-item" onclick="sendSticker('meh')"><img src="images/stickers/meh.png" alt="无语"></div>
+            <div class="sticker-item" onclick="sendSticker('star')"><img src="images/stickers/star.png" alt="星星眼"></div>
+            <div class="sticker-item" onclick="sendSticker('kiss')"><img src="images/stickers/kiss.png" alt="亲亲"></div>
+          </div>
         </div>
       </div>
 
