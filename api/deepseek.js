@@ -9,7 +9,7 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${process.env.ANTHROPIC_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-v3.2',
+        model: 'deepseek-chat',
         max_tokens,
         messages: [
           { role: 'system', content: system },
@@ -19,9 +19,16 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error('DeepSeek API error:', response.status, JSON.stringify(data));
+      return res.status(500).json({ error: `API error ${response.status}`, detail: data });
+    }
+
     const text = data.choices?.[0]?.message?.content?.trim() || '';
     res.status(200).json({ text });
   } catch (err) {
+    console.error('DeepSeek handler error:', err.message);
     res.status(500).json({ error: err.message });
   }
 }
