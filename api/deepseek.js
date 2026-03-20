@@ -6,18 +6,16 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
         'Authorization': `Bearer ${process.env.ANTHROPIC_API_KEY}`,
       },
       body: JSON.stringify({
         model: 'deepseek-chat',
         max_tokens,
+        stream: false,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-        tools: [],
-        tool_choice: 'none',
       }),
     });
 
