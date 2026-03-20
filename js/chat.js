@@ -304,6 +304,20 @@ function onWorkScreenShow() {
     if (el) updateAmbientPulse(el.dataset.color, el.dataset.glow);
   }
 }
+
+// ===== DeepSeek 功能型调用（第三档）=====
+async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
+  try {
+    const res = await fetchWithTimeout('/api/deepseek', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system: systemPrompt, user: userContent, max_tokens: maxTokens }),
+    }, 12000);
+    const data = await res.json();
+    return data.text || '';
+  } catch(e) { return ''; }
+}
+
 async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -2922,11 +2936,36 @@ async function sendMessage() {
     // ===== Step 3: 预判本轮主行为意图 =====
     const intent = decideMainIntent(text, pendingEvent);
 
+    // ===== Step 3.5: 情绪意图识别（D老师）=====
+    // 判断用户这条消息的情绪和需求，注入system prompt辅助Ghost回应
+    let emotionHint = '';
+    try {
+      const emotionRaw = await fetchDeepSeek(
+        '判断用户消息的情绪和需求。只返回JSON，不要其他文字。\n格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost"}\ntarget含义：无=没有针对对象，外人=被外人伤害，Ghost=对Ghost有情绪',
+        `用户说：${text}`,
+        80
+      );
+      const emotionResult = JSON.parse(emotionRaw.replace(/```json|```/g, '').trim());
+      if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
+        if (emotionResult.target === '外人') {
+          emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
+        } else if (emotionResult.need === '安慰') {
+          emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
+        }
+      }
+    } catch(e) {}
+
     // 过滤掉系统注入消息和撤回消息，只保留真实对话内容
     const cleanHistory = chatHistory
       .filter(m => !m._system && !m._recalled)
       .slice(-30)
-      .map(m => ({ role: m.role, content: m.content })); // 只传role和content，去掉所有内部标记字段
+      .map(m => ({ role: m.role, content: m.content }));
+
+    // 如果有情绪提示，注入到最后一条用户消息后面
+    if (emotionHint) {
+      cleanHistory.push({ role: 'user', content: emotionHint });
+    }
+
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3164,7 +3203,7 @@ function incrementMemoryCount() {
 
 async function updateLongTermMemory() {
   const count = incrementMemoryCount();
-  if (count % 8 !== 0) return; // 每8次（约64条消息）更新一次
+  if (count % 8 !== 0) return;
 
   const existingMemory = getLongTermMemory();
   const recentMessages = chatHistory
@@ -3176,21 +3215,11 @@ async function updateLongTermMemory() {
   if (!recentMessages) return;
 
   try {
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        system: '你是一个记忆提取器。从对话中提取Ghost需要记住的信息，用简短的几条中文列出。包括：她说的重要的事、她的喜好/口癖/习惯、她喜欢聊的话题和风格、她当下的状态和情绪、她随口提到的小事和细节、特别的互动、她提到的人/地点/计划。每条不超过20字，最多10条。只返回列表，不要其他文字。格式：- xxx',
-        messages: [{
-          role: 'user',
-          content: `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`
-        }]
-      })
-    });
-    const data = await res.json();
-    const newMemory = data.content?.[0]?.text?.trim();
+    const newMemory = await fetchDeepSeek(
+      '你是一个记忆提取器。从对话中提取Ghost需要记住的信息，用简短的几条中文列出。包括：她说的重要的事、她的喜好/口癖/习惯、她喜欢聊的话题和风格、她当下的状态和情绪、她随口提到的小事和细节、特别的互动、她提到的人/地点/计划。每条不超过20字，最多10条。只返回列表，不要其他文字。格式：- xxx',
+      `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`,
+      300
+    );
     if (newMemory) saveLongTermMemory(newMemory);
   } catch(e) {}
 }
@@ -5355,19 +5384,12 @@ async function checkTriggersAndEmotion(userText, botText) {
     return;
   }
   try {
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        system: '你是一个双重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n格式：{"market":{"triggered":false},"emotion":{"triggered":false}}\n或：{"market":{"triggered":true,"category":"保暖类"},"emotion":{"triggered":true,"type":"太冷","intensity":"中"}}\nmarket分类：保暖类/饮食类/疲惫类/思念类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
-        messages: [{ role: 'user', content: `Ghost说：${botText}\n用户说：${userText}` }]
-      })
-    });
-    const data = await res.json();
-    const raw = data.content?.[0]?.text?.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(raw);
+    const raw = await fetchDeepSeek(
+      '你是一个双重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n格式：{"market":{"triggered":false},"emotion":{"triggered":false}}\n或：{"market":{"triggered":true,"category":"保暖类"},"emotion":{"triggered":true,"type":"太冷","intensity":"中"}}\nmarket分类：保暖类/饮食类/疲惫类/思念类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
+      `Ghost说：${botText}\n用户说：${userText}`,
+      150
+    );
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
 
     // 处理商城触发
     if (result.market?.triggered) {
@@ -5439,19 +5461,12 @@ async function checkLocationSpecial(userText, botText) {
     if (localStorage.getItem(sentKey)) return;
 
     // Haiku判断：用户聊到食物/想要/好奇某样东西
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 60,
-        system: '判断用户的消息是否包含：提到食物、想吃某样东西、好想要某东西、馋了、羡慕、好奇当地有什么、让他带东西回来。只返回JSON：{"triggered":true} 或 {"triggered":false}',
-        messages: [{ role: 'user', content: `用户说：${userText}\nGhost说：${botText}` }]
-      })
-    });
-    const data = await res.json();
-    const raw = data.content?.[0]?.text?.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(raw);
+    const raw = await fetchDeepSeek(
+      '判断用户的消息是否包含：提到食物、想吃某样东西、好想要某东西、馋了、羡慕、好奇当地有什么、让他带东西回来。只返回JSON：{"triggered":true} 或 {"triggered":false}',
+      `用户说：${userText}\nGhost说：${botText}`,
+      60
+    );
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
     if (!result.triggered) return;
 
     // 随机抽一件特产
