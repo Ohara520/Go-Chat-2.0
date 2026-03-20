@@ -1611,11 +1611,37 @@ function doCheckin() {
     milestoneMsg = `\n🎉 第${streak}天里程碑：额外+${milestoneBonus}条！`;
   }
 
-  showToast(rewardMsg + milestoneMsg);
+  showCheckinResult(rewardMsg + milestoneMsg, streak);
   renderCheckin();
-  initCalendar(); // 刷新日历显示今天的花
-  launchCheckinFlowers(); // 花朵动画
+  initCalendar();
+  launchCheckinFlowers();
   saveToCloud();
+}
+
+function showCheckinResult(msg, streak) {
+  const existing = document.getElementById('checkinResultModal');
+  if (existing) existing.remove();
+  const lines = msg.split('\n').filter(Boolean);
+  const mainReward = lines[0] || '';
+  const milestoneReward = lines[1] || '';
+  const isLucky = mainReward.includes('🎰');
+  const modal = document.createElement('div');
+  modal.id = 'checkinResultModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:24px;padding:28px 24px;width:280px;text-align:center;box-shadow:0 20px 60px rgba(100,0,200,0.15);">
+      <div style="font-size:44px;margin-bottom:8px">${isLucky?'🎰':'🌸'}</div>
+      <div style="font-size:15px;font-weight:700;color:#3a1a60;margin-bottom:4px">${isLucky?'欧气签到！':'签到成功'}</div>
+      <div style="font-size:12px;color:#b0a0c8;margin-bottom:16px">连续签到第 ${streak} 天</div>
+      <div style="background:${isLucky?'linear-gradient(135deg,#fef3c7,#fde68a)':'rgba(168,85,247,0.08)'};border:1.5px solid ${isLucky?'rgba(251,191,36,0.5)':'rgba(168,85,247,0.2)'};border-radius:14px;padding:14px;margin-bottom:${milestoneReward?'10px':'20px'};">
+        <div style="font-size:20px;font-weight:800;color:${isLucky?'#b45309':'#7c3aed'}">${mainReward.replace(/[💰💬🎰]/g,'').trim()}</div>
+      </div>
+      ${milestoneReward?`<div style="background:rgba(236,72,153,0.08);border:1px solid rgba(236,72,153,0.2);border-radius:12px;padding:10px 14px;margin-bottom:20px;font-size:13px;color:#be185d;font-weight:600;">${milestoneReward}</div>`:''}
+      <button onclick="document.getElementById('checkinResultModal').remove()" style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:15px;font-weight:600;cursor:pointer;">好的 ✨</button>
+    </div>
+  `;
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
 }
 
 function launchCheckinFlowers() {
