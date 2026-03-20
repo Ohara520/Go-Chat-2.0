@@ -151,9 +151,27 @@ async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   }
 }
 
-// ========================================
-// Go Chat — chat.js
-// ========================================
+async function fetchWithRetry(url, options, timeoutMs = 30000, maxRetries = 2) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, options, timeoutMs);
+      if (res.status === 529 || res.status === 503 || res.status === 502) {
+        // 服务器忙，等一下再试
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+          continue;
+        }
+      }
+      return res;
+    } catch(e) {
+      if (attempt < maxRetries && e?.name !== 'AbortError') {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
 
 // ===== System Prompt =====
 function buildSystemPrompt() {
@@ -1559,12 +1577,19 @@ function doCheckin() {
   const milestoneRewards = { 1: 10, 3: 20, 7: 50, 14: 100, 30: 200 };
   const milestoneBonus = milestoneRewards[streak] || 0;
 
-  // 随机奖励：30%英镑，70%条数
-  const isCoins = Math.random() < 0.3;
+  // 随机奖励：5%欧气大奖，47.5%英镑，47.5%条数
+  const rand = Math.random();
   let rewardMsg = '';
 
-  if (isCoins) {
-    const coins = [2, 3, 5, 8, 10][Math.floor(Math.random() * 5)];
+  if (rand < 0.05) {
+    // 欧气签到！
+    const coins = Math.random() < 0.5 ? 100 : 150;
+    setBalance(getBalance() + coins);
+    addTransaction({ icon: '🎰', name: '欧气签到！', amount: coins });
+    renderWallet();
+    rewardMsg = `🎰 欧气签到！£${coins}！`;
+  } else if (rand < 0.525) {
+    const coins = [5, 8, 10, 15, 20][Math.floor(Math.random() * 5)];
     setBalance(getBalance() + coins);
     addTransaction({ icon: '🎁', name: '签到奖励', amount: coins });
     renderWallet();
@@ -2684,7 +2709,7 @@ async function sendMessage() {
       .filter(m => !m._system && !m._recalled)
       .slice(-30)
       .map(m => ({ role: m.role, content: m.content })); // 只传role和content，去掉所有内部标记字段
-    const response = await fetchWithTimeout('/api/chat', {
+    const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2693,12 +2718,39 @@ async function sendMessage() {
         system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
         messages: cleanHistory
       })
-    }, 30000); // 主回复给30秒
+    }, 30000);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('API错误:', response.status, errText);
+      throw new Error(`API_ERROR_${response.status}`);
+    }
 
     const data = await response.json();
     hideTyping();
 
-    let reply = data.content?.[0]?.text || '...';
+    let reply = data.content?.[0]?.text || '';
+    if (!reply) {
+      // 空内容，等一秒重试一次
+      console.warn('API返回空内容，重试中...');
+      await new Promise(r => setTimeout(r, 1000));
+      const retryRes = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: getMainModel(),
+          max_tokens: 1000,
+          system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+          messages: cleanHistory
+        })
+      }, 30000);
+      const retryData = await retryRes.json();
+      reply = retryData.content?.[0]?.text || '';
+      if (!reply) {
+        console.error('重试后仍为空:', retryData);
+        throw new Error('EMPTY_REPLY');
+      }
+    }
     updateToRead();
 
     // ===== Step 4: 解析模型tag =====
@@ -2819,10 +2871,10 @@ async function sendMessage() {
     saveHistory();
     checkSassyPost(text, reply);
     checkTriggersAndEmotion(text, reply);
-    if (Math.random() < 0.5) checkStoryOnMessage(text);
+    if (Math.random() < 0.3) setTimeout(() => checkStoryOnMessage(text), 2000); // 延迟2秒，错开
     updateLongTermMemory();
     const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
-    if (itEl) checkAndGenerateInnerThought(parts[0] || reply, itEl);
+    if (itEl && Math.random() < 0.6) setTimeout(() => checkAndGenerateInnerThought(parts[0] || reply, itEl), 3000); // 延迟3秒
     handleLostPackageClaim(text);
 
     // ===== Step 7: 副行为调度（反寄/查岗/confront）fire-and-forget，不阻塞主流程 =====
@@ -2837,8 +2889,15 @@ async function sendMessage() {
     console.error('sendMessage error:', err?.name, err?.message);
     const isTimeout = err?.name === 'AbortError';
     const isNetwork = err?.message?.includes('fetch') || err?.message?.includes('Failed');
+    const isApiError = err?.message?.startsWith('API_ERROR_');
+    const isEmptyReply = err?.message === 'EMPTY_REPLY';
     if (isTimeout) {
       appendMessage('bot', "...\n[回复超时了，再发一次试试。]");
+    } else if (isApiError) {
+      const code = err.message.replace('API_ERROR_', '');
+      appendMessage('bot', `...\n[服务暂时有点问题（${code}），稍等一下。]`);
+    } else if (isEmptyReply) {
+      appendMessage('bot', "...\n[没收到回复，再试一次。]");
     } else if (isNetwork) {
       appendMessage('bot', "...\n[网络不太好，等一下再试。]");
     } else {
@@ -5089,10 +5148,15 @@ async function checkTriggersAndEmotion(userText, botText) {
       const cat = catMap[result.market.category];
       if (cat) {
         const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
+        const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
         const now = Date.now();
-        const alreadyTriggered = cat.products.some(name => triggered[name] && now - triggered[name].timestamp < 72 * 3600 * 1000);
+        // 这个分类下的商品：没被买过 且 冷却7天
+        const cooldownMs = 7 * 24 * 3600 * 1000;
+        const availableProducts = cat.products.filter(name => !purchased.includes(name));
+        if (availableProducts.length === 0) return; // 全买完了，不再触发
+        const alreadyTriggered = availableProducts.some(name => triggered[name] && now - triggered[name].timestamp < cooldownMs);
         if (!alreadyTriggered) {
-          cat.products.forEach(name => { triggered[name] = { reason: cat.reason, timestamp: now }; });
+          availableProducts.forEach(name => { triggered[name] = { reason: cat.reason, timestamp: now }; });
           localStorage.setItem('marketTriggered', JSON.stringify(triggered));
         }
       }
@@ -5172,7 +5236,7 @@ function getProductTrigger(name) {
   const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
   const item = triggered[name];
   if (!item) return null;
-  if (Date.now() - item.timestamp > 72 * 3600 * 1000) return null;
+  if (Date.now() - item.timestamp > 7 * 24 * 3600 * 1000) return null; // 7天冷却
   return item.reason;
 }
 
