@@ -161,9 +161,10 @@ async function saveToCloud() {
       purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
       weeklyGiven: getWeeklyGiven(),
       // 故事书、相册、朋友圈
-      storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 30),
-      collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 50),
-      coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 30),
+      // 故事书、相册、朋友圈——只存最近10条，减小体积
+      storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 10),
+      collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 20),
+      coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 10),
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
       // 状态标记
       coldWarStart: localStorage.getItem('coldWarStart') || '',
@@ -3193,7 +3194,7 @@ async function sendMessage() {
     }
 
     // 消息撤回：4%概率，发完3-6秒后撤回，重新打一条
-    if (lastBotResult && !giveMoney && Math.random() < 0.04) {
+    if (lastBotResult && !giveMoneyMatch && Math.random() < 0.04) {
       const recallDelay = (Math.floor(Math.random() * 4) + 3) * 1000;
       _isSending = true; // 撤回期间保持锁定，防止切页面重渲染
       setTimeout(async () => {
