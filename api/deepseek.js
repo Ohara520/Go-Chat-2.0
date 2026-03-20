@@ -6,6 +6,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'Authorization': `Bearer ${process.env.ANTHROPIC_API_KEY}`,
       },
       body: JSON.stringify({
@@ -15,17 +16,18 @@ export default async function handler(req, res) {
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
+        tools: [],
+        tool_choice: 'none',
       }),
     });
 
-    // 先读文本再解析，避免HTML响应导致JSON报错
-    const text = await response.text();
+    const rawText = await response.text();
     let data;
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(rawText);
     } catch(e) {
-      console.error('DeepSeek non-JSON response:', text.slice(0, 200));
-      return res.status(500).json({ error: 'Invalid response', raw: text.slice(0, 200) });
+      console.error('DeepSeek non-JSON:', rawText.slice(0, 300));
+      return res.status(500).json({ error: 'Invalid response', raw: rawText.slice(0, 300) });
     }
 
     if (!response.ok) {
@@ -33,8 +35,8 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: `API error ${response.status}`, detail: data });
     }
 
-    const result = data.choices?.[0]?.message?.content?.trim() || '';
-    res.status(200).json({ text: result });
+    const text = data.choices?.[0]?.message?.content?.trim() || '';
+    res.status(200).json({ text });
   } catch (err) {
     console.error('DeepSeek handler error:', err.message);
     res.status(500).json({ error: err.message });
