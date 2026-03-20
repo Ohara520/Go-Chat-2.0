@@ -2370,7 +2370,7 @@ async function sendSticker(id) {
     saveHistory();
   } catch(e) {
     hideTyping();
-    appendMessage('bot', '...\n[出了点问题，再试一次。]');
+    console.warn('表情包回复失败:', e);
   } finally {
     _isSending = false;
   }
@@ -2644,16 +2644,43 @@ async function initChat() {
   chatHistory.forEach(msg => {
     if (msg.role === 'user') {
       if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') || /\b(REFUND|KEEP)\b/.test(msg.content)) {
-        // 重建用户转账卡片
         if (msg._userTransfer) {
           const container = document.getElementById('messagesContainer');
           if (container) showUserTransferCard(container, msg._userTransfer.amount);
         }
         return;
       }
+      // 检测用户发的表情包
+      const userStickerMatch = msg.content.match(/^\[用户发了表情包：(.+)\]$/);
+      if (userStickerMatch) {
+        const label = userStickerMatch[1];
+        const stickerId = Object.keys(STICKER_META).find(k => STICKER_META[k].label === label) || label;
+        const container = document.getElementById('messagesContainer');
+        if (container) {
+          const div = document.createElement('div');
+          div.className = 'message user';
+          div.innerHTML = `<div class="sticker-message"><img src="images/stickers/${stickerId}.png" alt="${label}"></div>`;
+          container.appendChild(div);
+        }
+        return;
+      }
       appendMessage('user', msg.content, false);
     } else if (msg.role === 'assistant') {
       if (msg._recalled) return;
+      // 检测Ghost发的表情包
+      const ghostStickerMatch = msg.content.match(/^\[Ghost发了表情包：(.+)\]$/);
+      if (ghostStickerMatch) {
+        const label = ghostStickerMatch[1];
+        const stickerId = Object.keys(STICKER_META).find(k => STICKER_META[k].label === label) || label;
+        const container = document.getElementById('messagesContainer');
+        if (container) {
+          const div = document.createElement('div');
+          div.className = 'message bot';
+          div.innerHTML = `<div class="sticker-message"><img src="images/stickers/${stickerId}.png" alt="${label}"></div>`;
+          container.appendChild(div);
+        }
+        return;
+      }
       const parts = msg.content.split(/\n---\n/);
       parts.forEach(part => appendMessage('bot', part.trim(), false));
       // 重建转账卡片（静态版，不走setTimeout，防重复）
@@ -3080,10 +3107,10 @@ async function sendMessage() {
       .slice(-30)
       .map(m => ({ role: m.role, content: m.content }));
 
-    // 如果有情绪提示，注入到最后一条用户消息后面
-    if (emotionHint) {
-      cleanHistory.push({ role: 'user', content: emotionHint });
-    }
+    // 情绪提示注入system prompt末尾，不放进history
+    const finalSystem = emotionHint
+      ? buildSystemPrompt() + '\n' + emotionHint
+      : buildSystemPrompt();
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
@@ -3091,7 +3118,7 @@ async function sendMessage() {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 1000,
-        system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+        system: finalSystem, systemParts: buildSystemPromptParts(),
         messages: cleanHistory
       })
     }, 30000);
@@ -3133,17 +3160,6 @@ async function sendMessage() {
     const { cleanedReply, giveMoney: parsedMoney, coldWarStart } = parseAssistantTags(reply);
     reply = cleanedReply;
 
-    // 兜底翻译检查——如果只有英文没有中文，用D老师补翻译
-    if (reply && /[a-zA-Z]/.test(reply) && !/[\u4e00-\u9fff]/.test(reply)) {
-      try {
-        const zhTranslation = await fetchDeepSeek(
-          '你是翻译。把Ghost(西蒙·莱利)说的英文翻译成中文，保持他的语气——克制、干、偶尔冷幽默。只返回中文翻译，不要任何其他内容。',
-          reply,
-          150
-        );
-        if (zhTranslation) reply = reply + '\n' + zhTranslation;
-      } catch(e) {}
-    }
     const giveMoneyMatch = parsedMoney;
     let giveAmount = giveMoneyMatch ? giveMoneyMatch.amount : 0;
 
@@ -3282,18 +3298,12 @@ async function sendMessage() {
     const isNetwork = err?.message?.includes('fetch') || err?.message?.includes('Failed');
     const isApiError = err?.message?.startsWith('API_ERROR_');
     const isEmptyReply = err?.message === 'EMPTY_REPLY';
-    if (isTimeout) {
-      appendMessage('bot', "...\n[回复超时了，再发一次试试。]");
-    } else if (isApiError) {
-      const code = err.message.replace('API_ERROR_', '');
-      appendMessage('bot', `...\n[服务暂时有点问题（${code}），稍等一下。]`);
-    } else if (isEmptyReply) {
-      appendMessage('bot', "...\n[没收到回复，再试一次。]");
-    } else if (isNetwork) {
-      appendMessage('bot', "...\n[网络不太好，等一下再试。]");
-    } else {
-      appendMessage('bot', "...\n[出了点问题，再试一次。]");
+    if (isTimeout || isNetwork) {
+      appendMessage('bot', "...\n[信号不太好，再发一次。]");
+    } else if (isApiError || isEmptyReply) {
+      appendMessage('bot', "...\n[稍等一下，再试试。]");
     }
+    // 其他未知错误静默处理
   }
 }
 
