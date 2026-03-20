@@ -2270,6 +2270,112 @@ function incrementTodayGivenCount() {
 }
 
 // ===== 转账弹窗 =====
+// ===== 表情包系统 =====
+const STICKER_META = {
+  cry:   { label: '哭',   emotion: 'sad',    ghostContext: '用户发了一个哭/撒娇/委屈的表情包' },
+  shy:   { label: '害羞', emotion: 'shy',    ghostContext: '用户发了一个害羞的表情包' },
+  angry: { label: '生气', emotion: 'angry',  ghostContext: '用户发了一个生气/闹脾气的表情包' },
+  meh:   { label: '无语', emotion: 'meh',    ghostContext: '用户发了一个无语/嫌弃的表情包' },
+  star:  { label: '星星眼', emotion: 'want', ghostContext: '用户发了一个星星眼/渴望/期待的表情包' },
+  kiss:  { label: '亲亲', emotion: 'love',   ghostContext: '用户发了一个亲亲/撒娇示爱的表情包' },
+};
+
+function toggleStickerPanel() {
+  const panel = document.getElementById('stickerPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function closeStickerPanel() {
+  const panel = document.getElementById('stickerPanel');
+  if (panel) panel.style.display = 'none';
+}
+
+async function sendSticker(id) {
+  closeStickerPanel();
+  const meta = STICKER_META[id];
+  if (!meta) return;
+
+  // 渲染用户表情包消息
+  const container = document.getElementById('messagesContainer');
+  if (container) {
+    const div = document.createElement('div');
+    div.className = 'message user';
+    div.innerHTML = `<div class="sticker-message"><img src="images/stickers/${id}.png" alt="${meta.label}"></div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // 存进历史
+  const stickerMsg = `[表情包：${meta.label}]`;
+  chatHistory.push({ role: 'user', content: stickerMsg });
+  saveHistory();
+
+  // Ghost回复
+  if (_isSending) return;
+  _isSending = true;
+  showTyping();
+
+  try {
+    const systemHint = `[${meta.ghostContext}。根据表情包的情绪自然回应，不要提到"表情包"三个字，就像真实收到一样反应。]`;
+    const cleanHistory = chatHistory
+      .filter(m => !m._system && !m._recalled)
+      .slice(-30)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const response = await fetchWithRetry('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: getMainModel(),
+        max_tokens: 300,
+        system: buildSystemPrompt() + '\n' + systemHint,
+        systemParts: buildSystemPromptParts(),
+        messages: cleanHistory,
+      })
+    }, 30000);
+
+    const data = await response.json();
+    hideTyping();
+    let reply = data.content?.[0]?.text?.trim() || '';
+    if (!reply) throw new Error('EMPTY_REPLY');
+
+    reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+
+    // Ghost偶尔也发表情包回应（kiss→5%，meh→10%，kiss对cry→3%）
+    const ghostStickerChance = { kiss: 0.05, meh: 0.10 };
+    if (Math.random() < (ghostStickerChance[id] || 0)) {
+      appendMessage('bot', reply);
+      setTimeout(() => appendGhostSticker(id === 'kiss' ? 'kiss' : 'meh'), 1200);
+    } else {
+      appendMessage('bot', reply);
+    }
+
+    chatHistory.push({ role: 'assistant', content: reply });
+    saveHistory();
+  } catch(e) {
+    hideTyping();
+    appendMessage('bot', '...\n[出了点问题，再试一次。]');
+  } finally {
+    _isSending = false;
+  }
+}
+
+function appendGhostSticker(id) {
+  const container = document.getElementById('messagesContainer');
+  if (!container) return;
+  const meta = STICKER_META[id];
+  const div = document.createElement('div');
+  div.className = 'message bot';
+  div.innerHTML = `<div class="sticker-message"><img src="images/stickers/${id}.png" alt="${meta?.label || ''}"></div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+
+  // 存进历史
+  chatHistory.push({ role: 'assistant', content: `[表情包：${meta?.label || id}]` });
+  saveHistory();
+}
+
 function openTransfer() {
   // 条数上限检查
   if (getTodayCount() >= DAILY_LIMIT) {
