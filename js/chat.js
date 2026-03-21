@@ -145,6 +145,13 @@ async function loadFromCloud() {
         const local = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
         if (s.coupleFeedHistory.length >= local.length) localStorage.setItem('coupleFeedHistory', JSON.stringify(s.coupleFeedHistory));
       }
+      // 朋友圈辅助状态：云端更新时恢复，防止清缓存后当天重复生成或有机帖计数失效
+      if (cloudIsNewer) {
+        if (s.coupleFeedDate) localStorage.setItem('coupleFeedDate', s.coupleFeedDate);
+        if (s.organicFeedCountKey && s.organicFeedCount != null) {
+          localStorage.setItem(s.organicFeedCountKey, s.organicFeedCount);
+        }
+      }
       if (Array.isArray(s.deliveryHistory)) {
         const local = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
         if (s.deliveryHistory.length >= local.length) localStorage.setItem('deliveryHistory', JSON.stringify(s.deliveryHistory));
@@ -234,7 +241,10 @@ async function saveToCloud() {
       // 故事书、相册、朋友圈——只存最近10条，减小体积
       storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 10),
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 20),
-      coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 10),
+      coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 25),
+      coupleFeedDate: localStorage.getItem('coupleFeedDate') || '',
+      organicFeedCount: localStorage.getItem('organicFeedCount_' + new Date().toDateString()) || '0',
+      organicFeedCountKey: 'organicFeedCount_' + new Date().toDateString(),
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
       // 状态标记
@@ -3243,6 +3253,14 @@ async function sendMessage() {
   saveHistory();
   _isSending = true; // 立刻锁定，防止切页面重渲染吞消息
 
+  // 用户主动要求Ghost发朋友圈 → 后台静默触发，不拦主流程
+  const feedRequestKws = ['发条朋友圈','发个朋友圈','发朋友圈','po一条','晒一下','post something','发一条','你发一条','你po'];
+  if (feedRequestKws.some(k => text.toLowerCase().includes(k.toLowerCase()))) {
+    setTimeout(() => {
+      try { checkOrganicFeedPost('用户让Ghost发朋友圈', 'fine.'); } catch(e) {}
+    }, 3500);
+  }
+
   // 已读不回：低心情且非冷战，5%概率触发，显示已读但延迟30-90秒才回
   const mood = getMoodLevel ? getMoodLevel() : 5;
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
@@ -3485,6 +3503,7 @@ async function sendMessage() {
     if (Math.random() < 0.25) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (Math.random() < 0.15) try { checkSassyPost(text, reply); } catch(e) {}
     if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
+    if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     // 每8条更新一次长期记忆
     if (_globalTurnCount % 8 === 0) try { updateLongTermMemory(); } catch(e) {}
     const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
@@ -3856,7 +3875,7 @@ async function generateCoupleFeed() {
   // 冷战状态传入氛围
   const isColdWar = localStorage.getItem('coldWarMode') === 'true';
   const toneHint = isColdWar ? '当前Ghost和老婆处于冷战状态，Ghost朋友圈可以带点情绪，但不要太明显。' : '';
-  const count = Math.floor(Math.random() * 3) + 1; // 每天随机1-3条
+  const count = Math.floor(Math.random() * 3) + 2; // 每天随机2-4条
 
   feed.innerHTML = '<div class="couple-loading">加载中...</div>';
 
@@ -3922,8 +3941,7 @@ ${toneHint ? `- ${toneHint}` : ''}
     // 同步一份简洁摘要进prompt用（只保留最近3条，省token）
     const summary = history.slice(-3).map(p => `[${p.date}] ${p.post.author}: ${p.post.en}`).join('\n');
     localStorage.setItem('coupleFeedSummary', summary);
-
-    renderCoupleFeed(history.map(p => p.post));
+    localStorage.setItem('coupleFeedDate', today); // 今天已生成，防重复
   } catch(e) {
     feed.innerHTML = '<div class="couple-empty">暂无动态</div>';
   }
@@ -4014,6 +4032,114 @@ function toggleCoupleLike(btn, key) {
     btn.classList.add('couple-liked');
     btn.innerHTML = '❤️ <span class="like-num">' + count + '</span>';
   }
+}
+
+// ===== 有机朋友圈触发 =====
+// 从对话内容提炼素材，Gemini 判断够不够发，够了才生成，不够不发
+async function checkOrganicFeedPost(userText, ghostReply) {
+  // 同一天最多触发2条有机帖
+  const todayKey = 'organicFeedCount_' + new Date().toDateString();
+  const todayCount = parseInt(localStorage.getItem(todayKey) || '0');
+  if (todayCount >= 2) return;
+
+  // 用 Gemini 判断这段对话有没有值得发帖的素材
+  const raw = await fetchDeepSeek(
+    '你是一个判断器。只返回JSON，不要其他文字。\n判断这段对话里有没有Ghost或队友值得发朋友圈的素材（有趣的事、天气吐槽、队友糗事、训练日常、某个感慨、随口一句话）。\n没有素材返回：{"should_post": false}\n有素材返回：{"should_post": true, "poster": "Ghost或Soap或Gaz或Price", "hint": "一句话描述素材，英文"}',
+    `用户说：${userText}\nGhost说：${ghostReply}`,
+    120
+  );
+  if (!raw) return;
+
+  let result;
+  try { result = JSON.parse(raw.replace(/```json|```/g, '').trim()); } catch(e) { return; }
+  if (!result?.should_post) return;
+
+  const poster = result.poster || 'Ghost';
+  const hint = result.hint || '';
+  const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+  const posterAvatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
+  const posterAvatar = posterAvatarMap[poster] || GHOST_AV;
+
+  try {
+    // 生成帖子正文
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{ role: 'user', content:
+          `你是141特遣队的${poster}。根据这个素材发一条朋友圈：「${hint}」。\n` +
+          `风格：一句话，全小写英文，自然真实，不煽情不滥情，有${poster}的味道。附中文翻译。\n` +
+          `只返回JSON：{"en": "英文内容", "zh": "中文翻译"}`
+        }]
+      })
+    });
+    const data = await res.json();
+    const postRaw = data.content?.[0]?.text?.replace(/```json|```/g, '').trim();
+    const post = JSON.parse(postRaw);
+    if (!post?.en) return;
+
+    // 60% 概率生成队友评论，1-2条
+    let comments = [];
+    if (Math.random() < 0.6) {
+      const others = ['Ghost', 'Soap', 'Gaz', 'Price'].filter(n => n !== poster);
+      const commenters = others.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1);
+      const res2 = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 200,
+          messages: [{ role: 'user', content:
+            `${poster}发了朋友圈："${post.en}"。` +
+            `生成${commenters.length}条评论，评论者：${commenters.join('、')}。` +
+            `每行格式：角色名|英文|中文。只返回评论，不要其他文字。`
+          }]
+        })
+      });
+      const data2 = await res2.json();
+      const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
+      comments = (data2.content?.[0]?.text?.trim() || '')
+        .split('\n')
+        .filter(l => l.includes('|'))
+        .map(l => { const [name, en, zh] = l.split('|'); return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() }; })
+        .filter(c => c.name && c.en)
+        .map(c => ({ avatar: avatarMap[c.name] || '👤', author: c.name, name: c.name, en: c.en, zh: c.zh, text: c.en }));
+    }
+
+    // 插入 feed 历史
+    const today = new Date().toISOString().slice(0, 10);
+    const newEntry = {
+      date: today,
+      post: {
+        en: post.en, zh: post.zh,
+        avatar: posterAvatar, author: poster, name: poster,
+        comments, time: '刚刚',
+        likes: Math.floor(Math.random() * 30 + 3)
+      }
+    };
+    let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    history.unshift(newEntry);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    history = history.filter(h => h.date >= sevenDaysAgo).slice(0, 25);
+    localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
+
+    const summary = history.slice(0, 3).map(h => `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`).join('\n');
+    localStorage.setItem('coupleFeedSummary', summary);
+
+    // 红点通知
+    localStorage.setItem('feedHasNew', '1');
+    const badge = document.getElementById('feedNewBadge');
+    if (badge) badge.style.display = 'block';
+
+    // 如果朋友圈页开着就刷新
+    const coupleScreen = document.getElementById('coupleScreen');
+    if (coupleScreen?.classList.contains('active') && typeof initCoupleSpace === 'function') initCoupleSpace();
+
+    // 累计今日有机帖计数
+    localStorage.setItem(todayKey, String(todayCount + 1));
+  } catch(e) {}
 }
 
 // ===== 阴阳帖系统 =====
