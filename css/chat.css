@@ -2542,21 +2542,21 @@
   padding: 10px 0;
   border-radius: 24px;
   border: none;
-  background: rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  color: #9b72c4;
+  color: #c4a8e0;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 1px 8px rgba(168,85,247,0.08);
+  box-shadow: 0 1px 6px rgba(168,85,247,0.06);
   letter-spacing: 0.02em;
 }
 .couple-tab.active {
-  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  background: linear-gradient(135deg, rgba(196,148,255,0.85) 0%, rgba(249,168,212,0.85) 100%);
   color: white;
-  font-weight: 700;
-  box-shadow: 0 4px 18px rgba(168,85,247,0.35);
+  font-weight: 600;
+  box-shadow: 0 3px 14px rgba(196,148,255,0.3);
   transform: translateY(-1px);
 }

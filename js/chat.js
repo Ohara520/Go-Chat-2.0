@@ -245,7 +245,7 @@ async function saveToCloud() {
       lastReversePackageTurn: getLastReversePackageTurn(),
       relationshipFlags: getRelationshipFlags(),
       // 钱包和快递数据
-      deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]').slice(0, 20),
+      deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]').slice(0, 30),
       transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 50),
       purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
       weeklyGiven: getWeeklyGiven(),
@@ -6324,9 +6324,12 @@ function confirmPurchase() {
     }
   }
 
-  // 奢侈品自动发朋友圈
-  if (isLuxury) {
-    setTimeout(() => triggerLuxuryMoment(p, p.isGhostGift ? 'ghost' : 'user'), 1000);
+  // 奢侈品朋友圈：用户自己买的入事件池弹草稿；Ghost收到的等快递签收再触发
+  if (isLuxury && !p.isGhostGift) {
+    setTimeout(() => {
+      feedEvent_boughtBigItem(p.name, p.price || 0, false);
+      maybeTriggerFeedPost('event_arrived');
+    }, 1000);
   }
 
   // 建立小家道具购买处理
@@ -6540,10 +6543,9 @@ async function triggerLuxuryMoment(product, poster) {
     setTimeout(() => maybeTriggerFeedPost('event_arrived'), 500);
     return;
   }
-
-  // Ghost 收到礼物 → Ghost侧入池，延迟发
-  feedEvent_giftReceived(product.name, 'ghost');
-  setTimeout(() => maybeTriggerFeedPost('event_arrived'), 500);
+  // Ghost 收到礼物 → 不在这里入池！
+  // 应该等快递真正签收（addGhostDeliveryDone）后才触发，防止还没送到就发朋友圈
+  // 签收逻辑在 checkDeliveryUpdates 里调用 triggerLuxuryMomentOnDelivery
 }
 
 
@@ -6616,7 +6618,7 @@ function addDelivery(product, isGhostSend, isLuxury) {
   };
 
   deliveries.unshift(delivery);
-  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 10)));
+  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
   renderDeliveryTracker();
 }
 
@@ -6643,7 +6645,7 @@ function addGhostReverseDelivery(item, emotionType) {
     isLostConfirmed: false,
     productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
-  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 10)));
+  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
   // 不在聊天里立刻显示，等快递到达时再弹窗通知，保留惊喜感
 }
 
@@ -6785,8 +6787,14 @@ async function onGhostReceived(delivery) {
           saveHistory();
           // 好感度
           changeAffection(pd.price > 3000 ? 5 : 3);
-          // 精品专柜发朋友圈
-          triggerLuxuryMoment(pd, pd.isGhostGift ? 'ghost' : 'user');
+          // 精品专柜：Ghost真正签收后才入事件池发朋友圈
+          if (pd.isGhostGift) {
+            feedEvent_giftReceived(pd.name, 'ghost');
+            setTimeout(() => maybeTriggerFeedPost('event_arrived'), 1000);
+          } else {
+            feedEvent_boughtBigItem(pd.name, pd.price || 0, false);
+            setTimeout(() => maybeTriggerFeedPost('event_arrived'), 1000);
+          }
         }
       }, 5000);
     } else {
