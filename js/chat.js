@@ -4400,10 +4400,40 @@ function checkSalaryDay() {
     const salaryNote = `[系统提示：今天是25号，你刚向老婆转了本月工资 £${salary}，已到她账户。你可以在对话中自然提到这件事。]`;
     chatHistory.push({ role: 'user', content: salaryNote });
     const container = document.getElementById('messagesContainer');
-    if (container) showGhostTransferCard(container, salary, `salary's in. £${salary}. don't ask where the rest went.\n工资到了，£${salary}。别问剩下的去哪了。`, false);
-    // 存入 _transfer 以便重新进入时重建卡片
-    chatHistory.push({ role: 'assistant', content: `salary's in. £${salary}. don't ask where the rest went.\n工资到了，£${salary}。别问剩下的去哪了。`, _transfer: { amount: salary, isRefund: false } });
-    saveHistory();
+
+    // 用 Haiku 动态生成转账台词，fallback 到备用台词
+    const salaryFallbacks = [
+      `salary's in. £${salary}.\n工资到了，£${salary}。`,
+      `transferred. £${salary}. don't spend it all.\n转了，£${salary}。别一次花完。`,
+      `check your account. £${salary}.\n看看账户，£${salary}。`,
+      `it's in. £${salary}. this month's.\n到了，£${salary}，这个月的。`,
+      `sent. £${salary}.\n转了，£${salary}。`,
+    ];
+    const fallbackLine = salaryFallbacks[Math.floor(Math.random() * salaryFallbacks.length)];
+
+    fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 80,
+        messages: [{ role: 'user', content:
+          `你是西蒙·莱利（Ghost），刚向老婆转了本月工资 £${salary}。` +
+          `发一条简短消息告知她，一句话，全小写英文，符合他克制、不废话的风格，不要肉麻，不要解释太多。` +
+          `附中文翻译。只返回一行英文+换行+中文翻译，不要其他内容。`
+        }]
+      })
+    }, 8000).then(r => r.json()).then(data => {
+      const line = data.content?.[0]?.text?.trim() || fallbackLine;
+      if (container) showGhostTransferCard(container, salary, line, false);
+      chatHistory.push({ role: 'assistant', content: line, _transfer: { amount: salary, isRefund: false } });
+      saveHistory();
+    }).catch(() => {
+      if (container) showGhostTransferCard(container, salary, fallbackLine, false);
+      chatHistory.push({ role: 'assistant', content: fallbackLine, _transfer: { amount: salary, isRefund: false } });
+      saveHistory();
+    });
+
     showToast('💷 Ghost 本月工资已到账 £' + salary + '！');
   }, 2000);
 }
