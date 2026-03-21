@@ -255,8 +255,8 @@ async function saveToCloud() {
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 20),
       coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 25),
       coupleFeedDate: localStorage.getItem('coupleFeedDate') || '',
-      organicFeedCount: localStorage.getItem('organicFeedCount_' + new Date().toDateString()) || '0',
-      organicFeedCountKey: 'organicFeedCount_' + new Date().toDateString(),
+      organicFeedCount: localStorage.getItem('organicFeedCount_' + getTodayDateStr()) || '0',
+      organicFeedCountKey: 'organicFeedCount_' + getTodayDateStr(),
       feedEventPool: getFeedEventPool().filter(e => !e.consumed).slice(0, 20),
       lastFeedPostAt: localStorage.getItem('lastFeedPostAt') || '',
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
@@ -497,6 +497,40 @@ ${coldWar ? 'In cold war: minimal, tense, no warmth.' : ''}
 ${jealousy === 'severe' ? 'Severely jealous: sharp, direct, no softness.' : ''}`;
 }
 
+// 今日细节轮换——独立函数，每次对话只应调用一次
+function pickTodayDetail() {
+  const DETAILS = [
+    'training ran late again.',
+    'range day. price made us run eight klicks before breakfast.',
+    'soap broke something. won\'t say what.',
+    'quiet night. no missions. strange.',
+    'kit inspection. everything in order.',
+    'signal was bad all day.',
+    'soap just challenged price to an arm wrestle. price didn\'t look up from his book.',
+    'gaz made tea. it was actually decent.',
+    "price said three words today. that\'s a lot for him.",
+    "soap\'s singing again. nobody has the energy to stop him.",
+    "found your photo in my kit bag. don\'t make a thing of it.",
+    'gaz found a stray cat. base said no. cat is still here.',
+  ];
+  const usedKey = 'usedDetails';
+  let used = JSON.parse(localStorage.getItem(usedKey) || '[]');
+  let available = DETAILS.filter(d => !used.includes(d));
+  if (available.length === 0) { used = []; available = DETAILS; localStorage.setItem(usedKey, '[]'); }
+  const pick = available[Math.floor(Math.random() * available.length)];
+  used.push(pick);
+  localStorage.setItem(usedKey, JSON.stringify(used));
+  return pick;
+}
+
+// Ghost生日初始化——只在确实没有时才随机生成，不放在buildSystemPrompt里
+function ensureGhostBirthday() {
+  if (localStorage.getItem('ghostBirthday')) return;
+  const pick = GHOST_BIRTHDAY_POOL[Math.floor(Math.random() * GHOST_BIRTHDAY_POOL.length)];
+  localStorage.setItem('ghostBirthday', pick.date);
+  localStorage.setItem('ghostZodiac', pick.zodiac);
+}
+
 function buildSystemPrompt() {
   const userName = localStorage.getItem('userName') || '你';
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
@@ -534,13 +568,7 @@ function buildSystemPrompt() {
   ];
   let ghostBirthday = localStorage.getItem('ghostBirthday');
   let ghostZodiac = localStorage.getItem('ghostZodiac');
-  if (!ghostBirthday) {
-    const pick = GHOST_BIRTHDAY_POOL[Math.floor(Math.random() * GHOST_BIRTHDAY_POOL.length)];
-    ghostBirthday = pick.date;
-    ghostZodiac = pick.zodiac;
-    localStorage.setItem('ghostBirthday', ghostBirthday);
-    localStorage.setItem('ghostZodiac', ghostZodiac);
-  }
+  // 纯读取，不再在这里写入——由 ensureGhostBirthday() 负责初始化
   // 随机状态碎片（一次会话固定，刷新才换）
   let randomState = sessionStorage.getItem('ghostState');
   if (!randomState && typeof GHOST_STATES !== 'undefined' && GHOST_STATES.length) {
@@ -727,56 +755,7 @@ ${(()=>{ const f=typeof FESTIVALS!=='undefined'?FESTIVALS[todayStr]:null; if(!f)
 ${longTermMemory ? `Key memories: ${longTermMemory}` : ''}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
 
-Today's detail to bring up naturally if it fits (skip if not):「${(() => {
-  const DETAILS = [
-    'training ran late again.',
-    'range day. price made us run eight klicks before breakfast.',
-    'PT in the rain. brilliant.',
-    'soap talked the entire run. entire.',
-    'new recruit nearly shot the wrong target. twice.',
-    'been on the range all morning. hands still smell like gunpowder.',
-    "price's idea of warmup is everyone else's idea of a full workout.",
-    "mess hall's out of decent tea again.",
-    "someone left soap's protein powder in the wrong place. not my problem.",
-    'price confiscated soap energy drinks. third time this month.',
-    'generator is down again. candles it is.',
-    'someone drew a face on my locker. i know it was soap.',
-    "heating's out in my block. third time this month.",
-    'gaz reorganised the common room. nobody asked him to.',
-    'found a grey hair this morning. price thinks it is funny.',
-    'soap burned the kitchen. again.',
-    'someone keeps stealing my coffee.',
-    'briefing in an hour.',
-    'been on standby for three days.',
-    "just got back. don't ask.",
-    'kit inspection at 0600. fun.',
-    'comms went down for six hours. peaceful, actually.',
-    'nothing is happening. somehow worse than something happening.',
-    'been cleaning kit for two hours.',
-    "three hours of paperwork. price's idea of a punishment.",
-    'read the same page four times. gave up.',
-    'staring at the ceiling.',
-    "soap won't stop talking. no one has the energy to tell him to stop.",
-    "it's raining. again.",
-    'cold enough to remind me why i hate norway.',
-    "sun's out. strange.",
-    "fog so thick you can't see ten feet.",
-    'wind knocked over half the equipment outside.',
-    "soap just challenged price to an arm wrestle. price didn't look up from his book.",
-    'gaz made tea. it was actually decent.',
-    "price said three words today. that's a lot for him.",
-    "soap's singing again. nobody has the energy to stop him.",
-    "found your photo in my kit bag. don't make a thing of it.",
-    'gaz found a stray cat. base said no. cat is still here.',
-  ];
-  const usedKey = 'usedDetails';
-  let used = JSON.parse(localStorage.getItem(usedKey) || '[]');
-  let available = DETAILS.filter(d => !used.includes(d));
-  if (available.length === 0) { used = []; available = DETAILS; localStorage.setItem(usedKey, '[]'); }
-  const pick = available[Math.floor(Math.random() * available.length)];
-  used.push(pick); localStorage.setItem(usedKey, JSON.stringify(used));
-  return pick;
-})()}」`;
+Today's detail to bring up naturally if it fits (skip if not):「${sessionStorage.getItem('todayDetail') || ''}」`;
 
   const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt;
   return fullPrompt;
@@ -870,6 +849,7 @@ function saveRemark() {
   if (nameEl) nameEl.textContent = val || 'Simon Riley';
   const profileNameEl = document.getElementById('profileDisplayName');
   if (profileNameEl) profileNameEl.textContent = val || 'Simon Riley';
+  touchLocalState(); // 确保备注变更及时同步云端
 }
 
 // ===== 思想气泡 =====
@@ -2830,6 +2810,13 @@ async function initChat() {
   // 好感度初始化（首次）
   if (!localStorage.getItem('affection')) setAffection(80);
 
+  // 副作用初始化——统一在这里做，buildSystemPrompt 只读不写
+  ensureGhostBirthday();
+  // 每次会话只轮换一次今日细节，存入 sessionStorage 供 prompt 读取
+  if (!sessionStorage.getItem('todayDetail')) {
+    sessionStorage.setItem('todayDetail', pickTodayDetail());
+  }
+
   // 纪念日/整数天检测 → 弹用户草稿
   const _marriageDate = localStorage.getItem('marriageDate');
   if (_marriageDate) {
@@ -3348,6 +3335,11 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0) {
 function getTodayKey() {
   const d = new Date();
   return `msgCount_${d.getFullYear()}_${d.getMonth()+1}_${d.getDate()}`;
+}
+// 稳定的日期 key，YYYY-MM-DD 格式，跨设备/时区一致
+function getTodayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function getTodayCount() {
   return parseInt(localStorage.getItem(getTodayKey()) || '0');
@@ -4466,7 +4458,7 @@ function shouldEventBecomePost(evt) {
 
 // ----- 兜底日常路过 -----
 async function maybeGenerateAmbientPost(triggerSource) {
-  const todayKey = 'ambientFeedCount_' + new Date().toDateString();
+  const todayKey = 'ambientFeedCount_' + getTodayDateStr();
   const count = parseInt(localStorage.getItem(todayKey) || '0');
   if (count >= 2) return null;
   const chance = triggerSource === 'open_couple_space' ? 0.2 : 0.08;
