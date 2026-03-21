@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     const { system, user, max_tokens = 300 } = req.body;
 
     const response = await client.chat.completions.create({
-      model: 'deepseek-chat',
+      model: 'gemini-2.5-flash-lite',
       max_tokens,
       messages: [
         { role: 'system', content: system },
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const text = response.choices?.[0]?.message?.content?.trim() || '';
     res.status(200).json({ text });
   } catch (err) {
-    console.error('DeepSeek error:', err.message, err.status);
+    console.error('D老师 error:', err.message);
     res.status(500).json({ error: err.message });
   }
 }
