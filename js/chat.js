@@ -3132,32 +3132,26 @@ function appendMessage(role, text, animate = true) {
     if (firstZhIdx > 0) {
       // 标准格式：英文行在前，中文行在后
       const enLines = lines.slice(0, firstZhIdx);
-      const zhLines = lines.slice(firstZhIdx).map(l => {
-        l = l.replace(/\b[A-Z]{2,}\b/g, '').trim();
-        return l;
-      }).filter(l => l).slice(0, 1); // 只取第一行中文，防止模型输出多行重复翻译
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
       enLine.textContent = enLines.join('\n');
       enLine.style.whiteSpace = 'pre-line';
       const zhLine = document.createElement('div');
       zhLine.className = 'bubble-zh';
-      zhLine.textContent = zhLines.join(' ');
+      zhLine.textContent = ''; // Gemini 异步填入，不用模型自带翻译
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
-      // 用 Gemini 异步翻译替换模型自带的生硬翻译
       setTimeout(() => translateWithGemini(enLines.join(' '), zhLine), 100);
     } else if (firstZhIdx === 0 && firstEnIdx > 0) {
       // 中文在前英文在后——重新排列，英文提到前面
       const enLines = lines.filter(l => !isChinese(l) && l.trim());
-      const zhLines = lines.filter(l => isChinese(l)).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l).slice(0, 1); // 只取第一行中文
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
       enLine.textContent = enLines.join('\n');
       enLine.style.whiteSpace = 'pre-line';
       const zhLine = document.createElement('div');
       zhLine.className = 'bubble-zh';
-      zhLine.textContent = zhLines.join('');
+      zhLine.textContent = ''; // Gemini 异步填入
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
       setTimeout(() => translateWithGemini(enLines.join(' '), zhLine), 100);
@@ -3167,13 +3161,12 @@ function appendMessage(role, text, animate = true) {
       const zhMatch = raw.match(/([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef「」【】《》，。！？、…—～·]+)/);
       if (zhMatch) {
         const enPart = raw.slice(0, raw.indexOf(zhMatch[0])).replace(/[\[\(（【「《\s]+$/, '').trim();
-        const zhPart = raw.replace(/[\[\]（）【】「」《》]/g, '').replace(/^[a-zA-Z0-9\s\.\,\!\?\'\"]+/, '').trim();
         const enLine = document.createElement('div');
         enLine.className = 'bubble-en';
         enLine.textContent = enPart;
         const zhLine = document.createElement('div');
         zhLine.className = 'bubble-zh';
-        zhLine.textContent = zhPart;
+        zhLine.textContent = ''; // Gemini 填入，不用模型自带翻译
         bubble.appendChild(enLine);
         bubble.appendChild(zhLine);
         setTimeout(() => translateWithGemini(enPart, zhLine), 100);
