@@ -5916,6 +5916,7 @@ function addGhostReverseDelivery(item, emotionType) {
   const totalMs = (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
   const now = Date.now();
   const interval = totalMs / DELIVERY_STAGES_GHOST.length;
+  const daysEst = Math.round(totalMs / (24 * 3600 * 1000));
 
   deliveries.unshift({
     id: now,
@@ -5933,7 +5934,21 @@ function addGhostReverseDelivery(item, emotionType) {
     productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 10)));
-  // 不调用renderDeliveryTracker，保持神秘
+
+  // 在聊天里显示快递通知气泡
+  setTimeout(() => {
+    const container = document.getElementById('messagesContainer');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'message bot';
+    div.style.cssText = 'opacity:0.85';
+    div.innerHTML = `<div style="background:linear-gradient(135deg,rgba(99,58,162,0.08),rgba(168,85,247,0.05));border:1.5px solid rgba(168,85,247,0.2);border-radius:16px;padding:10px 14px;font-size:13px;color:#5b21b6;max-width:220px;">
+      📦 有一份包裹正在配送中<br>
+      <span style="font-size:11px;color:rgba(91,33,182,0.5);">预计 ${daysEst} 天后送达，去商城查看物流</span>
+    </div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }, 3000);
 }
 
 function checkDeliveryUpdates() {
@@ -6111,15 +6126,33 @@ async function onGhostReceived(delivery) {
 function showMysteryPackage(delivery) {
   // 商城顶部显示神秘包裹提示
   const tracker = document.getElementById('deliveryTracker');
-  if (!tracker) return;
-  tracker.style.display = 'block';
-  // 添加神秘标签
-  const mysteryTag = document.createElement('span');
-  mysteryTag.className = 'delivery-tag';
-  mysteryTag.style.cssText = 'background:rgba(255,240,255,0.9);border-color:rgba(192,132,252,0.5);color:#7c3aed;';
-  mysteryTag.innerHTML = `<span class="delivery-tag-dot" style="background:#7c3aed"></span>📬 来自英国的包裹`;
-  mysteryTag.onclick = () => showToast('包裹正在派送，快收到啦～');
-  tracker.appendChild(mysteryTag);
+  if (tracker) {
+    tracker.style.display = 'block';
+    const mysteryTag = document.createElement('span');
+    mysteryTag.className = 'delivery-tag';
+    mysteryTag.style.cssText = 'background:rgba(255,240,255,0.9);border-color:rgba(192,132,252,0.5);color:#7c3aed;';
+    mysteryTag.innerHTML = `<span class="delivery-tag-dot" style="background:#7c3aed"></span>📬 来自英国的包裹`;
+    mysteryTag.onclick = () => showToast('包裹正在派送，快收到啦～');
+    tracker.appendChild(mysteryTag);
+  }
+
+  // 弹窗通知用户有快递到了
+  setTimeout(() => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9998;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s ease;';
+    overlay.innerHTML = `
+      <div style="background:rgba(255,255,255,0.97);backdrop-filter:blur(20px);border-radius:24px;padding:28px 24px;max-width:300px;width:88%;text-align:center;box-shadow:0 16px 48px rgba(139,92,246,0.2);border:1.5px solid rgba(168,85,247,0.15);">
+        <div style="font-size:48px;margin-bottom:12px;">📦</div>
+        <div style="font-size:16px;font-weight:700;color:#3b0764;margin-bottom:8px;">有快递到了</div>
+        <div style="font-size:13px;color:rgba(109,40,217,0.6);margin-bottom:20px;line-height:1.6;">来自英国的包裹已送达<br>去商城签收一下？</div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;">待会再说</button>
+          <button onclick="this.closest('div[style*=fixed]').remove();openScreen('shopScreen');" style="flex:1;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">去签收</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }, 1500);
 
   // 签收后Sonnet生成台词
   setTimeout(async () => {
