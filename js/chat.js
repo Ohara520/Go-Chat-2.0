@@ -107,7 +107,7 @@ async function loadFromCloud() {
     console.log('云端数据已加载');
 
     // 一次性补偿发放（2026年3月21日系统故障补偿）
-    const compensationKey = 'compensation_20260321';
+    const compensationKey = 'compensation_20260321_v2';
     if (!localStorage.getItem(compensationKey)) {
       const currentBalance = parseFloat(localStorage.getItem('wallet') || '0');
       localStorage.setItem('wallet', (currentBalance + 200).toFixed(2));
