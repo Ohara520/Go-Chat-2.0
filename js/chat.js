@@ -3875,11 +3875,11 @@ function buildSharedMemories() {
 }
 
 function getRelationshipStage(days) {
-  if (days < 7)   return { name: '还不肯承认', desc: '心里有，嘴上不说' };
-  if (days < 30)  return { name: '开始在意', desc: '不知不觉多看了几眼' };
-  if (days < 90)  return { name: '学着靠近', desc: '慢慢知道怎么和他相处' };
-  if (days < 180) return { name: '已经离不开', desc: '这件事他已经默认了' };
-  return { name: '就这样了', desc: '谁也不用说，都知道' };
+  if (days < 30)  return { name: '新婚', desc: '还在摸索怎么和他过日子' };
+  if (days < 90)  return { name: '慢慢习惯', desc: '开始知道他的节奏，也让他知道你的' };
+  if (days < 180) return { name: '跨越时区的日常', desc: '不同的城市，但联系从没断过' };
+  if (days < 365) return { name: '离不开了', desc: '他已经是你时区里最重要的那个人' };
+  return { name: '异国夫妻，就这样', desc: '距离算什么，你们早就过了那关' };
 }
 
 function renderSharedMemories() {
@@ -4181,15 +4181,27 @@ function renderCoupleFeed(posts) {
       return a; // emoji
     };
     const postAvatarHTML = item.avatar ? getAvatarHTML(item.avatar) : (emojiMap[item.author] || '👤');
-    const commentsHTML = (item.comments || []).map(c => `
-      <div class="couple-comment">
-        <div class="couple-avatar couple-avatar-sm">${emojiMap[c.author] || '👤'}</div>
-        <div class="couple-comment-body">
-          <div class="couple-comment-name ${nameClassMap[c.author] || ''}">${c.author}</div>
-          <div class="couple-comment-en">${c.text}</div>
+    const commentsHTML = (item.comments || []).map((c, ci) => {
+      const commentId = `comment_${idx}_${ci}`;
+      const zhText = c.zh || '';
+      // 有存储的中文就直接用，没有就用 Gemini 异步翻译
+      if (!zhText && c.text) {
+        setTimeout(() => {
+          const el = document.getElementById(commentId);
+          if (el) translateWithGemini(c.text, el);
+        }, 200 + ci * 100);
+      }
+      return `
+        <div class="couple-comment">
+          <div class="couple-avatar couple-avatar-sm">${emojiMap[c.author] || '👤'}</div>
+          <div class="couple-comment-body">
+            <div class="couple-comment-name ${nameClassMap[c.author] || ''}">${c.author}</div>
+            <div class="couple-comment-en">${c.text}</div>
+            <div class="couple-comment-zh" id="${commentId}" style="font-size:11px;color:#b09cc8;margin-top:2px;">${zhText}</div>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     const postKey = 'like_post_' + idx;
     const isLiked = localStorage.getItem(postKey) === '1';
