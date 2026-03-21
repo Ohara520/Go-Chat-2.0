@@ -2637,19 +2637,7 @@ async function initChat() {
   // 先从云端加载数据，再读取历史记录（避免闪屏）
   const container = document.getElementById('messagesContainer');
   if (!container) return;
-  // 先不渲染，等云端数据加载完再一次性渲染
   await loadFromCloud();
-
-  // 一次性补偿发放（2026年3月21日系统故障补偿）
-  const compensationKey = 'compensation_20260321_v2';
-  if (!localStorage.getItem(compensationKey)) {
-    const currentBalance = parseFloat(localStorage.getItem('wallet') || '0');
-    localStorage.setItem('wallet', (currentBalance + 200).toFixed(2));
-    localStorage.setItem(compensationKey, '1');
-    _lastSyncTime = 0;
-    saveToCloud();
-    renderWallet();
-  }
   const saved = localStorage.getItem('chatHistory');
   if (saved) {
     try { chatHistory = JSON.parse(saved); } catch(e) { chatHistory = []; }

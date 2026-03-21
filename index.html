@@ -1270,6 +1270,14 @@ const sbClient = window.sbClient;
     if (emailEl) emailEl.textContent = '📧 ' + session.user.email;
     const mainEmailEl = document.getElementById('main-account-email');
     if (mainEmailEl) mainEmailEl.textContent = session.user.email;
+
+    // 一次性补偿发放（2026年3月21日系统故障）
+    const compensationKey = 'compensation_20260321_v3';
+    if (!localStorage.getItem(compensationKey)) {
+      const currentBalance = parseFloat(localStorage.getItem('wallet') || '0');
+      localStorage.setItem('wallet', (currentBalance + 200).toFixed(2));
+      localStorage.setItem(compensationKey, '1');
+    }
   }
 })();
 
