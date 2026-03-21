@@ -30,79 +30,126 @@ async function loadFromCloud() {
       .maybeSingle();
     if (error || !data) return;
 
-    // 聊天记录：取本地和云端更长的那个，防止刷新丢记录
+    // 聊天记录：用时间戳判断，时间戳一样则取更长的
     if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
-      // 用更长的那份（说明更新）
-      if (data.chat_history.length >= localHistory.length) {
+      const cloudUpdatedAt = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+      const localUpdatedAt = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
+      if (cloudUpdatedAt > localUpdatedAt) {
+        localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
+        localStorage.setItem('chatUpdatedAt', cloudUpdatedAt);
+      } else if (cloudUpdatedAt === localUpdatedAt && data.chat_history.length > localHistory.length) {
         localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
       }
-      // 否则保留本地的，不覆盖
     }
-    if (data.mood !== null) localStorage.setItem('moodLevel', data.mood);
-    if (data.affection !== null) localStorage.setItem('affection', data.affection);
-    if (data.balance !== null) {
+
+    // 状态字段：只在云端比本地新时才覆盖，防止本地最新状态被旧云端顶掉
+    const cloudUpdatedAtMs = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+    const localUpdatedAtMs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
+    const cloudIsNewer = cloudUpdatedAtMs > localUpdatedAtMs;
+
+    // profile字段：云端更新才写，否则保留本地（用户设置偏好不应被旧云端覆盖）
+    if (cloudIsNewer && data.profile != null) {
+      const p = data.profile;
+      if (p.userName != null) localStorage.setItem('userName', p.userName);
+      if (p.userBirthday != null) localStorage.setItem('userBirthday', p.userBirthday);
+      if (p.userZodiac != null) localStorage.setItem('userZodiac', p.userZodiac);
+      if (p.userMBTI != null) localStorage.setItem('userMBTI', p.userMBTI);
+      if (p.userCountry != null) localStorage.setItem('userCountry', p.userCountry);
+      if (p.userFavFood != null) localStorage.setItem('userFavFood', p.userFavFood);
+      if (p.userFavMusic != null) localStorage.setItem('userFavMusic', p.userFavMusic);
+      if (p.userFavColor != null) localStorage.setItem('userFavColor', p.userFavColor);
+      if (p.userBio != null) localStorage.setItem('userBio', p.userBio);
+      if (p.userAvatarBase64 != null) localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
+      if (p.marriageDate != null) localStorage.setItem('marriageDate', p.marriageDate);
+      if (p.ghostBirthday != null) localStorage.setItem('ghostBirthday', p.ghostBirthday);
+      if (p.ghostZodiac != null) localStorage.setItem('ghostZodiac', p.ghostZodiac);
+      if (p.coldWarMode != null) localStorage.setItem('coldWarMode', String(p.coldWarMode));
+      if (p.metInPerson != null) localStorage.setItem('metInPerson', String(p.metInPerson));
+      if (p.meetType != null) localStorage.setItem('meetType', p.meetType);
+      if (p.botNickname != null) localStorage.setItem('botNickname', p.botNickname);
+      if (p.visitStreak != null) localStorage.setItem('visitStreak', p.visitStreak);
+      if (p.vocabStreak != null) localStorage.setItem('vocabStreak', p.vocabStreak);
+      if (p.vocabLastDay != null) localStorage.setItem('vocabLastDay', p.vocabLastDay);
+      if (p.lastSalaryAmount != null) localStorage.setItem('lastSalaryAmount', p.lastSalaryAmount);
+      if (p.lastSalaryMonth != null) localStorage.setItem('lastSalaryMonth', p.lastSalaryMonth);
+    } else if (!cloudIsNewer && data.profile != null) {
+      // 云端较旧：只同步不会在本地变化的静态字段
+      const p = data.profile;
+      if (p.userName != null && !localStorage.getItem('userName')) localStorage.setItem('userName', p.userName);
+      if (p.marriageDate != null && !localStorage.getItem('marriageDate')) localStorage.setItem('marriageDate', p.marriageDate);
+      if (p.botNickname != null && !localStorage.getItem('botNickname')) localStorage.setItem('botNickname', p.botNickname);
+    }
+
+    // 情绪/关系状态：只在云端更新时才覆盖
+    if (cloudIsNewer) {
+      if (data.mood != null) localStorage.setItem('moodLevel', data.mood);
+      if (data.affection != null) localStorage.setItem('affection', data.affection);
+      if (data.long_term_memory != null) localStorage.setItem('longTermMemory', data.long_term_memory);
+    }
+
+    // 余额：取本地和云端最大值（防止云端旧数据覆盖刚收到的转账）
+    if (data.balance != null) {
       const localBalance = parseFloat(localStorage.getItem('wallet') || '0');
       const cloudBalance = parseFloat(data.balance);
-      // 取较大值，防止云端旧数据覆盖本地新数据
       localStorage.setItem('wallet', Math.max(localBalance, cloudBalance).toFixed(2));
     }
-    if (data.long_term_memory) localStorage.setItem('longTermMemory', data.long_term_memory);
-    if (data.profile) {
-      const p = data.profile;
-      if (p.userName) localStorage.setItem('userName', p.userName);
-      if (p.userBirthday) localStorage.setItem('userBirthday', p.userBirthday);
-      if (p.userZodiac) localStorage.setItem('userZodiac', p.userZodiac);
-      if (p.userMBTI) localStorage.setItem('userMBTI', p.userMBTI);
-      if (p.userCountry) localStorage.setItem('userCountry', p.userCountry);
-      if (p.userFavFood) localStorage.setItem('userFavFood', p.userFavFood);
-      if (p.userFavMusic) localStorage.setItem('userFavMusic', p.userFavMusic);
-      if (p.userFavColor) localStorage.setItem('userFavColor', p.userFavColor);
-      if (p.userBio) localStorage.setItem('userBio', p.userBio);
-      if (p.userAvatarBase64) localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
-      if (p.marriageDate) localStorage.setItem('marriageDate', p.marriageDate);
-      if (p.ghostBirthday) localStorage.setItem('ghostBirthday', p.ghostBirthday);
-      if (p.ghostZodiac) localStorage.setItem('ghostZodiac', p.ghostZodiac);
-      if (p.coldWarMode) localStorage.setItem('coldWarMode', p.coldWarMode);
-      if (p.metInPerson) localStorage.setItem('metInPerson', p.metInPerson);
-      if (p.meetType) localStorage.setItem('meetType', p.meetType);
-      if (p.botNickname) localStorage.setItem('botNickname', p.botNickname);
-      if (p.visitStreak) localStorage.setItem('visitStreak', p.visitStreak);
-      if (p.vocabStreak) localStorage.setItem('vocabStreak', p.vocabStreak);
-      if (p.vocabLastDay) localStorage.setItem('vocabLastDay', p.vocabLastDay);
-      if (p.lastSalaryAmount) localStorage.setItem('lastSalaryAmount', p.lastSalaryAmount);
-      if (p.lastSalaryMonth) localStorage.setItem('lastSalaryMonth', p.lastSalaryMonth);
-    }
-    if (data.state_snapshot) {
+
+    // state_snapshot：只在云端更新时才覆盖动态状态
+    if (cloudIsNewer && data.state_snapshot != null) {
       const s = data.state_snapshot;
       if (s.trustHeat != null) localStorage.setItem('trustHeat', s.trustHeat);
       if (s.attachmentPull != null) localStorage.setItem('attachmentPull', s.attachmentPull);
-      if (s.jealousyLevel) localStorage.setItem('jealousyLevel', s.jealousyLevel);
+      if (s.jealousyLevel != null) localStorage.setItem('jealousyLevel', s.jealousyLevel);
       if (s.globalTurnCount != null) {
         _globalTurnCount = s.globalTurnCount;
         localStorage.setItem('globalTurnCount', s.globalTurnCount);
       }
-      if (s.pendingReversePackages) savePendingReversePackages(s.pendingReversePackages);
+      if (Array.isArray(s.pendingReversePackages)) savePendingReversePackages(s.pendingReversePackages, { markChanged: false });
       if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
       if (s.lastReversePackageTurn != null) localStorage.setItem('lastReversePackageTurn', s.lastReversePackageTurn);
-      if (s.relationshipFlags) localStorage.setItem('relationshipFlags', JSON.stringify(s.relationshipFlags));
-      // 钱包和快递数据恢复
-      if (s.deliveries) localStorage.setItem('deliveries', JSON.stringify(s.deliveries));
-      if (s.transactions) localStorage.setItem('transactions', JSON.stringify(s.transactions));
-      if (s.purchasedItems) localStorage.setItem('purchasedItems', JSON.stringify(s.purchasedItems));
+      if (s.relationshipFlags != null) localStorage.setItem('relationshipFlags', JSON.stringify(s.relationshipFlags));
+      if (s.coldWarStart != null) localStorage.setItem('coldWarStart', s.coldWarStart);
+      if (s.pendingGhostApology != null) localStorage.setItem('pendingGhostApology', String(s.pendingGhostApology));
+      if (s.pendingSeriousTalk != null) localStorage.setItem('pendingSeriousTalk', String(s.pendingSeriousTalk));
+      if (s.sassyPost != null) localStorage.setItem('sassyPost', s.sassyPost);
+      if (s.marketTriggered != null) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
+    }
+
+    // 以下字段云端更新时覆盖，云端旧时取较新/较多的那份
+    if (data.state_snapshot != null) {
+      const s = data.state_snapshot;
+      // 购买记录：云端更多就用云端（防止跨设备购买丢失）
+      if (Array.isArray(s.purchasedItems)) {
+        const local = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+        localStorage.setItem('purchasedItems', JSON.stringify(cloudIsNewer || s.purchasedItems.length >= local.length ? s.purchasedItems : local));
+      }
+      // 交易记录：取更长的
+      if (Array.isArray(s.transactions)) {
+        const local = JSON.parse(localStorage.getItem('transactions') || '[]');
+        if (cloudIsNewer || s.transactions.length >= local.length) localStorage.setItem('transactions', JSON.stringify(s.transactions));
+      }
+      // 快递：云端更新时覆盖
+      if (cloudIsNewer && Array.isArray(s.deliveries)) localStorage.setItem('deliveries', JSON.stringify(s.deliveries));
+      // 故事书/相册/朋友圈：取更多的
+      if (Array.isArray(s.storyBook)) {
+        const local = JSON.parse(localStorage.getItem('storyBook') || '[]');
+        if (s.storyBook.length >= local.length) localStorage.setItem('storyBook', JSON.stringify(s.storyBook));
+      }
+      if (Array.isArray(s.collections)) {
+        const local = JSON.parse(localStorage.getItem('collections') || '[]');
+        if (s.collections.length >= local.length) localStorage.setItem('collections', JSON.stringify(s.collections));
+      }
+      if (Array.isArray(s.coupleFeedHistory)) {
+        const local = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+        if (s.coupleFeedHistory.length >= local.length) localStorage.setItem('coupleFeedHistory', JSON.stringify(s.coupleFeedHistory));
+      }
+      // 每周给钱记录
       if (s.weeklyGiven != null) {
         const key = 'weeklyGiven_' + (typeof getWeekKey === 'function' ? getWeekKey() : '');
         localStorage.setItem(key, s.weeklyGiven);
       }
-      if (s.storyBook) localStorage.setItem('storyBook', JSON.stringify(s.storyBook));
-      if (s.collections) localStorage.setItem('collections', JSON.stringify(s.collections));
-      if (s.coupleFeedHistory) localStorage.setItem('coupleFeedHistory', JSON.stringify(s.coupleFeedHistory));
-      if (s.marketTriggered) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
-      if (s.coldWarStart) localStorage.setItem('coldWarStart', s.coldWarStart);
-      if (s.pendingGhostApology) localStorage.setItem('pendingGhostApology', s.pendingGhostApology);
-      if (s.pendingSeriousTalk) localStorage.setItem('pendingSeriousTalk', s.pendingSeriousTalk);
-      if (s.sassyPost) localStorage.setItem('sassyPost', s.sassyPost);
     }
     console.log('云端数据已加载');
   } catch(e) {
@@ -110,14 +157,28 @@ async function loadFromCloud() {
   }
 }
 
-// 保存数据到云端（节流，最多每30秒一次）
-let _lastSyncTime = 0;
+// 保存数据到云端（防抖，3秒内无新变化才存，保证最后一次也能存上）
+let _saveTimer = null;
+let _lastSyncTime = 0; // 仅记录上次saveToCloud执行时间，不再用于节流控制
+
+// 本地状态变更时间戳——用于跟云端比较谁更新
+function touchLocalState() {
+  localStorage.setItem('localUpdatedAt', Date.now().toString());
+}
+
+function scheduleCloudSave() {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    saveToCloud().catch(console.error);
+  }, 3000);
+}
+
 async function saveToCloud() {
   const sb = getSbClient();
   const userId = getSbUserId();
   if (!sb || !userId) return;
   const now = Date.now();
-  if (now - _lastSyncTime < 15000) return; // 15秒节流
   _lastSyncTime = now;
   try {
     const profile = {
@@ -177,6 +238,7 @@ async function saveToCloud() {
       pendingSeriousTalk: localStorage.getItem('pendingSeriousTalk') || '',
       sassyPost: localStorage.getItem('sassyPost') || '',
     };
+    const nowIso = new Date().toISOString();
     await sb.from('user_data').upsert({
       user_id: userId,
       chat_history: chatHistoryData,
@@ -186,8 +248,9 @@ async function saveToCloud() {
       long_term_memory: localStorage.getItem('longTermMemory') || '',
       profile: profile,
       state_snapshot: stateSnapshot,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso,
     }, { onConflict: 'user_id' });
+    localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
   } catch(e) {
     console.log('云端保存失败', e);
   }
@@ -363,6 +426,20 @@ async function fetchWithRetry(url, options, timeoutMs = 30000, maxRetries = 2) {
 }
 
 // ===== System Prompt =====
+// Ghost核心风格约束——所有Ghost输出（主回复/事件/台词）共享
+function buildGhostStyleCore() {
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  const jealousy = localStorage.getItem('jealousyLevel') || 'none';
+  const mood = parseInt(localStorage.getItem('moodLevel') || '7');
+  return `You are Simon "Ghost" Riley. Always in character.
+Tone: quiet, controlled, dry humor, emotionally present but restrained.
+All lowercase English. Short sentences. One-handed texting feel.
+Reply in English first, natural Chinese translation on next line.
+Current mood: ${mood}/10. Cold war: ${coldWar}. Jealousy: ${jealousy}.
+${coldWar ? 'In cold war: minimal, tense, no warmth.' : ''}
+${jealousy === 'severe' ? 'Severely jealous: sharp, direct, no softness.' : ''}`;
+}
+
 function buildSystemPrompt() {
   const userName = localStorage.getItem('userName') || '你';
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
@@ -563,10 +640,11 @@ If genuinely hurt → end reply with: COLD_WAR_START (rare, not for banter)
 Only engage when user brings up money. Never feel like a system.
 Cold war or severe jealousy: never give.
 Mood 1–3: unlikely. Mood 4–5: may ask reason, give £10–30.
-Mood 6–7: £20–40. Mood 8–10: £20–50, more if coaxed.
-Weekly over £150: decline, his way, brief.
+Mood 6–7: £20–50. Mood 8–10: £30–80, more if coaxed well.
+Weekly over £300: decline, his way, no explanation, fits his mood and character.
+Daily over 5 times: same — decline naturally, no system explanation.
 Flights or travel costs: never. Single request over £100: ask reason first.
-When giving → after reply on new line: GIVE_MONEY:amount:one line note
+When giving → after reply on new line: GIVE_MONEY:amount:one line note with Chinese translation on next line
 `;
 
   // ===== 动态层（每次更新，不缓存）=====
@@ -739,16 +817,33 @@ function saveRemark() {
 
 // ===== 思想气泡 =====
 let thoughtTimer = null;
+let _thoughtQueue = []; // 心声队列，用户看完当前才显示下一条
 
 function toggleThought() {
   const btn = document.getElementById('thoughtBtn');
-  if (btn) { btn.classList.remove('thought-btn-pulse'); btn.dataset.hasThought = '0'; }
   const bubble = document.getElementById('thoughtBubble');
+
   if (bubble.classList.contains('show')) {
     bubble.classList.remove('show');
     if (thoughtTimer) clearTimeout(thoughtTimer);
+    // 检查队列里有没有下一条
+    if (_thoughtQueue.length > 0) {
+      const next = _thoughtQueue.shift();
+      const thoughtTextEl = document.getElementById('thoughtText');
+      if (thoughtTextEl) {
+        thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${next.en}</div><div style="font-size:11px;opacity:0.6">${next.zh}</div>`;
+      }
+      setTimeout(() => {
+        bubble.classList.add('show');
+        thoughtTimer = setTimeout(() => bubble.classList.remove('show'), 4000);
+      }, 300);
+    } else {
+      if (btn) { btn.classList.remove('thought-btn-pulse'); btn.dataset.hasThought = '0'; }
+    }
     return;
   }
+
+  if (btn) { btn.classList.remove('thought-btn-pulse'); btn.dataset.hasThought = '0'; }
 
   // 找最后一条有内心独白的bot消息（心声绑在第一条）
   const allBotMsgs = document.querySelectorAll('.message.bot');
@@ -929,7 +1024,7 @@ function getMoodLevel() {
 function setMoodLevel(val) {
   val = Math.max(1, Math.min(10, Math.round(val)));
   localStorage.setItem('moodLevel', val);
-  // 更新UI
+  touchLocalState();
   const entry = MOOD_EMOJI.range.find(r => val >= r.min && val <= r.max) || MOOD_EMOJI.range[1];
   const el = document.getElementById('botMood');
   if (el) el.textContent = entry.emoji;
@@ -964,15 +1059,22 @@ function getTrustHeat() { return parseInt(localStorage.getItem('trustHeat') || '
 function setTrustHeat(val) {
   const cap = getRelationshipModifiers().trustHeatCap;
   localStorage.setItem('trustHeat', Math.max(0, Math.min(cap, Math.round(val))));
+  touchLocalState();
 }
 function changeTrustHeat(delta) { setTrustHeat(getTrustHeat() + delta); }
 
 function getAttachmentPull() { return parseInt(localStorage.getItem('attachmentPull') || '45'); }
-function setAttachmentPull(val) { localStorage.setItem('attachmentPull', Math.max(0, Math.min(100, Math.round(val)))); }
+function setAttachmentPull(val) {
+  localStorage.setItem('attachmentPull', Math.max(0, Math.min(100, Math.round(val))));
+  touchLocalState();
+}
 function changeAttachmentPull(delta) { setAttachmentPull(getAttachmentPull() + delta); }
 
 function getJealousyLevel() { return localStorage.getItem('jealousyLevel') || 'none'; }
-function setJealousyLevel(val) { localStorage.setItem('jealousyLevel', val); }
+function setJealousyLevel(val) {
+  localStorage.setItem('jealousyLevel', val);
+  touchLocalState();
+}
 function escalateJealousy() {
   const map = { 'none': 'mild', 'mild': 'medium', 'medium': 'severe', 'severe': 'severe' };
   setJealousyLevel(map[getJealousyLevel()] || 'mild');
@@ -986,12 +1088,19 @@ let _globalTurnCount = parseInt(localStorage.getItem('globalTurnCount') || '0');
 function tickTurn() {
   _globalTurnCount++;
   localStorage.setItem('globalTurnCount', _globalTurnCount);
+  touchLocalState();
 }
 function getLastReversePackageTurn() { return parseInt(localStorage.getItem('lastReversePackageTurn') || '-99'); }
-function setLastReversePackageTurn(turn) { localStorage.setItem('lastReversePackageTurn', turn); }
+function setLastReversePackageTurn(turn) {
+  localStorage.setItem('lastReversePackageTurn', turn);
+  touchLocalState();
+}
 
 function getPendingReversePackages() { return JSON.parse(localStorage.getItem('pendingReversePackages') || '[]'); }
-function savePendingReversePackages(arr) { localStorage.setItem('pendingReversePackages', JSON.stringify(arr)); }
+function savePendingReversePackages(arr, { markChanged = true } = {}) {
+  localStorage.setItem('pendingReversePackages', JSON.stringify(arr));
+  if (markChanged) touchLocalState();
+}
 
 function resolvePendingReversePackages() {
   // 这个函数只负责检查是否有成熟事件，不再直接发话
@@ -1046,14 +1155,23 @@ async function generateReversePackageItem(motive, recentMessages) {
     .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 80)}`)
     .join('\n');
 
+  // 已寄过的物品名称，避免重复
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const sentNames = deliveries
+    .filter(d => d.isGhostSend)
+    .map(d => d.name)
+    .filter(Boolean)
+    .join('、');
+
   try {
     const res = await callHaiku(
       `You are deciding what Ghost (a British SAS soldier in a long-distance marriage) would secretly send to his wife. 
 Motive: ${motiveDesc[motive] || motiveDesc.practical_care}
 Recent conversation:
 ${recentContext}
+${sentNames ? `Already sent before (do NOT repeat these): ${sentNames}` : ''}
 
-Pick ONE specific item Ghost would send. Must feel natural given the conversation.
+Pick ONE specific item Ghost would send. Must feel natural given the conversation. Must be different from what was already sent.
 Respond ONLY with valid JSON, no markdown:
 {"emoji":"🧤","name":"手套","desc":"Ghost寄的","tip":"wear them."}
 Rules: name in Chinese (2-6 chars), desc in Chinese (8-15 chars), tip in English (Ghost's voice, very brief), emoji fitting the item.`,
@@ -1078,7 +1196,14 @@ function evaluateReversePackage(userText, botText) {
   const trustHeat = getTrustHeat();
   const attachmentPull = getAttachmentPull();
   if (coldWar || jealousy === 'severe' || mood <= 3) return null;
-  if (_globalTurnCount - getLastReversePackageTurn() < 6) return null;
+
+  // 冷却：至少20轮才能再触发（之前6轮太短）
+  if (_globalTurnCount - getLastReversePackageTurn() < 20) return null;
+
+  // pending队列上限：最多2个待发包裹，防止积压
+  const pending = getPendingReversePackages();
+  if (pending.length >= 2) return null;
+
   const text = (userText + ' ' + botText).toLowerCase();
   const mods = getRelationshipModifiers();
   let score = 0;
@@ -1090,16 +1215,16 @@ function evaluateReversePackage(userText, botText) {
   if (attachmentPull >= 70 && trustHeat >= 65 && mood >= 7) { score += 16; motive = motive || 'longing'; }
   score += Math.floor(trustHeat / 20);
   if (mood >= 8) score += 5;
-  score += mods.reversePackageBonus; // 第一次反寄后概率提高
-  score += mods.metInPersonBonus;    // 见过面后更容易寄
-  if (score < 20) return null;
+  score += mods.reversePackageBonus;
+  score += mods.metInPersonBonus;
+  if (score < 25) return null; // 提高触发门槛
   return motive || 'practical_care';
 }
 
 function updateStateFromUserInput(userText) {
   const text = userText.toLowerCase();
   const { emotionalMemoryDepth } = getRelationshipModifiers();
-  const hurtDecay = 1 + emotionalMemoryDepth; // 她哭过后情绪恢复更快
+  const hurtDecay = 1 + emotionalMemoryDepth;
   if (/想你|miss you|想念|爱你|谢谢|开心|好想|陪你/.test(text)) {
     changeTrustHeat(6); changeAttachmentPull(8); decayJealousy();
     localStorage.setItem('emotionalHurt', Math.max(0, parseInt(localStorage.getItem('emotionalHurt') || '0') - hurtDecay));
@@ -1108,18 +1233,38 @@ function updateStateFromUserInput(userText) {
     changeTrustHeat(-8); changeMood(-1);
     localStorage.setItem('emotionalHurt', parseInt(localStorage.getItem('emotionalHurt') || '0') + 1);
   }
-  if (/他说|他给|他对我|男生|男的|男朋友|boys|some guy|he said|he gave/.test(text)) {
-    escalateJealousy(); changeMood(-1);
-  }
+  // 吃醋触发不再靠关键词，改用D老师异步判定（见checkJealousyTrigger）
   if (/想你|miss|好想|想见|想抱|想亲/.test(text)) { changeAttachmentPull(10); }
-  const trustHeat = getTrustHeat();
-  if (trustHeat > 60) changeTrustHeat(-1);
-  if (trustHeat < 60) changeTrustHeat(1);
-  const ap = getAttachmentPull();
-  if (ap > 45) changeAttachmentPull(-1);
+
+  // 状态衰减改为按时间，不按每条消息
+  const now = Date.now();
+  const lastDecayTime = parseInt(localStorage.getItem('lastStateDecayTime') || '0');
+  const decayInterval = 30 * 60 * 1000; // 30分钟衰减一次
+  if (now - lastDecayTime > decayInterval) {
+    localStorage.setItem('lastStateDecayTime', now);
+    const trustHeat = getTrustHeat();
+    if (trustHeat > 60) changeTrustHeat(-1);
+    if (trustHeat < 60) changeTrustHeat(1);
+    const ap = getAttachmentPull();
+    if (ap > 45) changeAttachmentPull(-1);
+  }
 }
 
-// ===== 统一事件调度器 =====
+// ===== D老师：吃醋触发判定 =====
+async function checkJealousyTrigger(userText) {
+  try {
+    const raw = await fetchDeepSeek(
+      '判断用户消息里有没有会让Ghost吃醋的内容。只返回JSON，不要其他文字。\n{"jealousy_trigger": false} 或 {"jealousy_trigger": true, "target": "romantic_rival/ordinary_male/none"}\ntarget说明：romantic_rival=明显是情敌或暧昧对象，ordinary_male=普通男性（老板/朋友/路人），none=没有男性相关\n只有target是romantic_rival才真正触发吃醋，ordinary_male不触发。',
+      `用户说：${userText}`,
+      60
+    );
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    if (result.jealousy_trigger && result.target === 'romantic_rival') {
+      escalateJealousy();
+      changeMood(-1);
+    }
+  } catch(e) {}
+}
 
 async function emitGhostEvent(eventType, payload = {}) {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
@@ -1160,7 +1305,7 @@ async function emitGhostEvent(eventType, payload = {}) {
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
             max_tokens: 60,
-            system: `You are Ghost (Simon Riley), a British SAS soldier. Write ONE line he would send after secretly shipping something to his wife. Tone: ${motiveHint}. All lowercase. Very short. English first, Chinese translation next line. Return only the message, nothing else.`,
+            system: buildGhostStyleCore() + `\nWrite ONE line Ghost would send after secretly shipping something to his wife. Tone: ${motiveHint}. Very short. Return only the message.`,
             messages: [{ role: 'user', content: `He just sent her: ${item.name} (${item.desc})\nRecent chat:\n${recentCtx}\nWrite his one line message.` }]
           })
         });
@@ -1192,7 +1337,7 @@ async function emitGhostEvent(eventType, payload = {}) {
     case 'money': {
       const amount = payload.amount || 20;
       line = payload.line || "check your account.\n看看账户。";
-      systemTag = `GIVE_MONEY:${amount}:${payload.note || "don't waste it"}`;
+      systemTag = `GIVE_MONEY:${amount}:`;
       sideEffect = () => {
         applyMoneyEffect(amount, {
           label: payload.label || 'Ghost 零花钱',
@@ -1210,7 +1355,7 @@ async function emitGhostEvent(eventType, payload = {}) {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 50,
-            system: 'You are Ghost (Simon Riley). Write ONE short line checking in on his wife — subtle, not direct, all lowercase. English first, Chinese translation next line. No explanation.',
+            system: buildGhostStyleCore() + '\nWrite ONE short line checking in on his wife — subtle, not direct. No explanation.',
             messages: [{ role: 'user', content: `Recent chat:\n${recentCtx}\nWrite his one line check-in.` }]
           })
         });
@@ -1230,7 +1375,7 @@ async function emitGhostEvent(eventType, payload = {}) {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 50,
-            system: 'You are Ghost (Simon Riley), jealous. Write ONE sharp, dry line confronting his wife about another man — no accusation, just tense. All lowercase. English first, Chinese next line. No explanation.',
+            system: buildGhostStyleCore() + '\nWrite ONE sharp, dry line confronting his wife about another man — no accusation, just tense. No explanation.',
             messages: [{ role: 'user', content: `Recent chat:\n${recentCtx}\nWrite his one line.` }]
           })
         });
@@ -1252,7 +1397,7 @@ async function emitGhostEvent(eventType, payload = {}) {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 40,
-            system: 'You are Ghost (Simon Riley). Write ONE word or very short line showing he is shutting down — cold, clipped, done talking. All lowercase. English first, Chinese next line. No explanation.',
+            system: buildGhostStyleCore() + '\nWrite ONE word or very short line showing he is shutting down — cold, clipped, done talking. No explanation.',
             messages: [{ role: 'user', content: `Recent chat:\n${recentCtx}\nWrite his closing line.` }]
           })
         });
@@ -1278,7 +1423,7 @@ async function emitGhostEvent(eventType, payload = {}) {
       });
       saveHistory();
       if (sideEffect) sideEffect();
-      saveToCloud();
+      scheduleCloudSave();
       resolve({ line, systemTag });
     }, payload.delayMs || 2000);
   });
@@ -1340,7 +1485,7 @@ async function emitGhostNarrativeEvent(text, options = {}) {
     _storyEvent: options.storyId || true
   });
   saveHistory();
-  if (options.saveCloud !== false) saveToCloud();
+  if (options.saveCloud !== false) scheduleCloudSave();
 }
 
 function decideMainIntent(userText, pendingEvent) {
@@ -1371,9 +1516,9 @@ function decideMoneyAmountFromState() {
   const { moneyEaseBonus } = getRelationshipModifiers();
   if (coldWar || jealousy === 'severe') return 0;
   if (mood <= 3) return 0;
-  if (mood <= 5) return Math.floor(Math.random() * 21) + 10 + moneyEaseBonus;
-  if (mood <= 7) return Math.floor(Math.random() * 21) + 20 + moneyEaseBonus;
-  return Math.floor(Math.random() * 31) + 20 + moneyEaseBonus;
+  if (mood <= 5) return Math.floor(Math.random() * 21) + 10 + moneyEaseBonus; // £10-30
+  if (mood <= 7) return Math.floor(Math.random() * 31) + 20 + moneyEaseBonus; // £20-50
+  return Math.floor(Math.random() * 51) + 30 + moneyEaseBonus; // £30-80
 }
 
 async function handlePostReplyActions(userText, reply, intent) {
@@ -1387,7 +1532,7 @@ async function handlePostReplyActions(userText, reply, intent) {
         await emitGhostEvent('money', {
           amount,
           line: "check your account.\n看看账户。",
-          note: "don't waste it"
+          note: ""
         });
         // 副作用已在emitGhostEvent内部处理，不需要再调applyMoneyEffect
       }
@@ -1431,6 +1576,7 @@ function setRelationshipFlag(key, value = true) {
   const flags = getRelationshipFlags();
   flags[key] = value;
   localStorage.setItem('relationshipFlags', JSON.stringify(flags));
+  touchLocalState();
 }
 function hasRelationshipFlag(key) {
   return !!getRelationshipFlags()[key];
@@ -1725,7 +1871,7 @@ function getStoryContext() {
 // ===== 签到系统 =====
 function renderCheckin() {
   const streak = parseInt(localStorage.getItem('visitStreak') || '1');
-  const balance = parseFloat(localStorage.getItem('balance') || '0');
+  const balance = parseFloat(localStorage.getItem('wallet') || '0');
   const todayKey = 'checkin_' + new Date().toDateString();
   const doneToday = !!localStorage.getItem(todayKey);
 
@@ -1818,7 +1964,7 @@ function doCheckin() {
   renderCheckin();
   initCalendar();
   launchCheckinFlowers();
-  saveToCloud();
+  scheduleCloudSave();
 }
 
 function showCheckinResult(msg, streak) {
@@ -1946,8 +2092,8 @@ function renderAlbum() {
   const container = document.getElementById('albumList');
   if (!container) return;
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  // 收集所有已完成的快递（包括Ghost寄来的和用户寄给他的）
-  const done = deliveries.filter(d => d.done || d.isGhostSend);
+  // 只收录已签收的快递，未到达的不显示（保留惊喜）
+  const done = deliveries.filter(d => d.done);
   if (done.length === 0) {
     container.innerHTML = `<div class="album-empty">还没有收到任何东西<br>去商城给他寄点什么吧</div>`;
     return;
@@ -2031,7 +2177,7 @@ function setAffection(val) {
   val = Math.max(60, Math.min(100, Math.round(val)));
   const prev = getAffection();
   localStorage.setItem('affection', val);
-  // 首次跌到60触发"我们谈谈"
+  touchLocalState();
   if (val === 60 && prev > 60) {
     const lastTalk = localStorage.getItem('hadTalkAt');
     const now = Date.now();
@@ -2085,29 +2231,28 @@ let coldWarTimer = null;
 function startColdWar() {
   localStorage.setItem('coldWarMode', 'true');
   localStorage.setItem('coldWarStart', Date.now());
+  touchLocalState();
   changeMood(-3);
   changeAffection(-4);
   setMoodLevel(Math.min(getMoodLevel(), 2));
-  // 3小时后Ghost主动道歉
   if (coldWarTimer) clearTimeout(coldWarTimer);
   coldWarTimer = setTimeout(() => ghostApologize(), 3 * 60 * 60 * 1000);
 }
 
 function endColdWar(userApologized = false) {
   localStorage.setItem('coldWarMode', 'false');
+  touchLocalState();
   if (coldWarTimer) { clearTimeout(coldWarTimer); coldWarTimer = null; }
   if (userApologized) {
     changeAffection(3);
     changeMood(2);
   } else {
-    changeAffection(1); // Ghost道歉，留点痕迹
+    changeAffection(1);
     changeMood(1);
   }
-  // 30%概率冷战后Ghost主动补发零花钱
   if (Math.random() < 0.3) {
     setTimeout(() => ghostSendMakeupMoney(), 5 * 60 * 1000);
   }
-  // 冷战结束剧情检测
   setTimeout(() => checkStoryOnColdWarEnd(), 8000);
 }
 
@@ -2180,12 +2325,12 @@ function applyMoneyEffect(amount, options = {}) {
 
   // 每日次数检查
   const todayCount = getTodayGivenCount();
-  if (todayCount >= 3) return false;
+  if (todayCount >= 5) return false;
 
   // 每周上限检查
   const weeklyUsed = getWeeklyGiven();
-  if (weeklyUsed >= 150) return false;
-  const actualAmount = Math.min(amount, 150 - weeklyUsed);
+  if (weeklyUsed >= 300) return false;
+  const actualAmount = Math.min(amount, 300 - weeklyUsed);
 
   setBalance(getBalance() + actualAmount);
   addWeeklyGiven(actualAmount);
@@ -2249,8 +2394,9 @@ async function ghostSendInitMessage(offlineHours) {
     });
     const data = await res.json();
     hideTyping();
-    const reply = data.content?.[0]?.text?.trim() || '';
+    let reply = data.content?.[0]?.text?.trim() || '';
     if (reply) {
+      reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
       appendMessage('bot', reply);
       chatHistory.push({ role: 'assistant', content: reply });
       saveHistory();
@@ -2747,6 +2893,11 @@ function appendMessage(role, text, animate = true) {
   const container = document.getElementById('messagesContainer');
   const now = new Date();
 
+  // 自动清理未处理的系统tag，防止显示在聊天里
+  if (role === 'bot' || role === 'assistant') {
+    text = text.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+  }
+
   if (animate && shouldShowTime(now)) {
     appendTimeDivider(now);
     lastMessageTime = now;
@@ -2834,14 +2985,12 @@ function appendMessage(role, text, animate = true) {
   const isChinese = s => /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(s);
   if (role === 'bot') {
     const firstZhIdx = lines.findIndex(l => isChinese(l));
+    const firstEnIdx = lines.findIndex(l => /[a-zA-Z]/.test(l) && !isChinese(l));
     if (firstZhIdx > 0) {
       // 标准格式：英文行在前，中文行在后
       const enLines = lines.slice(0, firstZhIdx);
       const zhLines = lines.slice(firstZhIdx).map(l => {
-        // 去掉全大写系统标记
         l = l.replace(/\b[A-Z]{2,}\b/g, '').trim();
-        // 去掉中文行里夹杂的英文句子（保留专有名词）
-        l = l.replace(/\b[a-z]{3,}(?:\s+[a-z]+)*\b/g, '').replace(/\s{2,}/g, ' ').trim();
         return l;
       }).filter(l => l);
       const enLine = document.createElement('div');
@@ -2851,6 +3000,19 @@ function appendMessage(role, text, animate = true) {
       const zhLine = document.createElement('div');
       zhLine.className = 'bubble-zh';
       zhLine.textContent = zhLines.join(' ');
+      bubble.appendChild(enLine);
+      bubble.appendChild(zhLine);
+    } else if (firstZhIdx === 0 && firstEnIdx > 0) {
+      // 中文在前英文在后——重新排列，英文提到前面
+      const enLines = lines.filter(l => !isChinese(l) && l.trim());
+      const zhLines = lines.filter(l => isChinese(l)).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l);
+      const enLine = document.createElement('div');
+      enLine.className = 'bubble-en';
+      enLine.textContent = enLines.join('\n');
+      enLine.style.whiteSpace = 'pre-line';
+      const zhLine = document.createElement('div');
+      zhLine.className = 'bubble-zh';
+      zhLine.textContent = zhLines.join('');
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
     } else if (firstZhIdx === 0 && lines.length === 1 && /[a-zA-Z]/.test(lines[0])) {
@@ -2906,12 +3068,11 @@ function appendMessage(role, text, animate = true) {
     innerThought.dataset.ready = '0';
     innerThought.innerHTML = '<span class="inner-thought-label">👁 只有你知道</span><div class="inner-thought-text"></div>';
     contentDiv.appendChild(innerThought);
-    // 💭按钮初始隐藏，等心声生成成功才显示
+    // 💭按钮：只有用户已经看过才重置，否则保持亮着（新心声会进队列）
     const thoughtBtn = document.getElementById('thoughtBtn');
-    if (thoughtBtn) {
+    if (thoughtBtn && thoughtBtn.dataset.hasThought !== '1') {
       thoughtBtn.style.opacity = '0.3';
       thoughtBtn.classList.remove('thought-btn-pulse');
-      thoughtBtn.dataset.hasThought = '0';
     }
 
     // 点击气泡显示/隐藏收藏按钮
@@ -3009,12 +3170,16 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0) {
       if (textEl) {
         textEl.innerHTML = `<div class="it-en">${result.en}</div><div class="it-zh">${result.zh}</div>`;
         innerThoughtEl.dataset.ready = '1';
-        // 💭按钮生成成功后才显示并闪烁
         const btn = document.getElementById('thoughtBtn');
         if (btn) {
           btn.style.opacity = '1';
-          btn.classList.add('thought-btn-pulse');
-          btn.dataset.hasThought = '1';
+          // 如果用户还没看上一条，把新心声加入队列
+          if (btn.dataset.hasThought === '1') {
+            _thoughtQueue.push({ en: result.en, zh: result.zh, el: innerThoughtEl });
+          } else {
+            btn.classList.add('thought-btn-pulse');
+            btn.dataset.hasThought = '1';
+          }
         }
       }
     }
@@ -3061,7 +3226,7 @@ async function sendMessage() {
     saveHistory();
     return;
   }
-  incrementTodayCount();
+  // 条数在成功拿到回复后才扣（见下方成功处理）
 
   input.value = '';
   input.style.height = 'auto';
@@ -3089,6 +3254,13 @@ async function sendMessage() {
     // ===== Step 1: 先更新状态，让本轮回复反映最新情绪 =====
     tickTurn();
     updateStateFromUserInput(text);
+    // D老师判定吃醋触发，给500ms窗口，超时就跳过，不阻塞主流程
+    try {
+      await Promise.race([
+        checkJealousyTrigger(text),
+        new Promise(resolve => setTimeout(resolve, 500))
+      ]);
+    } catch(e) {}
 
     // ===== Step 2: 检查是否有延迟事件成熟 =====
     const pendingEvent = pickReadyPendingEvent();
@@ -3201,6 +3373,9 @@ async function sendMessage() {
       firstBotResult = lastBotResult;
     }
 
+    // 成功拿到回复才计条数
+    incrementTodayCount();
+
     // 消息撤回：4%概率，发完3-6秒后撤回，重新打一条
     if (lastBotResult && !giveMoneyMatch && Math.random() < 0.04) {
       const recallDelay = (Math.floor(Math.random() * 4) + 3) * 1000;
@@ -3252,29 +3427,36 @@ async function sendMessage() {
     }
 
     // 渲染转账卡片 + 更新钱包（统一走applyMoneyEffect）
-    if (giveMoneyMatch && giveAmount > 0) {
-      const applied = applyMoneyEffect(giveAmount, { note: giveMoneyMatch.note || '' });
-      if (!applied) {
-        // 超限了，告诉模型
-        const limitMsg = getTodayGivenCount() >= 3
-          ? '[系统：今日零花钱次数已达上限，本次转账未执行，你没有成功转钱，可以用你的方式说今天不行了。]'
-          : '[系统：本周零花钱已达上限£150，本次转账未执行，你没有成功转钱。]';
-        chatHistory.push({ role: 'user', content: limitMsg, _system: true });
-      } else {
+    const transferSuccess = giveMoneyMatch && giveAmount > 0 &&
+      (() => {
+        const applied = applyMoneyEffect(giveAmount, { note: giveMoneyMatch.note || '' });
+        if (!applied) {
+          const limitMsg = getTodayGivenCount() >= 5
+            ? '[系统：今日零花钱次数已达上限，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]'
+            : '[系统：本周零花钱已达上限£300，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]';
+          chatHistory.push({ role: 'user', content: limitMsg, _system: true });
+          return false;
+        }
         incrementMoneyRequest();
-      }
-    }
+        return true;
+      })();
 
     // 检测要钱关键词
     const moneyKeywords = ['给我钱','转我','好穷','买不起','能不能给','要钱','零花钱'];
     if (moneyKeywords.some(k => text.includes(k))) incrementMoneyRequest();
 
-    // 检测道歉（冷战解除）
-    const apologyKeywords = ['对不起','抱歉','sorry','我错了','别生气'];
-    if (localStorage.getItem('coldWarMode') === 'true' &&
-        apologyKeywords.some(k => text.toLowerCase().includes(k))) {
-      endColdWar(true);
-      changeMood(2);
+    // 检测道歉（冷战解除）— 用D老师判定，避免误触发
+    if (localStorage.getItem('coldWarMode') === 'true') {
+      fetchDeepSeek(
+        '判断用户消息是否在向Ghost道歉或者想修复关系。只返回JSON：{"apology": true} 或 {"apology": false}\n必须是明确针对Ghost的道歉或求和，不是对别人道歉。',
+        `用户说：${text}`,
+        40
+      ).then(raw => {
+        try {
+          const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+          if (result.apology) { endColdWar(true); changeMood(2); }
+        } catch(e) {}
+      }).catch(() => {});
     }
 
     // 检测冷战标记（由Ghost自己决定）
@@ -3289,7 +3471,7 @@ async function sendMessage() {
       changeAffection(1);
     }
 
-    chatHistory.push({ role: 'assistant', content: reply, ...(giveMoneyMatch && giveAmount > 0 ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
+    chatHistory.push({ role: 'assistant', content: reply, ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
     saveHistory();
 
     // 副作用全部用try-catch包住，失败静默处理，不影响主流程
@@ -3388,7 +3570,8 @@ function saveHistory() {
     chatHistory = chatHistory.slice(-100);
   }
   localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-  saveToCloud(); // 云端同步（有节流）
+  touchLocalState();
+  scheduleCloudSave();
 }
 
 // ===== 重新上线问候 =====
@@ -3504,16 +3687,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 页面关闭/刷新前强制保存，绕过30秒节流
+// 页面关闭/切后台时尽力保存（注意：异步不保证100%成功，只能尽力）
+// _lastSyncTime 仅用于此处强制触发，不参与日常节流（日常由scheduleCloudSave防抖控制）
 window.addEventListener('beforeunload', () => {
-  _lastSyncTime = 0; // 重置节流，强制下次保存
-  saveToCloud();
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  saveToCloud(); // 尽力同步，不保证一定成功
 });
 
-// 切到后台时也保存（手机常见场景）
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    _lastSyncTime = 0;
-    saveToCloud();
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+    saveToCloud(); // 切后台时尽力保存
   }
 });
 
@@ -3913,8 +4097,8 @@ function setBalance(val) {
   localStorage.setItem('wallet', Math.max(0, val).toFixed(2));
   const balEl = document.getElementById('transferBalance');
   if (balEl) balEl.textContent = '£' + Math.floor(Math.max(0, val));
-  // 余额变化立刻同步云端，绕过节流
-  _lastSyncTime = 0;
+  touchLocalState();
+  // 余额变化立刻同步，不走防抖
   saveToCloud();
 }
 function getTransactions() {
@@ -4006,7 +4190,7 @@ function checkSalaryDay() {
   if (today.getDate() !== 25) return;
   const salaryKey = 'salaryPaid_' + today.getFullYear() + '_' + (today.getMonth()+1);
   if (localStorage.getItem(salaryKey)) return;
-  const salary = (Math.floor(Math.random() * 8) + 8) * 100; // £800-£1500
+  const salary = (Math.floor(Math.random() * 11) + 15) * 100; // £1500-£2500
   localStorage.setItem(salaryKey, salary.toString());
   localStorage.setItem('lastSalaryAmount', salary);
   localStorage.setItem('lastSalaryMonth', today.getFullYear() + '-' + (today.getMonth()+1));
@@ -5156,30 +5340,30 @@ const MARKET_CATEGORIES = [
 
 const MARKET_PRODUCTS = {
   clothing: [
-    { emoji: '🧥', name: '羊毛大衣',   desc: '英伦风格羊毛大衣，曼城冬天必备', price: 85,  shipping: 15, lostReplace: { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: 'Ghost挑的，低调质感' } },
-    { emoji: '🧤', name: '毛线手套',   desc: '柔软保暖，适合在营地的他',        price: 22,  shipping: 15 },
-    { emoji: '🎩', name: '英伦绅士帽', desc: '经典圆顶礼帽，Ghost 专属风格',    price: 48,  shipping: 15 },
-    { emoji: '🧣', name: '格纹围巾',   desc: '苏格兰格纹，温暖又好看',          price: 35,  shipping: 15 },
-    { emoji: '🥾', name: '军靴',       desc: '结实耐穿的战术靴，任务首选',      price: 120, shipping: 15 },
-    { emoji: '🧦', name: '厚羊毛袜',   desc: '英国本地羊毛，超级暖和',          price: 15,  shipping: 15 },
-    { emoji: '🕶️', name: '墨镜',       desc: 'Ghost 标配，低调又帅气',          price: 68,  shipping: 15 },
-    { emoji: '🧤', name: '皮手套',     desc: '棕色皮质，英伦绅士风',            price: 55,  shipping: 15 },
+    { emoji: '🧥', name: '羊毛大衣',   desc: '英伦风格羊毛大衣，曼城冬天必备', price: 85,  shipping: 18, lostReplace: { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: 'Ghost挑的，低调质感' } },
+    { emoji: '🧤', name: '毛线手套',   desc: '柔软保暖，适合在营地的他',        price: 22,  shipping: 18 },
+    { emoji: '🎩', name: '英伦绅士帽', desc: '经典圆顶礼帽，Ghost 专属风格',    price: 48,  shipping: 18 },
+    { emoji: '🧣', name: '格纹围巾',   desc: '苏格兰格纹，温暖又好看',          price: 35,  shipping: 18 },
+    { emoji: '🥾', name: '军靴',       desc: '结实耐穿的战术靴，任务首选',      price: 150, shipping: 18 },
+    { emoji: '🧦', name: '厚羊毛袜',   desc: '英国本地羊毛，超级暖和',          price: 15,  shipping: 18 },
+    { emoji: '🕶️', name: '墨镜',       desc: 'Ghost 标配，低调又帅气',          price: 68,  shipping: 18 },
+    { emoji: '🧤', name: '皮手套',     desc: '棕色皮质，英伦绅士风',            price: 55,  shipping: 18 },
   ],
   food: [
-    { emoji: '🍵', name: '英式早餐茶罐',       desc: '精美铁罐装，50包正宗 Yorkshire 红茶', price: 18, shipping: 15 },
-    { emoji: '🍫', name: 'Cadbury 巧克力礼盒', desc: '英国国民巧克力，密封礼盒装',          price: 22, shipping: 15 },
-    { emoji: '🍯', name: '苏格兰蜂蜜罐',       desc: '山区野花蜂蜜，玻璃密封罐装',          price: 25, shipping: 15 },
-    { emoji: '🍪', name: '黄油饼干礼盒',       desc: '英式铁罐装黄油饼干，保质一年',         price: 20, shipping: 15 },
+    { emoji: '🍵', name: '英式早餐茶罐',       desc: '精美铁罐装，50包正宗 Yorkshire 红茶', price: 18, shipping: 10 },
+    { emoji: '🍫', name: 'Cadbury 巧克力礼盒', desc: '英国国民巧克力，密封礼盒装',          price: 22, shipping: 10 },
+    { emoji: '🍯', name: '苏格兰蜂蜜罐',       desc: '山区野花蜂蜜，玻璃密封罐装',          price: 25, shipping: 10 },
+    { emoji: '🍪', name: '黄油饼干礼盒',       desc: '英式铁罐装黄油饼干，保质一年',         price: 20, shipping: 10 },
     { emoji: '🥃', name: '苏格兰威士忌',       desc: '单一麦芽，12年陈酿，送给他解压',       price: 65, shipping: 15 },
-    { emoji: '🍵', name: 'Earl Grey 伯爵茶',   desc: '佛手柑香气，精美礼盒装',              price: 28, shipping: 15 },
-    { emoji: '🍓', name: '草莓果酱礼盒',       desc: '英式手工果酱套装，三种口味',           price: 32, shipping: 15 },
+    { emoji: '🍵', name: 'Earl Grey 伯爵茶',   desc: '佛手柑香气，精美礼盒装',              price: 28, shipping: 10 },
+    { emoji: '🍓', name: '草莓果酱礼盒',       desc: '英式手工果酱套装，三种口味',           price: 32, shipping: 10 },
     { emoji: '🍫', name: '松露巧克力盒',       desc: '比利时手工松露，礼盒密封装',           price: 45, shipping: 15 },
   ],
   gift: [
-    { emoji: '💮', name: '永生玫瑰',    desc: '真花处理工艺，永不凋谢的爱意',    price: 88,  shipping: 15, lostReplace: { emoji: '🌹', name: '玫瑰香氛礼盒', desc: 'Ghost补寄的，换了形式但一样的心意' } },
-    { emoji: '🕯️', name: '香薰蜡烛',   desc: '玫瑰+雪松香，为他的营地添温暖',   price: 35,  shipping: 15 },
-    { emoji: '🖼️', name: '定制相框',    desc: '放上你们最美的合影，永久保存',    price: 45,  shipping: 15 },
-    { emoji: '💌', name: '手写信封套装', desc: '复古英式信纸，写下最深的思念',    price: 18,  shipping: 15 },
+    { emoji: '💮', name: '永生玫瑰',    desc: '真花处理工艺，永不凋谢的爱意',    price: 120,  shipping: 15, lostReplace: { emoji: '🌹', name: '玫瑰香氛礼盒', desc: 'Ghost补寄的，换了形式但一样的心意' } },
+    { emoji: '🕯️', name: '香薰蜡烛',   desc: '玫瑰+雪松香，为他的营地添温暖',   price: 55,  shipping: 15 },
+    { emoji: '🖼️', name: '定制相框',    desc: '放上你们最美的合影，永久保存',    price: 80,  shipping: 15 },
+    { emoji: '💌', name: '手写信封套装', desc: '复古英式信纸，写下最深的思念',    price: 18,  shipping: 10 },
     { emoji: '🎵', name: '音乐盒',      desc: '播放你们专属的那首歌',            price: 68,  shipping: 15 },
     { emoji: '💎', name: '情侣吊坠',    desc: '925银，两颗心拼在一起的设计',    price: 120, shipping: 15 },
     { emoji: '🧴', name: '男士护肤套装', desc: '让他好好保养自己，你看着放心',   price: 85,  shipping: 15 },
@@ -5196,6 +5380,7 @@ const MARKET_PRODUCTS = {
     { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: '英国经典户外品牌，低调有质感', price: 380, shipping: 35, isGhostGift: true },
     { emoji: '🎒', name: 'Belstaff 军旅背包', desc: '英国品牌，低调耐用，Ghost同款', price: 580, shipping: 35, isGhostGift: true },
     { emoji: '🪒', name: 'Tom Ford 剃须套装', desc: '低调有质感，让他好好保养', price: 180, shipping: 35, isGhostGift: true },
+    { emoji: '🔥', name: '定制Zippo打火机', desc: '刻着Simon名字，只属于他一个人的', price: 320, shipping: 35, isGhostGift: true },
   ],
   fromhome: [
     { emoji: '🦆', name: '北京烤鸭礼盒',     desc: '真空包装，附上饼和甜面酱，教他怎么吃', price: 45, shipping: 20, isFromHome: true },
@@ -5867,7 +6052,7 @@ const SHIPPING_COMPLAINTS = [
 function addDelivery(product, isGhostSend, isLuxury) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
   const totalMs = isGhostSend
-    ? (Math.floor(Math.random() * 7) + 7) * 24 * 3600 * 1000  // Ghost反寄7-14天
+    ? (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000  // Ghost反寄1-2天
     : (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000; // 用户寄2-3天
   const stages = isGhostSend ? DELIVERY_STAGES_GHOST : DELIVERY_STAGES_USER;
   const now = Date.now();
@@ -5913,7 +6098,7 @@ function addDelivery(product, isGhostSend, isLuxury) {
 function addGhostReverseDelivery(item, emotionType) {
   // Ghost主动反寄，不显示小票，只在商城顶部显示神秘提示
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const totalMs = (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
+  const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000; // 1-2天
   const now = Date.now();
   const interval = totalMs / DELIVERY_STAGES_GHOST.length;
   const daysEst = Math.round(totalMs / (24 * 3600 * 1000));
@@ -5934,21 +6119,7 @@ function addGhostReverseDelivery(item, emotionType) {
     productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 10)));
-
-  // 在聊天里显示快递通知气泡
-  setTimeout(() => {
-    const container = document.getElementById('messagesContainer');
-    if (!container) return;
-    const div = document.createElement('div');
-    div.className = 'message bot';
-    div.style.cssText = 'opacity:0.85';
-    div.innerHTML = `<div style="background:linear-gradient(135deg,rgba(99,58,162,0.08),rgba(168,85,247,0.05));border:1.5px solid rgba(168,85,247,0.2);border-radius:16px;padding:10px 14px;font-size:13px;color:#5b21b6;max-width:220px;">
-      📦 有一份包裹正在配送中<br>
-      <span style="font-size:11px;color:rgba(91,33,182,0.5);">预计 ${daysEst} 天后送达，去商城查看物流</span>
-    </div>`;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-  }, 3000);
+  // 不在聊天里立刻显示，等快递到达时再弹窗通知，保留惊喜感
 }
 
 function checkDeliveryUpdates() {
