@@ -105,18 +105,6 @@ async function loadFromCloud() {
       if (s.sassyPost) localStorage.setItem('sassyPost', s.sassyPost);
     }
     console.log('云端数据已加载');
-
-    // 一次性补偿发放（2026年3月21日系统故障补偿）
-    const compensationKey = 'compensation_20260321_v2';
-    if (!localStorage.getItem(compensationKey)) {
-      const currentBalance = parseFloat(localStorage.getItem('wallet') || '0');
-      localStorage.setItem('wallet', (currentBalance + 200).toFixed(2));
-      localStorage.setItem(compensationKey, '1');
-      _lastSyncTime = 0;
-      saveToCloud();
-      setTimeout(() => { if (typeof renderWallet === 'function') renderWallet(); }, 500);
-      console.log('补偿£200已发放');
-    }
   } catch(e) {
     console.log('云端加载失败，使用本地数据', e);
   }
@@ -2651,6 +2639,17 @@ async function initChat() {
   if (!container) return;
   // 先不渲染，等云端数据加载完再一次性渲染
   await loadFromCloud();
+
+  // 一次性补偿发放（2026年3月21日系统故障补偿）
+  const compensationKey = 'compensation_20260321_v2';
+  if (!localStorage.getItem(compensationKey)) {
+    const currentBalance = parseFloat(localStorage.getItem('wallet') || '0');
+    localStorage.setItem('wallet', (currentBalance + 200).toFixed(2));
+    localStorage.setItem(compensationKey, '1');
+    _lastSyncTime = 0;
+    saveToCloud();
+    renderWallet();
+  }
   const saved = localStorage.getItem('chatHistory');
   if (saved) {
     try { chatHistory = JSON.parse(saved); } catch(e) { chatHistory = []; }
