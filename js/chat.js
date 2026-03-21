@@ -410,6 +410,32 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
   }
 }
 
+// ===== Gemini 翻译层 =====
+// 用第三档 Gemini 把英文翻译成自然中文，替换掉模型自带的生硬翻译
+const _translateCache = new Map();
+
+async function translateWithGemini(enText, zhEl) {
+  if (!enText || !enText.trim()) return;
+  const key = enText.trim();
+  // 命中缓存直接写入，不重复请求
+  if (_translateCache.has(key)) {
+    if (zhEl && zhEl.isConnected) zhEl.textContent = _translateCache.get(key);
+    return;
+  }
+  try {
+    const raw = await fetchDeepSeek(
+      '你是一个翻译助手。把用户输入的英文翻译成自然流畅的中文口语，保留语气和情绪，不要太正式，不要逐字翻译。只返回中文翻译，不要任何解释。',
+      key,
+      120
+    );
+    const zh = raw?.trim();
+    if (zh && /[\u4e00-\u9fff]/.test(zh)) {
+      _translateCache.set(key, zh);
+      if (zhEl && zhEl.isConnected) zhEl.textContent = zh;
+    }
+  } catch(e) {}
+}
+
 async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -3078,6 +3104,8 @@ function appendMessage(role, text, animate = true) {
       zhLine.textContent = zhLines.join(' ');
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
+      // 用 Gemini 异步翻译替换模型自带的生硬翻译
+      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine), 100);
     } else if (firstZhIdx === 0 && firstEnIdx > 0) {
       // 中文在前英文在后——重新排列，英文提到前面
       const enLines = lines.filter(l => !isChinese(l) && l.trim());
@@ -3091,7 +3119,7 @@ function appendMessage(role, text, animate = true) {
       zhLine.textContent = zhLines.join('');
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
-    } else if (firstZhIdx === 0 && lines.length === 1 && /[a-zA-Z]/.test(lines[0])) {
+      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine), 100);
       // 同一行英中混排，如 "yeah. [嗯。]" 或 "yeah. 嗯。"
       // 把中文及前面的分隔符拆出来
       const raw = lines[0];
@@ -3107,11 +3135,26 @@ function appendMessage(role, text, animate = true) {
         zhLine.textContent = zhPart;
         bubble.appendChild(enLine);
         bubble.appendChild(zhLine);
+        setTimeout(() => translateWithGemini(enPart, zhLine), 100);
       } else {
         bubble.textContent = text;
       }
     } else {
-      bubble.textContent = text;
+      // 纯英文或无中文——加一个空的 zh 占位，让 Gemini 填入翻译
+      if (role === 'bot' && /[a-zA-Z]/.test(text) && text.trim().length > 3) {
+        const enLine = document.createElement('div');
+        enLine.className = 'bubble-en';
+        enLine.textContent = text;
+        enLine.style.whiteSpace = 'pre-line';
+        const zhLine = document.createElement('div');
+        zhLine.className = 'bubble-zh';
+        zhLine.textContent = '';
+        bubble.appendChild(enLine);
+        bubble.appendChild(zhLine);
+        setTimeout(() => translateWithGemini(text, zhLine), 100);
+      } else {
+        bubble.textContent = text;
+      }
     }
   } else {
     bubble.textContent = text;
