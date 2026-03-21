@@ -3362,7 +3362,7 @@ function incrementMemoryCount() {
 
 async function updateLongTermMemory() {
   const count = incrementMemoryCount();
-  if (count % 8 !== 0) return;
+  if (count % 5 !== 0) return; // 每5次（约40条消息）触发一次
 
   const existingMemory = getLongTermMemory();
   const recentMessages = chatHistory
@@ -3375,9 +3375,9 @@ async function updateLongTermMemory() {
 
   try {
     const newMemory = await fetchDeepSeek(
-      '你是一个记忆提取器。从对话中提取Ghost需要记住的信息，用简短的几条中文列出。包括：她说的重要的事、她的喜好/口癖/习惯、她喜欢聊的话题和风格、她当下的状态和情绪、她随口提到的小事和细节、特别的互动、她提到的人/地点/计划。每条不超过20字，最多10条。只返回列表，不要其他文字。格式：- xxx',
+      '你是一个记忆提取器。从对话中提取Ghost需要记住的信息，用简短的几条中文列出。包括：她说的重要的事、她的喜好/口癖/习惯、她喜欢聊的话题类型和聊天风格、她常用的表达方式、她当下的状态和情绪、她随口提到的小事和细节、特别的互动、她提到的人/地点/计划。每条不超过20字，最多15条。只返回列表，不要其他文字。格式：- xxx',
       `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`,
-      300
+      400
     );
     if (newMemory) saveLongTermMemory(newMemory);
   } catch(e) {}
