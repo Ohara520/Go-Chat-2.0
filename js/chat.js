@@ -3788,27 +3788,14 @@ function scheduleSilenceCheck(index) {
 
 // ===== 键盘弹出/收起时防止空白区域残留 =====
 if (window.visualViewport) {
-  const handleViewportResize = () => {
+  window.visualViewport.addEventListener('resize', () => {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
-    const chatContainer = document.querySelector('.chat-container');
-    if (!chatContainer) return;
-
-    const vv = window.visualViewport;
-    // 同时设 top 和 height，消除键盘弹起时底部空白
-    chatContainer.style.position = 'fixed';
-    chatContainer.style.top = vv.offsetTop + 'px';
-    chatContainer.style.left = vv.offsetLeft + 'px';
-    chatContainer.style.width = vv.width + 'px';
-    chatContainer.style.height = vv.height + 'px';
-
-    // 滚到底部，防止输入框被键盘遮住
+    // interactive-widget=resizes-content 已处理键盘空白问题
+    // 这里只做滚底，防止输入框被遮
     const container = document.getElementById('messagesContainer');
     if (container) setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
-  };
-
-  window.visualViewport.addEventListener('resize', handleViewportResize);
-  window.visualViewport.addEventListener('scroll', handleViewportResize);
+  });
 }
 
 // ===== 切换到聊天页时的轻量刷新（不清空重渲，防止闪屏）=====
