@@ -2530,3 +2530,29 @@
   from { transform: translateY(100%); opacity: 0; }
   to   { transform: translateY(0);   opacity: 1; }
 }
+
+/* ===== 情侣空间 Tab 切换 ===== */
+.couple-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 4px;
+}
+.couple-tab {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 20px;
+  border: 1.5px solid rgba(168,85,247,0.2);
+  background: transparent;
+  color: #a78bbd;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.couple-tab.active {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 12px rgba(168,85,247,0.3);
+}

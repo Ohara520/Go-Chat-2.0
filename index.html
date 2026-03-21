@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="color-scheme" content="light only">
 <title>Go Chat</title>
 <link rel="stylesheet" href="css/base.css">
@@ -733,6 +733,15 @@
     <!-- Feed -->
     <div class="couple-feed-section">
 
+      <!-- Tab 切换 -->
+      <div class="couple-tabs">
+        <button class="couple-tab active" id="tabFeed" onclick="switchCoupleTab('feed')">动态</button>
+        <button class="couple-tab" id="tabMemory" onclick="switchCoupleTab('memory')">回忆</button>
+      </div>
+
+      <!-- 动态面板 -->
+      <div id="panelFeed">
+
       <!-- 置顶婚帖 -->
       <div class="couple-post-card couple-wedding">
         <div class="couple-pinned-tag">📌 置顶</div>
@@ -790,6 +799,18 @@
 
       <!-- AI动态Feed -->
       <div id="couplePostsFeed"></div>
+
+      </div><!-- end panelFeed -->
+
+      <!-- 回忆面板 -->
+      <div id="panelMemory" style="display:none;">
+        <!-- 关系阶段条 -->
+        <div class="memory-stage-bar" id="memoryStageBar"></div>
+        <!-- 精选3张 -->
+        <div class="memory-highlights" id="memoryHighlights"></div>
+        <!-- 完整时间线 -->
+        <div class="memory-timeline" id="memoryTimeline"></div>
+      </div>
 
     </div>
   </div>
