@@ -2327,8 +2327,12 @@ function endColdWar(userApologized = false) {
   }
   localStorage.setItem('pendingColdWarEndStory', 'true');
   setTimeout(() => checkStoryOnColdWarEnd(), 8000);
-  // 和好入事件池，延迟20-180分钟后才可能发帖
+  // 和好入事件池，延迟20-180分钟后才可能发帖（Ghost侧）
   feedEvent_madeUp();
+  // 用户侧：和好是双方的事，延迟20-90分钟后弹草稿
+  setTimeout(() => {
+    showUserDraftCard({ type: 'made_up', actor: 'user', meta: {} });
+  }, randMinutes(20, 90));
 }
 
 function ghostApologize() {
@@ -2825,6 +2829,28 @@ let lastMessageTime = null;
 async function initChat() {
   // 好感度初始化（首次）
   if (!localStorage.getItem('affection')) setAffection(80);
+
+  // 纪念日/整数天检测 → 弹用户草稿
+  const _marriageDate = localStorage.getItem('marriageDate');
+  if (_marriageDate) {
+    const _days = Math.max(1, Math.floor((Date.now() - new Date(_marriageDate).getTime()) / 86400000) + 1);
+    const _isMilestone = _days === 52 || (_days % 100 === 0 && _days > 0) || _days === 365;
+    const _isAnniversary = _days >= 365 && (() => {
+      const [,mm,dd] = _marriageDate.split('-').map(Number);
+      const now = new Date();
+      return now.getMonth() + 1 === mm && now.getDate() === dd;
+    })();
+    const _milestoneKey = 'milestoneDraftShown_' + _days;
+    if ((_isMilestone || _isAnniversary) && !localStorage.getItem(_milestoneKey)) {
+      localStorage.setItem(_milestoneKey, '1');
+      setTimeout(() => {
+        showUserDraftCard({
+          type: 'anniversary', actor: 'user',
+          meta: { days: _days, isAnniversary: _isAnniversary }
+        });
+      }, 8000); // 进聊天8秒后弹，不要太急
+    }
+  }
 
   // 检查待触发的"我们谈谈"
   if (localStorage.getItem('pendingSeriousTalk') === 'true') {
@@ -4548,15 +4574,27 @@ async function showUserDraftCard(evt) {
   // 生成3个风格版本
   const item = evt.meta?.itemName || '这件事';
   const amount = evt.meta?.amount || 0;
-  const contextDesc = evt.type === 'bought_big_item'
-    ? `刚买了${item}，花了£${amount}`
-    : evt.type === 'gift_received' ? `刚收到了${item}` : '刚发生了一件开心的事';
+  const days = evt.meta?.days || 0;
+  const isAnniversary = evt.meta?.isAnniversary || false;
+  const isReplace = evt.meta?.isReplace || false;
+
+  const contextDescMap = {
+    bought_big_item: `刚${item.includes('车') ? '买了一辆车' : item.includes('房') ? '买了一套房' : item.includes('地') ? '买了一块地' : `买了${item}`}`,
+    gift_received: isReplace
+      ? `快递丢失后，西蒙悄悄补寄了「${item}」，刚收到`
+      : `刚收到了西蒙寄来的「${item}」`,
+    made_up: '和西蒙冷战后刚和好了',
+    anniversary: isAnniversary
+      ? `今天是结婚一周年纪念日`
+      : `今天是在一起第${days}天`,
+  };
+  const contextDesc = contextDescMap[evt.type] || '刚发生了一件开心的事';
 
   let options = ['今天有点开心。', '有些事，不说，但记着。', '谁也没告诉，但就是挺满足的。'];
   try {
     const raw = await fetchDeepSeek(
       '你是一个朋友圈文案生成器。只返回JSON，不要其他文字。',
-      `用户${contextDesc}，帮她生成3条朋友圈候选文案（一句话，口语化，不要太甜腻）。分别是：低调版、情绪版、嘴硬版。附中文只需要一句话本身。只返回JSON：{"quiet":"...","emotional":"...","tsundere":"..."}`,
+      `用户${contextDesc}，帮她生成3条朋友圈候选文案（一句话，口语化，不要太甜腻，不要提西蒙名字）。分别是：低调版、情绪版、嘴硬版。只返回JSON：{"quiet":"...","emotional":"...","tsundere":"..."}`,
       200
     );
     const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
@@ -4567,6 +4605,14 @@ async function showUserDraftCard(evt) {
   // 移除旧弹窗
   document.getElementById('userDraftCard')?.remove();
 
+  const titleMap = {
+    bought_big_item: '要不要把这一刻留在动态里？',
+    gift_received: isReplace ? '他补寄了——要留个记录吗？' : '收到他的东西，发一条？',
+    made_up: '和好了，要说点什么吗？',
+    anniversary: isAnniversary ? '一周年纪念日，留一条？' : `第${days}天，发一条？`,
+  };
+  const cardTitle = titleMap[evt.type] || '要不要把这一刻留在动态里？';
+
   const labels = ['低调', '情绪', '嘴硬'];
   const card = document.createElement('div');
   card.id = 'userDraftCard';
@@ -4574,7 +4620,7 @@ async function showUserDraftCard(evt) {
   card.innerHTML = `
     <div style="text-align:center;margin-bottom:12px;">
       <div style="width:36px;height:4px;background:rgba(168,85,247,0.3);border-radius:2px;margin:0 auto 12px;"></div>
-      <div style="font-size:13px;color:#9333ea;font-weight:600;">要不要把这一刻留在动态里？</div>
+      <div style="font-size:13px;color:#9333ea;font-weight:600;">${cardTitle}</div>
     </div>
     <div id="draftOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
       ${options.map((opt, i) => `
@@ -6879,6 +6925,16 @@ function showMysteryPackage(delivery) {
         appendMessage('bot', reply);
         chatHistory.push({ role: 'assistant', content: reply });
         saveHistory();
+      }
+      // 用户收到 Ghost 补偿反寄 → 弹草稿
+      if (delivery.productData?.lostReplace || delivery.noLost) {
+        setTimeout(() => {
+          const evt = {
+            type: 'gift_received', actor: 'user',
+            meta: { itemName: delivery.name, isReplace: true }
+          };
+          showUserDraftCard(evt);
+        }, 4000);
       }
     } catch(e) {}
   }, 2000);
