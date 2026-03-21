@@ -740,9 +740,9 @@ Today's detail to bring up naturally if it fits (skip if not):「${(() => {
   return fullPrompt;
 }
 
-function buildSystemPromptParts() {
-  // 重新调用一次获取固定和动态部分
-  const full = buildSystemPrompt();
+function buildSystemPromptParts(full) {
+  // 接收已构建好的 prompt，不再内部调用 buildSystemPrompt()，避免副作用触发两次
+  if (!full) full = buildSystemPrompt();
   const splitMarker = '[CURRENT STATE]';
   const idx = full.indexOf(splitMarker);
   if (idx === -1) return { fixed: full, dynamic: '' };
@@ -1354,10 +1354,14 @@ async function emitGhostEvent(eventType, payload = {}) {
       line = payload.line || "check your account.\n看看账户。";
       systemTag = `GIVE_MONEY:${amount}:`;
       sideEffect = () => {
+        // 吃醋情绪性转账：不受周限制，prompt 里明确说明
+        const jealousy = getJealousyLevel();
+        const isJealousyGift = payload.isJealousyGift || (jealousy === 'mild' || jealousy === 'medium');
         applyMoneyEffect(amount, {
-          label: payload.label || 'Ghost 零花钱',
+          label: payload.label || (isJealousyGift ? 'Ghost 吃醋转账' : 'Ghost 零花钱'),
           note: payload.note || '',
-          cardDelay: (payload.delayMs || 2000) + 600
+          cardDelay: (payload.delayMs || 2000) + 600,
+          bypassWeeklyLimit: isJealousyGift,
         });
       };
       break;
@@ -2227,7 +2231,7 @@ function triggerSeriousTalk() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 1000,
-      system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+      ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(data => {
@@ -2285,7 +2289,7 @@ function ghostApologize() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 500,
-      system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+      ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(async data => {
@@ -2308,7 +2312,7 @@ function ghostSendMakeupMoney() {
     body: JSON.stringify({
       model: getMainModel(),
       max_tokens: 300,
-      system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+      ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
       messages: chatHistory.slice(-20)
     })
   }).then(r => r.json()).then(async data => {
@@ -2344,10 +2348,14 @@ function applyMoneyEffect(amount, options = {}) {
   const todayCount = getTodayGivenCount();
   if (todayCount >= 5) return false;
 
-  // 每周上限检查
+  // 每周上限检查——吃醋情绪性转账可绕过
   const weeklyUsed = getWeeklyGiven();
-  if (weeklyUsed >= 300) return false;
-  const actualAmount = Math.min(amount, 300 - weeklyUsed);
+  if (!options.bypassWeeklyLimit) {
+    if (weeklyUsed >= 300) return false;
+  }
+  const actualAmount = options.bypassWeeklyLimit
+    ? amount
+    : Math.min(amount, 300 - weeklyUsed);
 
   setBalance(getBalance() + actualAmount);
   addWeeklyGiven(actualAmount);
@@ -2402,7 +2410,7 @@ async function ghostSendInitMessage(offlineHours) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-6), {
           role: 'user',
           content: `[系统：${hint}你注意到了，主动说一句——可以是质问、可以是随口一提、可以是什么都不说只是打个招呼。全小写，附中文翻译。]`
@@ -2511,7 +2519,8 @@ async function sendSticker(id) {
       .map(m => ({ role: m.role, content: m.content }));
 
     // 把表情包情绪提示注入system
-    const stickerSystem = buildSystemPrompt() + `\n\n[本轮提示：${meta.ghostHint}不要提"表情包"三个字，自然回应就好。]`;
+    const _stickerBase = buildSystemPrompt();
+    const stickerSystem = _stickerBase + `\n\n[本轮提示：${meta.ghostHint}不要提"表情包"三个字，自然回应就好。]`;
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
@@ -2520,7 +2529,7 @@ async function sendSticker(id) {
         model: getMainModel(),
         max_tokens: 300,
         system: stickerSystem,
-        systemParts: buildSystemPromptParts(),
+        systemParts: buildSystemPromptParts(_stickerBase),
         messages: cleanHistory,
       })
     }, 30000);
@@ -2621,7 +2630,7 @@ function confirmTransfer() {
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
-      system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+      ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
       messages: cleanMessages(chatHistory.slice(-10))
     })
   }).then(r => r.json()).then(data => {
@@ -3323,9 +3332,10 @@ async function sendMessage() {
       .map(m => ({ role: m.role, content: m.content }));
 
     // 情绪提示注入system prompt末尾，不放进history
+    const _baseSystem = buildSystemPrompt();
     const finalSystem = emotionHint
-      ? buildSystemPrompt() + '\n' + emotionHint
-      : buildSystemPrompt();
+      ? _baseSystem + '\n' + emotionHint
+      : _baseSystem;
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
@@ -3333,7 +3343,7 @@ async function sendMessage() {
       body: JSON.stringify({
         model: getMainModel(),
         max_tokens: 1000,
-        system: finalSystem, systemParts: buildSystemPromptParts(),
+        system: finalSystem, systemParts: buildSystemPromptParts(_baseSystem),
         messages: cleanHistory
       })
     }, 30000);
@@ -3358,7 +3368,7 @@ async function sendMessage() {
         body: JSON.stringify({
           model: getMainModel(),
           max_tokens: 1000,
-          system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+          ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
           messages: cleanHistory
         })
       }, 30000);
@@ -3431,7 +3441,7 @@ async function sendMessage() {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 150,
-              system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+              ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
               messages: [...chatHistory.slice(-8), {
                 role: 'user',
                 content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，附中文翻译。]'
@@ -3454,7 +3464,13 @@ async function sendMessage() {
     // 渲染转账卡片 + 更新钱包（统一走applyMoneyEffect）
     const transferSuccess = giveMoneyMatch && giveAmount > 0 &&
       (() => {
-        const applied = applyMoneyEffect(giveAmount, { note: giveMoneyMatch.note || '' });
+        const jealousy = getJealousyLevel();
+        const isJealousyGift = jealousy === 'mild' || jealousy === 'medium';
+        const applied = applyMoneyEffect(giveAmount, {
+          note: giveMoneyMatch.note || '',
+          label: isJealousyGift ? 'Ghost 吃醋转账' : 'Ghost 零花钱',
+          bypassWeeklyLimit: isJealousyGift,
+        });
         if (!applied) {
           const limitMsg = getTodayGivenCount() >= 5
             ? '[系统：今日零花钱次数已达上限，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]'
@@ -3622,7 +3638,7 @@ function checkOnlineGreeting() {
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001', // 上线问候不需要Sonnet
           max_tokens: 200,
-          system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+          ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
           messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
         })
       }).then(r => r.json()).then(data => {
@@ -3660,7 +3676,7 @@ function scheduleSilenceCheck(index) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001', // 沉默提醒不需要Sonnet，Haiku够用
         max_tokens: 200,
-        system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-10), { role: 'user', content: systemNote }]
       })
     }).then(r => r.json()).then(data => {
@@ -5996,7 +6012,7 @@ async function triggerHomeItemMoment(product) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
-        system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-6), {
           role: 'user',
           content: `[系统：老婆刚${desc}。${hint}。用西蒙的方式回应——可以是意外、认可、破防、嘴硬，但能感受到他是在意的。全小写，附中文翻译。]`
@@ -6333,7 +6349,7 @@ async function onGhostReceived(delivery) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-10), {
           role: 'user',
           content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || ''}
@@ -6373,7 +6389,7 @@ async function onGhostReceived(delivery) {
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
             max_tokens: 300,
-            system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+            ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
             messages: [...chatHistory.slice(-15), {
               role: 'user',
               content: `[系统：你收到了一件奢侈品「${delivery.name}」，这不是普通礼物，有分量。
@@ -6412,7 +6428,7 @@ async function onGhostReceived(delivery) {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 100,
-              system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+              ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
               messages: [...chatHistory.slice(-6), {
                 role: 'user',
                 content: `[系统：几天前你收到了老婆寄来的「${delivery.name}」，现在你想起来说一句感受，可能是吃完了/试过了/还在想那个味道。简短，全小写，附中文翻译。不要太刻意，就是随口一提。]`
@@ -6472,7 +6488,7 @@ function showMysteryPackage(delivery) {
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 300,
-          system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+          ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
           messages: [...chatHistory.slice(-10), {
             role: 'user',
             content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。如果她问是不是你寄的，你可以承认也可以否认，看你当下心情——否认的话要装得像，别穿帮太明显。你不主动提是从哪里寄的。${delivery.productData?.tip ? `参考语气：「${delivery.productData.tip}」——这是你的风格，不用照抄，意思到了就行。` : ''}现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，附中文翻译。]`
@@ -6521,7 +6537,7 @@ async function handleLostPackageClaim(userText) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
-        system: buildSystemPrompt(), systemParts: buildSystemPromptParts(),
+        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: chatHistory.slice(-20)
       })
     });
