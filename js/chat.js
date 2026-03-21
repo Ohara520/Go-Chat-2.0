@@ -1443,7 +1443,11 @@ async function emitGhostEvent(eventType, payload = {}) {
       chatHistory.push({
         role: 'assistant',
         content: line,
-        ...(systemTag ? { _eventTag: systemTag } : {})
+        ...(systemTag ? { _eventTag: systemTag } : {}),
+        // money 이벤트면 _transfer 저장해서 재진입 시 카드 재렌더링 가능하게
+        ...(systemTag && systemTag.startsWith('GIVE_MONEY:') ? {
+          _transfer: { amount: payload.amount || 0, isRefund: false }
+        } : {})
       });
       saveHistory();
       if (sideEffect) sideEffect();
@@ -1493,7 +1497,6 @@ async function emitGhostNarrativeEvent(text, options = {}) {
   if (!text) return;
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const jealousy = getJealousyLevel();
-  const mood = getMoodLevel();
 
   // 剧情事件优先级较高，只在极端情况下压制
   // 冷战中 + severe jealousy 才压制，其他情况正常触发
@@ -1506,7 +1509,9 @@ async function emitGhostNarrativeEvent(text, options = {}) {
   chatHistory.push({
     role: 'assistant',
     content: text,
-    _storyEvent: options.storyId || true
+    _storyEvent: options.storyId || true,
+    // 转账相关剧情事件存入 _transfer，便于重新进入时重建卡片
+    ...(options.transfer ? { _transfer: options.transfer } : {})
   });
   saveHistory();
   if (options.saveCloud !== false) scheduleCloudSave();
@@ -2327,8 +2332,14 @@ function ghostSendMakeupMoney() {
   }).then(r => r.json()).then(async data => {
     hideTyping();
     const reply = data.content?.[0]?.text || '...';
-    applyMoneyEffect(amount, { label: 'Ghost 悄悄转账', showCard: true, note: reply, cardDelay: 0 });
-    await emitGhostNarrativeEvent(reply, { storyId: 'cold_war_makeup_money', delayMs: 0 });
+    // showCard: false — 카드는 emitGhostNarrativeEvent가 _transfer로 저장해서 렌더링
+    applyMoneyEffect(amount, { label: 'Ghost 悄悄转账', showCard: false });
+    await emitGhostNarrativeEvent(reply, { storyId: 'cold_war_makeup_money', delayMs: 0, transfer: { amount, isRefund: false } });
+    // 카드 렌더링 (emitGhostNarrativeEvent는 텍스트만 추가, 카드는 별도 렌더)
+    setTimeout(() => {
+      const container = document.getElementById('messagesContainer');
+      if (container) showGhostTransferCard(container, amount, '', false);
+    }, 600);
   }).catch(() => { hideTyping(); });
 }
 
@@ -2888,7 +2899,25 @@ async function initChat() {
         const container = document.getElementById('messagesContainer');
         const cardId = 'transfer_' + chatHistory.indexOf(msg);
         if (container && !document.getElementById(cardId)) {
-          const { amount, isRefund } = msg._transfer;
+          const { amount: rawAmount, isRefund } = msg._transfer;
+          const amount = parseInt(rawAmount, 10) || 0;
+          // Ghost 转出卡片（左边灰色）
+          const divOut = document.createElement('div');
+          divOut.className = 'message bot';
+          divOut.innerHTML = `<div class="transfer-card ghost-transfer-card ${isRefund ? 'refund-card' : ''}">
+            <div class="transfer-card-top">
+              <div class="transfer-label">${isRefund ? 'REFUND' : 'TRANSFER TO YOU'}</div>
+              <div class="transfer-name">${isRefund ? '退款' : '转给你'}</div>
+            </div>
+            <div class="transfer-amount-block">
+              <div class="transfer-amount-label">AMOUNT</div>
+              <div class="transfer-amount">£${amount}</div>
+            </div>
+            <div class="transfer-footer">
+              <div class="transfer-status ${isRefund ? 'refund-status' : ''}">${isRefund ? '退款中' : '转账中'}</div>
+            </div></div>`;
+          container.appendChild(divOut);
+          // 用户收到卡片（右边粉色）
           const divIn = document.createElement('div');
           divIn.className = 'message user';
           divIn.id = cardId;
@@ -3497,6 +3526,8 @@ async function sendMessage() {
           chatHistory.push({ role: 'user', content: limitMsg, _system: true });
           return false;
         }
+        // 用实际到账金额覆盖，防止被周上限截断后不一致
+        giveAmount = applied;
         incrementMoneyRequest();
         return true;
       })();
@@ -4370,6 +4401,9 @@ function checkSalaryDay() {
     chatHistory.push({ role: 'user', content: salaryNote });
     const container = document.getElementById('messagesContainer');
     if (container) showGhostTransferCard(container, salary, `salary's in. £${salary}. don't ask where the rest went.\n工资到了，£${salary}。别问剩下的去哪了。`, false);
+    // 存入 _transfer 以便重新进入时重建卡片
+    chatHistory.push({ role: 'assistant', content: `salary's in. £${salary}. don't ask where the rest went.\n工资到了，£${salary}。别问剩下的去哪了。`, _transfer: { amount: salary, isRefund: false } });
+    saveHistory();
     showToast('💷 Ghost 本月工资已到账 £' + salary + '！');
   }, 2000);
 }
@@ -6575,6 +6609,9 @@ async function handleLostPackageClaim(userText) {
         renderWallet();
         const container = document.getElementById('messagesContainer');
         if (container) showGhostTransferCard(container, compensation, '', false);
+        // 存入 _transfer 以便重新进入时重建卡片
+        chatHistory.push({ role: 'assistant', content: `[快递遗失赔偿 £${compensation}]`, _transfer: { amount: compensation, isRefund: false } });
+        saveHistory();
         d.compensated = true;
         // 3000以上触发反寄
         if (price >= 3000 && d.productData?.lostReplace) {
