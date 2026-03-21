@@ -145,6 +145,10 @@ async function loadFromCloud() {
         const local = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
         if (s.coupleFeedHistory.length >= local.length) localStorage.setItem('coupleFeedHistory', JSON.stringify(s.coupleFeedHistory));
       }
+      if (Array.isArray(s.deliveryHistory)) {
+        const local = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+        if (s.deliveryHistory.length >= local.length) localStorage.setItem('deliveryHistory', JSON.stringify(s.deliveryHistory));
+      }
       // 每周给钱记录
       if (s.weeklyGiven != null) {
         const key = 'weeklyGiven_' + (typeof getWeekKey === 'function' ? getWeekKey() : '');
@@ -231,6 +235,7 @@ async function saveToCloud() {
       storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 10),
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 20),
       coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 10),
+      deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
       // 状态标记
       coldWarStart: localStorage.getItem('coldWarStart') || '',
@@ -2091,9 +2096,11 @@ function switchAchievementTab(tab) {
 function renderAlbum() {
   const container = document.getElementById('albumList');
   if (!container) return;
+  // 优先从永久相册历史读，fallback到deliveries里已完成的
+  const history = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  // 只收录已签收的快递，未到达的不显示（保留惊喜）
-  const done = deliveries.filter(d => d.done);
+  const fromDeliveries = deliveries.filter(d => d.done && !history.find(h => h.id === d.id));
+  const done = [...history, ...fromDeliveries];
   if (done.length === 0) {
     container.innerHTML = `<div class="album-empty">还没有收到任何东西<br>去商城给他寄点什么吧</div>`;
     return;
@@ -6153,11 +6160,16 @@ function checkDeliveryUpdates() {
         // 签收
         if (i === d.stages.length - 1 && !d.isLostConfirmed) {
           d.done = true;
+          d.doneAt = Date.now();
+          // 签收时存入永久相册历史
+          const history = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+          if (!history.find(h => h.id === d.id)) {
+            history.unshift(d);
+            localStorage.setItem('deliveryHistory', JSON.stringify(history));
+          }
           if (d.isGhostSend) {
-            // Ghost寄来的：商城显示神秘提示
             showMysteryPackage(d);
           } else {
-            // 用户寄的：Ghost签收，Haiku生成反应
             onGhostReceived(d);
           }
         }
