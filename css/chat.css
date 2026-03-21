@@ -2377,3 +2377,156 @@
   line-height: 2.2;
   font-style: italic;
 }
+
+/* ===== 共同回忆区 ===== */
+
+/* 关系阶段条 */
+.memory-stage-bar {
+  padding: 18px 20px 14px;
+  text-align: center;
+}
+.memory-stage-label {
+  font-size: 11px;
+  color: #c084fc;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.memory-stage-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #6b21a8;
+  margin-bottom: 6px;
+}
+.memory-stage-desc {
+  font-size: 12px;
+  color: #a78bbd;
+  line-height: 1.5;
+}
+
+/* 精选标题 */
+.memory-highlights-title,
+.memory-timeline-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c084fc;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 10px 20px 6px;
+}
+
+/* 通用回忆卡 */
+.memory-card {
+  margin: 6px 16px;
+  border-radius: 18px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 剧情卡 - 章节感，深色背景 */
+.memory-card.tier-major {
+  background: linear-gradient(135deg, #2d1a45 0%, #3d1f60 100%);
+  border: 1px solid rgba(168,85,247,0.3);
+  box-shadow: 0 4px 20px rgba(88,28,135,0.2);
+}
+.memory-card.tier-major .memory-card-badge {
+  color: #c084fc;
+}
+.memory-card.tier-major .memory-card-title {
+  color: #f3e8ff;
+  font-size: 15px;
+  font-weight: 600;
+}
+.memory-card.tier-major .memory-card-sub {
+  color: #d8b4fe;
+  font-size: 13px;
+}
+.memory-card.tier-major .memory-card-date {
+  color: rgba(196,181,222,0.6);
+}
+
+/* 生活留痕卡 - 相册感，浅色温暖 */
+.memory-card.tier-middle {
+  background: linear-gradient(135deg, #fdf4ff 0%, #fce7f3 100%);
+  border: 1px solid rgba(236,182,222,0.5);
+  box-shadow: 0 2px 12px rgba(236,72,153,0.08);
+}
+.memory-card.tier-middle .memory-card-badge {
+  color: #db2777;
+}
+.memory-card.tier-middle .memory-card-title {
+  color: #831843;
+  font-size: 14px;
+  font-weight: 600;
+}
+.memory-card.tier-middle .memory-card-sub {
+  color: #be185d;
+  font-size: 13px;
+}
+.memory-card.tier-middle .memory-card-date {
+  color: rgba(190,24,93,0.5);
+}
+
+/* 情绪残响卡 - 便签感，轻透明 */
+.memory-card.tier-light {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(196,181,222,0.4);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(139,92,246,0.06);
+}
+.memory-card.tier-light .memory-card-badge {
+  color: #9333ea;
+}
+.memory-card.tier-light .memory-card-title {
+  color: #4c1d95;
+  font-size: 13px;
+  font-style: italic;
+}
+.memory-card.tier-light .memory-card-sub {
+  color: #7c3aed;
+  font-size: 12px;
+}
+.memory-card.tier-light .memory-card-date {
+  color: rgba(124,58,237,0.4);
+}
+
+/* 卡片内通用元素 */
+.memory-card-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.memory-card-title {
+  line-height: 1.4;
+  margin-bottom: 5px;
+}
+.memory-card-sub {
+  line-height: 1.5;
+  margin-bottom: 6px;
+  opacity: 0.85;
+}
+.memory-card-date {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+/* 空状态 */
+.memory-empty {
+  text-align: center;
+  color: #c4b5d4;
+  padding: 40px 20px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* 用户草稿弹窗动画 */
+#userDraftCard {
+  animation: slideUpDraft 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes slideUpDraft {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}

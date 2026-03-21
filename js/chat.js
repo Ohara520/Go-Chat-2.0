@@ -153,6 +153,15 @@ async function loadFromCloud() {
         if (s.organicFeedCountKey && s.organicFeedCount != null) {
           localStorage.setItem(s.organicFeedCountKey, s.organicFeedCount);
         }
+        if (s.lastFeedPostAt) localStorage.setItem('lastFeedPostAt', s.lastFeedPostAt);
+        if (Array.isArray(s.feedEventPool)) {
+          const localPool = getFeedEventPool();
+          // 合并云端和本地事件池，去重
+          const merged = [...s.feedEventPool, ...localPool];
+          const seen = new Set();
+          const deduped = merged.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+          setFeedEventPool(deduped.slice(0, 30));
+        }
       }
       if (Array.isArray(s.deliveryHistory)) {
         const local = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
@@ -248,6 +257,8 @@ async function saveToCloud() {
       coupleFeedDate: localStorage.getItem('coupleFeedDate') || '',
       organicFeedCount: localStorage.getItem('organicFeedCount_' + new Date().toDateString()) || '0',
       organicFeedCountKey: 'organicFeedCount_' + new Date().toDateString(),
+      feedEventPool: getFeedEventPool().filter(e => !e.consumed).slice(0, 20),
+      lastFeedPostAt: localStorage.getItem('lastFeedPostAt') || '',
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
       // 状态标记
@@ -2295,6 +2306,8 @@ function startColdWar() {
   setMoodLevel(Math.min(getMoodLevel(), 2));
   if (coldWarTimer) clearTimeout(coldWarTimer);
   coldWarTimer = setTimeout(() => ghostApologize(), 3 * 60 * 60 * 1000);
+  // 冷战入事件池，延迟30-120分钟后才可能发帖
+  feedEvent_coldWarStarted();
 }
 
 function endColdWar(userApologized = false) {
@@ -2314,6 +2327,8 @@ function endColdWar(userApologized = false) {
   }
   localStorage.setItem('pendingColdWarEndStory', 'true');
   setTimeout(() => checkStoryOnColdWarEnd(), 8000);
+  // 和好入事件池，延迟20-180分钟后才可能发帖
+  feedEvent_madeUp();
 }
 
 function ghostApologize() {
@@ -3355,12 +3370,11 @@ async function sendMessage() {
   saveHistory();
   _isSending = true; // 立刻锁定，防止切页面重渲染吞消息
 
-  // 用户主动要求Ghost发朋友圈 → 后台静默触发，不拦主流程
+  // 用户主动要求Ghost发朋友圈 → 入池立刻触发
   const feedRequestKws = ['发条朋友圈','发个朋友圈','发朋友圈','po一条','晒一下','post something','发一条','你发一条','你po'];
   if (feedRequestKws.some(k => text.toLowerCase().includes(k.toLowerCase()))) {
-    setTimeout(() => {
-      try { checkOrganicFeedPost('用户让Ghost发朋友圈', 'fine.'); } catch(e) {}
-    }, 3500);
+    feedEvent_dailyMoment();
+    setTimeout(() => maybeTriggerFeedPost('user_request'), 3000);
   }
 
   // 已读不回：低心情且非冷战，5%概率触发，显示已读但延迟30-90秒才回
@@ -3612,9 +3626,9 @@ async function sendMessage() {
 
     // 副作用全部用try-catch包住，失败静默处理，不影响主流程
     if (Math.random() < 0.25) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
-    if (Math.random() < 0.15) try { checkSassyPost(text, reply); } catch(e) {}
     if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
+    setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
     // 每8条更新一次长期记忆
     if (_globalTurnCount % 8 === 0) try { updateLongTermMemory(); } catch(e) {}
     const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
@@ -3798,6 +3812,138 @@ if (window.visualViewport) {
   });
 }
 
+// ===== 情侣空间 Tab 切换 =====
+function switchCoupleTab(tab) {
+  document.getElementById('panelFeed').style.display = tab === 'feed' ? '' : 'none';
+  document.getElementById('panelMemory').style.display = tab === 'memory' ? '' : 'none';
+  document.getElementById('tabFeed').classList.toggle('active', tab === 'feed');
+  document.getElementById('tabMemory').classList.toggle('active', tab === 'memory');
+  if (tab === 'memory') renderSharedMemories();
+}
+
+// ===== 共同回忆区渲染 =====
+function buildSharedMemories() {
+  const stories = JSON.parse(localStorage.getItem('storyBook') || '[]');
+  const deliveries = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+  const feeds = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+
+  const memories = [];
+
+  // 剧情回忆 → major
+  stories.slice(0, 10).forEach(s => {
+    memories.push({
+      id: 'story_' + (s.storyId || s.id || Math.random()),
+      type: 'story', tier: 'major',
+      title: s.title || s.storyId || '一段故事',
+      sub: s.preview || s.en || '',
+      timestamp: s.unlockedAt || s.createdAt || 0,
+      date: s.unlockedAt ? new Date(s.unlockedAt).toISOString().slice(0, 10) : '',
+      badge: '剧情 · 章节'
+    });
+  });
+
+  // 快递回忆 → middle
+  deliveries.filter(d => d.stage >= 5 || d.status === 'done').slice(0, 15).forEach(d => {
+    memories.push({
+      id: 'delivery_' + (d.id || d.name),
+      type: 'delivery', tier: 'middle',
+      title: d.emoji ? `${d.emoji} ${d.name}` : d.name,
+      sub: d.ghostReaction || (d.isFromGhost ? '他寄给你的' : '你寄给他的'),
+      timestamp: d.doneAt || d.createdAt || 0,
+      date: d.doneAt ? new Date(d.doneAt).toISOString().slice(0, 10) : '',
+      badge: d.isFromGhost ? '生活 · 他送的' : '生活 · 你送的'
+    });
+  });
+
+  // 有分量的朋友圈 → light（只取冷战/和好/大事件类型）
+  feeds.filter(h => h.post?.sourceEvent && ['cold_war_started','made_up','gift_received','bought_big_item'].includes(h.post.sourceEvent))
+    .slice(0, 8).forEach(h => {
+    memories.push({
+      id: 'feed_' + h.date + '_' + (h.post?.en || '').slice(0, 10),
+      type: 'feed', tier: 'light',
+      title: h.post?.en || '',
+      sub: h.post?.zh || '',
+      timestamp: h.post?.sourceEvent ? Date.parse(h.date) : 0,
+      date: h.date,
+      badge: '情绪 · 那一刻'
+    });
+  });
+
+  // 按时间排序
+  memories.sort((a, b) => b.timestamp - a.timestamp);
+  return memories;
+}
+
+function getRelationshipStage(days) {
+  if (days < 7)   return { name: '还不肯承认', desc: '心里有，嘴上不说' };
+  if (days < 30)  return { name: '开始在意', desc: '不知不觉多看了几眼' };
+  if (days < 90)  return { name: '学着靠近', desc: '慢慢知道怎么和他相处' };
+  if (days < 180) return { name: '已经离不开', desc: '这件事他已经默认了' };
+  return { name: '就这样了', desc: '谁也不用说，都知道' };
+}
+
+function renderSharedMemories() {
+  const memories = buildSharedMemories();
+  const days = parseInt(document.getElementById('coupleDaysNum')?.textContent || '0');
+  const stage = getRelationshipStage(days);
+
+  // 关系阶段条
+  const stageBar = document.getElementById('memoryStageBar');
+  if (stageBar) {
+    stageBar.innerHTML = `
+      <div class="memory-stage-label">你们现在</div>
+      <div class="memory-stage-name">${stage.name}</div>
+      <div class="memory-stage-desc">${stage.desc} · 已在一起 ${days} 天 · ${memories.length} 个回忆</div>
+    `;
+  }
+
+  // 精选3张（major×1 + middle×1 + light×1）
+  const highlights = document.getElementById('memoryHighlights');
+  if (highlights) {
+    const picks = [
+      memories.find(m => m.tier === 'major'),
+      memories.find(m => m.tier === 'middle'),
+      memories.find(m => m.tier === 'light'),
+    ].filter(Boolean).slice(0, 3);
+
+    if (picks.length) {
+      highlights.innerHTML = `
+        <div class="memory-highlights-title">精选回忆</div>
+        <div style="display:flex;flex-direction:column;gap:0;">
+          ${picks.map(m => renderMemoryCard(m, true)).join('')}
+        </div>
+      `;
+    } else {
+      highlights.innerHTML = '<div style="text-align:center;color:#c4b5d4;padding:20px;font-size:13px;">还没有回忆，继续聊聊吧</div>';
+    }
+  }
+
+  // 完整时间线
+  const timeline = document.getElementById('memoryTimeline');
+  if (timeline) {
+    if (memories.length > 3) {
+      timeline.innerHTML = `
+        <div class="memory-timeline-title">全部回忆</div>
+        ${memories.map(m => renderMemoryCard(m, false)).join('')}
+      `;
+    } else {
+      timeline.innerHTML = '';
+    }
+  }
+}
+
+function renderMemoryCard(m, isHighlight) {
+  const tierLabel = { major: '📖 剧情', middle: '📦 生活', light: '💬 情绪' };
+  return `
+    <div class="memory-card tier-${m.tier}" style="${isHighlight ? 'margin:4px 0;' : ''}">
+      <div class="memory-card-badge">${m.badge || tierLabel[m.tier] || ''}</div>
+      <div class="memory-card-title">${m.title}</div>
+      ${m.sub ? `<div class="memory-card-sub">${m.sub}</div>` : ''}
+      ${m.date ? `<div class="memory-card-date">${m.date}</div>` : ''}
+    </div>
+  `;
+}
+
 // ===== 切换到聊天页时的轻量刷新（不清空重渲，防止闪屏）=====
 function refreshChatScreen() {
   // 第一次进入才做完整初始化
@@ -3917,51 +4063,9 @@ function initCoupleSpace() {
   // 花瓣动画
   spawnCouplePetals();
 
-  // 生成朋友圈feed
-  generateCoupleFeed();
-
-  // 检查阴阳帖
-  const sassy = getSassyPost();
-  if (sassy) {
-    const feed = document.getElementById('couplePostsFeed');
-    const remaining = Math.max(0, Math.ceil((sassy.expires - Date.now()) / 60000));
-    const sassyDiv = document.createElement('div');
-    sassyDiv.className = 'couple-post-card couple-sassy';
-    sassyDiv.id = 'sassyPostCard';
-    sassyDiv.innerHTML = `
-      <div class="couple-sassy-bar" id="sassyBar"></div>
-      <div class="couple-deleting-tag">🔥 ${remaining}分钟后删除</div>
-      <div class="couple-post-header">
-        <div class="couple-avatar"><img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
-        <div class="couple-post-meta">
-          <div class="couple-post-name couple-ghost-name" >${localStorage.getItem('botNickname') || 'Simon Riley'}</div>
-          <div class="couple-post-time">刚刚</div>
-        </div>
-      </div>
-      <div class="couple-post-en">${sassy.en}</div>
-      <div class="couple-post-zh">${sassy.zh}</div>
-      <div class="couple-post-footer">
-        <button class="couple-like-btn" data-key="sassy-post" data-count="1" onclick="toggleCoupleLike(this)">🤍 <span class="like-num">1</span></button>
-      </div>
-    `;
-    if (feed) feed.insertBefore(sassyDiv, feed.firstChild);
-
-    // 进度条动画
-    const bar = document.getElementById('sassyBar');
-    if (bar) {
-      const pct = ((sassy.expires - Date.now()) / (60 * 60 * 1000)) * 100;
-      bar.style.width = pct + '%';
-      bar.style.transition = `width ${sassy.expires - Date.now()}ms linear`;
-      setTimeout(() => { bar.style.width = '0%'; }, 50);
-    }
-
-    // 到期自动移除
-    setTimeout(() => {
-      const el = document.getElementById('sassyPostCard');
-      if (el) el.remove();
-    }, sassy.expires - Date.now());
-  }
-}
+  // 先渲染已有历史，再跑调度器（可能会新增帖子）
+  renderCoupleFeedFromHistory();
+  setTimeout(() => maybeTriggerFeedPost('open_couple_space'), 800);
 
 async function generateCoupleFeed() {
   const feed = document.getElementById('couplePostsFeed');
@@ -4139,165 +4243,426 @@ function toggleCoupleLike(btn, key) {
   }
 }
 
-// ===== 有机朋友圈触发 =====
-// 从对话内容提炼素材，Gemini 判断够不够发，够了才生成，不够不发
-async function checkOrganicFeedPost(userText, ghostReply) {
-  // 同一天最多触发2条有机帖
-  const todayKey = 'organicFeedCount_' + new Date().toDateString();
-  const todayCount = parseInt(localStorage.getItem(todayKey) || '0');
-  if (todayCount >= 2) return;
+// ===== 阴阳帖系统 =====
+// ===================================================================
+// ===== 朋友圈新系统：事件池 + 调度器 =====
+// ===================================================================
 
-  // 用 Gemini 判断这段对话有没有值得发帖的素材
-  const raw = await fetchDeepSeek(
-    '你是一个判断器。只返回JSON，不要其他文字。\n判断这段对话里有没有Ghost或队友值得发朋友圈的素材（有趣的事、天气吐槽、队友糗事、训练日常、某个感慨、随口一句话）。\n没有素材返回：{"should_post": false}\n有素材返回：{"should_post": true, "poster": "Ghost或Soap或Gaz或Price", "hint": "一句话描述素材，英文"}',
-    `用户说：${userText}\nGhost说：${ghostReply}`,
-    120
-  );
-  if (!raw) return;
+// ----- 事件池 CRUD -----
+function getFeedEventPool() {
+  try { return JSON.parse(localStorage.getItem('feedEventPool') || '[]'); } catch(e) { return []; }
+}
+function setFeedEventPool(list) {
+  localStorage.setItem('feedEventPool', JSON.stringify(list));
+  scheduleCloudSave();
+}
+function pushFeedEvent(event) {
+  const pool = getFeedEventPool();
+  pool.unshift({
+    id: 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    type: event.type,
+    actor: event.actor || 'ghost',
+    intensity: event.intensity ?? 2,
+    mood: event.mood || 'neutral',
+    shareability: event.shareability ?? 0.5,
+    privacy: event.privacy || 'semi',
+    createdAt: Date.now(),
+    dueAt: event.dueAt || Date.now(),
+    expiresAt: event.expiresAt || (Date.now() + 12 * 3600 * 1000),
+    consumed: false,
+    meta: event.meta || {}
+  });
+  setFeedEventPool(pool.slice(0, 30));
+}
+function consumeFeedEvent(id) {
+  const pool = getFeedEventPool().map(e => e.id === id ? { ...e, consumed: true } : e);
+  setFeedEventPool(pool);
+}
 
-  let result;
-  try { result = JSON.parse(raw.replace(/```json|```/g, '').trim()); } catch(e) { return; }
-  if (!result?.should_post) return;
+// ----- 随机分钟数工具 -----
+function randMinutes(min, max) {
+  return (Math.floor(Math.random() * (max - min + 1)) + min) * 60 * 1000;
+}
 
-  const poster = result.poster || 'Ghost';
-  const hint = result.hint || '';
+// ----- 事件入口：所有地方改为调用这些，不再直接发帖 -----
+function feedEvent_coldWarStarted() {
+  pushFeedEvent({
+    type: 'cold_war_started', actor: 'ghost', mood: 'hurt',
+    intensity: 4, shareability: 0.65, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(30, 120),
+    expiresAt: Date.now() + 8 * 3600 * 1000
+  });
+}
+function feedEvent_madeUp() {
+  pushFeedEvent({
+    type: 'made_up', actor: 'ghost', mood: 'soft',
+    intensity: 5, shareability: 0.55, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(20, 180),
+    expiresAt: Date.now() + 24 * 3600 * 1000
+  });
+}
+function feedEvent_giftReceived(itemName, from = 'ghost') {
+  pushFeedEvent({
+    type: 'gift_received', actor: from, mood: 'soft',
+    intensity: 3, shareability: 0.6, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(10, 120),
+    expiresAt: Date.now() + 24 * 3600 * 1000,
+    meta: { itemName }
+  });
+}
+function feedEvent_boughtBigItem(itemName, amount, isHome = false) {
+  pushFeedEvent({
+    type: 'bought_big_item', actor: 'user', mood: 'proud',
+    intensity: amount > 10000 ? 5 : amount > 1000 ? 4 : 3,
+    shareability: 0.7, privacy: 'public',
+    dueAt: Date.now() + randMinutes(30, 240),
+    expiresAt: Date.now() + 2 * 24 * 3600 * 1000,
+    meta: { itemName, amount, isHome }
+  });
+}
+function feedEvent_dailyMoment() {
+  pushFeedEvent({
+    type: 'daily_moment', actor: Math.random() < 0.45 ? 'ghost' : (Math.random() < 0.5 ? 'soap' : 'gaz'),
+    mood: 'neutral', intensity: 1, shareability: 0.4, privacy: 'public',
+    dueAt: Date.now(),
+    expiresAt: Date.now() + 6 * 3600 * 1000
+  });
+}
+
+// ----- 调度器核心 -----
+async function maybeTriggerFeedPost(triggerSource = 'unknown') {
+  const now = Date.now();
+
+  // 2小时全局冷却
+  const lastPostAt = parseInt(localStorage.getItem('lastFeedPostAt') || '0');
+  if (now - lastPostAt < 2 * 3600 * 1000) return null;
+
+  // 拿有效事件
+  const pool = getFeedEventPool()
+    .filter(e => !e.consumed && e.dueAt <= now && e.expiresAt > now);
+
+  if (!pool.length) {
+    // 没事件时兜底：低概率生成日常路过
+    return await maybeGenerateAmbientPost(triggerSource);
+  }
+
+  // 选最佳事件
+  const chosen = selectBestFeedEvent(pool, triggerSource);
+  if (!chosen) return null;
+
+  // 判断现在像不像会发
+  if (!shouldEventBecomePost(chosen)) {
+    // 不发就重新调度：延迟30-90分钟再试
+    const updated = getFeedEventPool().map(e =>
+      e.id === chosen.id ? { ...e, dueAt: now + randMinutes(30, 90) } : e
+    );
+    setFeedEventPool(updated);
+    return null;
+  }
+
+  // 用户侧事件 → 生成草稿，不直接发
+  if (chosen.actor === 'user') {
+    consumeFeedEvent(chosen.id);
+    showUserDraftCard(chosen);
+    return null;
+  }
+
+  // 角色侧事件 → 生成帖子
+  const result = await generateFeedPostFromEvent(chosen);
+  if (!result) return null;
+
+  // 存入历史
+  insertFeedPost(result);
+  consumeFeedEvent(chosen.id);
+  localStorage.setItem('lastFeedPostAt', String(now));
+  scheduleCloudSave();
+
+  // 红点提示
+  localStorage.setItem('feedHasNew', '1');
+  const badge = document.getElementById('feedNewBadge');
+  if (badge) badge.style.display = 'block';
+
+  // 如果情侣空间开着就刷新
+  const coupleScreen = document.getElementById('coupleScreen');
+  if (coupleScreen?.classList.contains('active') && typeof initCoupleSpace === 'function') {
+    renderCoupleFeedFromHistory();
+  }
+
+  return result;
+}
+
+// ----- 事件评分选择 -----
+function selectBestFeedEvent(pool, triggerSource) {
+  const now = Date.now();
+  const typeWeight = {
+    made_up: 10, cold_war_started: 9, missed_you: 8,
+    bought_big_item: 7, gift_received: 6, teammate_teasing: 5,
+    daily_moment: 3
+  };
+  const scored = pool.map(evt => {
+    let score = typeWeight[evt.type] || 1;
+    score += evt.intensity * 1.5;
+    score += evt.shareability * 3;
+    const ageHours = (now - evt.createdAt) / 3600000;
+    score += Math.max(0, 3 - ageHours);
+    if (evt.actor === 'ghost') score += 1;
+    if (triggerSource === 'after_chat_turn') score += 2;
+    if (triggerSource === 'open_couple_space') score += 1;
+    return { evt, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0]?.evt || null;
+}
+
+// ----- 像不像活人发帖 -----
+function shouldEventBecomePost(evt) {
+  if (evt.privacy === 'private') return false;
+  const actor = evt.actor;
+  const type = evt.type;
+  if (actor === 'ghost') {
+    if (type === 'daily_moment') return Math.random() < 0.2;
+    if (type === 'cold_war_started') return Math.random() < 0.55;
+    if (type === 'made_up') return Math.random() < 0.45;
+    if (type === 'gift_received') return Math.random() < 0.35;
+    return Math.random() < 0.4;
+  }
+  if (actor === 'soap') return Math.random() < 0.7;
+  if (actor === 'gaz') return Math.random() < 0.55;
+  if (actor === 'price') return Math.random() < 0.2;
+  if (actor === 'user') return true; // 用户侧走草稿路径
+  return Math.random() < 0.4;
+}
+
+// ----- 兜底日常路过 -----
+async function maybeGenerateAmbientPost(triggerSource) {
+  const todayKey = 'ambientFeedCount_' + new Date().toDateString();
+  const count = parseInt(localStorage.getItem(todayKey) || '0');
+  if (count >= 2) return null;
+  const chance = triggerSource === 'open_couple_space' ? 0.2 : 0.08;
+  if (Math.random() > chance) return null;
+
+  feedEvent_dailyMoment();
+  const pool = getFeedEventPool().filter(e => !e.consumed && e.dueAt <= Date.now());
+  const evt = pool.find(e => e.type === 'daily_moment');
+  if (!evt) return null;
+  const result = await generateFeedPostFromEvent(evt);
+  if (!result) return null;
+  insertFeedPost(result);
+  consumeFeedEvent(evt.id);
+  localStorage.setItem(todayKey, String(count + 1));
+  return result;
+}
+
+// ----- 根据事件生成帖子 -----
+async function generateFeedPostFromEvent(evt) {
+  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const weather = localStorage.getItem('lastWeatherDisplay') || '';
+  const isColdWar = localStorage.getItem('coldWarMode') === 'true';
   const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
-  const posterAvatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
-  const posterAvatar = posterAvatarMap[poster] || GHOST_AV;
+  const posterMap = {
+    ghost: { name: localStorage.getItem('botNickname') || 'Simon Riley', avatar: GHOST_AV, nameClass: 'couple-ghost-name' },
+    soap:  { name: 'Soap', avatar: '🧼', nameClass: 'couple-soap-name' },
+    gaz:   { name: 'Gaz', avatar: '🎖️', nameClass: 'couple-gaz-name' },
+    price: { name: 'Price', avatar: '🚬', nameClass: 'couple-price-name' },
+  };
+  const posterInfo = posterMap[evt.actor] || posterMap['ghost'];
+
+  // 按事件类型拼 prompt
+  const promptMap = {
+    cold_war_started: `你是西蒙·莱利，刚和老婆冷战。发一条朋友圈，一句话，全小写英文，阴阳怪气但不点名，看起来平静但明显有情绪。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`,
+    made_up: `你是西蒙·莱利，刚和老婆和好了。发一条朋友圈，一句话，全小写英文，若无其事但带点余温，不要直说和好。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`,
+    gift_received: `你是西蒙·莱利，刚收到老婆送的「${evt.meta?.itemName || '东西'}」。发一条朋友圈，一句话，全小写英文，嘴硬但在意。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`,
+    daily_moment: (() => {
+      const actor = evt.actor;
+      if (actor === 'soap') return `你是Soap（约翰·麦克塔维什），141特遣队成员。发一条日常朋友圈，一句话，英文，活泼，可以调侃队友。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`;
+      if (actor === 'gaz')  return `你是Gaz（凯尔·加里克），141特遣队成员。发一条日常朋友圈，一句话，英文，稳重幽默。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`;
+      return `你是西蒙·莱利，141特遣队成员，当前在${location}，天气${weather || '不明'}。发一条日常朋友圈，一句话，全小写英文，符合当前状态。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`;
+    })(),
+  };
+  const prompt = promptMap[evt.type] || promptMap['daily_moment'];
 
   try {
-    // 生成帖子正文
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        messages: [{ role: 'user', content:
-          `你是141特遣队的${poster}。根据这个素材发一条朋友圈：「${hint}」。\n` +
-          `风格：一句话，全小写英文，自然真实，不煽情不滥情，有${poster}的味道。附中文翻译。\n` +
-          `只返回JSON：{"en": "英文内容", "zh": "中文翻译"}`
-        }]
-      })
-    });
-    const data = await res.json();
-    const postRaw = data.content?.[0]?.text?.replace(/```json|```/g, '').trim();
-    const post = JSON.parse(postRaw);
-    if (!post?.en) return;
+    const raw = await fetchDeepSeek('你是一个角色扮演生成器。只返回JSON，不要任何其他文字。', prompt, 150);
+    const post = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    if (!post?.en) return null;
 
-    // 60% 概率生成队友评论，1-2条
+    // 60% 概率生成评论
     let comments = [];
     if (Math.random() < 0.6) {
-      const others = ['Ghost', 'Soap', 'Gaz', 'Price'].filter(n => n !== poster);
+      const others = ['Ghost', 'Soap', 'Gaz', 'Price'].filter(n => n.toLowerCase() !== evt.actor);
       const commenters = others.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1);
+      const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
       const res2 = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 200,
-          messages: [{ role: 'user', content:
-            `${poster}发了朋友圈："${post.en}"。` +
-            `生成${commenters.length}条评论，评论者：${commenters.join('、')}。` +
-            `每行格式：角色名|英文|中文。只返回评论，不要其他文字。`
-          }]
+          model: 'claude-haiku-4-5-20251001', max_tokens: 200,
+          messages: [{ role: 'user', content: `${posterInfo.name}发了朋友圈："${post.en}"。生成${commenters.length}条评论，评论者：${commenters.join('、')}。每行格式：角色名|英文|中文。只返回评论。` }]
         })
       });
-      const data2 = await res2.json();
-      const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
-      comments = (data2.content?.[0]?.text?.trim() || '')
-        .split('\n')
+      const d2 = await res2.json();
+      comments = (d2.content?.[0]?.text?.trim() || '').split('\n')
         .filter(l => l.includes('|'))
         .map(l => { const [name, en, zh] = l.split('|'); return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() }; })
         .filter(c => c.name && c.en)
         .map(c => ({ avatar: avatarMap[c.name] || '👤', author: c.name, name: c.name, en: c.en, zh: c.zh, text: c.en }));
     }
 
-    // 插入 feed 历史
-    const today = new Date().toISOString().slice(0, 10);
-    const newEntry = {
-      date: today,
+    return {
+      date: new Date().toISOString().slice(0, 10),
       post: {
         en: post.en, zh: post.zh,
-        avatar: posterAvatar, author: poster, name: poster,
+        avatar: posterInfo.avatar, author: posterInfo.name, name: posterInfo.name,
         comments, time: '刚刚',
-        likes: Math.floor(Math.random() * 30 + 3)
+        likes: Math.floor(Math.random() * 30 + 3),
+        sourceEvent: evt.type
       }
     };
-    let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    history.unshift(newEntry);
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-    history = history.filter(h => h.date >= sevenDaysAgo).slice(0, 25);
-    localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
+  } catch(e) { return null; }
+}
 
-    const summary = history.slice(0, 3).map(h => `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`).join('\n');
-    localStorage.setItem('coupleFeedSummary', summary);
+// ----- 插入帖子到历史 -----
+function insertFeedPost(entry) {
+  let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+  history.unshift(entry);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  history = history.filter(h => h.date >= sevenDaysAgo).slice(0, 25);
+  localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
+  const summary = history.slice(0, 3).map(h => `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`).join('\n');
+  localStorage.setItem('coupleFeedSummary', summary);
+}
 
-    // 红点通知
-    localStorage.setItem('feedHasNew', '1');
-    const badge = document.getElementById('feedNewBadge');
-    if (badge) badge.style.display = 'block';
+// ----- 用户草稿弹窗 -----
+async function showUserDraftCard(evt) {
+  // 生成3个风格版本
+  const item = evt.meta?.itemName || '这件事';
+  const amount = evt.meta?.amount || 0;
+  const contextDesc = evt.type === 'bought_big_item'
+    ? `刚买了${item}，花了£${amount}`
+    : evt.type === 'gift_received' ? `刚收到了${item}` : '刚发生了一件开心的事';
 
-    // 如果朋友圈页开着就刷新
-    const coupleScreen = document.getElementById('coupleScreen');
-    if (coupleScreen?.classList.contains('active') && typeof initCoupleSpace === 'function') initCoupleSpace();
-
-    // 累计今日有机帖计数
-    localStorage.setItem(todayKey, String(todayCount + 1));
+  let options = ['今天有点开心。', '有些事，不说，但记着。', '谁也没告诉，但就是挺满足的。'];
+  try {
+    const raw = await fetchDeepSeek(
+      '你是一个朋友圈文案生成器。只返回JSON，不要其他文字。',
+      `用户${contextDesc}，帮她生成3条朋友圈候选文案（一句话，口语化，不要太甜腻）。分别是：低调版、情绪版、嘴硬版。附中文只需要一句话本身。只返回JSON：{"quiet":"...","emotional":"...","tsundere":"..."}`,
+      200
+    );
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    options = [parsed.quiet, parsed.emotional, parsed.tsundere].filter(Boolean);
+    if (options.length < 3) options = ['今天有点开心。', '有些事，不说，但记着。', '谁也没告诉，但就是挺满足的。'];
   } catch(e) {}
+
+  // 移除旧弹窗
+  document.getElementById('userDraftCard')?.remove();
+
+  const labels = ['低调', '情绪', '嘴硬'];
+  const card = document.createElement('div');
+  card.id = 'userDraftCard';
+  card.style.cssText = `position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;background:linear-gradient(to top,rgba(248,231,255,0.98),rgba(255,245,255,0.95));border-radius:24px 24px 0 0;box-shadow:0 -4px 30px rgba(168,85,247,0.15);backdrop-filter:blur(20px);`;
+  card.innerHTML = `
+    <div style="text-align:center;margin-bottom:12px;">
+      <div style="width:36px;height:4px;background:rgba(168,85,247,0.3);border-radius:2px;margin:0 auto 12px;"></div>
+      <div style="font-size:13px;color:#9333ea;font-weight:600;">要不要把这一刻留在动态里？</div>
+    </div>
+    <div id="draftOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+      ${options.map((opt, i) => `
+        <div class="draft-option" data-idx="${i}" onclick="selectDraftOption(this)" style="padding:12px 16px;border-radius:14px;border:1.5px solid rgba(168,85,247,0.2);background:white;cursor:pointer;transition:all 0.2s;">
+          <span style="font-size:11px;color:#c084fc;font-weight:600;margin-right:8px;">${labels[i]}</span>
+          <span style="font-size:14px;color:#4a1a70;">${opt}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="dismissUserDraft()" style="flex:1;padding:12px;border-radius:14px;border:1.5px solid rgba(168,85,247,0.2);background:transparent;color:#9333ea;font-size:14px;cursor:pointer;">不了</button>
+      <button id="draftPublishBtn" onclick="publishUserDraft('${evt.id}')" style="flex:2;padding:12px;border-radius:14px;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;border:none;cursor:pointer;opacity:0.5;pointer-events:none;">发布</button>
+    </div>
+  `;
+  document.body.appendChild(card);
+
+  // 存草稿内容供发布用
+  window._currentDraftOptions = options;
+  window._currentDraftEvtId = evt.id;
+  window._currentDraftMeta = evt.meta || {};
+}
+
+let _selectedDraftIdx = -1;
+function selectDraftOption(el) {
+  document.querySelectorAll('.draft-option').forEach(d => {
+    d.style.background = 'white';
+    d.style.borderColor = 'rgba(168,85,247,0.2)';
+  });
+  el.style.background = 'rgba(168,85,247,0.08)';
+  el.style.borderColor = '#a855f7';
+  _selectedDraftIdx = parseInt(el.dataset.idx);
+  const btn = document.getElementById('draftPublishBtn');
+  if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }
+}
+
+function dismissUserDraft() {
+  document.getElementById('userDraftCard')?.remove();
+  _selectedDraftIdx = -1;
+}
+
+async function publishUserDraft() {
+  if (_selectedDraftIdx < 0 || !window._currentDraftOptions) return;
+  const text = window._currentDraftOptions[_selectedDraftIdx];
+  if (!text) return;
+
+  dismissUserDraft();
+
+  const userName = localStorage.getItem('userName') || '你';
+  const savedAvatar = localStorage.getItem('userAvatarBase64');
+  const userAvatar = savedAvatar ? 'IMG' : userName.charAt(0);
+  const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+
+  // 翻译
+  let zh = text;
+  try {
+    const translated = await fetchDeepSeek('只返回中文翻译，不要其他内容。', text, 60);
+    if (translated?.trim()) zh = translated.trim();
+  } catch(e) {}
+
+  // 生成评论
+  let comments = [];
+  try {
+    const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 200,
+        messages: [{ role: 'user', content: `${userName}发了朋友圈："${text}"。生成2条队友评论，角色从Soap、Gaz、Ghost中选。格式：角色名|英文|中文。只返回评论。` }]
+      })
+    });
+    const d = await res.json();
+    comments = (d.content?.[0]?.text?.trim() || '').split('\n')
+      .filter(l => l.includes('|'))
+      .map(l => { const [name, en, zh] = l.split('|'); return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() }; })
+      .filter(c => c.name && c.en)
+      .map(c => ({ avatar: avatarMap[c.name] || '👤', author: c.name, name: c.name, en: c.en, zh: c.zh, text: c.en }));
+  } catch(e) {}
+
+  const entry = {
+    date: new Date().toISOString().slice(0, 10),
+    post: { en: text, zh, avatar: userAvatar, author: userName, name: userName, comments, time: '刚刚', likes: 1, isUserPost: true }
+  };
+  insertFeedPost(entry);
+  localStorage.setItem('feedHasNew', '1');
+  const badge = document.getElementById('feedNewBadge');
+  if (badge) badge.style.display = 'block';
+
+  showToast('✨ 已发布到动态');
+
+  const coupleScreen = document.getElementById('coupleScreen');
+  if (coupleScreen?.classList.contains('active')) renderCoupleFeedFromHistory();
+}
+
+// ----- 只渲染历史（不重新生成） -----
+function renderCoupleFeedFromHistory() {
+  const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+  renderCoupleFeed(all.map(h => h.post));
 }
 
 // ===== 阴阳帖系统 =====
-async function checkSassyPost(userText, ghostReply) {
-  // 只有真正进入冷战模式才触发阴阳帖
-  const isColdWar = localStorage.getItem('coldWarMode') === 'true';
-  if (!isColdWar) return;
-  // 冷战期间每小时最多一条
-  const lastSassy = parseInt(localStorage.getItem('lastSassyTime') || '0');
-  if (Date.now() - lastSassy < 60 * 60 * 1000) return;
-  generateSassyPost();
-}
-
-async function generateSassyPost() {
-  try {
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        system: '你是西蒙·莱利。只返回JSON，不要任何其他文字。',
-        messages: [{
-          role: 'user',
-          content: `你刚刚跟老婆吵架/吃醋/冷战了。在朋友圈发一条阴阳怪气的帖子，一句话，全小写英文，要有Ghost的味道——看起来平静但明显有情绪。附上中文翻译。\n\n只返回：{"en": "英文内容", "zh": "中文翻译"}`
-        }]
-      })
-    });
-    const data = await res.json();
-    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
-    const post = JSON.parse(raw);
-
-    // 存入，1小时后过期
-    const sassyData = {
-      en: post.en,
-      zh: post.zh,
-      expires: Date.now() + 60 * 60 * 1000
-    };
-    localStorage.setItem('sassyPost', JSON.stringify(sassyData));
-    localStorage.setItem('lastSassyTime', Date.now().toString());
-  } catch(e) {}
-}
-
-function getSassyPost() {
-  try {
-    const data = JSON.parse(localStorage.getItem('sassyPost') || 'null');
-    if (!data) return null;
-    if (Date.now() > data.expires) {
-      localStorage.removeItem('sassyPost');
-      return null;
-    }
-    return data;
-  } catch(e) { return null; }
 }
 
 // ===== 花瓣动画 =====
@@ -6152,146 +6517,23 @@ async function triggerHomeItemMoment(product) {
     }
   } catch(e) {}
 
-  // 发朋友圈（用户视角，@Ghost，带成就感）
-  try {
-    const feedPrompt = `${userName}刚${desc}，心情很好，发一条朋友圈（1-2句话，带点得意和幸福感，可以@Simon Riley）。附中文翻译。只返回帖子内容，格式：英文\\n中文`;
-    const res2 = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        messages: [{ role: 'user', content: feedPrompt }]
-      })
-    });
-    const data2 = await res2.json();
-    const text = data2.content?.[0]?.text?.trim() || '';
-    const parts = text.split('\n').filter(p => p.trim());
-    const postEn = parts[0] || '';
-    const postZh = parts[1] || '';
-    if (!postEn) return;
-
-    // 生成评论——队友羡慕类型
-    const commentPrompt = `这是${userName}发的朋友圈："${postEn}"（她刚${desc}）。生成2-3条评论，角色：Soap(🧼,调侃羡慕)、Gaz(🎖️,真心祝贺)、Price(🚬,简短认可)，Ghost(👻,嘴硬但在意)。格式：角色名|英文|中文。只返回评论。`;
-    const res3 = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 250,
-        messages: [{ role: 'user', content: commentPrompt }]
-      })
-    });
-    const data3 = await res3.json();
-    const commentText = data3.content?.[0]?.text?.trim() || '';
-    const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
-    const avatarMap = { 'Ghost': GHOST_AV, 'Soap': '🧼', 'Gaz': '🎖️', 'Price': '🚬' };
-    const comments = commentText.split('\n').filter(l => l.includes('|')).map(l => {
-      const [name, en, zh] = l.split('|');
-      return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() };
-    }).filter(c => c.name && c.en).map(c => ({
-      avatar: avatarMap[c.name] || '👤', author: c.name, name: c.name, en: c.en, zh: c.zh
-    }));
-
-    const userAvatar = localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0);
-    const post = {
-      date: new Date().toISOString().slice(0,10),
-      post: { en: postEn, zh: postZh, avatar: userAvatar, author: userName, name: userName, comments },
-      type: 'home_purchase', homeType: product.homeType
-    };
-    let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    history.unshift(post);
-    localStorage.setItem('coupleFeedHistory', JSON.stringify(history.slice(0, 30)));
-  } catch(e) {}
+  // 改为入事件池，不再直接发帖——由调度器决定延迟发布草稿
+  feedEvent_boughtBigItem(product.name, product.price || 0, true);
+  setTimeout(() => maybeTriggerFeedPost('event_arrived'), 500);
 }
 async function triggerLuxuryMoment(product, poster) {
-  try {
-    const userName = localStorage.getItem('userName') || '你';
-    const posterName = poster === 'ghost' ? 'Simon Riley' : userName;
-    const prompt = poster === 'ghost'
-      ? `西蒙·莱利刚收到老婆送的「${product.name}」，用他当下的心情发一条朋友圈（1-2句话，自然真实，不肉麻，符合他的性格就行）。附中文翻译。只返回帖子内容，格式：英文\\n中文`
-      : `用户刚给自己买了「${product.name}」（${product.desc}），替她发一条朋友圈（1-2句话，带点小得意或幸福感，口语化）。附中文翻译。只返回帖子内容，格式：英文\\n中文`;
+  // 用户买的 → 入事件池，弹草稿让用户选
+  if (poster !== 'ghost') {
+    feedEvent_boughtBigItem(product.name, product.price || 0, false);
+    setTimeout(() => maybeTriggerFeedPost('event_arrived'), 500);
+    return;
+  }
 
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await res.json();
-    const text = data.content?.[0]?.text?.trim() || '';
-    const parts = text.split('\n').filter(p => p.trim());
-    const postEn = parts[0] || '';
-    const postZh = parts[1] || '';
-
-    // 生成评论（70%概率有评论）
-    let comments = [];
-    if (Math.random() < 0.7) {
-      const commentCount = Math.floor(Math.random() * 3) + 1; // 1-3条
-      const commentPrompt = `这是${posterName}发的朋友圈："${postEn}"。生成${commentCount}条队友评论，角色：Soap(🧼,风趣调侃)、Gaz(🎖️,温和支持)、Price(🚬,简短稳重)，Ghost(👻,克制但在意)可选出现。每条评论一行，格式：角色名|英文|中文。只返回评论，不要其他文字。`;
-
-      const res2 = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 300,
-          messages: [{ role: 'user', content: commentPrompt }]
-        })
-      });
-      const data2 = await res2.json();
-      const commentText = data2.content?.[0]?.text?.trim() || '';
-      comments = commentText.split('\n').filter(l => l.includes('|')).map(l => {
-        const [name, en, zh] = l.split('|');
-        return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() };
-      }).filter(c => c.name && c.en);
-    }
-
-    // 存入朋友圈
-    const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
-    const avatarMap = { 'Ghost': GHOST_AV, 'Soap': '🧼', 'Gaz': '🎖️', 'Price': '🚬' };
-    const post = {
-      date: new Date().toISOString().slice(0, 10),
-      post: {
-        en: postEn, zh: postZh,
-        avatar: poster === 'ghost' ? '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' : (localStorage.getItem('userAvatarBase64') ? 'IMG' : userName.charAt(0)),
-        author: posterName,
-        name: posterName,
-        comments: comments.map(c => ({
-          avatar: avatarMap[c.name] || '👤',
-          author: c.name,
-          name: c.name, en: c.en, zh: c.zh
-        }))
-      }
-    };
-
-    const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    history.unshift(post);
-    // 只保留7天
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-    const filtered = history.filter(h => h.date >= sevenDaysAgo).slice(0, 21);
-    localStorage.setItem('coupleFeedHistory', JSON.stringify(filtered));
-
-    // 更新summary让Ghost知道自己发了什么（只保留最近3条，省token）
-    const summary = filtered.slice(0, 3).map(h =>
-      `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`
-    ).join('\n');
-    localStorage.setItem('coupleFeedSummary', summary);
-
-    // 显示新动态提示
-    localStorage.setItem('feedHasNew', '1');
-    const badge = document.getElementById('feedNewBadge');
-    if (badge) badge.style.display = 'block';
-
-    // 如果在情侣空间就刷新
-    const coupleScreen = document.getElementById('coupleScreen');
-    if (coupleScreen?.classList.contains('active') && typeof initCoupleSpace === 'function') {
-      initCoupleSpace();
-    }
-  } catch(e) {}
+  // Ghost 收到礼物 → Ghost侧入池，延迟发
+  feedEvent_giftReceived(product.name, 'ghost');
+  setTimeout(() => maybeTriggerFeedPost('event_arrived'), 500);
 }
+
 
 // ===== 快递系统 =====
 const DELIVERY_STAGES_USER = [
