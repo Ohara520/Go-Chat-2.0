@@ -42,7 +42,12 @@ async function loadFromCloud() {
     }
     if (data.mood !== null) localStorage.setItem('moodLevel', data.mood);
     if (data.affection !== null) localStorage.setItem('affection', data.affection);
-    if (data.balance !== null) localStorage.setItem('wallet', data.balance);
+    if (data.balance !== null) {
+      const localBalance = parseFloat(localStorage.getItem('wallet') || '0');
+      const cloudBalance = parseFloat(data.balance);
+      // 取较大值，防止云端旧数据覆盖本地新数据
+      localStorage.setItem('wallet', Math.max(localBalance, cloudBalance).toFixed(2));
+    }
     if (data.long_term_memory) localStorage.setItem('longTermMemory', data.long_term_memory);
     if (data.profile) {
       const p = data.profile;
@@ -313,12 +318,12 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system: systemPrompt, user: userContent, max_tokens: maxTokens }),
-    }, 12000);
-    if (!res.ok) return ''; // 路由不存在或报错，静默返回空
+    }, 3000); // 3秒超时，失败立刻跳过不阻塞主流程
+    if (!res.ok) return '';
     const data = await res.json();
     return data.text || '';
   } catch(e) {
-    return ''; // 完全静默，不抛异常
+    return '';
   }
 }
 
@@ -3092,21 +3097,25 @@ async function sendMessage() {
     // ===== Step 3: 预判本轮主行为意图 =====
     const intent = decideMainIntent(text, pendingEvent);
 
-    // ===== Step 3.5: 情绪意图识别（D老师）=====
-    // 判断用户这条消息的情绪和需求，注入system prompt辅助Ghost回应
+    // ===== Step 3.5: 情绪意图识别（D老师，非阻塞）=====
     let emotionHint = '';
     try {
-      const emotionRaw = await fetchDeepSeek(
-        '判断用户消息的情绪和需求。只返回JSON，不要其他文字。\n格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost"}\ntarget含义：无=没有针对对象，外人=被外人伤害，Ghost=对Ghost有情绪',
-        `用户说：${text}`,
-        80
-      );
-      const emotionResult = JSON.parse(emotionRaw.replace(/```json|```/g, '').trim());
-      if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
-        if (emotionResult.target === '外人') {
-          emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
-        } else if (emotionResult.need === '安慰') {
-          emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
+      const emotionRaw = await Promise.race([
+        fetchDeepSeek(
+          '判断用户消息的情绪和需求。只返回JSON，不要其他文字。\n格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost"}\ntarget含义：无=没有针对对象，外人=被外人伤害，Ghost=对Ghost有情绪',
+          `用户说：${text}`,
+          80
+        ),
+        new Promise(resolve => setTimeout(() => resolve(''), 2500))
+      ]);
+      if (emotionRaw) {
+        const emotionResult = JSON.parse(emotionRaw.replace(/```json|```/g, '').trim());
+        if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
+          if (emotionResult.target === '外人') {
+            emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
+          } else if (emotionResult.need === '安慰') {
+            emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
+          }
         }
       }
     } catch(e) {}
