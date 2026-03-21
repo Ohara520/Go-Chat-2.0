@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.GEMINI_API_KEY,
   baseURL: 'https://api.yunjintao.com/v1',
 });
 
