@@ -114,6 +114,7 @@ async function loadFromCloud() {
       localStorage.setItem(compensationKey, '1');
       _lastSyncTime = 0;
       saveToCloud();
+      setTimeout(() => { if (typeof renderWallet === 'function') renderWallet(); }, 500);
       console.log('补偿£200已发放');
     }
   } catch(e) {
