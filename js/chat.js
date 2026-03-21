@@ -6546,14 +6546,14 @@ async function triggerHomeItemMoment(product) {
   const desc = typeDesc[product.homeType] || `买了${product.name}`;
   const hint = tierHint[product.tier] || '';
 
-  // Ghost反应
+  // Ghost反应 — 买房/车/地是重大事件，用Sonnet保证情感深度
   try {
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
+        model: getMainModel(),
+        max_tokens: 300,
         ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-6), {
           role: 'user',
@@ -6755,7 +6755,7 @@ async function onGhostReceived(delivery) {
 
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
 
-  // Haiku生成签收反应
+  // 奢侈品用Sonnet，普通包裹用Haiku
   try {
     const isFromHome = !!pd.isFromHome;
     const fromHomeHint = isFromHome
@@ -6765,7 +6765,7 @@ async function onGhostReceived(delivery) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: pd.isLuxury ? getMainModel() : 'claude-haiku-4-5-20251001',
         max_tokens: 150,
         ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-10), {
@@ -6798,15 +6798,15 @@ async function onGhostReceived(delivery) {
       }, 3000);
     }
 
-    // 精品专柜用Sonnet补充
+    // 精品专柜第二条反应用Sonnet，情感分量要够
     if (pd.isLuxury) {
       setTimeout(async () => {
         const res2 = await fetchWithTimeout('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 300,
+            model: getMainModel(),
+            max_tokens: 400,
             ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
             messages: [...chatHistory.slice(-15), {
               role: 'user',
