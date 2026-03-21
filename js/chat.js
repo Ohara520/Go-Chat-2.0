@@ -2722,7 +2722,9 @@ function updateUserTransferCard(cardId, kept) {
 function showGhostTransferCard(container, amount, noteText, isRefund) {
   const now = new Date();
   const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  if (noteText) {
+  // note 只有纯中文时不单独渲染（卡片本身已有转账说明，避免冒出一条孤立中文消息）
+  const hasEnglish = noteText && /[a-zA-Z]/.test(noteText);
+  if (noteText && hasEnglish) {
     const parts = noteText.split(/\n---\n/).filter(p => p.trim());
     if (parts.length > 1) {
       parts.forEach((p, i) => setTimeout(() => appendMessage('bot', p.trim()), i * 600));
@@ -3066,7 +3068,7 @@ function appendMessage(role, text, animate = true) {
       const zhLines = lines.slice(firstZhIdx).map(l => {
         l = l.replace(/\b[A-Z]{2,}\b/g, '').trim();
         return l;
-      }).filter(l => l);
+      }).filter(l => l).slice(0, 1); // 只取第一行中文，防止模型输出多行重复翻译
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
       enLine.textContent = enLines.join('\n');
@@ -3079,7 +3081,7 @@ function appendMessage(role, text, animate = true) {
     } else if (firstZhIdx === 0 && firstEnIdx > 0) {
       // 中文在前英文在后——重新排列，英文提到前面
       const enLines = lines.filter(l => !isChinese(l) && l.trim());
-      const zhLines = lines.filter(l => isChinese(l)).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l);
+      const zhLines = lines.filter(l => isChinese(l)).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l).slice(0, 1); // 只取第一行中文
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
       enLine.textContent = enLines.join('\n');
