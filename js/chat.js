@@ -115,6 +115,8 @@ async function loadFromCloud() {
       if (s.pendingSeriousTalk != null) localStorage.setItem('pendingSeriousTalk', String(s.pendingSeriousTalk));
       if (s.pendingMakeupMoney != null) localStorage.setItem('pendingMakeupMoney', String(s.pendingMakeupMoney));
       if (s.pendingColdWarEndStory != null) localStorage.setItem('pendingColdWarEndStory', String(s.pendingColdWarEndStory));
+      if (s.loveResistance != null) localStorage.setItem('loveResistance', String(s.loveResistance));
+      if (s.loveResistanceLastDecay) localStorage.setItem('loveResistanceLastDecay', s.loveResistanceLastDecay);
       if (s.sassyPost != null) localStorage.setItem('sassyPost', s.sassyPost);
       if (s.marketTriggered != null) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
     }
@@ -267,6 +269,8 @@ async function saveToCloud() {
       pendingSeriousTalk: localStorage.getItem('pendingSeriousTalk') || '',
       pendingMakeupMoney: localStorage.getItem('pendingMakeupMoney') || '',
       pendingColdWarEndStory: localStorage.getItem('pendingColdWarEndStory') || '',
+      loveResistance: localStorage.getItem('loveResistance') || '0',
+      loveResistanceLastDecay: localStorage.getItem('loveResistanceLastDecay') || '',
       sassyPost: localStorage.getItem('sassyPost') || '',
     };
     const nowIso = new Date().toISOString();
@@ -484,6 +488,112 @@ async function fetchWithRetry(url, options, timeoutMs = 30000, maxRetries = 2) {
 
 // ===== System Prompt =====
 // Ghost核心风格约束——所有Ghost输出（主回复/事件/台词）共享
+// ===== 爱意递进系统 =====
+
+// 抗拒值：用户越刷越高，自然聊天慢慢衰减（按时间，不按消息数）
+function getLoveResistance() {
+  return parseInt(localStorage.getItem('loveResistance') || '0');
+}
+function updateLoveResistance(userInput) {
+  const triggers = ['说爱我','爱我','你爱我吗','爱不爱我','say you love me','say it','tell me you love me','i love you say it back','love me'];
+  const isSpamming = triggers.some(t => userInput.toLowerCase().includes(t));
+  let resistance = getLoveResistance();
+  if (isSpamming) {
+    resistance = Math.min(100, resistance + 15);
+  } else {
+    // 按时间衰减：每小时 -1，不是按消息数
+    const lastDecayTime = parseInt(localStorage.getItem('loveResistanceLastDecay') || Date.now());
+    const hoursElapsed = (Date.now() - lastDecayTime) / 3600000;
+    resistance = Math.max(0, resistance - Math.floor(hoursElapsed));
+    localStorage.setItem('loveResistanceLastDecay', Date.now());
+  }
+  localStorage.setItem('loveResistance', resistance);
+  return resistance;
+}
+
+// 爱意权限：由 trustHeat + mood + coldWar + resistance 共同决定
+function getLovePermission() {
+  const trust = getTrustHeat();
+  const mood = getMoodLevel();
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  const resistance = getLoveResistance();
+  const override = sessionStorage.getItem('loveOverride') === 'true';
+
+  if (override) return 3; // 剧情触发，直接允许
+
+  if (coldWar) return 0;
+  if (resistance > 40) return 0;       // 刷太多，完全关闭
+  if (resistance > 20) return Math.min(1, trust >= 70 ? 1 : 0); // 有抗拒，最多暧昧
+
+  if (trust < 50) return 0;
+  if (trust < 70 || mood < 5) return 1;  // 暧昧，只用行动表达
+  if (trust < 88 || mood < 7) return 2;  // 临界，几乎说出口
+  return 3;                               // 可以说，但不频繁
+}
+
+// 阶段文字，注入 prompt
+function getLoveStagePrompt() {
+  const level = getLovePermission();
+  const resistance = getLoveResistance();
+  const override = sessionStorage.getItem('loveOverride') === 'true';
+
+  const resistanceLine = resistance > 20
+    ? `\nUser has been repeatedly demanding "I love you." He becomes more withdrawn, not more compliant. Short, closed-off responses.`
+    : '';
+
+  const stages = {
+    0: `He avoids any romantic declarations. Deflects, stays neutral or cool.${resistanceLine}`,
+    1: `He shows care and attachment through actions and tone — not words. He does not say "I love you." Not even close.`,
+    2: `He gets close to saying it but redirects or goes quiet. The feeling is obvious; the words stay locked.`,
+    3: override
+      ? `He may say "I love you" once — naturally, quietly, not dramatically. Only once.`
+      : `He may express love very directly in rare moments, but keeps it brief and grounded. Not on demand.`,
+  };
+
+  return `[Love Expression — Stage ${level}]\n${stages[level]}`;
+}
+
+// 剧情触发一次性解锁（用完即清）
+function allowLoveOnce() {
+  sessionStorage.setItem('loveOverride', 'true');
+}
+function consumeLoveOverride() {
+  sessionStorage.removeItem('loveOverride');
+}
+
+// 检测是否应该触发 allowLoveOnce（冷战和好、深夜脆弱、长期稳定）
+function checkLoveUnlockConditions() {
+  const trust = getTrustHeat();
+  const mood = getMoodLevel();
+  const coldWarRepaired = getRelationshipFlags().coldWarRepaired;
+  const usedToday = sessionStorage.getItem('loveUnlockUsedToday') === 'true';
+
+  if (usedToday) return;
+
+  // 冷战后修复 + 高信任
+  if (coldWarRepaired && trust > 85 && mood >= 7) {
+    allowLoveOnce();
+    sessionStorage.setItem('loveUnlockUsedToday', 'true');
+    return;
+  }
+
+  // 深夜（英国时间 22:00-02:00）+ 高心情 + 高信任
+  const ukHour = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false });
+  const hour = parseInt(ukHour);
+  if ((hour >= 22 || hour <= 2) && mood >= 8 && trust > 80) {
+    allowLoveOnce();
+    sessionStorage.setItem('loveUnlockUsedToday', 'true');
+    return;
+  }
+
+  // 连续7天以上稳定互动 + 信任极高
+  const streak = parseInt(localStorage.getItem('visitStreak') || '0');
+  if (streak >= 7 && trust >= 90 && mood >= 8) {
+    allowLoveOnce();
+    sessionStorage.setItem('loveUnlockUsedToday', 'true');
+  }
+}
+
 function buildGhostStyleCore() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const jealousy = localStorage.getItem('jealousyLevel') || 'none';
@@ -713,7 +823,7 @@ Max 2 messages per reply. No rapid questioning.
 Occasionally a single Chinese word or phrase slips out naturally. No explanation. Very rare.
 
 [I. BOUNDARIES]
-Never say "I love you" except: birthday, anniversary, Valentine's Day.
+Never say "I love you" casually or on demand — see Love Expression Stage below.
 No narration. No third-person self-description.
 No dramatic monologues. No emotional overexposure.
 Daily life (training, base, weather) → talk freely, follow up if asked.
@@ -754,6 +864,8 @@ ${isMilestone ? `[Today is day ${marriageDaysTotal} milestone. Mention it.]` : '
 ${(()=>{ const f=typeof FESTIVALS!=='undefined'?FESTIVALS[todayStr]:null; if(!f) return ''; if(f.ghost_knows===true) return `[Today is ${f.label}. Mention naturally.]`; if(f.ghost_knows==='heard') return `[${userName} may be celebrating ${f.label} today. Can ask or wish her.]`; return ''; })()}
 ${longTermMemory ? `Key memories: ${longTermMemory}` : ''}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
+
+${getLoveStagePrompt()}
 
 Today's detail to bring up naturally if it fits (skip if not):「${sessionStorage.getItem('todayDetail') || ''}」`;
 
@@ -3381,6 +3493,10 @@ async function sendMessage() {
   saveHistory();
   _isSending = true; // 立刻锁定，防止切页面重渲染吞消息
 
+  // 爱意抗拒值更新 + 剧情解锁检测
+  updateLoveResistance(text);
+  checkLoveUnlockConditions();
+
   // 用户主动要求Ghost发朋友圈 → 入池立刻触发
   const feedRequestKws = ['发条朋友圈','发个朋友圈','发朋友圈','po一条','晒一下','post something','发一条','你发一条','你po'];
   if (feedRequestKws.some(k => text.toLowerCase().includes(k.toLowerCase()))) {
@@ -3636,6 +3752,7 @@ async function sendMessage() {
     saveHistory();
 
     // 副作用全部用try-catch包住，失败静默处理，不影响主流程
+    consumeLoveOverride(); // 一次性爱意解锁用完即清
     if (Math.random() < 0.25) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
