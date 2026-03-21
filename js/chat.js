@@ -6324,13 +6324,7 @@ function confirmPurchase() {
     }
   }
 
-  // 奢侈品朋友圈：用户自己买的入事件池弹草稿；Ghost收到的等快递签收再触发
-  if (isLuxury && !p.isGhostGift) {
-    setTimeout(() => {
-      feedEvent_boughtBigItem(p.name, p.price || 0, false);
-      maybeTriggerFeedPost('event_arrived');
-    }, 1000);
-  }
+  // 奢侈品是寄给 Ghost 的礼物，等快递真正签收后才触发朋友圈，不在购买时发
 
   // 建立小家道具购买处理
   if (p.isHomeItem && !p.comingSoon) {
