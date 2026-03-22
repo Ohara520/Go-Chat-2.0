@@ -3716,7 +3716,80 @@ function incrementTodayCount() {
   localStorage.setItem(key, count);
   return count;
 }
-const DAILY_LIMIT = 100; // 内测每天100条
+const DAILY_LIMIT = 100; // 内测兜底限制
+
+// 订阅信息缓存（每次进聊天页刷新一次）
+let _subCache = null;
+let _subCacheTime = 0;
+
+async function getSubscription() {
+  const now = Date.now();
+  if (_subCache && now - _subCacheTime < 5 * 60 * 1000) return _subCache;
+  const email = localStorage.getItem('userEmail') || '';
+  if (!email) return null;
+  try {
+    const res = await fetch('/api/check-subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    _subCache = data.subscribed ? data : null;
+    _subCacheTime = now;
+    return _subCache;
+  } catch(e) { return null; }
+}
+
+async function consumeQuota() {
+  const email = localStorage.getItem('userEmail') || '';
+  if (!email) return true;
+  try {
+    const res = await fetch('/api/increment-usage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!data.ok) return false;
+    if (_subCache) {
+      _subCache.remaining = data.remaining;
+      _subCache.used_count = (_subCache.used_count || 0) + 1;
+    }
+    return true;
+  } catch(e) { return true; }
+}
+
+function showSubscribePrompt() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:28px 24px;max-width:300px;width:88%;text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">💌</div>
+      <div style="font-size:16px;font-weight:600;color:#3b0764;margin-bottom:8px;">开始你们的故事</div>
+      <div style="font-size:13px;color:#9b72c4;margin-bottom:20px;line-height:1.6;">订阅后即可与 Ghost 无限畅聊</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <a href="https://ifdian.net/order/create?plan_id=6c9cd46425d211f1964152540025c377" target="_blank"
+           style="padding:11px;border-radius:12px;background:rgba(168,85,247,0.1);color:#7c3aed;text-decoration:none;font-size:13px;">
+          新婚 ¥49.9/月 · 1800条
+        </a>
+        <a href="https://ifdian.net/order/create?plan_id=6e82f4a225d211f1b43e52540025c377" target="_blank"
+           style="padding:11px;border-radius:12px;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;text-decoration:none;font-size:13px;font-weight:600;">
+          蜜月 ¥69.9/月 · 2500条 ⭐推荐
+        </a>
+        <a href="https://ifdian.net/order/create?plan_id=6f7c680225d211f19aca52540025c377" target="_blank"
+           style="padding:11px;border-radius:12px;background:rgba(168,85,247,0.1);color:#7c3aed;text-decoration:none;font-size:13px;">
+          金婚 ¥109.9/月 · 4500条
+        </a>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:#c084fc;">付款后在爱发电备注填写你的登录邮箱</div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" 
+              style="margin-top:12px;padding:8px 20px;border-radius:10px;border:1px solid rgba(168,85,247,0.3);background:transparent;color:#9b72c4;font-size:12px;cursor:pointer;">
+        稍后再说
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
 
 async function sendMessage() {
   const input = document.getElementById('chatInput');
@@ -3724,18 +3797,30 @@ async function sendMessage() {
   if (!text) return;
 
   // 条数限制检查
-  const todayCount = getTodayCount();
-  if (todayCount >= DAILY_LIMIT) {
-    appendMessage('bot', "that\'s enough for today. go do something else.\n今天就到这。去做点别的事。");
-    // 存入隐藏系统记忆，让他明天知道发生过什么
-    const todayDateStr = new Date().toLocaleDateString('zh-CN');
-    chatHistory.push({ 
-      role: 'user', 
-      content: `[系统记忆：${todayDateStr}，你们聊天到了今天上限，你说了句话让她离开了。如果她今天或明天回来，你知道这件事，但不需要主动提，除非她问起或者你觉得自然。]`,
-      _system: true 
-    });
-    saveHistory();
-    return;
+  const email = localStorage.getItem('userEmail') || '';
+  if (email) {
+    const sub = await getSubscription();
+    if (!sub) {
+      showSubscribePrompt();
+      return;
+    }
+    if (sub.remaining <= 0) {
+      appendMessage('bot', "that's all for this month. come back when you've sorted it.\n这个月的额度用完了。续费再来。");
+      return;
+    }
+  } else {
+    const todayCount = getTodayCount();
+    if (todayCount >= DAILY_LIMIT) {
+      appendMessage('bot', "that\'s enough for today. go do something else.\n今天就到这。去做点别的事。");
+      const todayDateStr = new Date().toLocaleDateString('zh-CN');
+      chatHistory.push({
+        role: 'user',
+        content: `[系统记忆：${todayDateStr}，你们聊天到了今天上限，你说了句话让她离开了。如果她今天或明天回来，你知道这件事，但不需要主动提，除非她问起或者你觉得自然。]`,
+        _system: true
+      });
+      saveHistory();
+      return;
+    }
   }
   // 条数在成功拿到回复后才扣（见下方成功处理）
 
@@ -3931,6 +4016,8 @@ async function sendMessage() {
 
     // 成功拿到回复才计条数
     incrementTodayCount();
+    // 订阅用户扣减云端额度
+    if (localStorage.getItem('userEmail')) consumeQuota().catch(() => {});
 
     // 消息撤回：4%概率，发完3-6秒后撤回，重新打一条
     if (lastBotResult && !giveMoneyMatch && Math.random() < 0.04) {
