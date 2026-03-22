@@ -542,6 +542,23 @@
     <!-- 账户区域 -->
     <div style="padding: 8px 16px 32px; text-align:center;">
       <div id="main-account-email" style="font-size:12px;color:#c9aee0;margin-bottom:10px;"></div>
+
+      <!-- 订阅状态卡片 -->
+      <div id="subscribeCard" onclick="openSubscribePage()" style="
+        background: linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.1) 100%);
+        border: 1px solid rgba(168,85,247,0.25);
+        border-radius: 16px; padding: 12px 16px; margin-bottom: 10px;
+        cursor: pointer; transition: all 0.2s; text-align: left;
+      ">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div id="subPlanName" style="font-size:13px;font-weight:600;color:#7c3aed;">✨ 开通会员</div>
+            <div id="subRemaining" style="font-size:11px;color:#a78bbd;margin-top:2px;">与Ghost无限畅聊</div>
+          </div>
+          <div style="font-size:20px;">💌</div>
+        </div>
+      </div>
+
       <button onclick="handleLogout()" style="
         padding:10px 28px; border:1.5px solid #e8d5f5;
         background:white; border-radius:20px; font-size:13px;
@@ -733,6 +750,15 @@
     <!-- Feed -->
     <div class="couple-feed-section">
 
+      <!-- Tab 切换 -->
+      <div class="couple-tabs">
+        <button class="couple-tab active" id="tabFeed" onclick="switchCoupleTab('feed')">动态</button>
+        <button class="couple-tab" id="tabMemory" onclick="switchCoupleTab('memory')">回忆</button>
+      </div>
+
+      <!-- 动态面板 -->
+      <div id="panelFeed">
+
       <!-- 置顶婚帖 -->
       <div class="couple-post-card couple-wedding">
         <div class="couple-pinned-tag">📌 置顶</div>
@@ -790,6 +816,18 @@
 
       <!-- AI动态Feed -->
       <div id="couplePostsFeed"></div>
+
+      </div><!-- end panelFeed -->
+
+      <!-- 回忆面板 -->
+      <div id="panelMemory" style="display:none;">
+        <!-- 关系阶段条 -->
+        <div class="memory-stage-bar" id="memoryStageBar"></div>
+        <!-- 精选3张 -->
+        <div class="memory-highlights" id="memoryHighlights"></div>
+        <!-- 完整时间线 -->
+        <div class="memory-timeline" id="memoryTimeline"></div>
+      </div>
 
     </div>
   </div>
@@ -913,7 +951,7 @@
             <div class="ambient-track" data-id="story"     data-file="/audio/story.mp3"     data-color="#f9a8d4" data-glow="#f472b6" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎙️</div><div class="ambient-track-name">哄睡</div></div>
             <div class="ambient-track" data-id="piano"     data-file="/audio/piano.mp3"     data-color="#fde68a" data-glow="#fbbf24" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎹</div><div class="ambient-track-name">钢琴</div></div>
             <div class="ambient-track" data-id="cafe"      data-file="/audio/cafe.mp3"      data-color="#f9a8d4" data-glow="#b4835f" onclick="toggleTrack(this)"><div class="ambient-track-emoji">☕</div><div class="ambient-track-name">咖啡馆</div></div>
-            <div class="ambient-track" data-id="base"      data-file="/audio/base.mp3"      data-color="#cbd5e1" data-glow="#475569" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎖️</div><div class="ambient-track-name">基地环境</div></div>
+            <div class="ambient-track" data-id="book"      data-file="/audio/book.mp3"      data-color="#d4b896" data-glow="#8b6f47" onclick="toggleTrack(this)"><div class="ambient-track-emoji">📖</div><div class="ambient-track-name">翻书声</div></div>
             <div class="ambient-track" data-id="cricket"   data-file="/audio/cricket.mp3"   data-color="#86efac" data-glow="#22c55e" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🌙</div><div class="ambient-track-name">深夜虫鸣</div></div>
             <div class="ambient-track" data-id="sleep"     data-file="/audio/sleep.mp3"     data-color="#bae6fd" data-glow="#7dd3fc" onclick="toggleTrack(this)"><div class="ambient-track-emoji">😴</div><div class="ambient-track-name">深眠呼吸</div></div>
           </div>
@@ -1309,8 +1347,71 @@ async function handleLogout() {
   await sbClient.auth.signOut();
   localStorage.removeItem('sb_user_id');
   localStorage.removeItem('sb_user_email');
+  localStorage.removeItem('userEmail');
   window.location.href = '/login.html';
 }
+
+async function loadSubscribeCard() {
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
+  if (!email) return;
+  try {
+    const res = await fetch('/api/check-subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    const planEl = document.getElementById('subPlanName');
+    const remEl = document.getElementById('subRemaining');
+    const card = document.getElementById('subscribeCard');
+    if (!planEl) return;
+    if (data.subscribed) {
+      const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+      planEl.textContent = `💎 ${data.plan_name}`;
+      remEl.textContent = `剩余 ${data.remaining} 条 · ${endDate}到期`;
+      card.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(236,72,153,0.12) 100%)';
+    }
+  } catch(e) {}
+}
+
+function openSubscribePage() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(180deg,#fdf4ff,#fff5fb);border-radius:24px 24px 0 0;padding:24px;width:100%;max-width:480px;padding-bottom:calc(24px + env(safe-area-inset-bottom));">
+      <div style="width:36px;height:4px;background:rgba(168,85,247,0.3);border-radius:2px;margin:0 auto 20px;"></div>
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:18px;font-weight:700;color:#4a1a70;margin-bottom:4px;">选择你们的故事</div>
+        <div style="font-size:13px;color:#a78bbd;">付款后在爱发电备注填写登录邮箱</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+        <a href="https://ifdian.net/order/create?plan_id=6c9cd46425d211f1964152540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;">
+          <div><div style="font-size:14px;font-weight:600;color:#6b21a8;">新婚</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">1800条/月 · 记忆10条</div></div>
+          <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥49.9</div>
+        </a>
+        <a href="https://ifdian.net/order/create?plan_id=6e82f4a225d211f1b43e52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(236,72,153,0.15));border:1.5px solid rgba(168,85,247,0.35);text-decoration:none;position:relative;">
+          <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;">推荐</div>
+          <div><div style="font-size:14px;font-weight:700;color:#6b21a8;">蜜月</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">2500条/月 · 记忆15条</div></div>
+          <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥69.9</div>
+        </a>
+        <a href="https://ifdian.net/order/create?plan_id=6f7c680225d211f19aca52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;">
+          <div><div style="font-size:14px;font-weight:600;color:#6b21a8;">金婚</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">4500条/月 · 记忆20条</div></div>
+          <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥109.9</div>
+        </a>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="https://ifdian.net/item/9effc14425d411f19ee752540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;font-size:12px;color:#7c3aed;">⚡ 小加油包<br><span style="font-weight:700;">¥9.9 · 300条</span></a>
+        <a href="https://ifdian.net/item/8e7858cc25d411f1ba9852540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;font-size:12px;color:#7c3aed;">⚡ 大加油包<br><span style="font-weight:700;">¥19.9 · 700条</span></a>
+      </div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:14px;padding:12px;border-radius:14px;border:1px solid rgba(168,85,247,0.2);background:transparent;color:#a78bbd;font-size:13px;cursor:pointer;">稍后再说</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(loadSubscribeCard, 1000);
+});
 </script>
 <script src="js/app.js"></script>
 <script src="js/chat.js"></script>
