@@ -4591,6 +4591,15 @@ const COUPLE_POSTS = [
 ];
 
 function initCoupleSpace() {
+  // 事件委托：在朋友圈容器上监听点赞，避免动态DOM的onclick失效问题
+  const feedContainer = document.getElementById('couplePostsFeed');
+  if (feedContainer && !feedContainer._likeListenerAdded) {
+    feedContainer.addEventListener('click', e => {
+      const btn = e.target.closest('.couple-like-btn');
+      if (btn) { e.stopPropagation(); toggleCoupleLike(btn); }
+    });
+    feedContainer._likeListenerAdded = true;
+  }
   // 结婚日期 — 统一用marriageDate，与日历/首次登录同步
   let weddingDate = localStorage.getItem('marriageDate');
   if (!weddingDate) {
