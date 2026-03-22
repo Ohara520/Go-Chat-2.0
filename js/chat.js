@@ -683,25 +683,25 @@ function pickTodayDetail() {
 
   // 场景主题池——只给模型一个「今天发生了什么」的场景提示，不定死台词
   const DETAILS_BASE = [
-    'training ran late — something about drills going sideways',
+    'training ran late — drills went rough today',
     'range day, early start, long run before breakfast',
-    'soap did something stupid. won\'t say what.',
-    'quiet night on base. no missions. unusual.',
     'kit inspection today. standard.',
     'signal was patchy all day',
-    'soap challenged price to something. price ignored him.',
     'gaz made tea. actually not bad.',
     'price barely said a word all day.',
-    'soap was singing again at some point. nobody stopped him.',
-    'found something of yours tucked in his kit.',
-    'gaz found a stray cat near the base. still there.',
     'paperwork day. worse than any mission.',
-    'someone on the team got hurt in drills. nothing serious.',
+    'comms equipment acting up again',
+    'long debrief. took most of the afternoon.',
+    'quiet night on base. no missions. unusual.',
+    'boots needed resoling. sorted it.',
+    'rations were grim today. not worth describing.',
+    'soap did something loud. won\'t get into it.',
+    'been going over maps. nothing interesting.',
+    'slept four hours. functional.',
   ];
 
   const DETAILS_HOME = [
     'been quieter than expected back home',
-    'ran into someone from years ago. brief.',
     'slept properly for the first time in a while',
     'picked up a few things from the shop. basic stuff.',
     'old neighborhood hasn\'t changed much',
@@ -711,6 +711,8 @@ function pickTodayDetail() {
     'found an old photo. didn\'t expect it.',
     'went for a run early. needed the air.',
     'quiet street at night. different kind of quiet than base.',
+    'made tea. stood by the window for a bit.',
+    'nothing on the telly worth watching.',
   ];
 
   const DETAILS_ABROAD = [
@@ -721,7 +723,9 @@ function pickTodayDetail() {
     'comms have been slow',
     'long stretches of waiting today',
     'weather is unpredictable out here',
-    'team\'s been professional. not much else to say.',
+    'gear check took most of the morning',
+    'bad coffee again. getting used to it.',
+    'not much to report. just waiting.',
   ];
 
   const DETAILS_LONDON = [
@@ -733,6 +737,7 @@ function pickTodayDetail() {
     'grabbed something to eat. nothing special',
     'weather\'s been miserable. typical london',
     'long day on the move',
+    'too many people. needed some air.',
   ];
 
   const isLondon = location.includes('London') || location.includes('伦敦');
