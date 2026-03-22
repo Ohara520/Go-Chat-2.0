@@ -3933,16 +3933,12 @@ async function sendMessage() {
     let firstBotResult = null;
 
     // ===== Step 4.5: 幽灵第三者审查 =====
-    // 检测回复里是否出现无指代来源的 he/him/someone，若有则用 Haiku 重写
     try {
       const suspiciousThirdParty = /\b(he|him|his|someone|somebody|another person|another guy|other guy|other man)\b/i.test(reply);
       if (suspiciousThirdParty) {
         const recentText = cleanHistory.slice(-6).map(m => m.content || '').join('\n').toLowerCase();
         const hasClearReferent = /\b(ex|boyfriend|boss|coworker|colleague|friend|doctor|therapist|teacher|price|soap|gaz|simon|ghost|dad|father|brother)\b/i.test(recentText);
-        const replyLower = reply.toLowerCase();
-        const hasSelfContext = /\bi\b|\byou\b|\bwe\b|\bus\b/.test(replyLower);
-        if (!hasClearReferent && !hasSelfContext) {
-          // 无指代来源，用 Haiku 重写，不展示给用户
+        if (!hasClearReferent) {
           const regenRes = await fetchWithTimeout('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3961,7 +3957,7 @@ async function sendMessage() {
           }
         }
       }
-    } catch(e) {} // 审查失败静默处理，不影响主流程
+    } catch(e) {}
 
     // 审查后重新拆分（reply 可能已被重写）
     const finalParts = reply.split('\n---\n').filter(p => p.trim());
@@ -7356,15 +7352,9 @@ function checkDeliveryUpdates() {
         // 检测遗失
         if (d.isLost && i === d.lostAtStage && !d.isLostConfirmed) {
           d.isLostConfirmed = true;
-          // 商城页显示遗失状态，不在聊天框通知
+          d.lostConfirmedAt = Date.now(); // 记录丢失时间，用时间戳判断而不是setTimeout
           showToast(`❌ ${d.name} 快递遗失了`);
           renderDeliveryTracker();
-          // 48小时后小票消失
-          setTimeout(() => {
-            d.lostTicketExpired = true;
-            localStorage.setItem('deliveries', JSON.stringify(deliveries));
-            renderDeliveryTracker();
-          }, 48 * 3600 * 1000);
           return;
         }
 
@@ -7678,11 +7668,15 @@ function renderDeliveryTracker() {
   const tracker = document.getElementById('deliveryTracker');
   if (!tracker) return;
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  // 显示所有进行中的包裹，secret模式在最后阶段前隐藏
+  // 所有进行中的包裹，secret模式在最后阶段前隐藏
+  const now48 = Date.now();
   const active = deliveries.filter(d => {
-    if (d.done || d.lostTicketExpired) return false;
+    if (d.done) return false;
+    if (d.lostTicketExpired) return false;
+    // 丢失超过48小时自动消失
+    if (d.isLostConfirmed && d.lostConfirmedAt && now48 - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
     if (d.isSecretDelivery) {
-      return d.currentStage >= d.stages.length - 2; // 最后两个阶段才显示
+      return d.currentStage >= d.stages.length - 2;
     }
     return true;
   });
@@ -7702,9 +7696,10 @@ function renderDeliveryTracker() {
         ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
       </span>`;
     }
-    return `<span class="delivery-tag" onclick="openDeliveryModal(${active.indexOf(d)})" style="${isGhost ? 'border-color:rgba(168,85,247,0.5);' : ''}">
+    return `<span class="delivery-tag" onclick="openDeliveryModal(${active.indexOf(d)})" style="${isGhost ? 'background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.5);' : ''}">
       <div class="delivery-tag-dot" style="${isGhost ? 'background:#a855f7;' : ''}"></div>
       ${isGhost ? '💌 ' : ''}${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
+      ${d.isLostConfirmed ? `<span onclick="event.stopPropagation();dismissDelivery(${d.id})" style="margin-left:4px;font-size:10px;color:#ef4444;cursor:pointer;">✕</span>` : ''}
     </span>`;
   }).join('') + (hasMore ? `<span class="delivery-tag" onclick="event.stopPropagation();document.getElementById('deliveryTracker').dataset.expanded=document.getElementById('deliveryTracker').dataset.expanded==='true'?'false':'true';renderDeliveryTracker();" style="color:#a855f7;font-size:11px;cursor:pointer;">
     ${showAll ? '收起' : '+'+( active.length - MAX_VISIBLE)+'条'}
@@ -7713,7 +7708,13 @@ function renderDeliveryTracker() {
 
 function openDeliveryModal(idx) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const active = deliveries.filter(d => !d.isGhostSend && !d.done && !d.lostTicketExpired).slice(0, 5);
+  const now48 = Date.now();
+  const active = deliveries.filter(d => {
+    if (d.done || d.lostTicketExpired) return false;
+    if (d.isLostConfirmed && d.lostConfirmedAt && now48 - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
+    if (d.isSecretDelivery) return d.currentStage >= d.stages.length - 2;
+    return true;
+  });
   const d = active[idx];
   if (!d) return;
   document.getElementById('deliveryModalTitle').textContent = d.emoji + ' ' + d.name;
@@ -7745,5 +7746,16 @@ function openDeliveryModal(idx) {
 
 function closeDeliveryModal() {
   document.getElementById('deliveryModal').style.display = 'none';
+}
+
+function dismissDelivery(id) {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const idx = deliveries.findIndex(d => d.id === id);
+  if (idx !== -1) {
+    deliveries[idx].lostTicketExpired = true;
+    deliveries[idx].done = true;
+    localStorage.setItem('deliveries', JSON.stringify(deliveries));
+    renderDeliveryTracker();
+  }
 }
 
