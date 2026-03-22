@@ -89,12 +89,7 @@ async function loadFromCloud() {
       if (data.long_term_memory != null) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
-    // 余额：取本地和云端最大值（防止云端旧数据覆盖刚收到的转账）
-    if (data.balance != null) {
-      const localBalance = parseFloat(localStorage.getItem('wallet') || '0');
-      const cloudBalance = parseFloat(data.balance);
-      localStorage.setItem('wallet', Math.max(localBalance, cloudBalance).toFixed(2));
-    }
+    // 余额：现在从交易记录计算，不再单独同步余额字段
 
     // state_snapshot：只在云端更新时才覆盖动态状态
     if (cloudIsNewer && data.state_snapshot != null) {
@@ -5348,19 +5343,25 @@ function spawnCouplePetals() {
 
 // ===== 钱包系统 =====
 function getBalance() {
-  // 首次使用初始化100英镑
-  if (localStorage.getItem('wallet') === null) {
-    localStorage.setItem('wallet', '100.00');
-    addTransaction({ icon: '🎁', name: '新婚礼金', amount: 100 });
+  const txList = getTransactions();
+  if (txList.length === 0) {
+    // 首次使用，初始化100英镑
+    if (localStorage.getItem('walletInitialized') === null) {
+      localStorage.setItem('walletInitialized', '1');
+      addTransaction({ icon: '🎁', name: '新婚礼金', amount: 100 });
+      return 100;
+    }
+    return 0;
   }
-  return parseFloat(localStorage.getItem('wallet') || '100');
+  // 从交易记录计算余额，永远准确
+  const balance = txList.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
+  return Math.max(0, balance);
 }
 function setBalance(val) {
-  localStorage.setItem('wallet', Math.max(0, val).toFixed(2));
+  // setBalance 现在只更新UI，余额由交易记录决定
   const balEl = document.getElementById('transferBalance');
   if (balEl) balEl.textContent = '£' + Math.floor(Math.max(0, val));
   touchLocalState();
-  // 余额变化立刻同步，不走防抖
   saveToCloud();
 }
 function getTransactions() {
