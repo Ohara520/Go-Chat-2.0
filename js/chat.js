@@ -1056,11 +1056,12 @@ ${(()=>{
 ${getLoveStagePrompt()}
 
 Today's background (optional — only mention if it fits naturally into the conversation, ignore completely if it doesn't):「${sessionStorage.getItem('todayDetail') || ''}」
-Do NOT force this into the reply. Do NOT reference it if the user's message is unrelated.\`;
+Do NOT force this into the reply. Do NOT reference it if the user's message is unrelated.`;
 
   const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt;
   return fullPrompt;
 }
+
 
 function buildSystemPromptParts(full) {
   // 接收已构建好的 prompt，不再内部调用 buildSystemPrompt()，避免副作用触发两次
