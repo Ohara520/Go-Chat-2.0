@@ -7696,6 +7696,21 @@ function renderDeliveryTracker() {
 
   tracker.innerHTML = visible.map((d, idx) => {
     const isGhost = d.isGhostSend;
+    if (d.isLostConfirmed) {
+      return `<span class="delivery-tag" onclick="openDeliveryModal(${active.indexOf(d)})" style="background:rgba(255,235,235,0.9);border-color:rgba(240,100,100,0.5);color:#b91c1c;">
+        <span style="font-size:10px">❌</span>
+        ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
+      </span>`;
+    }
+    return `<span class="delivery-tag" onclick="openDeliveryModal(${active.indexOf(d)})" style="${isGhost ? 'border-color:rgba(168,85,247,0.5);' : ''}">
+      <div class="delivery-tag-dot" style="${isGhost ? 'background:#a855f7;' : ''}"></div>
+      ${isGhost ? '💌 ' : ''}${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
+    </span>`;
+  }).join('') + (hasMore ? `<span class="delivery-tag" onclick="event.stopPropagation();document.getElementById('deliveryTracker').dataset.expanded=document.getElementById('deliveryTracker').dataset.expanded==='true'?'false':'true';renderDeliveryTracker();" style="color:#a855f7;font-size:11px;cursor:pointer;">
+    ${showAll ? '收起' : '+'+( active.length - MAX_VISIBLE)+'条'}
+  </span>` : '');
+}
+
 function openDeliveryModal(idx) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
   const active = deliveries.filter(d => !d.isGhostSend && !d.done && !d.lostTicketExpired).slice(0, 5);
