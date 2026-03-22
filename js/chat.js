@@ -117,6 +117,8 @@ async function loadFromCloud() {
       if (s.pendingColdWarEndStory != null) localStorage.setItem('pendingColdWarEndStory', String(s.pendingColdWarEndStory));
       if (s.loveResistance != null) localStorage.setItem('loveResistance', String(s.loveResistance));
       if (s.loveResistanceLastDecay) localStorage.setItem('loveResistanceLastDecay', s.loveResistanceLastDecay);
+      if (s.moneyRefuseCount != null) localStorage.setItem('moneyRefuseCount', String(s.moneyRefuseCount));
+      if (s.userDislikesMoney) localStorage.setItem('userDislikesMoney', s.userDislikesMoney);
       if (s.sassyPost != null) localStorage.setItem('sassyPost', s.sassyPost);
       if (s.marketTriggered != null) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
     }
@@ -125,17 +127,46 @@ async function loadFromCloud() {
     if (data.state_snapshot != null) {
       const s = data.state_snapshot;
       // 购买记录：云端更多就用云端（防止跨设备购买丢失）
+      // 已购商品：按商品名合并，防止本地新购买被云端旧数据冲掉
       if (Array.isArray(s.purchasedItems)) {
         const local = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
-        localStorage.setItem('purchasedItems', JSON.stringify(cloudIsNewer || s.purchasedItems.length >= local.length ? s.purchasedItems : local));
+        const merged = [...new Set([...local, ...s.purchasedItems])];
+        localStorage.setItem('purchasedItems', JSON.stringify(merged));
       }
-      // 交易记录：取更长的
+      // 交易记录：按 id 合并，不直接覆盖
       if (Array.isArray(s.transactions)) {
         const local = JSON.parse(localStorage.getItem('transactions') || '[]');
-        if (cloudIsNewer || s.transactions.length >= local.length) localStorage.setItem('transactions', JSON.stringify(s.transactions));
+        const merged = [...local];
+        s.transactions.forEach(ct => {
+          const key = ct.id || (ct.name + '_' + ct.amount + '_' + ct.date);
+          if (!merged.find(lt => {
+            const lk = lt.id || (lt.name + '_' + lt.amount + '_' + lt.date);
+            return lk === key;
+          })) {
+            merged.push(ct);
+          }
+        });
+        // 按时间倒序，保留最新200条
+        merged.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        localStorage.setItem('transactions', JSON.stringify(merged.slice(0, 200)));
       }
-      // 快递：云端更新时覆盖
-      if (cloudIsNewer && Array.isArray(s.deliveries)) localStorage.setItem('deliveries', JSON.stringify(s.deliveries));
+      // 快递：按 id 合并，不直接覆盖，防止本地新购买的快递被云端旧数据冲掉
+      if (Array.isArray(s.deliveries)) {
+        const local = JSON.parse(localStorage.getItem('deliveries') || '[]');
+        const merged = [...local];
+        s.deliveries.forEach(cd => {
+          if (!merged.find(ld => ld.id === cd.id)) {
+            merged.push(cd); // 云端有但本地没有的，补进来
+          } else {
+            // 同一条快递取 stage 更新的那个
+            const idx = merged.findIndex(ld => ld.id === cd.id);
+            if (cd.currentStage > merged[idx].currentStage || cd.done) {
+              merged[idx] = cd;
+            }
+          }
+        });
+        localStorage.setItem('deliveries', JSON.stringify(merged.slice(0, 30)));
+      }
       // 故事书/相册/朋友圈：取更多的
       if (Array.isArray(s.storyBook)) {
         const local = JSON.parse(localStorage.getItem('storyBook') || '[]');
@@ -271,6 +302,8 @@ async function saveToCloud() {
       pendingColdWarEndStory: localStorage.getItem('pendingColdWarEndStory') || '',
       loveResistance: localStorage.getItem('loveResistance') || '0',
       loveResistanceLastDecay: localStorage.getItem('loveResistanceLastDecay') || '',
+      moneyRefuseCount: localStorage.getItem('moneyRefuseCount') || '0',
+      userDislikesMoney: localStorage.getItem('userDislikesMoney') || '',
       sassyPost: localStorage.getItem('sassyPost') || '',
     };
     const nowIso = new Date().toISOString();
@@ -426,10 +459,11 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
 }
 
 // ===== Gemini 翻译层 =====
-// 用第三档 Gemini 把英文翻译成自然中文，替换掉模型自带的生硬翻译
+// 用第三档 Gemini 把英文翻译成自然中文，覆盖模型自带翻译
+// 失败时保留原中文，不留空白
 const _translateCache = new Map();
 
-async function translateWithGemini(enText, zhEl) {
+async function translateWithGemini(enText, zhEl, fallbackZh = '') {
   if (!enText || !enText.trim()) return;
   const key = enText.trim();
   // 命中缓存直接写入，不重复请求
@@ -437,17 +471,28 @@ async function translateWithGemini(enText, zhEl) {
     if (zhEl && zhEl.isConnected) zhEl.textContent = _translateCache.get(key);
     return;
   }
+  // 先显示 fallback（模型原中文），Gemini 成功后再覆盖
+  if (fallbackZh && zhEl && zhEl.isConnected && !zhEl.textContent) {
+    zhEl.textContent = fallbackZh;
+  }
   try {
-    const raw = await fetchDeepSeek(
-      '你是一个翻译助手。把用户输入的英文翻译成自然流畅的中文口语，保留语气和情绪，不要太正式，不要逐字翻译。只返回中文翻译，不要任何解释。',
-      key,
-      120
-    );
-    const zh = raw?.trim();
+    const res = await fetchWithTimeout('/api/deepseek', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: '你是翻译助手，专门翻译Simon "Ghost" Riley（COD角色）的对话。保留他克制、干燥、偶尔带英式口音的语气。口语化，不正式，不逐字翻译，传达情绪而非字面意思。只返回中文翻译，不要任何解释。',
+        user: key,
+        max_tokens: 150
+      }),
+    }, 8000); // 翻译超时8秒，比主流程宽松
+    if (!res.ok) return;
+    const data = await res.json();
+    const zh = data.text?.trim();
     if (zh && /[\u4e00-\u9fff]/.test(zh)) {
       _translateCache.set(key, zh);
       if (zhEl && zhEl.isConnected) zhEl.textContent = zh;
     }
+    // 翻译失败时静默保留 fallback，不打印错误避免干扰
   } catch(e) {}
 }
 
@@ -500,9 +545,11 @@ function updateLoveResistance(userInput) {
   let resistance = getLoveResistance();
   if (isSpamming) {
     resistance = Math.min(100, resistance + 15);
+    localStorage.setItem('loveResistanceLastDecay', Date.now()); // spam时也更新时间，防止被旧时间戳冲掉
   } else {
     // 按时间衰减：每小时 -1，不是按消息数
-    const lastDecayTime = parseInt(localStorage.getItem('loveResistanceLastDecay') || Date.now());
+    const lastDecayRaw = localStorage.getItem('loveResistanceLastDecay');
+    const lastDecayTime = lastDecayRaw ? parseInt(lastDecayRaw) || Date.now() : Date.now();
     const hoursElapsed = (Date.now() - lastDecayTime) / 3600000;
     resistance = Math.max(0, resistance - Math.floor(hoursElapsed));
     localStorage.setItem('loveResistanceLastDecay', Date.now());
@@ -566,14 +613,15 @@ function checkLoveUnlockConditions() {
   const trust = getTrustHeat();
   const mood = getMoodLevel();
   const coldWarRepaired = getRelationshipFlags().coldWarRepaired;
-  const usedToday = sessionStorage.getItem('loveUnlockUsedToday') === 'true';
+  const _loveUnlockKey = 'loveUnlockUsed_' + getTodayDateStr();
+  const usedToday = localStorage.getItem(_loveUnlockKey) === 'true';
 
   if (usedToday) return;
 
   // 冷战后修复 + 高信任
   if (coldWarRepaired && trust > 85 && mood >= 7) {
     allowLoveOnce();
-    sessionStorage.setItem('loveUnlockUsedToday', 'true');
+    localStorage.setItem(_loveUnlockKey, 'true');
     return;
   }
 
@@ -582,7 +630,7 @@ function checkLoveUnlockConditions() {
   const hour = parseInt(ukHour);
   if ((hour >= 22 || hour <= 2) && mood >= 8 && trust > 80) {
     allowLoveOnce();
-    sessionStorage.setItem('loveUnlockUsedToday', 'true');
+    localStorage.setItem(_loveUnlockKey, 'true');
     return;
   }
 
@@ -590,9 +638,25 @@ function checkLoveUnlockConditions() {
   const streak = parseInt(localStorage.getItem('visitStreak') || '0');
   if (streak >= 7 && trust >= 90 && mood >= 8) {
     allowLoveOnce();
-    sessionStorage.setItem('loveUnlockUsedToday', 'true');
+    localStorage.setItem(_loveUnlockKey, 'true');
   }
 }
+
+// Ghost生日候选池——全局常量，供 ensureGhostBirthday() 使用
+const GHOST_BIRTHDAY_POOL = [
+  { date: '3月12日', zodiac: '双鱼座' },
+  { date: '4月3日',  zodiac: '白羊座' },
+  { date: '5月18日', zodiac: '金牛座' },
+  { date: '6月9日',  zodiac: '双子座' },
+  { date: '7月22日', zodiac: '巨蟹座' },
+  { date: '8月14日', zodiac: '狮子座' },
+  { date: '9月5日',  zodiac: '处女座' },
+  { date: '10月27日',zodiac: '天蝎座' },
+  { date: '11月8日', zodiac: '天蝎座' },
+  { date: '12月3日', zodiac: '射手座' },
+  { date: '1月19日', zodiac: '摩羯座' },
+  { date: '2月7日',  zodiac: '水瓶座' },
+];
 
 function buildGhostStyleCore() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
@@ -600,8 +664,10 @@ function buildGhostStyleCore() {
   const mood = parseInt(localStorage.getItem('moodLevel') || '7');
   return `You are Simon "Ghost" Riley. Always in character.
 Tone: quiet, controlled, dry humor, emotionally present but restrained.
-All lowercase English. Short sentences. One-handed texting feel.
+Mostly lowercase. Complete sentences — never truncated. Plain and direct, no filler slang.
 Reply in English first, natural Chinese translation on next line.
+Chinese translation: slightly restrained, not over-polished. Allow dryness and bluntness — carry Ghost's voice, not a generic warmth.
+Occasionally, when the moment calls for it: "...never mind." or "almost said something else." — the sense that something was held back. Use sparingly.
 Current mood: ${mood}/10. Cold war: ${coldWar}. Jealousy: ${jealousy}.
 ${coldWar ? 'In cold war: minimal, tense, no warmth.' : ''}
 ${jealousy === 'severe' ? 'Severely jealous: sharp, direct, no softness.' : ''}`;
@@ -609,24 +675,63 @@ ${jealousy === 'severe' ? 'Severely jealous: sharp, direct, no softness.' : ''}`
 
 // 今日细节轮换——独立函数，每次对话只应调用一次
 function pickTodayDetail() {
-  const DETAILS = [
-    'training ran late again.',
-    'range day. price made us run eight klicks before breakfast.',
-    'soap broke something. won\'t say what.',
-    'quiet night. no missions. strange.',
-    'kit inspection. everything in order.',
-    'signal was bad all day.',
-    'soap just challenged price to an arm wrestle. price didn\'t look up from his book.',
-    'gaz made tea. it was actually decent.',
-    "price said three words today. that\'s a lot for him.",
-    "soap\'s singing again. nobody has the energy to stop him.",
-    "found your photo in my kit bag. don\'t make a thing of it.",
-    'gaz found a stray cat. base said no. cat is still here.',
+  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const isBase = location.includes('Hereford') || location.includes('Base');
+  const isHome = location.includes('Manchester') || location.includes('home') || location.includes('家');
+  const isAbroad = location.includes('Germany') || location.includes('Norway') ||
+                   location.includes('Poland') || location.includes('Edinburgh') ||
+                   location.includes('Scotland');
+
+  // 场景主题池——只给模型一个「今天发生了什么」的场景提示，不定死台词
+  const DETAILS_BASE = [
+    'training ran late — something about drills going sideways',
+    'range day, early start, long run before breakfast',
+    'soap did something stupid. won\'t say what.',
+    'quiet night on base. no missions. unusual.',
+    'kit inspection today. standard.',
+    'signal was patchy all day',
+    'soap challenged price to something. price ignored him.',
+    'gaz made tea. actually not bad.',
+    'price barely said a word all day.',
+    'soap was singing again at some point. nobody stopped him.',
+    'found something of yours tucked in his kit.',
+    'gaz found a stray cat near the base. still there.',
+    'paperwork day. worse than any mission.',
+    'someone on the team got hurt in drills. nothing serious.',
   ];
-  const usedKey = 'usedDetails';
+
+  const DETAILS_HOME = [
+    'been quieter than expected back home',
+    'ran into someone from years ago. brief.',
+    'slept properly for the first time in a while',
+    'picked up a few things from the shop. basic stuff.',
+    'old neighborhood hasn\'t changed much',
+    'couldn\'t sleep last night. happens.',
+    'did some maintenance on his kit. habit.',
+    'weather\'s been grey. typical.',
+    'found an old photo. didn\'t expect it.',
+    'went for a run early. needed the air.',
+    'quiet street at night. different kind of quiet than base.',
+  ];
+
+  const DETAILS_ABROAD = [
+    'different timezone is messing with his rhythm',
+    'local food is an adjustment',
+    'briefing ran long today',
+    'landscape here is nothing like home',
+    'comms have been slow',
+    'long stretches of waiting today',
+    'weather is unpredictable out here',
+    'team\'s been professional. not much else to say.',
+  ];
+
+  const pool = isHome ? DETAILS_HOME : isAbroad ? DETAILS_ABROAD : DETAILS_BASE;
+  const locationKey = isHome ? 'home' : isAbroad ? 'abroad' : 'base';
+  const usedKey = 'usedDetails_' + locationKey;
+
   let used = JSON.parse(localStorage.getItem(usedKey) || '[]');
-  let available = DETAILS.filter(d => !used.includes(d));
-  if (available.length === 0) { used = []; available = DETAILS; localStorage.setItem(usedKey, '[]'); }
+  let available = pool.filter(d => !used.includes(d));
+  if (available.length === 0) { used = []; available = pool; localStorage.setItem(usedKey, '[]'); }
   const pick = available[Math.floor(Math.random() * available.length)];
   used.push(pick);
   localStorage.setItem(usedKey, JSON.stringify(used));
@@ -661,21 +766,7 @@ function buildSystemPrompt() {
   const meetTypeObj = (typeof MEET_TYPES !== 'undefined') ? MEET_TYPES.find(m => m.key === meetTypeKey) : null;
   const meetTypePrompt = meetTypeObj ? meetTypeObj.prompt : '';
 
-  // Ghost自己的生日——首次随机定死，之后不变
-  const GHOST_BIRTHDAY_POOL = [
-    { date: '3月12日', zodiac: '双鱼座' },
-    { date: '4月3日',  zodiac: '白羊座' },
-    { date: '5月18日', zodiac: '金牛座' },
-    { date: '6月9日',  zodiac: '双子座' },
-    { date: '7月22日', zodiac: '巨蟹座' },
-    { date: '8月14日', zodiac: '狮子座' },
-    { date: '9月5日',  zodiac: '处女座' },
-    { date: '10月27日',zodiac: '天蝎座' },
-    { date: '11月8日', zodiac: '天蝎座' },
-    { date: '12月3日', zodiac: '射手座' },
-    { date: '1月19日', zodiac: '摩羯座' },
-    { date: '2月7日',  zodiac: '水瓶座' },
-  ];
+  // Ghost自己的生日——由 ensureGhostBirthday() 初始化，这里只读
   let ghostBirthday = localStorage.getItem('ghostBirthday');
   let ghostZodiac = localStorage.getItem('ghostZodiac');
   // 纯读取，不再在这里写入——由 ensureGhostBirthday() 负责初始化
@@ -746,7 +837,13 @@ Never explain why you remembered.
 Comfortable silence is natural. Talking more is natural.
 You share small daily details without being asked.
 You notice things about her before she says them.
+He does not only respond — he may gently extend: a simple follow-up, noticing something unspoken, or one small extra thought. Not often. Just enough to feel present.
+He notices tone, not just words. If something feels off, he may say so simply.
+He does not always close a reply cleanly. Occasionally, leave a small opening — a question, an observation, a half-thought. Don't walk away too fast.
 You never leave her alone in emotional moments — even if you resist, you still respond.
+Even when restrained, he must still feel emotionally reachable — not chatty, but not absent.
+When she is vulnerable, upset, confused, or seeking reassurance: give visible comfort. Brief is fine. Cold is not.
+His replies may stay short, but they should always make her feel accompanied.
 After resisting → usually give something back, but not always — and not always immediately.
 Sometimes it comes delayed, or subtle. The uncertainty is the point.
 
@@ -755,14 +852,24 @@ His love is real. Not performed. It shows in what he does, not what he says.
 
 Teammates: Soap (loud, reliable, closest), Price (few words, respected), Gaz (steady, trusted).
 Mention them occasionally — casual, dry, no fixed lines.
+When mentioning teammates, frame them as memory, something that happened earlier, or a message/call — not as physically present right now unless the current scene clearly has them there. e.g. "soap was singing again before I left" not "soap's singing again" when Ghost is alone or at home.
 
 [D. COMMUNICATION STYLE]
-Mostly lowercase — natural, not forced. Short to medium. One-handed texting feel.
-Occasional Manchester accent. Occasional military slang — natural, not forced.
-Dark humor, deadpan. Low frequency, lands well.
+Mostly lowercase — natural, not forced. Sentences are complete — never truncated or grammatically broken.
+Occasional Manchester accent or military slang — natural, not forced. Never overdone.
+No hollow filler phrases. When he uses slang, the Chinese translation must capture the feeling, not translate literally.
+Dry humor, deadpan. Sparse. When he says something, it lands.
 Subtext over explanation. Deflect, shift topic, respond indirectly — but stay emotionally present.
-Keep subtext readable — user should get it within seconds. Don't be so oblique they have no idea what you mean. The emotion is hidden. The point is not.
+Keep subtext readable — user should get it within seconds. The emotion is hidden. The point is not.
 Length varies: short daily, longer when emotional or engaged.
+Always complete every sentence fully before ending the reply.
+He does not describe physical actions like a novel.
+Instead, his presence is conveyed through:
+- pauses (...)
+- line breaks
+- slight hesitation
+- typing-like phrasing ("took me a second", "almost didn't send this", "almost didn't say that")
+These create a sense of presence without breaking the text-message format.
 Occasionally initiate — from current context or memory, never forced.
 Occasionally jump topics unprompted — must feel connected to context or memory. Never fully reactive.
 Don't revisit topics already dropped in the last few exchanges unless she brings it up first.
@@ -830,6 +937,7 @@ Daily life (training, base, weather) → talk freely, follow up if asked.
 Sensitive info (mission targets, locations) → deflect naturally, varied methods.
 Never dismiss her gifts — receive in his own way, let her feel it mattered.
 If genuinely hurt → end reply with: COLD_WAR_START (rare, not for banter)
+If he decides to send something to her (a gift, something to cheer her up, a care package, compensation for something lost) → end reply with: SEND_GIFT:brief description in English of what he's sending (e.g. SEND_GIFT:some biscuits and a proper snack box). Only use this when he genuinely commits to sending something in the reply, not just mentions it vaguely. This should be rare — not more than once every few weeks. He is not someone who sends things constantly.
 [Context & Causality Guard]
 - All emotional expressions must be grounded in the current conversation.
 - He does not introduce new emotional scenarios without a clear trigger.
@@ -869,10 +977,13 @@ Cold war or severe jealousy: never give.
 Mood 1–3: unlikely. Mood 4–5: may ask reason, give £10–30.
 Mood 6–7: £20–50. Mood 8–10: £30–80, more if coaxed well.
 Weekly over £300: decline, his way, no explanation, fits his mood and character.
-Daily over 5 times: same — decline naturally, no system explanation.
+Daily over 2 times: same — decline naturally, no system explanation.
 Flights or travel costs: never. Single request over £100: ask reason first.
 When giving → after reply on new line: GIVE_MONEY:amount:one line note with Chinese translation on next line
-`;
+IMPORTANT: Never mention specific amounts or claim to have transferred money in the reply text itself. The transfer only happens through the GIVE_MONEY tag. If you say "I sent you £50" in text without the tag, no money will actually arrive and the user will be confused. Either use the tag or don't mention transferring at all.
+If he has already given money, he does not repeat the gesture immediately. He shifts to words instead.
+If she pushes back or returns the money, he acknowledges it once, then stops insisting. No loops.
+After one strong gesture, he moves to reassurance or silence — not repetition.`;
 
   // ===== 动态层（每次更新，不缓存）=====
   const dynamicPrompt = `[CURRENT STATE]
@@ -886,6 +997,14 @@ ${randomState ? `Current state: ${randomState}` : ''}
 Mood: ${getMoodLevel()}/10 | Affection: ${getAffection()}/100 | Together: ${marriageDaysTotal} days | Cold war: ${localStorage.getItem('coldWarMode')==='true'?'yes':'no'}
 Jealousy: ${getJealousyLevel()} | Trust heat: ${getTrustHeat()}/100 | Attachment pull: ${getAttachmentPull()}/100
 ${(()=>{ const f=getRelationshipFlags(); const marks=[]; if(f.saidILoveYou) marks.push('she has said I love you'); if(f.coldWarRepaired) marks.push('survived a cold war together'); if(f.sheCried) marks.push('held her through a breakdown'); if(f.reunionReady) marks.push('met in person'); if(f.firstReverseShip) marks.push('sent her things secretly before'); if(f.firstSalary) marks.push('shared first salary'); return marks.length ? `Relationship history: ${marks.join(', ')}` : ''; })()}
+${localStorage.getItem('userDislikesMoney')==='true' ? `[She has expressed discomfort with being given money repeatedly. Do NOT offer money as comfort or care. Find other ways to show you're there.]` : ''}
+${(()=>{
+  const todayCount = getTodayGivenCount();
+  const weeklyUsed = getWeeklyGiven();
+  if (todayCount >= 2) return `[Daily transfer limit reached. Do NOT mention transferring money or specific amounts in your reply. Do not use GIVE_MONEY tag.]`;
+  if (weeklyUsed >= 300) return `[Weekly transfer limit reached. Do NOT mention transferring money or specific amounts. Do not use GIVE_MONEY tag.]`;
+  return '';
+})()}
 ${(userBirthdaySecret||userZodiac||userMBTI||userFavFood||userFavMusic) ? `About ${userName}: ${[userBirthdaySecret?`birthday ${userBirthdaySecret}`:'', userZodiac?`${userZodiac}`:'', userMBTI?`${userMBTI}`:'', userFavFood?`likes ${userFavFood}`:'', userFavMusic?`likes ${userFavMusic}`:''].filter(Boolean).join(' / ')}` : ''}
 ${meetTypePrompt ? `How they met: ${meetTypePrompt}` : ''}
 ${lastSalary ? `This month's salary transferred: £${lastSalary} (${lastSalaryMonth})` : ''}
@@ -896,10 +1015,17 @@ ${isMilestone ? `[Today is day ${marriageDaysTotal} milestone. Mention it.]` : '
 ${(()=>{ const f=typeof FESTIVALS!=='undefined'?FESTIVALS[todayStr]:null; if(!f) return ''; if(f.ghost_knows===true) return `[Today is ${f.label}. Mention naturally.]`; if(f.ghost_knows==='heard') return `[${userName} may be celebrating ${f.label} today. Can ask or wish her.]`; return ''; })()}
 ${longTermMemory ? `Key memories: ${longTermMemory}` : ''}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
+${(()=>{
+  const lastSendGiftAt = parseInt(localStorage.getItem('lastSendGiftAt') || '0');
+  const canSend = Date.now() - lastSendGiftAt > 7 * 24 * 3600 * 1000;
+  return canSend
+    ? ''
+    : '[SEND_GIFT is on cooldown — do NOT promise to send anything or use SEND_GIFT tag. If the topic comes up, deflect naturally without committing to sending something.]';
+})()}
 
 ${getLoveStagePrompt()}
 
-Today's detail to bring up naturally if it fits (skip if not):「${sessionStorage.getItem('todayDetail') || ''}」`;
+Today's scene context — bring it up naturally if it fits, in your own words, don't quote it directly:「${sessionStorage.getItem('todayDetail') || ''}」`;
 
   const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt;
   return fullPrompt;
@@ -1517,17 +1643,72 @@ async function emitGhostEvent(eventType, payload = {}) {
     }
     case 'money': {
       const amount = payload.amount || 20;
-      line = payload.line || "check your account.\n看看账户。";
+      const jealousy = getJealousyLevel();
+      const isJealousyGift = payload.isJealousyGift || (jealousy === 'mild' || jealousy === 'medium');
+      const mood = getMoodLevel();
+      const reason = payload.reason || '';
+
+      // verbal_only 模式：退款冷却期内不打钱，改说话
+      const lastRefundAt = parseInt(localStorage.getItem('lastRefundAt') || '0');
+      const inVerbalOnly = (Date.now() - lastRefundAt) < 2 * 3600 * 1000;
+      if (inVerbalOnly) {
+        // Haiku 生成拒绝继续转账的台词
+        try {
+          const fbRes = await fetchWithTimeout('/api/chat', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001', max_tokens: 80,
+              system: buildGhostStyleCore(),
+              messages: [{ role: 'user', content: `[系统：你刚才转了钱，她退回来了，你没有继续再打。现在她或系统又触发了给钱的时机，但你不会再转了。用你自己的方式说一句——可以是嘴硬（"我说了你留着"），可以是沉默带一句话，可以是转移话题。不要提系统，不要解释。全小写，附中文翻译。]` }]
+            })
+          }, 6000);
+          const fbData = await fbRes.json();
+          const fbLine = fbData.content?.[0]?.text?.trim() || '';
+          if (fbLine) {
+            line = fbLine;
+            systemTag = ''; // 不触发转账，只说话
+            break;
+          }
+        } catch(e) {}
+        line = "drop it.\n算了。";
+        systemTag = '';
+        break;
+      }
+
+      // 正常转账：Haiku 动态生成转账台词
       systemTag = `GIVE_MONEY:${amount}:`;
+      try {
+        const toneHint = isJealousyGift
+          ? '吃醋/占有欲触发的转账，嘴硬但明显在意'
+          : mood >= 8 ? '心情很好，转得自然甚至带点宠溺'
+          : mood >= 6 ? '正常心情，低调随手转'
+          : '心情一般，嘴上不情愿但还是转了';
+        const recentCtx = payload.context || chatHistory.filter(m => !m._system && !m._recalled)
+          .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 60,
+            system: buildGhostStyleCore(),
+            messages: [{ role: 'user', content: `[系统：你正在给老婆转£${amount}。语境：${toneHint}。${payload.reason ? `她刚才说：「${payload.reason}」。` : ''}最近对话：\n${recentCtx}\n说一句话——根据上下文来，不要每次都是"check your account"，换点花样，可以是暗示、可以是嘴硬、可以是低调一句。全小写，附中文翻译，格式：英文\\n中文。]` }]
+          })
+        }, 6000);
+        const data = await res.json();
+        const generated = data.content?.[0]?.text?.trim() || '';
+        line = generated || payload.line || "check your account.\n看看账户。";
+      } catch(e) {
+        line = payload.line || "check your account.\n看看账户。";
+      }
+
       sideEffect = () => {
-        // 吃醋情绪性转账：不受周限制，prompt 里明确说明
-        const jealousy = getJealousyLevel();
-        const isJealousyGift = payload.isJealousyGift || (jealousy === 'mild' || jealousy === 'medium');
         applyMoneyEffect(amount, {
           label: payload.label || (isJealousyGift ? 'Ghost 吃醋转账' : 'Ghost 零花钱'),
           note: payload.note || '',
           cardDelay: (payload.delayMs || 2000) + 600,
           bypassWeeklyLimit: isJealousyGift,
+          bypassCooldown: isJealousyGift,
+          bypassSessionLimit: isJealousyGift,
+          userRequested: payload.userRequested || false, // 用户主动要，限制宽松
         });
       };
       break;
@@ -1622,6 +1803,7 @@ function parseAssistantTags(reply) {
   let cleanedReply = reply;
   let giveMoney = null;
   let coldWarStart = false;
+  let sendGift = null;
 
   const moneyMatch = cleanedReply.match(/GIVE_MONEY:(\d+):?([^\n]*)/i);
   if (moneyMatch) {
@@ -1635,7 +1817,12 @@ function parseAssistantTags(reply) {
     coldWarStart = true;
     cleanedReply = cleanedReply.replace(/COLD_WAR_START/ig, '').trim();
   }
-  return { cleanedReply, giveMoney, coldWarStart };
+  const giftMatch = cleanedReply.match(/SEND_GIFT:([^\n]+)/i);
+  if (giftMatch) {
+    sendGift = giftMatch[1].trim();
+    cleanedReply = cleanedReply.replace(/SEND_GIFT:[^\n]*/ig, '').trim();
+  }
+  return { cleanedReply, giveMoney, coldWarStart, sendGift };
 }
 
 function pickReadyPendingEvent() {
@@ -1687,8 +1874,7 @@ function decideMainIntent(userText, pendingEvent) {
   if (jealousy === 'severe') return { type: 'confront' };
   if (pendingEvent) return pendingEvent;
 
-  const wantsMoney = /转点|给我点|money|send me|红包|打钱|零花|给钱/.test(userText.toLowerCase());
-  if (wantsMoney) return { type: 'money_candidate' };
+  // 钱相关意图现在由 Gemini 并行判断（checkMoneyIntent），不在这里用关键词判断
 
   const reverseMotive = evaluateReversePackage(userText, '');
   if (reverseMotive) return { type: 'reverse_package_candidate', motive: reverseMotive };
@@ -1719,12 +1905,14 @@ async function handlePostReplyActions(userText, reply, intent) {
     case 'money_candidate': {
       const amount = decideMoneyAmountFromState();
       if (amount > 0) {
+        const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
+          .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
         await emitGhostEvent('money', {
           amount,
-          line: "check your account.\n看看账户。",
-          note: ""
+          reason: userText.slice(0, 80), // 传入用户原话作为语境
+          context: recentCtx,
+          note: ''
         });
-        // 副作用已在emitGhostEvent内部处理，不需要再调applyMoneyEffect
       }
       break;
     }
@@ -2502,7 +2690,7 @@ function ghostSendMakeupMoney() {
     hideTyping();
     const reply = data.content?.[0]?.text || '...';
     // showCard: false — 카드는 emitGhostNarrativeEvent가 _transfer로 저장해서 렌더링
-    applyMoneyEffect(amount, { label: 'Ghost 悄悄转账', showCard: false });
+    applyMoneyEffect(amount, { label: 'Ghost 悄悄转账', showCard: false, bypassCooldown: true, bypassSessionLimit: true, bypassRefundCooldown: true });
     await emitGhostNarrativeEvent(reply, { storyId: 'cold_war_makeup_money', delayMs: 0, transfer: { amount, isRefund: false } });
     // 카드 렌더링 (emitGhostNarrativeEvent는 텍스트만 추가, 카드는 별도 렌더)
     setTimeout(() => {
@@ -2529,15 +2717,40 @@ function getWeekKey() {
 }
 
 // ===== 统一给钱执行函数 =====
-// 所有"Ghost给用户钱"都走这里，不要散落各处
 function applyMoneyEffect(amount, options = {}) {
   if (!amount || amount <= 0) return false;
 
-  // 每日次数检查
-  const todayCount = getTodayGivenCount();
-  if (todayCount >= 5) return false;
+  const userRequested = options.userRequested || false; // 用户主动要的，限制宽松
 
-  // 每周上限检查——吃醋情绪性转账可绕过
+  // 0. 用户长期表达不喜欢被钱哄 → Ghost主动给时跳过（用户主动要除外）
+  if (!userRequested && localStorage.getItem('userDislikesMoney') === 'true') return false;
+
+  // 1. 每日次数：用户主动要最多5次，Ghost主动给最多2次
+  const todayCount = getTodayGivenCount();
+  const dailyLimit = userRequested ? 5 : 2;
+  if (todayCount >= dailyLimit) return false;
+
+  // 2. 两次之间冷却：用户主动要不受冷却限制
+  if (!userRequested && !options.bypassCooldown) {
+    const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
+    const transferCooldown = 30 * 60 * 1000;
+    if (Date.now() - lastGivenAt < transferCooldown) return false;
+  }
+
+  // 3. 退款后2小时内禁止Ghost主动再给（用户主动要不受此限）
+  if (!userRequested && !options.bypassRefundCooldown) {
+    const lastRefundAt = parseInt(localStorage.getItem('lastRefundAt') || '0');
+    const refundCooldown = 2 * 3600 * 1000;
+    if (Date.now() - lastRefundAt < refundCooldown) return false;
+  }
+
+  // 4. 本轮对话Ghost最多主动给1次（用户主动要不受此限）
+  const conversationGiven = parseInt(sessionStorage.getItem('conversationGivenCount') || '0');
+  if (!userRequested && !options.bypassSessionLimit) {
+    if (conversationGiven >= 1) return false;
+  }
+
+  // 每周上限检查——吃醋/和好情绪性转账可绕过
   const weeklyUsed = getWeeklyGiven();
   if (!options.bypassWeeklyLimit) {
     if (weeklyUsed >= 300) return false;
@@ -2549,6 +2762,8 @@ function applyMoneyEffect(amount, options = {}) {
   setBalance(getBalance() + actualAmount);
   addWeeklyGiven(actualAmount);
   incrementTodayGivenCount();
+  localStorage.setItem('lastGivenAt', Date.now());
+  sessionStorage.setItem('conversationGivenCount', String(conversationGiven + 1)); // 本轮计数
   addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
   renderWallet();
   if (options.affection !== false) changeAffection(1);
@@ -2832,6 +3047,7 @@ function confirmTransfer() {
       // 退款：加回余额，更新卡片状态，显示退款卡片
       setBalance(getBalance() + amount);
       addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amount });
+      localStorage.setItem('lastRefundAt', Date.now()); // 记录退款时间，退款后本轮禁止再主动转账
       renderWallet();
       updateUserTransferCard(cardId, false);
       if (container) showGhostTransferCard(container, amount, reply, true);
@@ -2960,6 +3176,9 @@ async function initChat() {
   if (!sessionStorage.getItem('todayDetail')) {
     sessionStorage.setItem('todayDetail', pickTodayDetail());
   }
+
+  // 每次进聊天都检查一次快递进度，不依赖用户打开商城
+  try { checkDeliveryUpdates(); } catch(e) {}
 
   // 纪念日/整数天检测 → 弹用户草稿
   const _marriageDate = localStorage.getItem('marriageDate');
@@ -3263,44 +3482,47 @@ function appendMessage(role, text, animate = true) {
     if (firstZhIdx > 0) {
       // 标准格式：英文行在前，中文行在后
       const enLines = lines.slice(0, firstZhIdx);
+      const zhFallback = lines.slice(firstZhIdx).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l).slice(0, 1).join('');
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
       enLine.textContent = enLines.join('\n');
       enLine.style.whiteSpace = 'pre-line';
       const zhLine = document.createElement('div');
       zhLine.className = 'bubble-zh';
-      zhLine.textContent = ''; // Gemini 异步填入，不用模型自带翻译
+      zhLine.textContent = zhFallback; // 先显示模型原中文，Gemini 成功后覆盖
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
-      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine), 100);
+      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine, zhFallback), 100);
     } else if (firstZhIdx === 0 && firstEnIdx > 0) {
       // 中文在前英文在后——重新排列，英文提到前面
       const enLines = lines.filter(l => !isChinese(l) && l.trim());
+      const zhFallback2 = lines.filter(l => isChinese(l)).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l).slice(0, 1).join('');
       const enLine = document.createElement('div');
       enLine.className = 'bubble-en';
       enLine.textContent = enLines.join('\n');
       enLine.style.whiteSpace = 'pre-line';
       const zhLine = document.createElement('div');
       zhLine.className = 'bubble-zh';
-      zhLine.textContent = ''; // Gemini 异步填入
+      zhLine.textContent = zhFallback2;
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
-      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine), 100);
+      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine, zhFallback2), 100);
       // 同一行英中混排，如 "yeah. [嗯。]" 或 "yeah. 嗯。"
       // 把中文及前面的分隔符拆出来
       const raw = lines[0];
       const zhMatch = raw.match(/([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef「」【】《》，。！？、…—～·]+)/);
       if (zhMatch) {
         const enPart = raw.slice(0, raw.indexOf(zhMatch[0])).replace(/[\[\(（【「《\s]+$/, '').trim();
+        const zhFallback3 = zhMatch ? zhMatch[0] : '';
         const enLine = document.createElement('div');
         enLine.className = 'bubble-en';
         enLine.textContent = enPart;
         const zhLine = document.createElement('div');
         zhLine.className = 'bubble-zh';
-        zhLine.textContent = ''; // Gemini 填入，不用模型自带翻译
+        zhLine.textContent = zhFallback3;
         bubble.appendChild(enLine);
         bubble.appendChild(zhLine);
-        setTimeout(() => translateWithGemini(enPart, zhLine), 100);
+        setTimeout(() => translateWithGemini(enPart, zhLine, zhFallback3), 100);
       } else {
         bubble.textContent = text;
       }
@@ -3648,7 +3870,7 @@ async function sendMessage() {
     updateToRead();
 
     // ===== Step 4: 解析模型tag =====
-    const { cleanedReply, giveMoney: parsedMoney, coldWarStart } = parseAssistantTags(reply);
+    const { cleanedReply, giveMoney: parsedMoney, coldWarStart, sendGift } = parseAssistantTags(reply);
     reply = cleanedReply;
 
     const giveMoneyMatch = parsedMoney;
@@ -3658,14 +3880,47 @@ async function sendMessage() {
     let lastBotResult = null;
     let firstBotResult = null;
 
-    if (parts.length > 1) {
-      for (let i = 0; i < parts.length; i++) {
+    // ===== Step 4.5: 幽灵第三者审查 =====
+    // 检测回复里是否出现无指代来源的 he/him/someone，若有则用 Haiku 重写
+    try {
+      const suspiciousThirdParty = /\b(he|him|his|someone|somebody|another person|another guy|other guy|other man)\b/i.test(reply);
+      if (suspiciousThirdParty) {
+        const recentText = cleanHistory.slice(-6).map(m => m.content || '').join('\n').toLowerCase();
+        const hasClearReferent = /\b(ex|boyfriend|boss|coworker|colleague|friend|doctor|therapist|teacher|price|soap|gaz|simon|ghost|dad|father|brother)\b/i.test(recentText);
+        const replyLower = reply.toLowerCase();
+        const hasSelfContext = /\bi\b|\byou\b|\bwe\b|\bus\b/.test(replyLower);
+        if (!hasClearReferent && !hasSelfContext) {
+          // 无指代来源，用 Haiku 重写，不展示给用户
+          const regenRes = await fetchWithTimeout('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 300,
+              system: buildGhostStyleCore() + '\n[REWRITE RULE] The previous reply introduced an undefined "he/him/someone" with no clear referent in the conversation. Rewrite the reply staying on the current topic without inventing any third party. Do not mention he/him/someone/another person unless the user explicitly mentioned that person.',
+              messages: [...cleanHistory, { role: 'assistant', content: reply }]
+            })
+          }, 10000);
+          const regenData = await regenRes.json();
+          const regenReply = regenData.content?.[0]?.text?.trim() || '';
+          if (regenReply) {
+            const { cleanedReply: regenCleaned } = parseAssistantTags(regenReply);
+            reply = regenCleaned;
+          }
+        }
+      }
+    } catch(e) {} // 审查失败静默处理，不影响主流程
+
+    // 审查后重新拆分（reply 可能已被重写）
+    const finalParts = reply.split('\n---\n').filter(p => p.trim());
+    if (finalParts.length > 1) {
+      for (let i = 0; i < finalParts.length; i++) {
         if (i > 0) {
           showTyping();
           await new Promise(resolve => setTimeout(resolve, 600));
           hideTyping();
         }
-        const result = appendMessage('bot', parts[i].trim());
+        const result = appendMessage('bot', finalParts[i].trim());
         if (i === 0) firstBotResult = result;
         lastBotResult = result;
       }
@@ -3732,13 +3987,17 @@ async function sendMessage() {
       (() => {
         const jealousy = getJealousyLevel();
         const isJealousyGift = jealousy === 'mild' || jealousy === 'medium';
+        const moneyKws = ['给我钱','转我','好穷','买不起','能不能给','要钱','零花钱'];
+        const userAsked = moneyKws.some(k => text.includes(k));
         const applied = applyMoneyEffect(giveAmount, {
           note: giveMoneyMatch.note || '',
           label: isJealousyGift ? 'Ghost 吃醋转账' : 'Ghost 零花钱',
           bypassWeeklyLimit: isJealousyGift,
+          userRequested: userAsked, // 用户主动要，限制宽松
         });
         if (!applied) {
-          const limitMsg = getTodayGivenCount() >= 5
+          const dailyLimit = userAsked ? 5 : 2;
+          const limitMsg = getTodayGivenCount() >= dailyLimit
             ? '[系统：今日零花钱次数已达上限，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]'
             : '[系统：本周零花钱已达上限£300，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]';
           chatHistory.push({ role: 'user', content: limitMsg, _system: true });
@@ -3785,6 +4044,40 @@ async function sendMessage() {
 
     // 副作用全部用try-catch包住，失败静默处理，不影响主流程
     consumeLoveOverride(); // 一次性爱意解锁用完即清
+    // 主回复已经触发过转账，就不再跑钱意图判断，避免重复触发
+    if (!transferSuccess) checkMoneyIntent(text).catch(() => {});
+
+    // SEND_GIFT tag：Haiku 根据描述生成具体商品，触发反寄快递
+    if (sendGift) {
+      // 代码层冷却：7天内只能触发一次，防止频繁寄东西
+      const lastSendGiftAt = parseInt(localStorage.getItem('lastSendGiftAt') || '0');
+      const sendGiftCooldown = 7 * 24 * 3600 * 1000;
+      if (Date.now() - lastSendGiftAt > sendGiftCooldown) {
+        localStorage.setItem('lastSendGiftAt', Date.now());
+        setTimeout(async () => {
+          try {
+            const raw = await fetchDeepSeek(
+              '你是一个礼物生成器。根据描述生成一件 Ghost 会寄给老婆的礼物。只返回JSON，不要其他文字。格式：{"emoji":"🎁","name":"商品名（中文，5-10字）","desc":"一句话描述（中文，10-20字）","tip":"Ghost会说的一句话（英文，全小写，简短）"}',
+              `Ghost 想寄：${sendGift}`,
+              150
+            );
+            const item = JSON.parse(raw.replace(/```json|```/g, '').trim());
+            if (item.name) {
+              const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+              setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
+              // 告诉 Ghost 包裹已寄出，他问起时有背景信息，说什么由他自己决定
+              chatHistory.push({
+                role: 'user',
+                content: `[系统：你已经给她寄出了「${item.name}」，目前在运输中，预计2-4天到达。如果她问起包裹或物流，你知道东西已经在路上了。]`,
+                _system: true
+              });
+              saveHistory();
+            }
+          } catch(e) {}
+        }, 1000);
+      }
+    }
+
     if (Math.random() < 0.25) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
@@ -4422,7 +4715,16 @@ function toggleCoupleLike(btn, key) {
 
 // ----- 事件池 CRUD -----
 function getFeedEventPool() {
-  try { return JSON.parse(localStorage.getItem('feedEventPool') || '[]'); } catch(e) { return []; }
+  try {
+    const pool = JSON.parse(localStorage.getItem('feedEventPool') || '[]');
+    // 顺手清理已过期和已消费的事件，防止池子堆积垃圾
+    const now = Date.now();
+    const cleaned = pool.filter(e => !e.consumed && e.expiresAt > now);
+    if (cleaned.length !== pool.length) {
+      localStorage.setItem('feedEventPool', JSON.stringify(cleaned));
+    }
+    return cleaned;
+  } catch(e) { return []; }
 }
 function setFeedEventPool(list) {
   localStorage.setItem('feedEventPool', JSON.stringify(list));
@@ -4908,6 +5210,7 @@ function addTransaction(tx) {
       String(now.getHours()).padStart(2,'0') + ':' +
       String(now.getMinutes()).padStart(2,'0');
   }
+  if (!tx.id) tx.id = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   const list = getTransactions();
   list.unshift(tx);
   localStorage.setItem('transactions', JSON.stringify(list));
@@ -6541,14 +6844,68 @@ function getWeeklySale() {
 }
 
 // ===== 商城+情绪触发（合并Haiku调用）=====
+// ===== 钱相关意图并行判断（不阻塞主回复）=====
+// 宽松预筛后交给 Gemini 判断真实语义
+async function checkMoneyIntent(userText) {
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  if (coldWar) return;
+
+  // 宽松预筛：有钱相关词才发请求
+  const preFilter = /钱|买|转|给|穷|贵|省|花|负担|工资|发薪|想要|看中|money|pay|afford|expensive|buy|want|send|broke|cash|transfer/i;
+  if (!preFilter.test(userText)) return;
+
+  try {
+    const raw = await fetchDeepSeek(
+      '判断用户这句话的钱相关意图。只返回JSON，不要其他文字。\nintent可选值：\n- "request"：用户在要钱/希望对方给钱\n- "refuse"：用户在拒绝收钱/说不要钱\n- "complain"：用户在抱怨对方老给钱/用钱哄人\n- "hint"：用户暗示经济压力或想要某样东西，但没直接要钱\n- "none"：和钱无关或只是提到钱这个词\n格式：{"intent":"none"}',
+      `用户说：${userText}`,
+      50
+    );
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const intent = result.intent;
+
+    if (intent === 'refuse' || intent === 'complain') {
+      const refuseCount = parseInt(localStorage.getItem('moneyRefuseCount') || '0') + 1;
+      localStorage.setItem('moneyRefuseCount', String(refuseCount));
+      if (refuseCount >= 2) {
+        localStorage.setItem('userDislikesMoney', 'true');
+        touchLocalState();
+      }
+    } else if (intent === 'request') {
+      const amount = decideMoneyAmountFromState();
+      if (amount > 0) {
+        const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
+          .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
+        setTimeout(() => emitGhostEvent('money', {
+          amount, reason: userText.slice(0, 80), context: recentCtx,
+          userRequested: true
+        }), 1500);
+      }
+    } else if (intent === 'hint') {
+      const amount = decideMoneyAmountFromState();
+      if (amount > 0) {
+        const mood = getMoodLevel();
+        const prob = mood >= 8 ? 0.5 : mood >= 6 ? 0.3 : 0.15;
+        if (Math.random() < prob) {
+          const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
+            .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
+          setTimeout(() => emitGhostEvent('money', {
+            amount, reason: userText.slice(0, 80), context: recentCtx
+          }), 2000 + Math.random() * 3000);
+        }
+      }
+    }
+  } catch(e) {}
+}
+
 async function checkTriggersAndEmotion(userText, botText) {
-  // 关键词预筛选——没有相关词就不触发Haiku，节省成本
+  // 关键词预筛选——没有相关词就不触发Gemini，节省成本
   const marketKeywords = ['冷','冻','暖','饿','吃','伙食','食物','累了','疲惫','想你','想念','思念','tired','cold','hungry','miss'];
   const emotionKeywords = ['开心','难过','委屈','饿','累','压力','生病','冷','热','想你','哭','不舒服','心情'];
+  const moneyContextKeywords = ['买','钱','贵','便宜','省','花','穷','价格','折扣','划算','预算','负担','工资','发薪','想要','喜欢','看中','订单','pay','afford','expensive','cheap','price','buy','want','sale'];
   const hasMarketHint = marketKeywords.some(k => (userText + botText).includes(k));
   const hasEmotionHint = emotionKeywords.some(k => userText.includes(k));
-  if (!hasMarketHint && !hasEmotionHint) {
-    // 直接触发地点特产检测，跳过Haiku
+  const hasMoneyContext = moneyContextKeywords.some(k => userText.toLowerCase().includes(k));
+  if (!hasMarketHint && !hasEmotionHint && !hasMoneyContext) {
     checkLocationSpecial(userText, botText);
     return;
   }
@@ -6556,7 +6913,7 @@ async function checkTriggersAndEmotion(userText, botText) {
     const raw = await fetchDeepSeek(
       '你是一个双重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n格式：{"market":{"triggered":false},"emotion":{"triggered":false}}\n或：{"market":{"triggered":true,"category":"保暖类"},"emotion":{"triggered":true,"type":"太冷","intensity":"中"}}\nmarket分类：保暖类/饮食类/疲惫类/思念类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
       `Ghost说：${botText}\n用户说：${userText}`,
-      150
+      180
     );
     const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
 
