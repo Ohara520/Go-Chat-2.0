@@ -2918,6 +2918,22 @@ async function sendSticker(id) {
   const meta = STICKER_META[id];
   if (!meta) return;
 
+  // 条数检查：用完了不触发Ghost回复
+  const email = localStorage.getItem('userEmail') || '';
+  if (email) {
+    const sub = await getSubscription();
+    if (!sub || sub.remaining <= 0) {
+      appendMessage('bot', "临时有个任务，等我回来。");
+      return;
+    }
+  } else {
+    const todayCount = getTodayCount();
+    if (todayCount >= DAILY_LIMIT) {
+      appendMessage('bot', "that's enough for today.\n今天就到这。");
+      return;
+    }
+  }
+
   // 渲染用户表情包
   const container = document.getElementById('messagesContainer');
   if (container) {
@@ -3844,7 +3860,7 @@ async function sendMessage() {
       return;
     }
     if (sub.remaining <= 0) {
-      appendMessage('bot', "that's all for this month. come back when you've sorted it.\n这个月的额度用完了。续费再来。");
+      appendMessage('bot', "临时有个任务，等我回来。");
       return;
     }
   } else {
