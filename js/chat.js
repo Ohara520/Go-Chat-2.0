@@ -4596,8 +4596,12 @@ function initCoupleSpace() {
   if (feedContainer && !feedContainer._likeListenerAdded) {
     feedContainer.addEventListener('click', e => {
       const btn = e.target.closest('.couple-like-btn');
-      if (btn) { e.stopPropagation(); toggleCoupleLike(btn); }
-    });
+      if (btn) {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleCoupleLike(btn);
+      }
+    }, true); // 用捕获阶段确保优先触发
     feedContainer._likeListenerAdded = true;
   }
   // 结婚日期 — 统一用marriageDate，与日历/首次登录同步
@@ -4871,7 +4875,7 @@ function timeAgo(ts) {
   if (!ts) return '刚刚';
   const now = Date.now();
   const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
-  if (isNaN(t)) return ts; // 旧数据直接显示原字符串
+  if (isNaN(t)) return '早些时候'; // 旧数据（'刚刚'字符串等）显示"早些时候"
   const diff = now - t;
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return '刚刚';
@@ -4885,7 +4889,8 @@ function timeAgo(ts) {
 }
 
 function toggleCoupleLike(btn, key) {
-  const storageKey = key || btn.dataset.key || ('like_' + btn.closest('.couple-post-card')?.querySelector('.couple-post-en')?.textContent?.slice(0,10));
+  const storageKey = key || btn.dataset.key;
+  if (!storageKey) return; // 没有key直接退出，防止存undefined
   const isLiked = localStorage.getItem(storageKey) === '1';
   let count = parseInt(btn.dataset.count || '0');
   if (isLiked) {
