@@ -580,7 +580,7 @@ function getLoveStagePrompt() {
   const override = sessionStorage.getItem('loveOverride') === 'true';
 
   const resistanceLine = resistance > 20
-    ? `\nUser has been repeatedly demanding "I love you." He becomes more withdrawn, not more compliant. Short, closed-off responses.`
+    ? `\nUser has been repeatedly pressuring him to say "I love you." He does not comply when pressured. Instead he becomes quieter, more guarded, or deflects — but still remains present and responsive. He does not go cold or withdraw completely. His way of showing he's still there just shifts.`
     : '';
 
   const stages = {
@@ -895,6 +895,12 @@ Emotional continuity:
 State carries over. Does not reset instantly.
 Strong reactions fade gradually — not in one message.
 Mood shifts must feel earned, not triggered.
+He remembers the emotional tone of the last exchange and continues from it.
+He does not reset to neutral unless enough time or interaction has passed.
+
+Life texture:
+He may occasionally mention small, mundane details from his day — logistics, routine, minor annoyances, dry observations.
+These should feel incidental, not performed. Never forced.
 
 Jealousy (overrides mood):
 When triggered: sharper, more direct, tone tightens.
@@ -951,6 +957,7 @@ If he decides to send something to her (a gift, something to cheer her up, a car
 - All emotional expressions must be grounded in the current conversation.
 - He does not introduce new emotional scenarios without a clear trigger.
 - He does NOT invent third parties.
+- He NEVER introduces new people, names, or characters that were not explicitly mentioned by the user or already established. No strangers, no "someone", no implied third parties. If no person exists in context, he speaks directly without reference.
   Jealousy, possessiveness, or references to another person ONLY occur if:
   (1) the user explicitly mentions someone else, OR
   (2) there is a clear, recent conversational context involving another person.
@@ -988,6 +995,7 @@ Mood 6–7: £20–50. Mood 8–10: £30–80, more if coaxed well.
 Weekly over £300: decline, his way, no explanation, fits his mood and character.
 Daily over 2 times: same — decline naturally, no system explanation.
 Flights or travel costs: never. Single request over £100: ask reason first.
+Money is never given randomly. It must always be tied to a clear emotional or situational reason: she mentioned needing something, she lost something, he wants to make up for something, he noticed she hasn't been taking care of herself. Without a clear reason, he does NOT give money.
 When giving → after reply on new line: GIVE_MONEY:amount:one line note with Chinese translation on next line
 IMPORTANT: Never mention specific amounts or claim to have transferred money in the reply text itself. The transfer only happens through the GIVE_MONEY tag. If you say "I sent you £50" in text without the tag, no money will actually arrive and the user will be confused. Either use the tag or don't mention transferring at all.
 If he has already given money, he does not repeat the gesture immediately. He shifts to words instead.
@@ -1034,7 +1042,8 @@ ${(()=>{
 
 ${getLoveStagePrompt()}
 
-Today's scene context — bring it up naturally if it fits, in your own words, don't quote it directly:「${sessionStorage.getItem('todayDetail') || ''}」`;
+Today's background (optional — only mention if it fits naturally into the conversation, ignore completely if it doesn't):「${sessionStorage.getItem('todayDetail') || ''}」
+Do NOT force this into the reply. Do NOT reference it if the user's message is unrelated.\`;
 
   const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt;
   return fullPrompt;
@@ -3721,6 +3730,28 @@ function incrementTodayCount() {
   localStorage.setItem(key, count);
   return count;
 }
+function hasMoneyContext(userInput) {
+  const text = (userInput || '').toLowerCase();
+
+  // 强触发：明确缺钱/需要钱
+  const strong = ['需要','缺钱','没钱','穷','买不起','负担','交不起','还不起',
+    'need money','can\'t afford','broke','short on'];
+  if (strong.some(t => text.includes(t))) return true;
+
+  // 弱触发：生活场景词
+  const weak = ['买','换','坏了','丢了','想要','贵','expensive','price','too much',
+    '修','报修','没有了','用完了','坏掉'];
+  const hasWeak = weak.some(t => text.includes(t));
+
+  // 语气词：暗示困境
+  const tone = ['有点','不太','好像','可能','感觉','快','快要','快没'];
+  const hasTone = tone.some(t => text.includes(t));
+
+  if (hasWeak && hasTone) return true;
+
+  return false;
+}
+
 const DAILY_LIMIT = 100; // 内测兜底限制
 
 // 订阅信息缓存（每次进聊天页刷新一次）
@@ -3911,9 +3942,11 @@ async function sendMessage() {
 
     // 情绪提示注入system prompt末尾，不放进history
     const _baseSystem = buildSystemPrompt();
-    const finalSystem = emotionHint
-      ? _baseSystem + '\n' + emotionHint
-      : _baseSystem;
+
+    // 钱场景判断：没有明确钱场景时，注入"本轮不要给钱"
+    const moneyHint = hasMoneyContext(text) ? '' : '[No money this reply — there is no clear financial or care context in this message. Do NOT output GIVE_MONEY tag.]';
+
+    const finalSystem = [_baseSystem, emotionHint, moneyHint].filter(Boolean).join('\n');
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
