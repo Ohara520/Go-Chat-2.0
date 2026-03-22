@@ -1291,7 +1291,10 @@
       <div id="deliveryModalTitle" class="delivery-modal-title"></div>
       <div class="delivery-modal-subtitle">点击空白处关闭</div>
       <div id="deliveryModalContent" class="delivery-modal-content"></div>
-      <button class="delivery-modal-close" onclick="closeDeliveryModal()">关闭</button>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button id="deliveryDismissBtn" class="delivery-modal-close" style="display:none;flex:1;background:rgba(168,85,247,0.1);color:#7c3aed;border-color:rgba(168,85,247,0.3);" onclick="confirmDeliveryReceived()">确认收货 ✓</button>
+        <button class="delivery-modal-close" onclick="closeDeliveryModal()" style="flex:1;">关闭</button>
+      </div>
     </div>
   </div>
 

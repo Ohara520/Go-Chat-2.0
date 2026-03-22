@@ -7740,10 +7740,28 @@ function openDeliveryModal(idx) {
   }).join('');
   document.getElementById('deliveryModalContent').innerHTML = html;
   document.getElementById('deliveryModal').style.display = 'flex';
+  // 已送达或遗失的快递显示"确认收货"按钮
+  const dismissBtn = document.getElementById('deliveryDismissBtn');
+  if (dismissBtn) {
+    if (d.done || d.isLostConfirmed) {
+      dismissBtn.style.display = '';
+      dismissBtn.dataset.deliveryId = d.id;
+      dismissBtn.textContent = d.isLostConfirmed ? '已知晓 ✓' : '确认收货 ✓';
+    } else {
+      dismissBtn.style.display = 'none';
+    }
+  }
 }
 
 function closeDeliveryModal() {
   document.getElementById('deliveryModal').style.display = 'none';
+}
+
+function confirmDeliveryReceived() {
+  const btn = document.getElementById('deliveryDismissBtn');
+  const id = parseInt(btn?.dataset.deliveryId || '0');
+  if (id) dismissDelivery(id);
+  closeDeliveryModal();
 }
 
 function dismissDelivery(id) {
