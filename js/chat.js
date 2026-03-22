@@ -290,7 +290,7 @@ async function saveToCloud() {
       coupleFeedDate: localStorage.getItem('coupleFeedDate') || '',
       organicFeedCount: localStorage.getItem('organicFeedCount_' + getTodayDateStr()) || '0',
       organicFeedCountKey: 'organicFeedCount_' + getTodayDateStr(),
-      feedEventPool: getFeedEventPool().filter(e => !e.consumed).slice(0, 20),
+      feedEventPool: (typeof getFeedEventPool === 'function' ? getFeedEventPool() : []).filter(e => !e.consumed).slice(0, 20),
       lastFeedPostAt: localStorage.getItem('lastFeedPostAt') || '',
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
