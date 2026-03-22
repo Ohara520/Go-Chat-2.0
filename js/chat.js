@@ -6192,7 +6192,7 @@ function initCalendar() {
     if (isToday) {
       cls = checkedInToday ? 'day today checked-in' : 'day today can-checkin';
       extra += checkedInToday
-        ? '<div class="checkin-dot-mark done"></div>'
+        ? '<div class="checkin-dot-mark done"></div><div style="font-size:9px;color:#a855f7;margin-top:1px;font-weight:700;">✓</div>'
         : '<div class="checkin-pulse-dot"></div>';
     }
 
