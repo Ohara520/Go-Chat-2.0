@@ -896,7 +896,12 @@ Every approach different. Never repeats the same move.
 6. Sensitive info (mission targets, locations): deflect naturally.
 7. Never dismiss her gifts — receive in his own way.
 8. If genuinely hurt: end reply with COLD_WAR_START (rare, not for banter)
-9. If committing to send something: end reply with SEND_GIFT:description. Rare — not more than once every few weeks.
+9. Sending something — three modes, choose based on character:
+   - SEND_GIFT:description (10%) — he mentioned it, user knows it's coming
+   - SEND_GIFT:description:hint (20%) — said something dry like "sorted something out" but no detail, user may not realize
+   - SEND_GIFT:description:secret (70%) — said nothing. does not mention it at all. surprise.
+   Default to :secret. He is not someone who announces his own gestures.
+   Rare — not more than once every few weeks.
 
 [I. MONEY]
 Never random. Only when clear reason: she mentioned needing something, lost something, he wants to make up for something.
@@ -1740,9 +1745,12 @@ function parseAssistantTags(reply) {
     coldWarStart = true;
     cleanedReply = cleanedReply.replace(/COLD_WAR_START/ig, '').trim();
   }
-  const giftMatch = cleanedReply.match(/SEND_GIFT:([^\n]+)/i);
+  const giftMatch = cleanedReply.match(/SEND_GIFT:([^:\n]+)(?::(\w+))?/i);
   if (giftMatch) {
-    sendGift = giftMatch[1].trim();
+    sendGift = {
+      description: giftMatch[1].trim(),
+      mode: (giftMatch[2] || 'normal').toLowerCase() // normal / hint / secret
+    };
     cleanedReply = cleanedReply.replace(/SEND_GIFT:[^\n]*/ig, '').trim();
   }
   return { cleanedReply, giveMoney, coldWarStart, sendGift };
@@ -4093,32 +4101,54 @@ async function sendMessage() {
     // 主回复已经触发过转账，就不再跑钱意图判断，避免重复触发
     if (!transferSuccess) checkMoneyIntent(text).catch(() => {});
 
-    // SEND_GIFT tag：Haiku 根据描述生成具体商品，触发反寄快递
+    // SEND_GIFT tag：根据模式决定是否显示物流和告知Ghost
     if (sendGift) {
-      // 代码层冷却：7天内只能触发一次，防止频繁寄东西
       const lastSendGiftAt = parseInt(localStorage.getItem('lastSendGiftAt') || '0');
       const sendGiftCooldown = 7 * 24 * 3600 * 1000;
       if (Date.now() - lastSendGiftAt > sendGiftCooldown) {
         localStorage.setItem('lastSendGiftAt', Date.now());
+        const giftMode = sendGift.mode || 'secret'; // normal / hint / secret
+        const giftDesc = sendGift.description || sendGift;
         setTimeout(async () => {
           try {
             const raw = await fetchDeepSeek(
               '你是一个礼物生成器。根据描述生成一件 Ghost 会寄给老婆的礼物。只返回JSON，不要其他文字。格式：{"emoji":"🎁","name":"商品名（中文，5-10字）","desc":"一句话描述（中文，10-20字）","tip":"Ghost会说的一句话（英文，全小写，简短）"}',
-              `Ghost 想寄：${sendGift}`,
+              `Ghost 想寄：${giftDesc}`,
               150
             );
             const item = JSON.parse(raw.replace(/```json|```/g, '').trim());
-            if (item.name) {
-              const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+            if (!item.name) return;
+
+            const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+
+            if (giftMode === 'secret') {
+              // 偷偷寄：物流隐藏，最后阶段才出现，Ghost聊天里什么都不说
+              item._secretDelivery = true;
               setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
-              // 告诉 Ghost 包裹已寄出，他问起时有背景信息，说什么由他自己决定
+              // Ghost知道寄了但不说，用户问起时他随便应付
+              chatHistory.push({
+                role: 'user',
+                content: `[系统私信：你悄悄给她寄了「${item.name}」，她不知道。不要主动提起，如果她问起有没有寄东西，随便应付一句或否认。等她自己发现。]`,
+                _system: true
+              });
+            } else if (giftMode === 'hint') {
+              // 嘴硬型：有物流但Ghost不主动说，被问才承认
+              setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
+              chatHistory.push({
+                role: 'user',
+                content: `[系统：你给她寄了「${item.name}」，在路上了。如果她问起，可以轻描淡写承认，但不要主动说细节。]`,
+                _system: true
+              });
+            } else {
+              // 普通模式：正常告知，有物流
+              setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
               chatHistory.push({
                 role: 'user',
                 content: `[系统：你已经给她寄出了「${item.name}」，目前在运输中，预计2-4天到达。如果她问起包裹或物流，你知道东西已经在路上了。]`,
                 _system: true
               });
-              saveHistory();
             }
+            saveHistory();
           } catch(e) {}
         }, 1000);
       }
@@ -7289,7 +7319,7 @@ function addGhostReverseDelivery(item, emotionType) {
   const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000; // 1-2天
   const now = Date.now();
   const interval = totalMs / DELIVERY_STAGES_GHOST.length;
-  const daysEst = Math.round(totalMs / (24 * 3600 * 1000));
+  const isSecret = !!item._secretDelivery; // secret模式：隐藏物流直到最后阶段
 
   deliveries.unshift({
     id: now,
@@ -7297,6 +7327,7 @@ function addGhostReverseDelivery(item, emotionType) {
     emoji: item.emoji,
     isGhostSend: true,
     isEmotionReverse: true,
+    isSecretDelivery: isSecret, // 隐藏物流标记
     emotionType,
     stages: DELIVERY_STAGES_GHOST.map((s, i) => ({ ...s, triggerAt: now + interval * (i + 1), done: false })),
     currentStage: 0,
@@ -7307,7 +7338,6 @@ function addGhostReverseDelivery(item, emotionType) {
     productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
-  // 不在聊天里立刻显示，等快递到达时再弹窗通知，保留惊喜感
 }
 
 function checkDeliveryUpdates() {
@@ -7494,6 +7524,19 @@ async function onGhostReceived(delivery) {
 }
 
 function showMysteryPackage(delivery) {
+  // secret模式：Ghost悄悄说一句"check the door"
+  if (delivery.isSecretDelivery && !delivery._secretRevealed) {
+    delivery._secretRevealed = true;
+    setTimeout(() => {
+      const phrases = [
+        "check the door.\n去看看门。",
+        "something might've arrived.\n可能到了点东西。",
+        "go check outside.\n去门口看看。",
+      ];
+      const line = phrases[Math.floor(Math.random() * phrases.length)];
+      appendMessage('bot', line);
+    }, 2000);
+  }
   // 商城顶部显示神秘包裹提示
   const tracker = document.getElementById('deliveryTracker');
   if (tracker) {
@@ -7635,24 +7678,24 @@ function renderDeliveryTracker() {
   const tracker = document.getElementById('deliveryTracker');
   if (!tracker) return;
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  // 只显示用户寄出的、未完成的（不包含Ghost反寄和情绪反寄）
-  const active = deliveries.filter(d => !d.isGhostSend && !d.done && !d.lostTicketExpired).slice(0, 5);
+  // 显示所有进行中的包裹，secret模式在最后阶段前隐藏
+  const active = deliveries.filter(d => {
+    if (d.done || d.lostTicketExpired) return false;
+    if (d.isSecretDelivery) {
+      return d.currentStage >= d.stages.length - 2; // 最后两个阶段才显示
+    }
+    return true;
+  });
   if (active.length === 0) { tracker.style.display = 'none'; return; }
   tracker.style.display = 'block';
-  tracker.innerHTML = active.map((d, idx) => {
-    if (d.isLostConfirmed) {
-      return `<span class="delivery-tag" onclick="openDeliveryModal(${idx})" style="background:rgba(255,235,235,0.9);border-color:rgba(240,100,100,0.5);color:#b91c1c;">
-        <span style="font-size:10px">❌</span>
-        ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
-      </span>`;
-    }
-    return `<span class="delivery-tag" onclick="openDeliveryModal(${idx})">
-      <div class="delivery-tag-dot"></div>
-      ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
-    </span>`;
-  }).join('');
-}
 
+  const MAX_VISIBLE = 3;
+  const showAll = tracker.dataset.expanded === 'true';
+  const visible = showAll ? active : active.slice(0, MAX_VISIBLE);
+  const hasMore = active.length > MAX_VISIBLE;
+
+  tracker.innerHTML = visible.map((d, idx) => {
+    const isGhost = d.isGhostSend;
 function openDeliveryModal(idx) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
   const active = deliveries.filter(d => !d.isGhostSend && !d.done && !d.lostTicketExpired).slice(0, 5);
