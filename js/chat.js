@@ -133,16 +133,16 @@ async function loadFromCloud() {
         const local = JSON.parse(localStorage.getItem('transactions') || '[]');
         const merged = [...local];
         s.transactions.forEach(ct => {
-          const key = ct.id || (ct.name + '_' + ct.amount + '_' + ct.date);
+          const key = ct.id || (ct.name + '_' + ct.amount + '_' + (ct.time || ct.date || ''));
           if (!merged.find(lt => {
-            const lk = lt.id || (lt.name + '_' + lt.amount + '_' + lt.date);
+            const lk = lt.id || (lt.name + '_' + lt.amount + '_' + (lt.time || lt.date || ''));
             return lk === key;
           })) {
             merged.push(ct);
           }
         });
         // 按时间倒序，保留最新200条
-        merged.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        merged.sort((a, b) => (b.time || b.date || '').localeCompare(a.time || a.date || ''));
         localStorage.setItem('transactions', JSON.stringify(merged.slice(0, 200)));
       }
       // 快递：按 id 合并，不直接覆盖，防止本地新购买的快递被云端旧数据冲掉
@@ -5361,6 +5361,8 @@ function setBalance(val) {
   // setBalance 现在只更新UI，余额由交易记录决定
   const balEl = document.getElementById('transferBalance');
   if (balEl) balEl.textContent = '£' + Math.floor(Math.max(0, val));
+  const walletBalEl = document.getElementById('walletBalance');
+  if (walletBalEl) walletBalEl.textContent = '£' + Math.max(0, val).toFixed(2);
   touchLocalState();
   saveToCloud();
 }
