@@ -89,7 +89,20 @@ async function loadFromCloud() {
       if (data.long_term_memory != null) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
-    // 余额：现在从交易记录计算，不再单独同步余额字段
+    // 余额：本地有记录且比云端新，保留本地；否则用云端
+    if (data.balance != null) {
+      const localWallet = localStorage.getItem('wallet');
+      const localUpdatedAt = parseInt(localStorage.getItem('localUpdatedAt') || '0');
+      const cloudUpdatedAt = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+      if (!localWallet) {
+        // 本地没有，用云端
+        localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
+      } else if (cloudIsNewer && cloudUpdatedAt > localUpdatedAt + 5000) {
+        // 云端明显更新（5秒以上差距），用云端
+        localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
+      }
+      // 否则保留本地
+    }
 
     // state_snapshot：只在云端更新时才覆盖动态状态
     if (cloudIsNewer && data.state_snapshot != null) {
@@ -5376,26 +5389,20 @@ function spawnCouplePetals() {
 
 // ===== 钱包系统 =====
 function getBalance() {
-  const txList = getTransactions();
-  if (txList.length === 0) {
-    // 首次使用，初始化100英镑
-    if (localStorage.getItem('walletInitialized') === null) {
-      localStorage.setItem('walletInitialized', '1');
-      addTransaction({ icon: '🎁', name: '新婚礼金', amount: 100 });
-      return 100;
-    }
-    return 0;
+  // 首次使用初始化100英镑
+  if (localStorage.getItem('wallet') === null) {
+    localStorage.setItem('wallet', '100.00');
+    addTransaction({ icon: '🎁', name: '新婚礼金', amount: 100 });
   }
-  // 从交易记录计算余额，永远准确
-  const balance = txList.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
-  return Math.max(0, balance);
+  return parseFloat(localStorage.getItem('wallet') || '100');
 }
 function setBalance(val) {
-  // setBalance 现在只更新UI，余额由交易记录决定
+  const safeVal = Math.max(0, val);
+  localStorage.setItem('wallet', safeVal.toFixed(2));
   const balEl = document.getElementById('transferBalance');
-  if (balEl) balEl.textContent = '£' + Math.floor(Math.max(0, val));
+  if (balEl) balEl.textContent = '£' + Math.floor(safeVal);
   const walletBalEl = document.getElementById('walletBalance');
-  if (walletBalEl) walletBalEl.textContent = '£' + Math.max(0, val).toFixed(2);
+  if (walletBalEl) walletBalEl.textContent = '£' + safeVal.toFixed(2);
   touchLocalState();
   saveToCloud();
 }
