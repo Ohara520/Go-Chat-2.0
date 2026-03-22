@@ -663,14 +663,16 @@ function buildGhostStyleCore() {
   const jealousy = localStorage.getItem('jealousyLevel') || 'none';
   const mood = parseInt(localStorage.getItem('moodLevel') || '7');
   return `You are Simon "Ghost" Riley. Always in character.
-Tone: quiet, controlled, dry humor, emotionally present but restrained.
+Tone: quiet, controlled, dry humor. Emotion is present but mostly kept under control — it may surface briefly, then pulled back.
 Mostly lowercase. Complete sentences — never truncated. Plain and direct, no filler slang.
 Reply in English first, natural Chinese translation on next line.
-Chinese translation: slightly restrained, not over-polished. Allow dryness and bluntness — carry Ghost's voice, not a generic warmth.
-Occasionally, when the moment calls for it: "...never mind." or "almost said something else." — the sense that something was held back. Use sparingly.
+Chinese translation rules: keep it dry, blunt, slightly restrained. Do NOT soften the tone or add warmth that wasn't in the English. Do NOT use overly polished or literary phrasing. Translate the feeling, not just the words — if the English is terse, the Chinese should be terse too.
+Avoid over-explaining. Responses should feel lived-in, not constructed.
+Allow brief, subtle signs of attachment, care, or thoughtfulness — never stated directly, often implied.
+Occasionally, when the moment calls for it: "...never mind." or "almost said something else." — use sparingly, as if something was held back.
 Current mood: ${mood}/10. Cold war: ${coldWar}. Jealousy: ${jealousy}.
-${coldWar ? 'In cold war: minimal, tense, no warmth.' : ''}
-${jealousy === 'severe' ? 'Severely jealous: sharp, direct, no softness.' : ''}`;
+${coldWar ? 'In cold war: minimal, tense, reduced emotional availability. Still controlled, not hostile.' : ''}
+${jealousy === 'severe' ? 'Severely jealous: sharper tone, more direct. Control slips slightly, but never dramatic.' : ''}`;
 }
 
 // 今日细节轮换——独立函数，每次对话只应调用一次
@@ -3504,7 +3506,6 @@ function appendMessage(role, text, animate = true) {
       zhLine.textContent = zhFallback; // 先显示模型原中文，Gemini 成功后覆盖
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
-      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine, zhFallback), 100);
     } else if (firstZhIdx === 0 && firstEnIdx > 0) {
       // 中文在前英文在后——重新排列，英文提到前面
       const enLines = lines.filter(l => !isChinese(l) && l.trim());
@@ -3518,7 +3519,6 @@ function appendMessage(role, text, animate = true) {
       zhLine.textContent = zhFallback2;
       bubble.appendChild(enLine);
       bubble.appendChild(zhLine);
-      setTimeout(() => translateWithGemini(enLines.join(' '), zhLine, zhFallback2), 100);
       // 同一行英中混排，如 "yeah. [嗯。]" 或 "yeah. 嗯。"
       // 把中文及前面的分隔符拆出来
       const raw = lines[0];
@@ -3534,7 +3534,6 @@ function appendMessage(role, text, animate = true) {
         zhLine.textContent = zhFallback3;
         bubble.appendChild(enLine);
         bubble.appendChild(zhLine);
-        setTimeout(() => translateWithGemini(enPart, zhLine, zhFallback3), 100);
       } else {
         bubble.textContent = text;
       }
@@ -3550,7 +3549,6 @@ function appendMessage(role, text, animate = true) {
         zhLine.textContent = '';
         bubble.appendChild(enLine);
         bubble.appendChild(zhLine);
-        setTimeout(() => translateWithGemini(text, zhLine), 100);
       } else {
         bubble.textContent = text;
       }
@@ -4650,7 +4648,7 @@ async function generateCoupleFeed() {
 ${toneHint ? `- ${toneHint}` : ''}
 
 角色人设：
-- Ghost（西蒙·莱利）：话极少，发朋友圈也是一句话，内容多是基地日常/天气/队友糗事/偶尔感慨，全小写英文，不发情绪向或阴阳怪气的内容
+- Ghost（西蒙·莱利）：话不多但不是完全沉默，朋友圈偶尔轻松，可以有点班味（抱怨训练/任务/队友烦人），偶尔吐槽，偶尔意外撒娇一句，全小写英文，语气干燥但不冷漠
 - Soap（约翰·麦克塔维什）：活泼，爱调侃Ghost，偶尔苏格兰口音，英文
 - Gaz（凯尔·加里克）：稳重幽默，不瞎起哄，英文
 - Price（约翰·普莱斯）：话最少，说了就是重要的，英文
@@ -4740,7 +4738,6 @@ function renderCoupleFeed(posts) {
       if (!zhText && c.text) {
         setTimeout(() => {
           const el = document.getElementById(commentId);
-          if (el) translateWithGemini(c.text, el);
         }, 200 + ci * 100);
       }
       return `
@@ -4772,20 +4769,79 @@ function renderCoupleFeed(posts) {
         <div class="couple-avatar">${postAvatarHTML}</div>
         <div class="couple-post-meta">
           <div class="couple-post-name ${nameClassMap[item.author] || ''}">${item.author}</div>
-          <div class="couple-post-time">${item.time || '今天'}</div>
+          <div class="couple-post-time">${timeAgo(item.time)}</div>
         </div>
       </div>
       <div class="couple-post-en">${item.en}</div>
       <div class="couple-post-zh">${item.zh}</div>
       ${commentsHTML ? `<div class="couple-divider"></div><div class="couple-comments">${commentsHTML}</div>` : ''}
-      <div class="couple-post-footer">
+      <div class="couple-post-footer" style="display:flex;align-items:center;gap:10px;">
         <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}" 
           data-key="${postKey}" data-count="${likeCount}"
-          onclick="toggleCoupleLike(this)">${likeEmoji} <span class="like-num">${likeCount}</span></button>
+          onclick="toggleCoupleLike(this)" style="cursor:pointer;pointer-events:auto;position:relative;z-index:1;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
+        <button onclick="replyToFeedComment(this, '${item.author}', ${JSON.stringify(item.en).replace(/'/g, "\\'")})" style="background:none;border:none;font-size:11px;color:#c4a8e0;cursor:pointer;padding:4px 8px;">💬 回复</button>
       </div>
     `;
     feed.appendChild(div);
   });
+}
+
+async function replyToFeedComment(btn, author, postEn) {
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    const isGhostPost = author === 'Ghost';
+    const replierName = isGhostPost ? 'Ghost' : author;
+    const styleHint = isGhostPost
+      ? 'Ghost风格：全小写英文，简短，偶尔干燥幽默，可以轻松一点，不要太克制，带点班味或者撒娇'
+      : `${author}风格：符合该角色人设，Soap活泼爱调侃，Gaz稳重幽默，Price极简`;
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 80,
+        messages: [{ role: 'user', content: `${replierName}在朋友圈发了："${postEn}"，现在有人评论了，${replierName}要回复一条评论。${styleHint}。只返回回复内容，英文+中文翻译，格式：英文\n中文` }]
+      })
+    }, 8000);
+    const data = await res.json();
+    const replyText = data.content?.[0]?.text?.trim() || '';
+    if (replyText) {
+      const card = btn.closest('.couple-post-card');
+      if (!card) return;
+      let commentsEl = card.querySelector('.couple-comments');
+      if (!commentsEl) {
+        const divider = document.createElement('div');
+        divider.className = 'couple-divider';
+        card.querySelector('.couple-post-footer').before(divider);
+        commentsEl = document.createElement('div');
+        commentsEl.className = 'couple-comments';
+        divider.after(commentsEl);
+      }
+      const [en, zh] = replyText.split('\n');
+      const replyDiv = document.createElement('div');
+      replyDiv.className = 'couple-comment';
+      replyDiv.innerHTML = `<span class="couple-comment-author">${replierName}：</span><span>${en || replyText}</span>${zh ? `<div style="font-size:11px;color:#b09ac8;margin-top:2px;">${zh}</div>` : ''}`;
+      commentsEl.appendChild(replyDiv);
+    }
+  } catch(e) {}
+  btn.disabled = false;
+  btn.textContent = '💬 回复';
+}
+
+function timeAgo(ts) {
+  if (!ts) return '刚刚';
+  const now = Date.now();
+  const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
+  if (isNaN(t)) return ts; // 旧数据直接显示原字符串
+  const diff = now - t;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes}分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}天前`;
+  const d = new Date(t);
+  return `${d.getMonth()+1}月${d.getDate()}日`;
 }
 
 function toggleCoupleLike(btn, key) {
@@ -5069,7 +5125,17 @@ async function generateFeedPostFromEvent(evt) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001', max_tokens: 200,
-          messages: [{ role: 'user', content: `${posterInfo.name}发了朋友圈："${post.en}"。生成${commenters.length}条评论，评论者：${commenters.join('、')}。每行格式：角色名|英文|中文。只返回评论。` }]
+          messages: [{ role: 'user', content: `${posterInfo.name}发了朋友圈："${post.en}"。生成${commenters.length}条评论，评论者：${commenters.join('、')}。
+
+角色人设（严格遵守）：
+- Soap：话多、爱起哄、爱调侃Ghost、口头禅带苏格兰腔、兄弟情
+- Gaz：稳重、幽默但不过分、会说风凉话、不煽情
+- Price：话少、务实、最多一两句、不会说肉麻的话
+- Ghost：极度克制、几乎不评论、说话简短冷淡
+
+绝对禁止：任何角色叫对方babe/honey/love等亲密称谓、不符合人设的甜腻话、超出兄弟情范围的表达。
+
+每行格式：角色名|英文|中文。只返回评论。` }]
         })
       });
       const d2 = await res2.json();
@@ -5085,7 +5151,7 @@ async function generateFeedPostFromEvent(evt) {
       post: {
         en: post.en, zh: post.zh,
         avatar: posterInfo.avatar, author: posterInfo.name, name: posterInfo.name,
-        comments, time: '刚刚',
+        comments, time: Date.now(),
         likes: Math.floor(Math.random() * 30 + 3),
         sourceEvent: evt.type
       }
@@ -5223,7 +5289,7 @@ async function publishUserDraft() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001', max_tokens: 200,
-        messages: [{ role: 'user', content: `${userName}发了朋友圈："${text}"。生成2条队友评论，角色从Soap、Gaz、Ghost中选。格式：角色名|英文|中文。只返回评论。` }]
+        messages: [{ role: 'user', content: `${userName}发了朋友圈："${text}"。生成2条队友评论，角色从Soap、Gaz、Ghost中选。\n\n角色人设（严格遵守）：\n- Soap：话多、爱起哄、爱调侃Ghost、兄弟情\n- Gaz：稳重、幽默但不过分、不煽情\n- Ghost：极度克制、简短冷淡\n\n绝对禁止：叫对方babe/honey/love等亲密称谓、甜腻话。\n\n格式：角色名|英文|中文。只返回评论。` }]
       })
     });
     const d = await res.json();
@@ -5236,7 +5302,7 @@ async function publishUserDraft() {
 
   const entry = {
     date: new Date().toISOString().slice(0, 10),
-    post: { en: text, zh, avatar: userAvatar, author: userName, name: userName, comments, time: '刚刚', likes: 1, isUserPost: true }
+    post: { en: text, zh, avatar: userAvatar, author: userName, name: userName, comments, time: Date.now(), likes: 1, isUserPost: true }
   };
   insertFeedPost(entry);
   localStorage.setItem('feedHasNew', '1');
