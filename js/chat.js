@@ -680,7 +680,7 @@ function pickTodayDetail() {
   const isHome = location.includes('Manchester') || location.includes('home') || location.includes('家');
   const isAbroad = location.includes('Germany') || location.includes('Norway') ||
                    location.includes('Poland') || location.includes('Edinburgh') ||
-                   location.includes('Scotland');
+                   location.includes('Scotland') || location.includes('London') || location.includes('伦敦');
 
   // 场景主题池——只给模型一个「今天发生了什么」的场景提示，不定死台词
   const DETAILS_BASE = [
@@ -725,8 +725,20 @@ function pickTodayDetail() {
     'team\'s been professional. not much else to say.',
   ];
 
-  const pool = isHome ? DETAILS_HOME : isAbroad ? DETAILS_ABROAD : DETAILS_BASE;
-  const locationKey = isHome ? 'home' : isAbroad ? 'abroad' : 'base';
+  const DETAILS_LONDON = [
+    'grey skies. standard.',
+    'city\'s loud even at this hour',
+    'different kind of busy here compared to base',
+    'passed through the old parts of the city',
+    'crowds everywhere. not his kind of place',
+    'grabbed something to eat. nothing special',
+    'weather\'s been miserable. typical london',
+    'long day on the move',
+  ];
+
+  const isLondon = location.includes('London') || location.includes('伦敦');
+  const pool = isHome ? DETAILS_HOME : isLondon ? DETAILS_LONDON : isAbroad ? DETAILS_ABROAD : DETAILS_BASE;
+  const locationKey = isHome ? 'home' : isLondon ? 'london' : isAbroad ? 'abroad' : 'base';
   const usedKey = 'usedDetails_' + locationKey;
 
   let used = JSON.parse(localStorage.getItem(usedKey) || '[]');
