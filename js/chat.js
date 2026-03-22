@@ -2833,7 +2833,7 @@ async function sendSticker(id) {
   if (email) {
     const sub = await getSubscription();
     if (!sub || sub.remaining <= 0) {
-      appendMessage('bot', '临时有个任务，等我回来。');
+      appendMessage('bot', 'got called away. give me a bit.\n临时有任务，等我。');
       return;
     }
   } else {
@@ -3770,7 +3770,7 @@ async function sendMessage() {
       return;
     }
     if (sub.remaining <= 0) {
-      appendMessage('bot', '临时有个任务，等我回来。');
+      appendMessage('bot', 'got called away. give me a bit.\n临时有任务，等我。');
       return;
     }
   } else {
