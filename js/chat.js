@@ -4822,7 +4822,7 @@ function renderCoupleFeed(posts) {
       <div class="couple-post-footer" style="display:flex;align-items:center;gap:10px;">
         <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}" 
           data-key="${postKey}" data-count="${likeCount}"
-          onclick="toggleCoupleLike(this)" style="cursor:pointer;pointer-events:auto;position:relative;z-index:1;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
+          onclick="(function(btn){var k=btn.dataset.key;if(!k)return;var liked=localStorage.getItem(k)==='1';var c=parseInt(btn.dataset.count||'0');if(liked){localStorage.removeItem(k);c=Math.max(0,c-1);btn.classList.remove('couple-liked');btn.innerHTML='🤍 <span class=\\'like-num\\'>'+c+'</span>';}else{localStorage.setItem(k,'1');c++;btn.classList.add('couple-liked');btn.innerHTML='❤️ <span class=\\'like-num\\'>'+c+'</span>';}btn.dataset.count=c;})(this)" style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
         <button onclick="replyToFeedComment(this, '${item.author}', ${JSON.stringify(item.en).replace(/'/g, "\\'")})" style="background:none;border:none;font-size:11px;color:#c4a8e0;cursor:pointer;padding:4px 8px;">💬 回复</button>
       </div>
     `;
