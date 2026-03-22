@@ -30,118 +30,130 @@ async function loadFromCloud() {
       .maybeSingle();
     if (error || !data) return;
 
-    // 聊天记录：用时间戳判断，时间戳一样则取更长的
+    // ── 时间戳 ──────────────────────────────────────────────
+    const cloudTs = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+    const localTs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
+    const cloudIsNewer = cloudTs > localTs;
+
+    // ── 1. 聊天记录：合并，保留更长的 ────────────────────────
     if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
-      const cloudUpdatedAt = data.updated_at ? new Date(data.updated_at).getTime() : 0;
-      const localUpdatedAt = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
-      if (cloudUpdatedAt > localUpdatedAt) {
+      if (data.chat_history.length > localHistory.length) {
         localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
-        localStorage.setItem('chatUpdatedAt', cloudUpdatedAt);
-      } else if (cloudUpdatedAt === localUpdatedAt && data.chat_history.length > localHistory.length) {
-        localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
+        localStorage.setItem('chatUpdatedAt', cloudTs);
       }
     }
 
-    // 状态字段：只在云端比本地新时才覆盖，防止本地最新状态被旧云端顶掉
-    const cloudUpdatedAtMs = data.updated_at ? new Date(data.updated_at).getTime() : 0;
-    const localUpdatedAtMs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
-    const cloudIsNewer = cloudUpdatedAtMs > localUpdatedAtMs;
-
-    // profile字段：云端更新才写，否则保留本地（用户设置偏好不应被旧云端覆盖）
-    if (cloudIsNewer && data.profile != null) {
+    // ── 2. Profile：每个字段独立，有值才覆盖，本地有就用本地 ──
+    if (data.profile != null) {
       const p = data.profile;
-      if (p.userName != null) localStorage.setItem('userName', p.userName);
-      if (p.userBirthday != null) localStorage.setItem('userBirthday', p.userBirthday);
-      if (p.userZodiac != null) localStorage.setItem('userZodiac', p.userZodiac);
-      if (p.userMBTI != null) localStorage.setItem('userMBTI', p.userMBTI);
-      if (p.userCountry != null) localStorage.setItem('userCountry', p.userCountry);
-      if (p.userFavFood != null) localStorage.setItem('userFavFood', p.userFavFood);
-      if (p.userFavMusic != null) localStorage.setItem('userFavMusic', p.userFavMusic);
-      if (p.userFavColor != null) localStorage.setItem('userFavColor', p.userFavColor);
-      if (p.userBio != null) localStorage.setItem('userBio', p.userBio);
-      if (p.userAvatarBase64 != null) localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
-      if (p.marriageDate != null) localStorage.setItem('marriageDate', p.marriageDate);
-      if (p.ghostBirthday != null) localStorage.setItem('ghostBirthday', p.ghostBirthday);
-      if (p.ghostZodiac != null) localStorage.setItem('ghostZodiac', p.ghostZodiac);
-      if (p.coldWarMode != null) localStorage.setItem('coldWarMode', String(p.coldWarMode));
-      if (p.metInPerson != null) localStorage.setItem('metInPerson', String(p.metInPerson));
-      if (p.meetType != null) localStorage.setItem('meetType', p.meetType);
-      if (p.botNickname != null) localStorage.setItem('botNickname', p.botNickname);
-      if (p.visitStreak != null) localStorage.setItem('visitStreak', p.visitStreak);
-      if (p.vocabStreak != null) localStorage.setItem('vocabStreak', p.vocabStreak);
-      if (p.vocabLastDay != null) localStorage.setItem('vocabLastDay', p.vocabLastDay);
-      if (p.lastSalaryAmount != null) localStorage.setItem('lastSalaryAmount', p.lastSalaryAmount);
-      if (p.lastSalaryMonth != null) localStorage.setItem('lastSalaryMonth', p.lastSalaryMonth);
-    } else if (!cloudIsNewer && data.profile != null) {
-      // 云端较旧：只同步不会在本地变化的静态字段
-      const p = data.profile;
-      if (p.userName != null && !localStorage.getItem('userName')) localStorage.setItem('userName', p.userName);
-      if (p.marriageDate != null && !localStorage.getItem('marriageDate')) localStorage.setItem('marriageDate', p.marriageDate);
-      if (p.botNickname != null && !localStorage.getItem('botNickname')) localStorage.setItem('botNickname', p.botNickname);
+      const setIfMissing = (key, val) => { if (val != null && val !== '' && !localStorage.getItem(key)) localStorage.setItem(key, val); };
+      const setIfNewer = (key, val) => { if (val != null && val !== '' && cloudIsNewer) localStorage.setItem(key, val); };
+      // 静态资料：本地没有才写（换设备恢复）
+      setIfMissing('userName', p.userName);
+      setIfMissing('marriageDate', p.marriageDate);
+      setIfMissing('ghostBirthday', p.ghostBirthday);
+      setIfMissing('ghostZodiac', p.ghostZodiac);
+      setIfMissing('meetType', p.meetType);
+      setIfMissing('botNickname', p.botNickname);
+      // 用户设置：云端更新才覆盖
+      setIfNewer('userBirthday', p.userBirthday);
+      setIfNewer('userZodiac', p.userZodiac);
+      setIfNewer('userMBTI', p.userMBTI);
+      setIfNewer('userCountry', p.userCountry);
+      setIfNewer('userFavFood', p.userFavFood);
+      setIfNewer('userFavMusic', p.userFavMusic);
+      setIfNewer('userFavColor', p.userFavColor);
+      setIfNewer('userBio', p.userBio);
+      setIfNewer('metInPerson', p.metInPerson != null ? String(p.metInPerson) : null);
+      setIfNewer('visitStreak', p.visitStreak);
+      setIfNewer('vocabStreak', p.vocabStreak);
+      setIfNewer('vocabLastDay', p.vocabLastDay);
+      setIfNewer('lastSalaryAmount', p.lastSalaryAmount);
+      setIfNewer('lastSalaryMonth', p.lastSalaryMonth);
+      // 头像：有就用云端（换设备必须恢复）
+      if (p.userAvatarBase64 && !localStorage.getItem('userAvatarBase64')) {
+        localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
+      }
+      // 冷战状态：取最新
+      if (p.coldWarMode != null && cloudIsNewer) localStorage.setItem('coldWarMode', String(p.coldWarMode));
     }
 
-    // 情绪/关系状态：只在云端更新时才覆盖
+    // ── 3. 情绪/关系：云端更新才覆盖，本地操作优先 ────────────
     if (cloudIsNewer) {
       if (data.mood != null) localStorage.setItem('moodLevel', data.mood);
       if (data.affection != null) localStorage.setItem('affection', data.affection);
       if (data.long_term_memory != null) localStorage.setItem('longTermMemory', data.long_term_memory);
+    } else {
+      // 云端较旧：只恢复本地没有的
+      if (data.mood != null && !localStorage.getItem('moodLevel')) localStorage.setItem('moodLevel', data.mood);
+      if (data.affection != null && !localStorage.getItem('affection')) localStorage.setItem('affection', data.affection);
+      if (data.long_term_memory != null && !localStorage.getItem('longTermMemory')) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
-    // 余额：本地有记录且比云端新，保留本地；否则用云端
-    if (data.balance != null) {
-      const localWallet = localStorage.getItem('wallet');
-      const localUpdatedAt = parseInt(localStorage.getItem('localUpdatedAt') || '0');
-      const cloudUpdatedAt = data.updated_at ? new Date(data.updated_at).getTime() : 0;
-      if (!localWallet) {
-        // 本地没有，用云端
-        localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
-      } else if (cloudIsNewer && cloudUpdatedAt > localUpdatedAt + 5000) {
-        // 云端明显更新（5秒以上差距），用云端
-        localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
-      }
-      // 否则保留本地
+    // ── 4. 余额：本地没有才从云端恢复，有就保留本地 ──────────
+    if (data.balance != null && !localStorage.getItem('wallet')) {
+      localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
     }
 
-    // state_snapshot：只在云端更新时才覆盖动态状态
-    if (cloudIsNewer && data.state_snapshot != null) {
-      const s = data.state_snapshot;
-      if (s.trustHeat != null) localStorage.setItem('trustHeat', s.trustHeat);
-      if (s.attachmentPull != null) localStorage.setItem('attachmentPull', s.attachmentPull);
-      if (s.jealousyLevel != null) localStorage.setItem('jealousyLevel', s.jealousyLevel);
-      if (s.globalTurnCount != null) {
-        _globalTurnCount = s.globalTurnCount;
-        localStorage.setItem('globalTurnCount', s.globalTurnCount);
-      }
-      if (Array.isArray(s.pendingReversePackages)) savePendingReversePackages(s.pendingReversePackages, { markChanged: false });
-      if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
-      if (s.lastReversePackageTurn != null) localStorage.setItem('lastReversePackageTurn', s.lastReversePackageTurn);
-      if (s.relationshipFlags != null) localStorage.setItem('relationshipFlags', JSON.stringify(s.relationshipFlags));
-      if (s.coldWarStart != null) localStorage.setItem('coldWarStart', s.coldWarStart);
-      if (s.pendingGhostApology != null) localStorage.setItem('pendingGhostApology', String(s.pendingGhostApology));
-      if (s.pendingSeriousTalk != null) localStorage.setItem('pendingSeriousTalk', String(s.pendingSeriousTalk));
-      if (s.pendingMakeupMoney != null) localStorage.setItem('pendingMakeupMoney', String(s.pendingMakeupMoney));
-      if (s.pendingColdWarEndStory != null) localStorage.setItem('pendingColdWarEndStory', String(s.pendingColdWarEndStory));
-      if (s.loveResistance != null) localStorage.setItem('loveResistance', String(s.loveResistance));
-      if (s.loveResistanceLastDecay) localStorage.setItem('loveResistanceLastDecay', s.loveResistanceLastDecay);
-      if (s.moneyRefuseCount != null) localStorage.setItem('moneyRefuseCount', String(s.moneyRefuseCount));
-      if (s.userDislikesMoney) localStorage.setItem('userDislikesMoney', s.userDislikesMoney);
-      if (s.sassyPost != null) localStorage.setItem('sassyPost', s.sassyPost);
-      if (s.marketTriggered != null) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
-    }
-
-    // 以下字段云端更新时覆盖，云端旧时取较新/较多的那份
+    // ── 5. state_snapshot ─────────────────────────────────────
     if (data.state_snapshot != null) {
       const s = data.state_snapshot;
-      // 购买记录：云端更多就用云端（防止跨设备购买丢失）
-      // 已购商品：按商品名合并，防止本地新购买被云端旧数据冲掉
+
+      // 动态状态：云端更新才覆盖
+      if (cloudIsNewer) {
+        if (s.trustHeat != null) localStorage.setItem('trustHeat', s.trustHeat);
+        if (s.attachmentPull != null) localStorage.setItem('attachmentPull', s.attachmentPull);
+        if (s.jealousyLevel != null) localStorage.setItem('jealousyLevel', s.jealousyLevel);
+        if (s.globalTurnCount != null) { _globalTurnCount = s.globalTurnCount; localStorage.setItem('globalTurnCount', s.globalTurnCount); }
+        if (Array.isArray(s.pendingReversePackages)) savePendingReversePackages(s.pendingReversePackages, { markChanged: false });
+        if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
+        if (s.lastReversePackageTurn != null) localStorage.setItem('lastReversePackageTurn', s.lastReversePackageTurn);
+        if (s.relationshipFlags != null) localStorage.setItem('relationshipFlags', JSON.stringify(s.relationshipFlags));
+        if (s.coldWarStart != null) localStorage.setItem('coldWarStart', s.coldWarStart);
+        if (s.pendingGhostApology != null) localStorage.setItem('pendingGhostApology', String(s.pendingGhostApology));
+        if (s.pendingSeriousTalk != null) localStorage.setItem('pendingSeriousTalk', String(s.pendingSeriousTalk));
+        if (s.pendingMakeupMoney != null) localStorage.setItem('pendingMakeupMoney', String(s.pendingMakeupMoney));
+        if (s.pendingColdWarEndStory != null) localStorage.setItem('pendingColdWarEndStory', String(s.pendingColdWarEndStory));
+        if (s.loveResistance != null) localStorage.setItem('loveResistance', String(s.loveResistance));
+        if (s.loveResistanceLastDecay) localStorage.setItem('loveResistanceLastDecay', s.loveResistanceLastDecay);
+        if (s.moneyRefuseCount != null) localStorage.setItem('moneyRefuseCount', String(s.moneyRefuseCount));
+        if (s.userDislikesMoney) localStorage.setItem('userDislikesMoney', s.userDislikesMoney);
+        if (s.sassyPost != null) localStorage.setItem('sassyPost', s.sassyPost);
+        if (s.marketTriggered != null) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
+        if (s.coupleFeedDate) localStorage.setItem('coupleFeedDate', s.coupleFeedDate);
+        if (s.organicFeedCountKey && s.organicFeedCount != null) localStorage.setItem(s.organicFeedCountKey, s.organicFeedCount);
+        if (s.lastFeedPostAt) localStorage.setItem('lastFeedPostAt', s.lastFeedPostAt);
+        if (s.weeklyGiven != null) {
+          const key = 'weeklyGiven_' + (typeof getWeekKey === 'function' ? getWeekKey() : '');
+          localStorage.setItem(key, s.weeklyGiven);
+        }
+      } else {
+        // 云端较旧：只恢复本地没有的字段
+        const restoreIfMissing = (key, val) => { if (val != null && !localStorage.getItem(key)) localStorage.setItem(key, String(val)); };
+        restoreIfMissing('trustHeat', s.trustHeat);
+        restoreIfMissing('attachmentPull', s.attachmentPull);
+        restoreIfMissing('jealousyLevel', s.jealousyLevel);
+        restoreIfMissing('emotionalHurt', s.emotionalHurt);
+        restoreIfMissing('relationshipFlags', s.relationshipFlags ? JSON.stringify(s.relationshipFlags) : null);
+        restoreIfMissing('loveResistance', s.loveResistance);
+        restoreIfMissing('moneyRefuseCount', s.moneyRefuseCount);
+        restoreIfMissing('userDislikesMoney', s.userDislikesMoney);
+        restoreIfMissing('coupleFeedDate', s.coupleFeedDate);
+        restoreIfMissing('lastFeedPostAt', s.lastFeedPostAt);
+      }
+
+      // ── 合并类：无论新旧都合并 ──────────────────────────────
+
+      // 已购商品：合并去重
       if (Array.isArray(s.purchasedItems)) {
         const local = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
         const merged = [...new Set([...local, ...s.purchasedItems])];
         localStorage.setItem('purchasedItems', JSON.stringify(merged));
       }
-      // 交易记录：按 id 合并，不直接覆盖
+
+      // 交易记录：按id合并
       if (Array.isArray(s.transactions)) {
         const local = JSON.parse(localStorage.getItem('transactions') || '[]');
         const merged = [...local];
@@ -150,76 +162,53 @@ async function loadFromCloud() {
           if (!merged.find(lt => {
             const lk = lt.id || (lt.name + '_' + lt.amount + '_' + (lt.time || lt.date || ''));
             return lk === key;
-          })) {
-            merged.push(ct);
-          }
+          })) merged.push(ct);
         });
-        // 按时间倒序，保留最新200条
         merged.sort((a, b) => (b.time || b.date || '').localeCompare(a.time || a.date || ''));
         localStorage.setItem('transactions', JSON.stringify(merged.slice(0, 200)));
       }
-      // 快递：按 id 合并，不直接覆盖，防止本地新购买的快递被云端旧数据冲掉
+
+      // 快递：按id合并，取进度更新的
       if (Array.isArray(s.deliveries)) {
         const local = JSON.parse(localStorage.getItem('deliveries') || '[]');
         const merged = [...local];
         s.deliveries.forEach(cd => {
-          if (!merged.find(ld => ld.id === cd.id)) {
-            merged.push(cd); // 云端有但本地没有的，补进来
-          } else {
-            // 同一条快递取 stage 更新的那个
-            const idx = merged.findIndex(ld => ld.id === cd.id);
-            if (cd.currentStage > merged[idx].currentStage || cd.done) {
-              merged[idx] = cd;
-            }
+          const idx = merged.findIndex(ld => ld.id === cd.id);
+          if (idx === -1) {
+            merged.push(cd);
+          } else if (cd.currentStage > merged[idx].currentStage || cd.done) {
+            merged[idx] = cd;
           }
         });
         localStorage.setItem('deliveries', JSON.stringify(merged.slice(0, 30)));
       }
-      // 故事书/相册/朋友圈：取更多的
-      if (Array.isArray(s.storyBook)) {
-        const local = JSON.parse(localStorage.getItem('storyBook') || '[]');
-        if (s.storyBook.length >= local.length) localStorage.setItem('storyBook', JSON.stringify(s.storyBook));
-      }
-      if (Array.isArray(s.collections)) {
-        const local = JSON.parse(localStorage.getItem('collections') || '[]');
-        if (s.collections.length >= local.length) localStorage.setItem('collections', JSON.stringify(s.collections));
-      }
-      if (Array.isArray(s.coupleFeedHistory)) {
-        const local = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-        if (s.coupleFeedHistory.length >= local.length) localStorage.setItem('coupleFeedHistory', JSON.stringify(s.coupleFeedHistory));
-      }
-      // 朋友圈辅助状态：云端更新时恢复，防止清缓存后当天重复生成或有机帖计数失效
-      if (cloudIsNewer) {
-        if (s.coupleFeedDate) localStorage.setItem('coupleFeedDate', s.coupleFeedDate);
-        if (s.organicFeedCountKey && s.organicFeedCount != null) {
-          localStorage.setItem(s.organicFeedCountKey, s.organicFeedCount);
-        }
-        if (s.lastFeedPostAt) localStorage.setItem('lastFeedPostAt', s.lastFeedPostAt);
-        if (Array.isArray(s.feedEventPool)) {
-          const localPool = getFeedEventPool();
-          // 合并云端和本地事件池，去重
-          const merged = [...s.feedEventPool, ...localPool];
-          const seen = new Set();
-          const deduped = merged.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
-          setFeedEventPool(deduped.slice(0, 30));
-        }
-      }
-      if (Array.isArray(s.deliveryHistory)) {
-        const local = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
-        if (s.deliveryHistory.length >= local.length) localStorage.setItem('deliveryHistory', JSON.stringify(s.deliveryHistory));
-      }
-      // 每周给钱记录
-      if (s.weeklyGiven != null) {
-        const key = 'weeklyGiven_' + (typeof getWeekKey === 'function' ? getWeekKey() : '');
-        localStorage.setItem(key, s.weeklyGiven);
+
+      // 故事书/相册/朋友圈历史/快递历史：取更多的
+      const mergeByLength = (key, arr) => {
+        if (!Array.isArray(arr)) return;
+        const local = JSON.parse(localStorage.getItem(key) || '[]');
+        if (arr.length > local.length) localStorage.setItem(key, JSON.stringify(arr));
+      };
+      mergeByLength('storyBook', s.storyBook);
+      mergeByLength('collections', s.collections);
+      mergeByLength('coupleFeedHistory', s.coupleFeedHistory);
+      mergeByLength('deliveryHistory', s.deliveryHistory);
+
+      // feedEventPool：合并去重
+      if (Array.isArray(s.feedEventPool)) {
+        const localPool = (typeof getFeedEventPool === 'function') ? getFeedEventPool() : [];
+        const merged = [...s.feedEventPool, ...localPool];
+        const seen = new Set();
+        const deduped = merged.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+        if (typeof setFeedEventPool === 'function') setFeedEventPool(deduped.slice(0, 30));
       }
     }
+
     console.log('云端数据已加载');
   } catch(e) {
     console.log('云端加载失败，使用本地数据', e);
   }
 }
-
 // 保存数据到云端（防抖，3秒内无新变化才存，保证最后一次也能存上）
 let _saveTimer = null;
 let _lastSyncTime = 0; // 仅记录上次saveToCloud执行时间，不再用于节流控制
