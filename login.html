@@ -144,6 +144,7 @@ async function handleLogin() {
     errEl.textContent = error.message.includes('Invalid') ? '邮箱或密码错误' : error.message;
     btn.disabled = false; btn.textContent = '登录';
   } else {
+    localStorage.setItem('userEmail', email.toLowerCase().trim());
     window.location.href = '/';
   }
 }
