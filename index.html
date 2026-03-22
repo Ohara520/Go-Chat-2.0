@@ -552,15 +552,15 @@
       ">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div id="subPlanName" style="font-size:13px;font-weight:600;color:#7c3aed;">订阅会员</div>
-            <div id="subRemaining" style="font-size:11px;color:#a78bbd;margin-top:2px;">点击查看套餐</div>
+            <div id="subPlanName" style="font-size:13px;font-weight:600;color:#7c3aed;">✨ 开通会员</div>
+            <div id="subRemaining" style="font-size:11px;color:#a78bbd;margin-top:2px;">与Ghost无限畅聊</div>
           </div>
           <div style="font-size:20px;">💌</div>
         </div>
       </div>
 
       <!-- 福利提示 -->
-      <div style="font-size:11px;color:#c4a8e0;line-height:1.8;margin-bottom:10px;text-align:left;padding:0 4px;">
+      <div style="font-size:11px;color:#c4a8e0;line-height:1.9;margin-bottom:10px;text-align:left;padding:0 4px;">
         🎁 新用户注册免费赠送100条<br>
         📅 每日签到随机获得英镑或条数奖励<br>
         🏆 连续签到达里程碑额外赠条数
@@ -572,6 +572,7 @@
         color:#a07ab8; cursor:pointer;
       ">退出登录</button>
     </div>
+  </div>
 
   <!-- 聊天页 -->
   <div class="screen" id="chatScreen">
@@ -1357,7 +1358,6 @@ async function handleLogout() {
   window.location.href = '/login.html';
 }
 
-// 订阅状态卡片
 async function loadSubscribeCard() {
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (!email) return;
@@ -1368,19 +1368,15 @@ async function loadSubscribeCard() {
       body: JSON.stringify({ email })
     });
     const data = await res.json();
-    const card = document.getElementById('subscribeCard');
     const planEl = document.getElementById('subPlanName');
     const remEl = document.getElementById('subRemaining');
-    if (!card) return;
+    const card = document.getElementById('subscribeCard');
+    if (!planEl) return;
     if (data.subscribed) {
       const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
       planEl.textContent = `💎 ${data.plan_name}`;
       remEl.textContent = `剩余 ${data.remaining} 条 · ${endDate}到期`;
       card.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(236,72,153,0.12) 100%)';
-    } else {
-      planEl.textContent = '✨ 开通会员';
-      remEl.textContent = '与Ghost无限畅聊';
-      card.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.08) 0%, rgba(236,72,153,0.06) 100%)';
     }
   } catch(e) {}
 }
@@ -1396,68 +1392,30 @@ function openSubscribePage() {
         <div style="font-size:13px;color:#a78bbd;">付款后在爱发电备注填写登录邮箱</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-        <a href="https://ifdian.net/order/create?plan_id=6c9cd46425d211f1964152540025c377" target="_blank" style="
-          display:flex;align-items:center;justify-content:space-between;
-          padding:14px 16px;border-radius:16px;
-          background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);
-          text-decoration:none;
-        ">
-          <div>
-            <div style="font-size:14px;font-weight:600;color:#6b21a8;">新婚</div>
-            <div style="font-size:11px;color:#a78bbd;margin-top:2px;">1800条/月 · 记忆10条</div>
-          </div>
+        <a href="https://ifdian.net/order/create?plan_id=6c9cd46425d211f1964152540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;">
+          <div><div style="font-size:14px;font-weight:600;color:#6b21a8;">新婚</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">1800条/月 · 记忆10条</div></div>
           <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥49.9</div>
         </a>
-        <a href="https://ifdian.net/order/create?plan_id=6e82f4a225d211f1b43e52540025c377" target="_blank" style="
-          display:flex;align-items:center;justify-content:space-between;
-          padding:14px 16px;border-radius:16px;
-          background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(236,72,153,0.15));
-          border:1.5px solid rgba(168,85,247,0.35);
-          text-decoration:none;position:relative;
-        ">
+        <a href="https://ifdian.net/order/create?plan_id=6e82f4a225d211f1b43e52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(236,72,153,0.15));border:1.5px solid rgba(168,85,247,0.35);text-decoration:none;position:relative;">
           <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;">推荐</div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#6b21a8;">蜜月</div>
-            <div style="font-size:11px;color:#a78bbd;margin-top:2px;">2500条/月 · 记忆15条</div>
-          </div>
+          <div><div style="font-size:14px;font-weight:700;color:#6b21a8;">蜜月</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">2500条/月 · 记忆15条</div></div>
           <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥69.9</div>
         </a>
-        <a href="https://ifdian.net/order/create?plan_id=6f7c680225d211f19aca52540025c377" target="_blank" style="
-          display:flex;align-items:center;justify-content:space-between;
-          padding:14px 16px;border-radius:16px;
-          background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);
-          text-decoration:none;
-        ">
-          <div>
-            <div style="font-size:14px;font-weight:600;color:#6b21a8;">金婚</div>
-            <div style="font-size:11px;color:#a78bbd;margin-top:2px;">4500条/月 · 记忆20条</div>
-          </div>
+        <a href="https://ifdian.net/order/create?plan_id=6f7c680225d211f19aca52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;">
+          <div><div style="font-size:14px;font-weight:600;color:#6b21a8;">金婚</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">4500条/月 · 记忆20条</div></div>
           <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥109.9</div>
         </a>
       </div>
       <div style="display:flex;gap:8px;">
-        <a href="https://ifdian.net/item/9effc14425d411f19ee752540025c377" target="_blank" style="
-          flex:1;display:block;text-align:center;padding:10px;border-radius:12px;
-          background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);
-          text-decoration:none;font-size:12px;color:#7c3aed;
-        ">⚡ 小加油包<br><span style="font-weight:700;">¥9.9 · 300条</span></a>
-        <a href="https://ifdian.net/item/8e7858cc25d411f1ba9852540025c377" target="_blank" style="
-          flex:1;display:block;text-align:center;padding:10px;border-radius:12px;
-          background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);
-          text-decoration:none;font-size:12px;color:#7c3aed;
-        ">⚡ 大加油包<br><span style="font-weight:700;">¥19.9 · 700条</span></a>
+        <a href="https://ifdian.net/item/9effc14425d411f19ee752540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;font-size:12px;color:#7c3aed;">⚡ 小加油包<br><span style="font-weight:700;">¥9.9 · 300条</span></a>
+        <a href="https://ifdian.net/item/8e7858cc25d411f1ba9852540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;font-size:12px;color:#7c3aed;">⚡ 大加油包<br><span style="font-weight:700;">¥19.9 · 700条</span></a>
       </div>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="
-        width:100%;margin-top:14px;padding:12px;border-radius:14px;
-        border:1px solid rgba(168,85,247,0.2);background:transparent;
-        color:#a78bbd;font-size:13px;cursor:pointer;
-      ">稍后再说</button>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:14px;padding:12px;border-radius:14px;border:1px solid rgba(168,85,247,0.2);background:transparent;color:#a78bbd;font-size:13px;cursor:pointer;">稍后再说</button>
     </div>
   `;
   document.body.appendChild(overlay);
 }
 
-// 进入首页时加载订阅状态
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(loadSubscribeCard, 1000);
 });
