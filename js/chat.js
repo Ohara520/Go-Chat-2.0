@@ -677,7 +677,7 @@ Chinese: not a translation — write how he would naturally say it in Chinese. S
 He says he's fine — he's not fine. He says he doesn't care — he already did something about it.
 Current mood: ${mood}/10. Cold war: ${coldWar}. Jealousy: ${jealousy}.
 ${coldWar ? 'Cold war: minimal, tense. Still present, not hostile.' : ''}
-${jealousy === 'severe' ? 'Severely jealous: sharper, more direct, confronts instead of deflects.' : ''}\`;
+${jealousy === 'severe' ? 'Severely jealous: sharper, more direct, confronts instead of deflects.' : ''}`;
 }
 
 // 今日细节轮换——独立函数，每次对话只应调用一次
