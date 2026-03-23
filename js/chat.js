@@ -35,11 +35,12 @@ async function loadFromCloud() {
     const localTs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
     const cloudIsNewer = cloudTs > localTs;
 
-    // ── 1. 聊天记录：合并，保留更长的 ────────────────────────
+    // ── 1. 聊天记录：本地空时无条件恢复，否则保留更长的 ────────
     if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
-      if (data.chat_history.length > localHistory.length) {
+      // 本地空 → 无条件从云端恢复；云端更多 → 也用云端
+      if (localHistory.length === 0 || data.chat_history.length > localHistory.length) {
         localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
         localStorage.setItem('chatUpdatedAt', cloudTs);
       }
@@ -93,7 +94,7 @@ async function loadFromCloud() {
     }
 
     // ── 4. 余额：本地没有才从云端恢复，有就保留本地 ──────────
-    if (data.balance != null && !localStorage.getItem('wallet')) {
+    if (data.balance != null && data.balance > 0 && !localStorage.getItem('wallet')) {
       localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
     }
 
@@ -261,7 +262,7 @@ async function saveToCloud() {
     const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw
       ? JSON.parse(chatHistoryRaw)
-          .filter(m => !m._system && !m._recalled) // 过滤系统消息和撤回消息
+          .filter(m => !m._system && !m._recalled)
           .slice(-100)
           .map(m => ({ role: m.role, content: m.content, ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}) }))
       : [];
@@ -304,17 +305,21 @@ async function saveToCloud() {
       sassyPost: localStorage.getItem('sassyPost') || '',
     };
     const nowIso = new Date().toISOString();
-    await sb.from('user_data').upsert({
+    const upsertData = {
       user_id: userId,
-      chat_history: chatHistoryData,
       mood: parseInt(localStorage.getItem('moodLevel') || '7'),
       affection: parseInt(localStorage.getItem('affection') || '50'),
-      balance: parseFloat(localStorage.getItem('wallet') || '0'),
       long_term_memory: localStorage.getItem('longTermMemory') || '',
       profile: profile,
       state_snapshot: stateSnapshot,
       updated_at: nowIso,
-    }, { onConflict: 'user_id' });
+    };
+    // 只在有内容时才存，防止空值覆盖云端已有数据
+    if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
+    const walletVal = parseFloat(localStorage.getItem('wallet') || '0');
+    if (walletVal > 0) upsertData.balance = walletVal;
+
+    await sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' });
     localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
   } catch(e) {
     console.log('云端保存失败', e);
