@@ -1558,16 +1558,7 @@ function updateStateFromUserInput(userText) {
     changeTrustHeat(6); changeAttachmentPull(8); decayJealousy();
     localStorage.setItem('emotionalHurt', Math.max(0, parseInt(localStorage.getItem('emotionalHurt') || '0') - hurtDecay));
   }
-  // 用Gemini判断氛围，正面/温暖聊天自动衰减mild吃醋
-  if (getJealousyLevel() === 'mild') {
-    fetchDeepSeek(
-      'Is this message warm, playful, affectionate, or positive in tone toward the person she\'s talking to? Answer only: YES or NO.\nYES examples: "mua~" / "么么哒" / "抱抱你" / "你最好了" / "亲亲" / "喜欢你" / "嘻嘻" / "人家想你"\nNO examples: "好啊随便" / "行吧" / "嗯" / "知道了" / "加班了" / "？" / "哈哈好啊" / "哈哈"',
-      `Message: "${userText.slice(0, 100)}"`,
-      10
-    ).then(r => {
-      if (r.trim().toUpperCase().startsWith('YES')) decayJealousy();
-    }).catch(() => {});
-  }
+  // 吃醋衰减已合并到Step 3.5情绪检测里处理
   if (/滚|烦|讨厌|生气|不理你|随便|无所谓/.test(text)) {
     changeTrustHeat(-8); changeMood(-1);
     localStorage.setItem('emotionalHurt', parseInt(localStorage.getItem('emotionalHurt') || '0') + 1);
@@ -4460,12 +4451,12 @@ async function sendMessage() {
     // ===== Step 3: 预判本轮主行为意图 =====
     const intent = decideMainIntent(text, pendingEvent);
 
-    // ===== Step 3.5: 情绪意图识别（D老师，非阻塞）=====
+    // ===== Step 3.5: 情绪意图识别 + 吃醋衰减判断（合并一次调用）=====
     let emotionHint = '';
     try {
       const emotionRaw = await Promise.race([
         fetchDeepSeek(
-          '判断用户消息的情绪和需求。只返回JSON，不要其他文字。\n格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost"}\ntarget含义：无=没有针对对象，外人=被外人伤害，Ghost=对Ghost有情绪',
+          '判断用户消息的情绪、需求和氛围。只返回JSON。\n格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true/false}\ntarget含义：无=没有针对对象，外人=被外人伤害，Ghost=对Ghost有情绪\nisWarm=true：消息是温暖/撒娇/亲密/正面的（如"mua~""抱抱""亲亲""喜欢你"）\nisWarm=false：中性或负面（如"嗯""好啊""加班了""？"）',
           `用户说：${text}`,
           80
         ),
@@ -4479,6 +4470,10 @@ async function sendMessage() {
           } else if (emotionResult.need === '安慰') {
             emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
           }
+        }
+        // 顺手处理吃醋衰减——温暖消息清掉mild吃醋
+        if (emotionResult.isWarm && getJealousyLevel() === 'mild') {
+          decayJealousy();
         }
       }
     } catch(e) {}
