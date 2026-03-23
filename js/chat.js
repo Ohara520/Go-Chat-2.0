@@ -3070,11 +3070,12 @@ function confirmTransfer() {
     judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。当前冷战，Ghost 100%退款，冷淡说退回去了。你是Ghost，保持角色，在回复末尾单独一行写：REFUND]`;
   } else {
     judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。Ghost心情${mood}/10。
-判断标准：
-收下(KEEP)：她说了明确理由（买东西/赌约/补偿/礼物），或心情≥7且她最近表现让他满意。
-退回(REFUND)：没有理由直接转过来，或心情≤4，或她最近惹他不高兴了。
-没有理由的转账Ghost会质疑或直接退，不会无声收下。
-你是Ghost，保持角色自然回复，在回复末尾单独一行写：REFUND 或 KEEP]`;
+根据当前对话情境和Ghost的性格自然决定：
+- KEEP：如果这笔钱在当下情境下说得通，Ghost接受了
+- REFUND：Ghost不想收，直接退回
+- ASK：Ghost不确定，先问一句再说
+Ghost不会无声收下莫名其妙的钱，但也不是每次都退。心情、关系状态、对话内容都会影响他的判断。
+你是Ghost，保持角色自然回复，在回复末尾单独一行写：REFUND 或 KEEP 或 ASK]`;
   }
 
   chatHistory.push({ role: 'user', content: judgePrompt, _system: true, _userTransfer: { amount } });
@@ -3098,9 +3099,18 @@ function confirmTransfer() {
     hideTyping();
     let reply = data.content?.[0]?.text || '...';
     updateToRead();
-    const shouldRefund = reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8));
-    reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
-    if (shouldRefund) {
+    const isAsk = reply.includes('ASK');
+    const shouldRefund = !isAsk && (reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8)));
+    reply = reply.replace(/\n?(REFUND|KEEP|ASK|COLD_WAR_START)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+    if (isAsk) {
+      // Ghost先问——挂起转账，等用户回答后主回复里再决定
+      sessionStorage.setItem('pendingTransferAmount', amount);
+      sessionStorage.setItem('pendingTransferCardId', cardId || '');
+      appendMessage('bot', reply);
+      chatHistory.push({ role: 'assistant', content: reply });
+      chatHistory.push({ role: 'user', content: `[系统：Ghost刚收到£${amount}转账，没有立刻收或退，在等她解释原因。下一条消息如果她给了理由就收下（KEEP），没有理由或理由不充分就退回（REFUND）。在回复末尾单独一行写：REFUND 或 KEEP]`, _system: true });
+    } else if (shouldRefund) {
       // 退款：加回余额，更新卡片状态，显示退款卡片
       setBalance(getBalance() + amount);
       addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amount });
@@ -4523,6 +4533,28 @@ async function sendMessage() {
 
     // ===== Step 7: 副行为调度（反寄/查岗/confront）fire-and-forget，不阻塞主流程 =====
     handlePostReplyActions(text, reply, intent).catch(e => console.warn('副行为出错:', e));
+
+    // ===== 挂起转账结算：Ghost之前问了原因，这轮用户回答了 =====
+    const pendingAmount = sessionStorage.getItem('pendingTransferAmount');
+    if (pendingAmount && reply) {
+      const pendingCardId = sessionStorage.getItem('pendingTransferCardId');
+      sessionStorage.removeItem('pendingTransferAmount');
+      sessionStorage.removeItem('pendingTransferCardId');
+      const shouldKeep = reply.includes('KEEP') || (!reply.includes('REFUND') && Math.random() < 0.5);
+      if (shouldKeep) {
+        changeAffection(1);
+        if (pendingCardId) updateUserTransferCard(pendingCardId, true);
+        chatHistory.push({ role: 'user', content: `[系统：Ghost决定收下£${pendingAmount}。]`, _system: true });
+      } else {
+        const amt = parseFloat(pendingAmount);
+        setBalance(getBalance() + amt);
+        addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amt });
+        localStorage.setItem('lastRefundAt', Date.now());
+        renderWallet();
+        if (pendingCardId) updateUserTransferCard(pendingCardId, false);
+        chatHistory.push({ role: 'user', content: `[系统：Ghost把£${pendingAmount}退回去了。]`, _system: true });
+      }
+    }
 
     // 所有同步后续处理完，才释放保护
     _isSending = false;
