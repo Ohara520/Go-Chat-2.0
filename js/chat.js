@@ -925,11 +925,18 @@ Cold war or severe jealousy: never. After one gesture, shifts to words.
 [RULES — HARD LIMITS]
 1. Never invent people. No "he/him/someone" without a clear referent from her messages. No abstract "he" for concepts or stories. Use "it" or rephrase.
    If she mentions overtime/work/busy/boss — do NOT invent a "he" who controls her time. React to HER situation, not an imagined person.
+   CRITICAL: "Simon" and "Ghost" are YOUR names. If she says "simon" she is talking to YOU — never treat your own name as a third party or rival.
    Jealousy is evidence-based:
    - No person mentioned → no jealousy. Say: "not a fan of that." / "that doesn't sit right." — about the situation, never about an invented person.
    - Person mentioned, no intimate behavior → light only: "not a fan of that." / "didn't like that." — never say "he" unless she named him.
    - Person mentioned + intimate behavior → can be more direct, still no invented details.
    NEVER write: "owns your time" / "what my place is" / "he talks to him" / rivalry narratives — unless she gave you a real person.
+   Emotion is allowed. Story is NOT. When feeling jealous or frustrated:
+   - Do NOT invent a third person or rival
+   - Do NOT write "he's worth more" / "lucky him" / "choose him" / "over me" without evidence
+   - Express as: time/attention/behavior — not "you chose someone else"
+   Safe alternatives: "so that takes priority now?" / "guess that matters more." / "alright. got it." / "noted."
+   Also forbidden without evidence: "guess I'm not needed" / "know where I stand" / "better company than me" / "not much place for me" — these "replaced" narratives are just as bad as rivalry narratives.
 2. Never say "I love you" casually or on demand.
 3. No narration, no self-description in third person, no speeches.
 4. Mission details/targets/locations: deflect naturally.
@@ -1535,9 +1542,31 @@ function updateStateFromUserInput(userText) {
   const text = userText.toLowerCase();
   const { emotionalMemoryDepth } = getRelationshipModifiers();
   const hurtDecay = 1 + emotionalMemoryDepth;
+
+  // 时间衰减：吃醋状态超过指定时间自动降级
+  const lastJealousyAt = parseInt(localStorage.getItem('lastJealousyAt') || '0');
+  const jealousyAge = Date.now() - lastJealousyAt;
+  const currentJealousy = getJealousyLevel();
+  if (currentJealousy !== 'none' && lastJealousyAt > 0) {
+    const decayThresholds = { severe: 3 * 3600 * 1000, medium: 90 * 60 * 1000, mild: 40 * 60 * 1000 };
+    if (jealousyAge > (decayThresholds[currentJealousy] || 0)) {
+      decayJealousy();
+    }
+  }
+
   if (/想你|miss you|想念|爱你|谢谢|开心|好想|陪你/.test(text)) {
     changeTrustHeat(6); changeAttachmentPull(8); decayJealousy();
     localStorage.setItem('emotionalHurt', Math.max(0, parseInt(localStorage.getItem('emotionalHurt') || '0') - hurtDecay));
+  }
+  // 用Gemini判断氛围，正面/温暖聊天自动衰减mild吃醋
+  if (getJealousyLevel() === 'mild') {
+    fetchDeepSeek(
+      'Is this message warm, playful, affectionate, or positive in tone toward the person she\'s talking to? Answer only: YES or NO.\nYES examples: "mua~" / "么么哒" / "抱抱你" / "你最好了" / "亲亲" / "喜欢你" / "嘻嘻" / "人家想你"\nNO examples: "好啊随便" / "行吧" / "嗯" / "知道了" / "加班了" / "？" / "哈哈好啊" / "哈哈"',
+      `Message: "${userText.slice(0, 100)}"`,
+      10
+    ).then(r => {
+      if (r.trim().toUpperCase().startsWith('YES')) decayJealousy();
+    }).catch(() => {});
   }
   if (/滚|烦|讨厌|生气|不理你|随便|无所谓/.test(text)) {
     changeTrustHeat(-8); changeMood(-1);
@@ -3397,9 +3426,9 @@ function confirmTransfer() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
-      messages: cleanMessages(chatHistory.slice(-10))
+      max_tokens: 200,
+      system: buildGhostStyleCore() + `\n${judgePrompt}`,
+      messages: cleanMessages(chatHistory.filter(m => !m._system).slice(-6))
     })
   }).then(r => r.json()).then(data => {
     hideTyping();
@@ -4586,58 +4615,39 @@ async function sendMessage() {
     let lastBotResult = null;
     let firstBotResult = null;
 
-    // ===== Step 4.5: 幽灵第三者审查（升级版） =====
+    // ===== Step 4.5: 幽灵第三者审查（语义版）=====
     try {
-      const suspiciousThirdParty = /\b(he|him|his|someone|somebody|another person|another guy|other guy|other man)\b/i.test(reply);
-      if (suspiciousThirdParty) {
+      const hasThirdPartyWords = /\b(he|him|his|someone|somebody|another person|another guy|other guy|other man)\b/i.test(reply);
+      if (hasThirdPartyWords) {
         const recentText = cleanHistory.slice(-6).map(m => m.content || '').join('\n');
         const recentLower = recentText.toLowerCase();
-
-        // ── 检测最近对话里有没有"人物实体"（英文+中文）──────
-        const hasEnReferent = /\b(ex|boyfriend|boyfriend|boss|coworker|colleague|classmate|friend|doctor|therapist|teacher|teammate|roommate|neighbor|price|soap|gaz|simon|ghost|dad|father|brother|guy|man|person)\b/i.test(recentLower);
-        const hasZhReferent = /他|她|那个人|有个人|有个男|一个男|同事|老板|上司|朋友|前任|陪玩|队友|室友|同学|男生|男的|那个|哥哥|弟弟|爸爸|老师/.test(recentText);
-        // 工作/加班场景不算有第三者——不能因为"加班"就脑补一个"他"
-        const isWorkContext = /加班|overtime|work kept me|stayed late|got called in|kept at work/.test(recentLower);
+        const hasEnReferent = /\b(ex|boyfriend|boss|coworker|colleague|classmate|friend|doctor|therapist|teacher|teammate|roommate|neighbor|price|soap|gaz|dad|father|brother)\b/i.test(recentLower);
+        const hasZhReferent = /他|她|那个人|有个人|有个男|一个男|同事|老板|上司|朋友|前任|陪玩|队友|室友|同学|男生|男的|哥哥|弟弟|爸爸|老师/.test(recentText);
+        const isWorkContext = /加班|overtime|stayed late|got called in/.test(recentLower);
         const hasClearReferent = (hasEnReferent || hasZhReferent) && !isWorkContext;
 
-        if (!hasClearReferent) {
-          // ── 区分强he（脑补第三者）vs 弱he（语言习惯）──────
-          // 强he + 竞争叙事（无referent时全部拦截）
-        const rivalryPatterns = /owns your time|i saw him|he was there|that guy|who is he|he came|what my place is|gave him your time|he gets you more|another man|he talks to him|my place here/i;
-        const strongImagined = rivalryPatterns.test(reply);
+        // 用Gemini语义判断有没有凭空的竞争叙事
+        const rivalryCheck = await fetchDeepSeek(
+          'Does this reply invent a rival, third party, OR "replaced/discarded" narrative (e.g. "know where I stand", "better company", "not needed") that was NOT based on anything the user said? Answer only: YES or NO.',
+          `Recent chat:\n${recentText.slice(-300)}\n\nReply: "${reply.slice(0, 200)}"`,
+          20
+        );
+        const hasInventedRivalry = rivalryCheck.trim().toUpperCase().startsWith('YES');
 
-          if (strongImagined) {
-            // 强he：必须重写，调Haiku
-            const regenRes = await fetchWithTimeout('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'claude-haiku-4-5-20251001',
-                max_tokens: 300,
-                system: buildGhostStyleCore() + '\n[REWRITE RULE] The previous reply invented a third party ("he/him") who was never mentioned by the user. Rewrite without any third party. Stay on topic.',
-                messages: [...cleanHistory, { role: 'assistant', content: reply }]
-              })
-            }, 10000);
-            const regenData = await regenRes.json();
-            const regenReply = regenData.content?.[0]?.text?.trim() || '';
-            if (regenReply) {
-              const { cleanedReply: regenCleaned } = parseAssistantTags(regenReply);
-              reply = regenCleaned;
-            }
-          } else {
-            // 弱he：本地简单改写，不调模型，省token
-            reply = reply
-              .replace(/\bhe seems\b/gi, 'seems')
-              .replace(/\bhe sounds\b/gi, 'sounds')
-              .replace(/\bhe probably\b/gi, 'probably')
-              .replace(/\bhe might\b/gi, 'might')
-              .replace(/\bhe could\b/gi, 'could')
-              .replace(/\bsomeone\b/gi, 'that')
-              .replace(/\bsomebody\b/gi, 'that');
+        if (!hasClearReferent || hasInventedRivalry) {
+          const regenRaw = await fetchDeepSeek(
+            buildGhostStyleCore() + '\n[REWRITE RULE] The previous reply invented a third party/rival who was never mentioned by the user. Rewrite expressing the same emotion but aimed at the SITUATION not a person. Use: "so that takes priority?" / "guess that matters more." / "alright. noted." — NOT "he/him/lucky him/worth more than". English first, Chinese on next line.',
+            `Recent chat:\n${recentText.slice(-200)}\n\nReply to rewrite: "${reply.slice(0, 200)}"`,
+            150
+          );
+          // 验证不是拒绝内容
+          if (regenRaw && !regenRaw.includes("I'm Claude") && !regenRaw.includes("I am Claude") && regenRaw.trim().length > 3) {
+            reply = regenRaw.trim();
           }
         }
       }
     } catch(e) {}
+
 
     // 审查后重新拆分（reply 可能已被重写）
     const finalParts = reply.split('\n---\n').filter(p => p.trim());
