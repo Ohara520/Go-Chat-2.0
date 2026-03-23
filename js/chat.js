@@ -3470,35 +3470,54 @@ function appendMessage(role, text, animate = true) {
   // 清掉模型输出的方括号（翻译格式残留）
   text = text.replace(/\[([^\]]*)\]/g, '$1').replace(/\s{2,}/g, ' ').trim();
 
-  // 纯英文渲染：bot消息直接显示，不做双语处理
+  // bot消息渲染：自动分离英文和中文（兼容Ghost偶尔还是输出双语的情况）
   if (role === 'bot' && text.trim().length > 3) {
+    const isChinese = s => /[\u4e00-\u9fff]/.test(s);
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const firstZhIdx = lines.findIndex(l => isChinese(l));
+
+    let enText, existingZh;
+    if (firstZhIdx > 0) {
+      // Ghost输出了双语：分离英文和中文
+      enText = lines.slice(0, firstZhIdx).join('\n');
+      existingZh = lines.slice(firstZhIdx).join('');
+    } else if (firstZhIdx === 0 && lines.length > 1) {
+      // 中文在前（少见）：英文提到前面
+      enText = lines.filter(l => !isChinese(l)).join('\n');
+      existingZh = lines.filter(l => isChinese(l)).join('');
+    } else {
+      // 纯英文
+      enText = text;
+      existingZh = '';
+    }
+
     const enLine = document.createElement('div');
     enLine.className = 'bubble-en';
-    enLine.textContent = text;
+    enLine.textContent = enText;
     enLine.style.whiteSpace = 'pre-line';
     bubble.appendChild(enLine);
 
-    // 翻译按钮 + 中文占位（按需显示）
+    // 翻译按钮
     const translateBtn = document.createElement('button');
     translateBtn.className = 'translate-btn';
     translateBtn.textContent = '译';
     translateBtn.title = '显示中文翻译';
     const zhLine = document.createElement('div');
     zhLine.className = 'bubble-zh bubble-zh-hidden';
-    zhLine.textContent = '';
+    zhLine.textContent = existingZh; // Ghost自带中文直接放进去，没有就留空
+
     translateBtn.onclick = async function(e) {
       e.stopPropagation();
       if (zhLine.classList.contains('bubble-zh-hidden')) {
-        // 展开翻译
         zhLine.classList.remove('bubble-zh-hidden');
         translateBtn.textContent = '收';
         translateBtn.classList.add('active');
+        // 没有现成中文才调用翻译
         if (!zhLine.textContent) {
           zhLine.textContent = '…';
-          await translateWithGemini(text, zhLine, '');
+          await translateWithGemini(enText, zhLine, '');
         }
       } else {
-        // 收起翻译
         zhLine.classList.add('bubble-zh-hidden');
         translateBtn.textContent = '译';
         translateBtn.classList.remove('active');

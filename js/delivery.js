@@ -179,7 +179,7 @@ async function onGhostReceived(delivery) {
 - 有时候可以是真的开心或感激，简短说出来，不花哨但真实
 - 有时候是假装不在意，嘴上轻描淡写，但细节里漏出他其实看了好几遍/留着了/很喜欢
 - 有时候是嘴上吐槽（包装太麻烦/不必要/太贵），但结尾暗示他收下了、放着了、没扔
-无论哪种，用户都要能感受到他是珍惜的，不能让她以为真的被嫌弃了。全小写，附中文翻译，格式：英文\\n中文翻译]`
+无论哪种，用户都要能感受到他是珍惜的，不能让她以为真的被嫌弃了。全小写，English only.]`
         }]
       })
     });
@@ -219,7 +219,7 @@ async function onGhostReceived(delivery) {
 - 有时候可以是真的被触动，破防一点点，但还是他的风格
 - 有时候是假装淡定，嘴上说"just got it"，但话里漏出他其实很在乎
 - 有时候是嘴上说太贵了/不必要，但暗示他会一直留着
-无论哪种，用户都要能感受到他珍惜这份心意。全小写，附中文翻译。]`
+无论哪种，用户都要能感受到他珍惜这份心意。全小写，English only.]`
             }]
           })
         });
@@ -259,7 +259,7 @@ async function onGhostReceived(delivery) {
               ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
               messages: [...chatHistory.slice(-6), {
                 role: 'user',
-                content: `[系统：几天前你收到了老婆寄来的「${delivery.name}」，现在你想起来说一句感受，可能是吃完了/试过了/还在想那个味道。简短，全小写，附中文翻译。不要太刻意，就是随口一提。]`
+                content: `[系统：几天前你收到了老婆寄来的「${delivery.name}」，现在你想起来说一句感受，可能是吃完了/试过了/还在想那个味道。简短，全小写，English only.不要太刻意，就是随口一提。]`
               }]
             })
           });
@@ -290,17 +290,8 @@ function showMysteryPackage(delivery) {
       appendMessage('bot', line);
     }, 2000);
   }
-  // 商城顶部显示神秘包裹提示
-  const tracker = document.getElementById('deliveryTracker');
-  if (tracker) {
-    tracker.style.display = 'block';
-    const mysteryTag = document.createElement('span');
-    mysteryTag.className = 'delivery-tag';
-    mysteryTag.style.cssText = 'background:rgba(255,240,255,0.9);border-color:rgba(192,132,252,0.5);color:#7c3aed;';
-    mysteryTag.innerHTML = `<span class="delivery-tag-dot" style="background:#7c3aed"></span>📬 来自英国的包裹`;
-    mysteryTag.onclick = () => showToast('包裹正在派送，快收到啦～');
-    tracker.appendChild(mysteryTag);
-  }
+  // 商城顶部走正常渲染，不手动插元素，避免小票被顶掉
+  renderDeliveryTracker();
 
   // 弹窗通知用户有快递到了
   setTimeout(() => {
@@ -332,7 +323,7 @@ function showMysteryPackage(delivery) {
           ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
           messages: [...chatHistory.slice(-10), {
             role: 'user',
-            content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。如果她问是不是你寄的，你可以承认也可以否认，看你当下心情——否认的话要装得像，别穿帮太明显。你不主动提是从哪里寄的。${delivery.productData?.tip ? `参考语气：「${delivery.productData.tip}」——这是你的风格，不用照抄，意思到了就行。` : ''}现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，附中文翻译。]`
+            content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。如果她问是不是你寄的，你可以承认也可以否认，看你当下心情——否认的话要装得像，别穿帮太明显。你不主动提是从哪里寄的。${delivery.productData?.tip ? `参考语气：「${delivery.productData.tip}」——这是你的风格，不用照抄，意思到了就行。` : ''}现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，English only.]`
           }]
         })
       });
@@ -376,8 +367,8 @@ async function handleLostPackageClaim(userText) {
     );
 
     const contextPrompt = knewAbout
-      ? `[系统：用户之前提过要寄「${d.name}」给你，现在告诉你快递遗失了。你之前知道有这个快递，现在得知丢失，用西蒙的方式反应——可以生气快递公司、可以愧疚、可以直接说赔。全小写，附中文翻译。]`
-      : `[系统：用户告诉你她寄给你的「${d.name}」快递遗失了，你之前完全不知道有这个快递，这是第一次听说。先反应这件事，再根据价值决定是否赔偿。全小写，附中文翻译。]`;
+      ? `[系统：用户之前提过要寄「${d.name}」给你，现在告诉你快递遗失了。你之前知道有这个快递，现在得知丢失，用西蒙的方式反应——可以生气快递公司、可以愧疚、可以直接说赔。全小写，English only.]`
+      : `[系统：用户告诉你她寄给你的「${d.name}」快递遗失了，你之前完全不知道有这个快递，这是第一次听说。先反应这件事，再根据价值决定是否赔偿。全小写，English only.]`;
 
     chatHistory.push({ role: 'user', content: contextPrompt });
     showTyping();

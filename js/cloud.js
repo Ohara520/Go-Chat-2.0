@@ -35,12 +35,13 @@ async function loadFromCloud() {
     const localTs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
     const cloudIsNewer = cloudTs > localTs;
 
-    // ── 1. 聊天记录：本地空时无条件恢复，否则保留更长的 ────────
+    // ── 1. 聊天记录：比较真实消息数（过滤系统消息），避免签收时系统消息撑大本地导致被旧云端覆盖 ──
     if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
-      // 本地空 → 无条件从云端恢复；云端更多 → 也用云端
-      if (localHistory.length === 0 || data.chat_history.length > localHistory.length) {
+      const localRealCount = localHistory.filter(m => !m._system && !m._recalled).length;
+      const cloudRealCount = data.chat_history.filter(m => !m._system && !m._recalled).length;
+      if (localRealCount === 0 || cloudRealCount > localRealCount) {
         localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
         localStorage.setItem('chatUpdatedAt', cloudTs);
       }
@@ -93,9 +94,19 @@ async function loadFromCloud() {
       if (data.long_term_memory != null && !localStorage.getItem('longTermMemory')) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
-    // ── 4. 余额：本地没有才从云端恢复，有就保留本地 ──────────
-    if (data.balance != null && data.balance > 0 && !localStorage.getItem('wallet')) {
-      localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
+    // ── 4. 余额：本地没有才从云端恢复，有就保留本地较大值（防止打工快速连续时云端旧值覆盖本地新值）
+    if (data.balance != null && data.balance > 0) {
+      const localWallet = localStorage.getItem('wallet');
+      if (!localWallet) {
+        localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
+      } else if (cloudIsNewer) {
+        // 云端更新：取较大值，防止打工收入丢失
+        const localVal = parseFloat(localWallet);
+        const cloudVal = parseFloat(data.balance);
+        if (cloudVal > localVal) {
+          localStorage.setItem('wallet', cloudVal.toFixed(2));
+        }
+      }
     }
 
     // ── 5. state_snapshot ─────────────────────────────────────
