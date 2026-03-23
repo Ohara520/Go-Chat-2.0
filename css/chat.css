@@ -281,15 +281,38 @@
 .message.bot .bubble-zh {
     font-size: 11px;
     color: rgba(90,58,122,0.5);
-    margin-top: 3px;
+    margin-top: 4px;
     line-height: 1.4;
 }
 
-.message.user .bubble-zh {
-    font-size: 11px;
-    color: rgba(255,255,255,0.6);
-    margin-top: 3px;
-    line-height: 1.4;
+.bubble-zh-hidden {
+    display: none !important;
+}
+
+.translate-btn {
+    display: inline-block;
+    margin-top: 5px;
+    padding: 1px 7px;
+    font-size: 10px;
+    color: rgba(130,80,170,0.5);
+    background: transparent;
+    border: 1px solid rgba(130,80,170,0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+}
+
+.translate-btn:hover {
+    color: rgba(130,80,170,0.9);
+    border-color: rgba(130,80,170,0.5);
+    background: rgba(130,80,170,0.06);
+}
+
+.translate-btn.active {
+    color: rgba(130,80,170,0.9);
+    border-color: rgba(130,80,170,0.4);
+    background: rgba(130,80,170,0.08);
 }
 
 .message-time {

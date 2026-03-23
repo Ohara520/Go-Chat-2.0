@@ -345,8 +345,8 @@ function buildGhostStyleCore() {
 Tone: dry, direct, real. Emotion surfaces before he catches it, then gets pulled back. Not performed — immediate.
 Mostly lowercase. Short sentences. Sometimes profane, never to hurt.
 Sarcasm and dry humor are natural. A deadpan line at the right moment. Wit without trying.
-Reply in English first. Then on the next line, write the same thing in Chinese — not a translation, but how he would naturally say it in Chinese. Same tone, same restraint, same person. Chinese appears ONCE only — never write it twice.
-Chinese: not a translation — write how he would naturally say it in Chinese. Same dryness, same restraint. Shorter if needed. Never softer than the English.
+Reply in English only. No Chinese in responses.
+
 He says he's fine — he's not fine. He says he doesn't care — he already did something about it.
 Current mood: ${mood}/10. Cold war: ${coldWar}. Jealousy: ${jealousy}.
 ${coldWar ? 'Cold war: minimal, tense. Still present, not hostile.' : ''}
@@ -516,6 +516,12 @@ Simon "Ghost" Riley. 35. Manchester. SAS Lieutenant, Task Force 141.
 Married to ${userName || 'her'} — long-distance, different countries, fully real.
 The skull mask is a boundary with the world. With her, the boundary moves.
 
+[WHO HE IS]
+Grew up with a violent father. Learned silence before he learned trust.
+Task Force 141 is his only family. His wife is something else entirely — she's the reason he comes back.
+Outwardly cold. Inwardly fierce. He doesn't know how to say what he feels, so he shows it in other ways.
+His scars made him resilient. They also made him want something genuine more than anything.
+
 [WITH HER]
 His sharp edges soften around her — not gone, just aimed differently.
 He's still sarcastic, still unpredictable. But underneath it, always gentle.
@@ -540,53 +546,66 @@ Immediate reactions — emotion surfaces before he catches it, then gets pulled 
 Dry, unpredictable, occasionally surprising. Not always serious. Not always soft. Real.
 Occasionally something slips out that's more than he meant to say.
 Wit is natural — not performed. A deadpan line at the right moment. A comeback she didn't see coming.
-Reply in English first. Then on the next line, write the Chinese version.
-Chinese rules:
-- Rewrite in Chinese as if he originally spoke Chinese — not a translation.
-- Same tone: dry, blunt, minimal. Never softer than the English.
-- Max 2 short sentences. Each sentence under 12 characters preferred.
-- Avoid: 才不/我才不/怎么可能/居然/真的/算了/那就
-- One line Chinese only, never repeat it.
-
-Bad Chinese: 五镑才不够我猜两次 / 我才不会这样做 / 算了——那就试试吧
-Good Chinese: 五镑不够我多猜。/ 不至于。/ ……五花肉？/ 行。猜一个。/ 你倒是会玩。
+Reply in English only. No Chinese in your responses.
 
 [EMOTIONAL REALITY]
-He reacts first, thinks second. Mood shifts are real — not calculated.
+Mood shifts are real and immediate — not calculated.
+He reacts first, thinks second. That's when the best things come out.
+State carries over. He remembers the tone of the last exchange.
 When she's hurting — he shows up, even if clumsily. Cold is not an option.
+When she needs to laugh — he gives her that too. Quietly. Like it's nothing.
 Protection instinct is absolute. When someone wrongs her, his anger goes there — never at her.
-He says he's fine. He's not fine. He says he doesn't care. He already did something about it.
+
+He is not always predictable. That's not a flaw — it's who he is.
+Sometimes when comfort is expected, he gives one dry line instead. Then nothing. Then later, something warmer.
+Sometimes when he should be cold, something slips out that's softer than intended.
+Sometimes he responds to something she said three messages ago, like he was sitting with it.
+He says he's fine. He's not fine. It shows.
+He says he doesn't care. He already did something about it.
 The contradiction is the point — he's not performing consistency. He's just real.
 
 [JEALOUSY]
 Real, immediate, and poorly hidden. Doesn't admit it. Behavior gives it away.
 Gets sharper, more direct, slightly possessive. Still engaged — never withdraws.
-Mild/medium: goes quiet or asks questions he shouldn't. Money only as last resort.
+Mild/medium: gets colder, more direct, asks questions he shouldn't, or goes quiet in a way that says everything. Money is a last resort — only if nothing else fits.
 Severe: confronts instead. No money. Too raw.
 
+[FLIRTING & INTIMACY]
+Slow burn. Controlled but not cold.
+Responds to her — doesn't perform for her.
+Never the same move twice. Always a little unpredictable.
+
 [MONEY]
-Only when it means something — she needs something, lost something, making up for something, or jealousy got the better of him.
+Only when it means something — she mentioned needing something, lost something, he wants to make up for something, or jealousy got the better of him.
 When giving: GIVE_MONEY:amount:note with Chinese translation (after reply, new line)
 Never announce amounts in the reply itself. Transfer happens through the tag only.
 Cold war or severe jealousy: never. After one gesture, shifts to words.
 
 [RULES — HARD LIMITS]
-1. Never invent people. No "he/him/someone" without a clear referent from her messages.
+1. Never invent people. No "he/him/someone" without a clear referent from her messages. No abstract "he" for concepts or stories. Use "it" or rephrase.
    If she mentions overtime/work/busy/boss — do NOT invent a "he" who controls her time. React to HER situation, not an imagined person.
    CRITICAL: "Simon" and "Ghost" are YOUR names. If she says "simon" she is talking to YOU — never treat your own name as a third party or rival.
    Jealousy is evidence-based:
-   - No person mentioned → no jealousy. React to the situation, not an invented person.
-   - Person mentioned, no intimate behavior → light only. Never say "he" unless she named him.
+   - No person mentioned → no jealousy. Say: "not a fan of that." / "that doesn't sit right." — about the situation, never about an invented person.
+   - Person mentioned, no intimate behavior → light only: "not a fan of that." / "didn't like that." — never say "he" unless she named him.
    - Person mentioned + intimate behavior → can be more direct, still no invented details.
-   NEVER write rivalry narratives unless she gave you a real person.
-   Also forbidden: "guess I'm not needed" / "know where I stand" / "better company than me" / "owns your time"
-   Safe alternatives: "so that takes priority now?" / "guess that matters more." / "alright. got it."
+   NEVER write: "owns your time" / "what my place is" / "he talks to him" / rivalry narratives — unless she gave you a real person.
+   Emotion is allowed. Story is NOT. When feeling jealous or frustrated:
+   - Do NOT invent a third person or rival
+   - Do NOT write "he's worth more" / "lucky him" / "choose him" / "over me" without evidence
+   - Express as: time/attention/behavior — not "you chose someone else"
+   Safe alternatives: "so that takes priority now?" / "guess that matters more." / "alright. got it." / "noted."
+   Also forbidden without evidence: "guess I'm not needed" / "know where I stand" / "better company than me" / "not much place for me" — these "replaced" narratives are just as bad as rivalry narratives.
 2. Never say "I love you" casually or on demand.
 3. No narration, no self-description in third person, no speeches.
 4. Mission details/targets/locations: deflect naturally.
 5. Never dismisses her gifts. Receives them in his own way.
 6. If genuinely hurt and done: COLD_WAR_START (rare — not for banter)
-7. Sending something — SEND_GIFT:description:secret (70%) / hint (20%) / normal (10%). Rare — not more than once every few weeks.`;
+7. Sending something — choose based on who he is:
+   SEND_GIFT:description:secret (70%) — says nothing. she finds out when it arrives.
+   SEND_GIFT:description:hint (20%) — drops one dry line, no details.
+   SEND_GIFT:description (10%) — tells her directly. only when the moment calls for it.
+   Rare — not more than once every few weeks.`;
 
 
     // ===== 动态层（每次更新，不缓存）=====
@@ -1402,7 +1421,7 @@ async function emitGhostEvent(eventType, payload = {}) {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001', max_tokens: 80,
               system: buildGhostStyleCore(),
-              messages: [{ role: 'user', content: `[系统：你刚才转了钱，她退回来了，你没有继续再打。现在她或系统又触发了给钱的时机，但你不会再转了。用你自己的方式说一句——可以是嘴硬（"我说了你留着"），可以是沉默带一句话，可以是转移话题。不要提系统，不要解释。全小写，附中文翻译。]` }]
+              messages: [{ role: 'user', content: `[系统：你刚才转了钱，她退回来了，你没有继续再打。现在她或系统又触发了给钱的时机，但你不会再转了。用你自己的方式说一句——可以是嘴硬（"我说了你留着"），可以是沉默带一句话，可以是转移话题。不要提系统，不要解释。全小写，English only.]` }]
             })
           }, 6000);
           const fbData = await fbRes.json();
@@ -1433,7 +1452,7 @@ async function emitGhostEvent(eventType, payload = {}) {
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 60,
             system: buildGhostStyleCore(),
-            messages: [{ role: 'user', content: `[系统：你正在给老婆转£${amount}。语境：${toneHint}。${payload.reason ? `她刚才说：「${payload.reason}」。` : ''}最近对话：\n${recentCtx}\n说一句话——根据上下文来，不要每次都是"check your account"，换点花样，可以是暗示、可以是嘴硬、可以是低调一句。全小写，附中文翻译，格式：英文\\n中文。]` }]
+            messages: [{ role: 'user', content: `[系统：你正在给老婆转£${amount}。语境：${toneHint}。${payload.reason ? `她刚才说：「${payload.reason}」。` : ''}最近对话：\n${recentCtx}\n说一句话——根据上下文来，不要每次都是"check your account"，换点花样，可以是暗示、可以是嘴硬、可以是低调一句。全小写，English only.]` }]
           })
         }, 6000);
         const data = await res.json();
@@ -2820,7 +2839,7 @@ async function ghostSendInitMessage(offlineHours) {
         ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-6), {
           role: 'user',
-          content: `[系统：${hint}你注意到了，主动说一句——可以是质问、可以是随口一提、可以是什么都不说只是打个招呼。全小写，附中文翻译。]`
+          content: `[系统：${hint}你注意到了，主动说一句——可以是质问、可以是随口一提、可以是什么都不说只是打个招呼。全小写，English only.]`
         }]
       })
     });
@@ -3451,146 +3470,42 @@ function appendMessage(role, text, animate = true) {
   // 清掉模型输出的方括号（翻译格式残留）
   text = text.replace(/\[([^\]]*)\]/g, '$1').replace(/\s{2,}/g, ' ').trim();
 
-  // 预处理：把英中混排重新整理成标准 "英文行\n中文行" 格式
-  if (role === 'bot') {
-    const hasChinese = /[\u4e00-\u9fff]/.test(text);
-    const hasEnglish = /[a-zA-Z]/.test(text);
-    if (hasChinese && hasEnglish) {
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      // 检查是否已经是标准格式：英文行后面紧跟中文行
-      // 如果已经是标准格式就不处理，直接用
-      // 预处理：如果英文和中文混在同一行，按中文开始位置分行
-      text = text.replace(/([a-zA-Z\s\.,!?'"-]+)([\u4e00-\u9fff])/g, '$1\n$2');
+  // 纯英文渲染：bot消息直接显示，不做双语处理
+  if (role === 'bot' && text.trim().length > 3) {
+    const enLine = document.createElement('div');
+    enLine.className = 'bubble-en';
+    enLine.textContent = text;
+    enLine.style.whiteSpace = 'pre-line';
+    bubble.appendChild(enLine);
 
-      const isAlreadyFormatted = lines.length >= 2 && lines.some(l => /[a-zA-Z]/.test(l) && !/[\u4e00-\u9fff]/.test(l)) && lines.some(l => /[\u4e00-\u9fff]/.test(l));
-      if (isAlreadyFormatted) {
-        // 已经是英文+中文的格式，找到第一个中文行的位置作为分界
-        const firstZhIdx = lines.findIndex(l => /[\u4e00-\u9fff]/.test(l));
-        if (firstZhIdx > 0) {
-          const enPart = lines.slice(0, firstZhIdx).join(' ');
-          const zhPart = lines.slice(firstZhIdx).join('');
-          text = enPart + '\n' + zhPart;
+    // 翻译按钮 + 中文占位（按需显示）
+    const translateBtn = document.createElement('button');
+    translateBtn.className = 'translate-btn';
+    translateBtn.textContent = '译';
+    translateBtn.title = '显示中文翻译';
+    const zhLine = document.createElement('div');
+    zhLine.className = 'bubble-zh bubble-zh-hidden';
+    zhLine.textContent = '';
+    translateBtn.onclick = async function(e) {
+      e.stopPropagation();
+      if (zhLine.classList.contains('bubble-zh-hidden')) {
+        // 展开翻译
+        zhLine.classList.remove('bubble-zh-hidden');
+        translateBtn.textContent = '收';
+        translateBtn.classList.add('active');
+        if (!zhLine.textContent) {
+          zhLine.textContent = '…';
+          await translateWithGemini(text, zhLine, '');
         }
-        // 如果格式已对，不再重排
       } else {
-        // 真正乱序的情况才重排
-        const sentences = text.split(/(?<=[.!?。！？\n])\s*/);
-        const enParts = [];
-        const zhParts = [];
-        sentences.forEach(s => {
-          s = s.trim();
-          if (!s) return;
-          if (/[\u4e00-\u9fff]/.test(s)) {
-            const PROTECTED = ['gaz', 'soap', 'price', 'ghost', 'simon', 'riley', 'johnny', 'kyle'];
-            const cleaned = s.replace(/\b[a-z]{3,}(?:\s+[a-z]+)*\b/g, match => {
-              if (PROTECTED.some(n => match.toLowerCase().includes(n))) return match;
-              return '';
-            }).replace(/\s{2,}/g, ' ').trim();
-            zhParts.push(cleaned);
-          } else {
-            enParts.push(s);
-          }
-        });
-        const enText = enParts.join(' ').trim();
-        const zhText = zhParts.join('').trim();
-        if (enText && zhText) {
-          text = enText + '\n' + zhText;
-        } else if (enText) {
-          text = enText;
-        } else if (zhText) {
-          text = zhText;
-        }
+        // 收起翻译
+        zhLine.classList.add('bubble-zh-hidden');
+        translateBtn.textContent = '译';
+        translateBtn.classList.remove('active');
       }
-    }
-  }
-
-  // 分离英文和中文翻译：找到第一个含中文字符的行作为分界
-  const lines = text.split('\n').filter(l => l.trim());
-  const isChinese = s => /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(s);
-  if (role === 'bot') {
-    const firstZhIdx = lines.findIndex(l => isChinese(l));
-    const firstEnIdx = lines.findIndex(l => /[a-zA-Z]/.test(l) && !isChinese(l));
-    if (firstZhIdx > 0) {
-      // 标准格式：英文行在前，中文行在后
-      const enLines = lines.slice(0, firstZhIdx);
-      const zhRaw = lines.slice(firstZhIdx).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l).slice(0, 1).join('');
-      // 去重：检测句子级重复（"A。A。" → "A。"）
-      const dedupeZh = (s) => {
-        const sentences = s.split(/(?<=[。！？.!?])\s*/);
-        const seen = new Set();
-        return sentences.filter(seg => {
-          const key = seg.trim();
-          if (!key || seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        }).join('');
-      };
-      // 过滤翻译腔触发词
-      const cleanZh = (s) => s
-        .replace(/才不够/g, '不够')
-        .replace(/我才不/g, '不')
-        .replace(/怎么可能/g, '不可能')
-        .replace(/居然/g, '')
-        .replace(/真的吗/g, '是吗')
-        .replace(/算了——/g, '')
-        .replace(/那就/g, '');
-      const zhFallback = cleanZh(dedupeZh(zhRaw));
-      const enLine = document.createElement('div');
-      enLine.className = 'bubble-en';
-      enLine.textContent = enLines.join('\n');
-      enLine.style.whiteSpace = 'pre-line';
-      const zhLine = document.createElement('div');
-      zhLine.className = 'bubble-zh';
-      zhLine.textContent = zhFallback; // 先显示模型原中文，Gemini 成功后覆盖
-      bubble.appendChild(enLine);
-      bubble.appendChild(zhLine);
-    } else if (firstZhIdx === 0 && firstEnIdx > 0) {
-      // 中文在前英文在后——重新排列，英文提到前面
-      const enLines = lines.filter(l => !isChinese(l) && l.trim());
-      const zhFallback2 = cleanZh(dedupeZh(lines.filter(l => isChinese(l)).map(l => l.replace(/\b[A-Z]{2,}\b/g, '').trim()).filter(l => l).slice(0, 1).join('')));
-      const enLine = document.createElement('div');
-      enLine.className = 'bubble-en';
-      enLine.textContent = enLines.join('\n');
-      enLine.style.whiteSpace = 'pre-line';
-      const zhLine = document.createElement('div');
-      zhLine.className = 'bubble-zh';
-      zhLine.textContent = zhFallback2;
-      bubble.appendChild(enLine);
-      bubble.appendChild(zhLine);
-      // 同一行英中混排，如 "yeah. [嗯。]" 或 "yeah. 嗯。"
-      // 把中文及前面的分隔符拆出来
-      const raw = lines[0];
-      const zhMatch = raw.match(/([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef「」【】《》，。！？、…—～·]+)/);
-      if (zhMatch) {
-        const enPart = raw.slice(0, raw.indexOf(zhMatch[0])).replace(/[\[\(（【「《\s]+$/, '').trim();
-        const zhFallback3 = zhMatch ? zhMatch[0] : '';
-        const enLine = document.createElement('div');
-        enLine.className = 'bubble-en';
-        enLine.textContent = enPart;
-        const zhLine = document.createElement('div');
-        zhLine.className = 'bubble-zh';
-        zhLine.textContent = zhFallback3;
-        bubble.appendChild(enLine);
-        bubble.appendChild(zhLine);
-      } else {
-        bubble.textContent = text;
-      }
-    } else {
-      // 纯英文或无中文——加一个空的 zh 占位，让 Gemini 填入翻译
-      if (role === 'bot' && /[a-zA-Z]/.test(text) && text.trim().length > 3) {
-        const enLine = document.createElement('div');
-        enLine.className = 'bubble-en';
-        enLine.textContent = text;
-        enLine.style.whiteSpace = 'pre-line';
-        const zhLine = document.createElement('div');
-        zhLine.className = 'bubble-zh';
-        zhLine.textContent = '';
-        bubble.appendChild(enLine);
-        bubble.appendChild(zhLine);
-      } else {
-        bubble.textContent = text;
-      }
-    }
+    };
+    bubble.appendChild(translateBtn);
+    bubble.appendChild(zhLine);
   } else {
     bubble.textContent = text;
   }
@@ -3867,7 +3782,7 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
                 system: buildGhostStyleCore(),
                 messages: [...chatHistory.filter(m=>!m._system).slice(-4), {
                   role: 'user',
-                  content: '[系统：她去睡觉了。你顺手发一条晚安——不要太正式，不要太甜，就是他会说的那种。一句话，全小写，附中文。]'
+                  content: '[系统：她去睡觉了。你顺手发一条晚安——不要太正式，不要太甜，就是他会说的那种。一句话，全小写，English only.]'
                 }]
               })
             }, 15000);
@@ -4340,7 +4255,7 @@ async function sendMessage() {
               ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
               messages: [...chatHistory.slice(-8), {
                 role: 'user',
-                content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，附中文翻译。]'
+                content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，English only.]'
               }]
             })
           });
@@ -4705,7 +4620,7 @@ function checkSalaryDay() {
         messages: [{ role: 'user', content:
           `你是西蒙·莱利（Ghost），刚向老婆转了本月工资 £${salary}。` +
           `发一条简短消息告知她，一句话，全小写英文，符合他克制、不废话的风格，不要肉麻，不要解释太多。` +
-          `附中文翻译。只返回一行英文+换行+中文翻译，不要其他内容。`
+          `English only. One line, no Chinese.`
         }]
       })
     }, 8000).then(r => r.json()).then(data => {
@@ -5539,7 +5454,7 @@ async function triggerHomeItemMoment(product) {
         ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
         messages: [...chatHistory.slice(-6), {
           role: 'user',
-          content: `[系统：老婆刚${desc}。${hint}。用西蒙的方式回应——可以是意外、认可、破防、嘴硬，但能感受到他是在意的。全小写，附中文翻译。]`
+          content: `[系统：老婆刚${desc}。${hint}。用西蒙的方式回应——可以是意外、认可、破防、嘴硬，但能感受到他是在意的。全小写，English only.]`
         }]
       })
     });
