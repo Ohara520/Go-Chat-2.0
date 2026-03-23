@@ -3376,7 +3376,12 @@ function confirmTransfer() {
   if (coldWar) {
     judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。当前冷战，Ghost 100%退款，冷淡说退回去了。你是Ghost，保持角色，在回复末尾单独一行写：REFUND]`;
   } else {
-    judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。Ghost心情${mood}/10。无理由转账80%退款20%收下，心情好收下概率略高。你是Ghost，保持角色自然回复，在回复末尾单独一行写：REFUND 或 KEEP]`;
+    judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。Ghost心情${mood}/10。
+判断标准：
+收下(KEEP)：她说了明确理由（买东西/赌约/补偿/礼物），或心情≥7且她最近表现让他满意。
+退回(REFUND)：没有理由直接转过来，或心情≤4，或她最近惹他不高兴了。
+没有理由的转账Ghost会质疑或直接退，不会无声收下。
+你是Ghost，保持角色自然回复，在回复末尾单独一行写：REFUND 或 KEEP]`;
   }
 
   chatHistory.push({ role: 'user', content: judgePrompt, _system: true, _userTransfer: { amount } });
@@ -3406,11 +3411,14 @@ function confirmTransfer() {
       // 退款：加回余额，更新卡片状态，显示退款卡片
       setBalance(getBalance() + amount);
       addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: amount });
-      localStorage.setItem('lastRefundAt', Date.now()); // 记录退款时间，退款后本轮禁止再主动转账
-      localStorage.setItem('lastMoneyRefusedAt', Date.now()); // 退款也算拒绝，30分钟内不再尝试给
+      localStorage.setItem('lastRefundAt', Date.now());
+      localStorage.setItem('lastMoneyRefusedAt', Date.now());
       renderWallet();
       updateUserTransferCard(cardId, false);
       if (container) showGhostTransferCard(container, amount, reply, true);
+      // 注入上下文，让Ghost知道自己退了钱
+      chatHistory.push({ role: 'assistant', content: reply || `sent it back. £${amount}.` });
+      chatHistory.push({ role: 'user', content: `[系统：Ghost刚把£${amount}退回去了。他知道自己退了钱。]`, _system: true });
     } else {
       // Ghost收下：更新卡片状态为已收到，只显示回复
       changeAffection(1);
@@ -3418,8 +3426,8 @@ function confirmTransfer() {
       if (reply) {
         appendMessage('bot', reply);
       }
+      chatHistory.push({ role: 'assistant', content: reply });
     }
-    chatHistory.push({ role: 'assistant', content: reply });
     saveHistory();
     _isSending = false;
   }).catch(() => {
