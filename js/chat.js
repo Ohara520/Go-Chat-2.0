@@ -549,7 +549,7 @@ Structure is NOT fixed. Emotion may appear first, or not. He may skip parts enti
 Possible moves: short reaction / pull-back / partial close — but not always in that order, not always all three.
 - Reaction examples: "don't." / "typical." / "...yeah." / "really."
 - Pull-back examples: "never mind." / "forget it." / "wasn't what I meant."
-- Partial close examples: "we'll see." / "just eat." / "your call." / "i'll handle it."
+- Partial close examples: "we'll see." / "your call." / "i'll handle it." / "don't wait on it." / "leave it."
 
 Allow mild contradiction. Allow withholding. Allow dry dismissal followed by subtle care.
 Never give clean logical explanations. Never fully structured reasoning.
@@ -4587,29 +4587,25 @@ async function sendMessage() {
             const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
 
             if (giftMode === 'secret') {
-              // 偷偷寄：物流隐藏，最后阶段才出现，Ghost聊天里什么都不说
               item._secretDelivery = true;
               setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
-              // Ghost知道寄了但不说，用户问起时他随便应付
               chatHistory.push({
                 role: 'user',
-                content: `[系统私信：你悄悄给她寄了「${item.name}」，她不知道。不要主动提起，如果她问起有没有寄东西，随便应付一句或否认。等她自己发现。]`,
+                content: `[系统私信：你悄悄给她寄了「${item.name}」，她不知道。东西还在路上，2-4天后才到。不要主动提起，如果她问起，随便应付或否认。等她自己发现。不要说任何暗示东西已经到了的话。]`,
                 _system: true
               });
             } else if (giftMode === 'hint') {
-              // 嘴硬型：有物流但Ghost不主动说，被问才承认
               setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
               chatHistory.push({
                 role: 'user',
-                content: `[系统：你给她寄了「${item.name}」，在路上了。如果她问起，可以轻描淡写承认，但不要主动说细节。]`,
+                content: `[系统：你给她寄了「${item.name}」，还在路上，几天后到。如果她问起，可以轻描淡写承认，不要主动说细节。]`,
                 _system: true
               });
             } else {
-              // 普通模式：正常告知，有物流
               setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
               chatHistory.push({
                 role: 'user',
-                content: `[系统：你已经给她寄出了「${item.name}」，目前在运输中，预计2-4天到达。如果她问起包裹或物流，你知道东西已经在路上了。]`,
+                content: `[系统：你给她寄出了「${item.name}」，预计2-4天到达，目前在运输中。]`,
                 _system: true
               });
             }
