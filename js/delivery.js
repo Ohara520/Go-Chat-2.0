@@ -73,12 +73,19 @@ function addDelivery(product, isGhostSend, isLuxury) {
 }
 
 function addGhostReverseDelivery(item, emotionType) {
-  // Ghost主动反寄，不显示小票，只在商城顶部显示神秘提示
+  // 全局反寄冷却检查
+  if (typeof canTriggerReverseDelivery === 'function' && !canTriggerReverseDelivery()) return;
+  if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
+
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000; // 1-2天
+  const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000; // 快递时长1-2天
   const now = Date.now();
   const interval = totalMs / DELIVERY_STAGES_GHOST.length;
-  const isSecret = !!item._secretDelivery; // secret模式：隐藏物流直到最后阶段
+  const isSecret = !!item._secretDelivery;
+
+  // 延迟1-2天后才在商城显示小票
+  const visibleDelay = (Math.floor(Math.random() * 24) + 24) * 3600 * 1000; // 24-48小时后可见
+  const visibleAt = now + visibleDelay;
 
   deliveries.unshift({
     id: now,
@@ -86,7 +93,8 @@ function addGhostReverseDelivery(item, emotionType) {
     emoji: item.emoji,
     isGhostSend: true,
     isEmotionReverse: true,
-    isSecretDelivery: isSecret, // 隐藏物流标记
+    isSecretDelivery: isSecret,
+    visibleAt, // 小票可见时间
     emotionType,
     stages: DELIVERY_STAGES_GHOST.map((s, i) => ({ ...s, triggerAt: now + interval * (i + 1), done: false })),
     currentStage: 0,
@@ -97,6 +105,72 @@ function addGhostReverseDelivery(item, emotionType) {
     productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
+
+  // 三种模式随机：60%偷偷寄、30%暗示、10%直说
+  const rand = Math.random();
+
+  // 无论哪种模式，都注入系统消息让模型知道寄了
+  const secretNote = `[系统私信：你悄悄给她寄了「${item.name}」，她还不知道。你记得这件事。不要主动提起。如果她问起有没有寄东西，可以装作不知道或岔开话题，但不要死口否认——如果她追问或已经收到，可以承认。]`;
+  const hintNote = `[系统私信：你给她寄了「${item.name}」，在路上了。你知道这件事。不要主动说细节，但如果她问起不要否认。]`;
+
+  if (rand < 0.6) {
+    // 偷偷寄：什么都不说，但注入系统消息
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'user', content: secretNote, _system: true });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    return;
+  } else if (rand < 0.9) {
+    // 暗示：随口一句，注入系统消息
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'user', content: hintNote, _system: true });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    setTimeout(async () => {
+      try {
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 40,
+            system: buildGhostStyleCore(),
+            messages: [{ role: 'user', content: `[系统：你悄悄给她寄了点东西，但不打算告诉她是什么。随口说一句很模糊的话暗示一下，比如"check your door sometime"或者"something might show up"，全小写，English only，一句话。]` }]
+          })
+        }, 6000);
+        const d = await res.json();
+        const line = d.content?.[0]?.text?.trim();
+        if (line) {
+          appendMessage('bot', line);
+          chatHistory.push({ role: 'assistant', content: line });
+          saveHistory();
+        }
+      } catch(e) {}
+    }, 2000);
+  } else {
+    // 直说：注入系统消息
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'user', content: `[系统私信：你给她寄了「${item.name}」，你知道这件事，如果她问起正常回应。]`, _system: true });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    setTimeout(async () => {
+      try {
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 50,
+            system: buildGhostStyleCore(),
+            messages: [{ role: 'user', content: `[系统：你给她寄了「${item.name}」。用你的方式说一句——嘴硬、低调、或者随口一提都行。不说细节，全小写，English only，一句话。${item.tip ? `参考语气：${item.tip}` : ''}]` }]
+          })
+        }, 6000);
+        const d = await res.json();
+        const line = d.content?.[0]?.text?.trim();
+        if (line) {
+          appendMessage('bot', line);
+          chatHistory.push({ role: 'assistant', content: line });
+          saveHistory();
+        }
+      } catch(e) {}
+    }, 2000);
+  }
 }
 
 function checkDeliveryUpdates() {
@@ -191,15 +265,9 @@ async function onGhostReceived(delivery) {
       saveHistory();
     }
 
-    // 30%概率吐槽运费
-    if (Math.random() < 0.3) {
-      const complaint = SHIPPING_COMPLAINTS[Math.floor(Math.random() * SHIPPING_COMPLAINTS.length)];
-      setTimeout(() => {
-        const msg = complaint.replace(/\{fee\}/g, fee);
-        appendMessage('bot', msg);
-        chatHistory.push({ role: 'assistant', content: msg });
-        saveHistory();
-      }, 3000);
+    // 好感度
+    if (!pd.isLuxury) {
+      changeAffection(pd.price > 500 ? 2 : 1);
     }
 
     // 精品专柜第二条反应用Sonnet，情感分量要够
@@ -241,8 +309,6 @@ async function onGhostReceived(delivery) {
           }
         }
       }, 5000);
-    } else {
-      changeAffection(pd.price > 500 ? 2 : 1);
     }
 
     // fromhome：2-3天后随机触发二次反应（吃完了/感受）
@@ -427,6 +493,8 @@ function renderDeliveryTracker() {
   const active = deliveries.filter(d => {
     if (d.done) return false;
     if (d.lostTicketExpired) return false;
+    // 延迟显示：visibleAt未到就不显示
+    if (d.visibleAt && now48 < d.visibleAt) return false;
     // 丢失超过48小时自动消失
     if (d.isLostConfirmed && d.lostConfirmedAt && now48 - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
     if (d.isSecretDelivery) {
@@ -465,6 +533,7 @@ function openDeliveryModal(idx) {
   const now48 = Date.now();
   const active = deliveries.filter(d => {
     if (d.done || d.lostTicketExpired) return false;
+    if (d.visibleAt && now48 < d.visibleAt) return false;
     if (d.isLostConfirmed && d.lostConfirmedAt && now48 - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
     if (d.isSecretDelivery) return d.currentStage >= d.stages.length - 2;
     return true;

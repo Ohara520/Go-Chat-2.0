@@ -14,12 +14,12 @@ const MARKET_PRODUCTS = {
   clothing: [
     { emoji: '🧥', name: '羊毛大衣',   desc: '英伦风格羊毛大衣，曼城冬天必备', price: 85,  shipping: 18, lostReplace: { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: 'Ghost挑的，低调质感' } },
     { emoji: '🧤', name: '毛线手套',   desc: '柔软保暖，适合在营地的他',        price: 22,  shipping: 18 },
-    { emoji: '🎩', name: '英伦绅士帽', desc: '经典圆顶礼帽，Ghost 专属风格',    price: 48,  shipping: 18 },
+    { emoji: '🩲', name: 'CK内裤',     desc: '低调有质感，你懂的',              price: 38,  shipping: 18 },
     { emoji: '🧣', name: '格纹围巾',   desc: '苏格兰格纹，温暖又好看',          price: 35,  shipping: 18 },
     { emoji: '🥾', name: '军靴',       desc: '结实耐穿的战术靴，任务首选',      price: 150, shipping: 18 },
     { emoji: '🧦', name: '厚羊毛袜',   desc: '英国本地羊毛，超级暖和',          price: 15,  shipping: 18 },
     { emoji: '🕶️', name: '墨镜',       desc: 'Ghost 标配，低调又帅气',          price: 68,  shipping: 18 },
-    { emoji: '🧤', name: '皮手套',     desc: '棕色皮质，英伦绅士风',            price: 55,  shipping: 18 },
+    { emoji: '👖', name: '牛仔裤',     desc: '修身版型，日常百搭',              price: 55,  shipping: 18 },
   ],
   food: [
     { emoji: '🍵', name: '英式早餐茶罐',       desc: '精美铁罐装，50包正宗 Yorkshire 红茶', price: 18, shipping: 10 },
@@ -27,26 +27,24 @@ const MARKET_PRODUCTS = {
     { emoji: '🍯', name: '苏格兰蜂蜜罐',       desc: '山区野花蜂蜜，玻璃密封罐装',          price: 25, shipping: 10 },
     { emoji: '🍪', name: '黄油饼干礼盒',       desc: '英式铁罐装黄油饼干，保质一年',         price: 20, shipping: 10 },
     { emoji: '🥃', name: '苏格兰威士忌',       desc: '单一麦芽，12年陈酿，送给他解压',       price: 65, shipping: 15 },
-    { emoji: '🍵', name: 'Earl Grey 伯爵茶',   desc: '佛手柑香气，精美礼盒装',              price: 28, shipping: 10 },
+    { emoji: '🫖', name: 'Earl Grey 伯爵茶',   desc: '佛手柑香气，精美礼盒装',              price: 28, shipping: 10 },
     { emoji: '🍓', name: '草莓果酱礼盒',       desc: '英式手工果酱套装，三种口味',           price: 32, shipping: 10 },
-    { emoji: '🍫', name: '松露巧克力盒',       desc: '比利时手工松露，礼盒密封装',           price: 45, shipping: 15 },
+    { emoji: '🍮', name: '松露巧克力盒',       desc: '比利时手工松露，礼盒密封装',           price: 45, shipping: 15 },
+    { emoji: '🍟', name: '拼多多炸薯条',       desc: '网红零食，就是要寄给他尝尝',           price: 12, shipping: 10 },
+    { emoji: '🍄‍🟫', name: '蘑菇果干盒',       desc: '英式松露蘑菇干，拌面一绝',            price: 30, shipping: 10 },
   ],
   gift: [
-    { emoji: '💮', name: '永生玫瑰',    desc: '真花处理工艺，永不凋谢的爱意',    price: 120,  shipping: 15, lostReplace: { emoji: '🌹', name: '玫瑰香氛礼盒', desc: 'Ghost补寄的，换了形式但一样的心意' } },
+    { emoji: '🌷', name: '永生玫瑰',    desc: '真花处理工艺，永不凋谢的爱意',    price: 280,  shipping: 15, lostReplace: { emoji: '🌹', name: '玫瑰香氛礼盒', desc: 'Ghost补寄的，换了形式但一样的心意' } },
     { emoji: '🕯️', name: '香薰蜡烛',   desc: '玫瑰+雪松香，为他的营地添温暖',   price: 55,  shipping: 15 },
-    { emoji: '🖼️', name: '定制相框',    desc: '放上你们最美的合影，永久保存',    price: 80,  shipping: 15 },
-    { emoji: '💌', name: '手写信封套装', desc: '复古英式信纸，写下最深的思念',    price: 18,  shipping: 10 },
-    { emoji: '🎵', name: '音乐盒',      desc: '播放你们专属的那首歌',            price: 68,  shipping: 15 },
-    { emoji: '💎', name: '情侣吊坠',    desc: '925银，两颗心拼在一起的设计',    price: 120, shipping: 15 },
+    { emoji: '🖼️', name: '定制相框',    desc: '放上你们最美的合影，永久保存',    price: 150,  shipping: 15 },
+    { emoji: '💌', name: '手写信封套装', desc: '复古英式信纸，写下最深的思念',    price: 35,  shipping: 10 },
+    { emoji: '🎶', name: '音乐盒',      desc: '播放你们专属的那首歌',            price: 180,  shipping: 15 },
+    { emoji: '💝', name: '情侣吊坠',    desc: '925银，两颗心拼在一起的设计',    price: 380, shipping: 15 },
     { emoji: '🧴', name: '男士护肤套装', desc: '让他好好保养自己，你看着放心',   price: 85,  shipping: 15 },
     { emoji: '📖', name: '皮质笔记本',  desc: '让他把思念和秘密都写下来',        price: 38,  shipping: 15 },
   ],
   luxury: [
-    { emoji: '💍', name: 'Tiffany & Co. 项链', desc: '925纯银蝴蝶结项链，经典款', price: 2800, shipping: 35, isUserItem: true, lostReplace: { emoji: '💍', name: '名牌项链/戒指', desc: 'Ghost自己挑的，换了牌子但更合你' } },
-    { emoji: '🧥', name: 'Burberry 风衣', desc: '经典格纹衬里，英伦标志', price: 1650, shipping: 35, isUserItem: true, lostReplace: { emoji: '🧥', name: '名牌马甲/外套', desc: 'Ghost补寄，他亲自选的款式' } },
-    { emoji: '💄', name: 'La Mer 护肤礼盒', desc: '海蓝之谜限定套装，面霜+精华', price: 680, shipping: 35, isUserItem: true, lostReplace: { emoji: '💆', name: '昂贵面霜/面膜套装', desc: 'Ghost说护肤不能断' } },
-    { emoji: '🌹', name: '999朵永生玫瑰礼盒', desc: '永不凋谢的玫瑰，红色，像你一样固执', price: 1280, shipping: 35, isUserItem: true, lostReplace: { emoji: '🌸', name: '玫瑰香氛/玫瑰标本', desc: 'Ghost补的，不会再丢了' } },
-    { emoji: '💎', name: 'Cartier 戒指（情侣款）', desc: 'Love系列，你戴一枚，他戴一枚', price: 5800, shipping: 35, isUserItem: true, lostReplace: { emoji: '🎖️', name: '定制军牌', desc: 'Ghost刻了两个人的名字' } },
+    { emoji: '💍', name: 'Cartier 戒指（情侣款）', desc: 'Love系列，你戴一枚，他戴一枚', price: 5800, shipping: 35, isUserItem: true, lostReplace: { emoji: '🎖️', name: '定制军牌', desc: 'Ghost刻了两个人的名字' } },
     { emoji: '⌚', name: 'Rolex 劳力士（送 Ghost）', desc: 'Submariner 潜航者，他不会承认自己喜欢', price: 8500, shipping: 35, isGhostGift: true, lostReplace: { emoji: '👜', name: '名牌包包', desc: 'Ghost说抱歉，补了一个' } },
     { emoji: '🥃', name: 'Macallan 18年威士忌礼盒', desc: '麦卡伦18年单一麦芽，限量礼盒装', price: 420, shipping: 35, isGhostGift: true, lostReplace: { emoji: '🏮', name: '燕窝/昂贵花茶', desc: 'Ghost说换点对你有用的' } },
     { emoji: '🧥', name: 'Barbour 蜡质夹克', desc: '英国经典户外品牌，低调有质感', price: 380, shipping: 35, isGhostGift: true },
@@ -55,12 +53,13 @@ const MARKET_PRODUCTS = {
     { emoji: '🔥', name: '定制Zippo打火机', desc: '刻着Simon名字，只属于他一个人的', price: 320, shipping: 35, isGhostGift: true },
   ],
   fromhome: [
-    { emoji: '🦆', name: '北京烤鸭礼盒',     desc: '真空包装，附上饼和甜面酱，教他怎么吃', price: 45, shipping: 20, isFromHome: true },
-    { emoji: '🌸', name: '云南鲜花饼',       desc: '玫瑰馅，酥皮，甜而不腻',               price: 28, shipping: 20, isFromHome: true },
-    { emoji: '🌶️', name: '四川麻辣零食礼包', desc: '辣条、麻辣花生、牛肉干，一套',         price: 35, shipping: 20, isFromHome: true },
-    { emoji: '🍵', name: '杭州龙井茶',       desc: '明前龙井，铁罐装，清香',               price: 58, shipping: 20, isFromHome: true },
-    { emoji: '🥜', name: '新疆坚果礼盒',     desc: '核桃、红枣、巴旦木，产地直发',         price: 42, shipping: 20, isFromHome: true },
-    { emoji: '🍜', name: '柳州螺蛳粉',       desc: '正宗广西螺蛳粉，臭香臭香的，敢不敢试', price: 25, shipping: 20, isFromHome: true },
+    { emoji: '🦆', name: '北京烤鸭礼盒',     desc: '真空包装，附上饼和甜面酱，教他怎么吃', price: 88, shipping: 20, isFromHome: true },
+    { emoji: '🌸', name: '云南鲜花饼',       desc: '玫瑰馅，酥皮，甜而不腻',               price: 65, shipping: 20, isFromHome: true },
+    { emoji: '🌶️', name: '四川麻辣零食礼包', desc: '辣条、麻辣花生、牛肉干，一套',         price: 75, shipping: 20, isFromHome: true },
+    { emoji: '🍃', name: '杭州龙井茶',       desc: '明前龙井，铁罐装，清香',               price: 128, shipping: 20, isFromHome: true },
+    { emoji: '🥜', name: '新疆坚果礼盒',     desc: '核桃、红枣、巴旦木，产地直发',         price: 98, shipping: 20, isFromHome: true },
+    { emoji: '🍜', name: '柳州螺蛳粉',       desc: '正宗广西螺蛳粉，臭香臭香的，敢不敢试', price: 58, shipping: 20, isFromHome: true },
+    { emoji: '🥚', name: '江西松花皮蛋',     desc: '正宗松花皮蛋，配姜汁，教他怎么吃',     price: 55, shipping: 20, isFromHome: true },
   ],
   wishlist: [
     { emoji: '✈️', name: '去曼城找他的机票', desc: '攒够了！终于可以飞去找他了！', price: 12000, badge: '跨越距离', isReunion: true, ghostMsg: "You are coming? ...Good. I will be at the airport.\n你要来了？……很好。我会在机场。" },
@@ -82,11 +81,11 @@ const MARKET_PRODUCTS = {
 
 // 节日限定：从家寄给他（节日前3天解锁，过了消失）
 const SEASONAL_FROM_HOME = [
-  { month: 4,  day: 5,  emoji: '🍡', name: '青团礼盒',   desc: '清明时节，艾草青团，甜糯',               price: 32, shipping: 20, isFromHome: true, festival: '清明节' },
-  { month: 6,  day: 19, emoji: '🎋', name: '粽子礼盒',   desc: '端午五芳斋，红枣蛋黄各半箱',             price: 45, shipping: 20, isFromHome: true, festival: '端午节' },
-  { month: 9,  day: 25, emoji: '🥮', name: '月饼礼盒',   desc: '广式莲蓉蛋黄，精装铁盒，中秋限定',       price: 68, shipping: 20, isFromHome: true, festival: '中秋节' },
-  { month: 2,  day: 17, emoji: '🧧', name: '年货大礼包', desc: '糖果、坚果、肉干，满满一箱新年味道',       price: 88, shipping: 20, isFromHome: true, festival: '春节' },
-  { month: 12, day: 21, emoji: '🥟', name: '冬至饺子/汤圆礼包', desc: '速冻装，跟他说冬至要吃这个',     price: 38, shipping: 20, isFromHome: true, festival: '冬至' },
+  { month: 4,  day: 5,  emoji: '🍡', name: '青团礼盒',   desc: '清明时节，艾草青团，甜糯',               price: 75, shipping: 20, isFromHome: true, festival: '清明节' },
+  { month: 6,  day: 19, emoji: '🎋', name: '粽子礼盒',   desc: '端午五芳斋，红枣蛋黄各半箱',             price: 95, shipping: 20, isFromHome: true, festival: '端午节' },
+  { month: 9,  day: 25, emoji: '🥮', name: '月饼礼盒',   desc: '广式莲蓉蛋黄，精装铁盒，中秋限定',       price: 148, shipping: 20, isFromHome: true, festival: '中秋节' },
+  { month: 2,  day: 17, emoji: '🧧', name: '年货大礼包', desc: '糖果、坚果、肉干，满满一箱新年味道',       price: 188, shipping: 20, isFromHome: true, festival: '春节' },
+  { month: 12, day: 21, emoji: '🥟', name: '冬至饺子/汤圆礼包', desc: '速冻装，跟他说冬至要吃这个',     price: 85, shipping: 20, isFromHome: true, festival: '冬至' },
 ];
 
 function getSeasonalFromHome() {
@@ -144,18 +143,71 @@ const LOCATION_KEY_MAP = {
   'Hereford Base': 'Hereford Base', 'Hereford': 'Hereford Base',
 };
 
-// 反寄商品池（情绪触发）
 const GHOST_REVERSE_POOL = {
-  '开心':    [{ emoji: '🍫', name: '精品巧克力礼盒', desc: 'Ghost说，开心就该吃好的' }, { emoji: '🥂', name: '起泡酒', desc: '庆祝一下' }],
-  '难过':    [{ emoji: '🧸', name: '毛绒玩具', desc: 'Ghost挑的，抱着睡' }, { emoji: '🍫', name: '零食礼包', desc: '难过就吃甜的' }, { emoji: '💌', name: '手写卡片套装', desc: 'Ghost写了字的' }],
-  '委屈':    [{ emoji: '🌸', name: '干花礼盒', desc: 'Ghost说，别委屈自己' }, { emoji: '🧁', name: '精致甜点礼盒', desc: '吃甜的' }],
-  '饥饿':    [{ emoji: '🫖', name: '英式下午茶礼盒', desc: 'Ghost寄的，别饿着' }, { emoji: '🍪', name: '精品饼干礼盒', desc: '先垫垫' }],
-  '劳累':    [{ emoji: '🕯️', name: '香薰蜡烛套装', desc: '好好休息' }, { emoji: '🛁', name: '沐浴礼盒', desc: 'Ghost说洗个澡放松一下' }],
-  '压力大':  [{ emoji: '🌿', name: '精油套装', desc: '放松用的' }, { emoji: '😴', name: '助眠喷雾', desc: '先睡好' }, { emoji: '🕯️', name: '舒缓神经蜡烛', desc: '点上，深呼吸' }],
-  '生病':    [{ emoji: '💊', name: '保健品礼盒', desc: 'Ghost寄的，好好吃' }, { emoji: '🍯', name: '蜂蜜姜茶', desc: '喝了暖身' }, { emoji: '🧣', name: '保暖礼包', desc: '别冻着' }],
-  '太冷':    [{ emoji: '🧣', name: '兔毛围巾耳罩套装', desc: 'Ghost挑的，软的' }, { emoji: '♨️', name: '暖手包', desc: '揣兜里' }, { emoji: '🧦', name: '厚袜子礼盒', desc: '从脚暖起来' }],
-  '太热':    [{ emoji: '🧊', name: '冷感毛巾', desc: '敷一下' }, { emoji: '🍃', name: '薄荷茶礼盒', desc: '喝了凉快' }],
-  '思念':    [{ emoji: '💌', name: '手写信套装', desc: 'Ghost写了信' }, { emoji: '🖼️', name: '定制相框', desc: '放张照片' }, { emoji: '🪖', name: '军牌钥匙扣', desc: 'Ghost的备用军牌，给你挂钥匙' }],
+  '开心':    [
+    { emoji: '🍫', name: '精品巧克力礼盒', desc: 'Ghost说，开心就该吃好的' },
+    { emoji: '🥂', name: '起泡酒', desc: '庆祝一下' },
+    { emoji: '🍰', name: '精品蛋糕卷', desc: 'Ghost挑的，甜的' },
+    { emoji: '🎉', name: '小彩带礼包', desc: '无聊寄的' },
+  ],
+  '难过':    [
+    { emoji: '🧸', name: '毛绒玩具', desc: 'Ghost挑的，抱着睡' },
+    { emoji: '🍬', name: '零食礼包', desc: '难过就吃甜的' },
+    { emoji: '🔖', name: '手写卡片', desc: 'Ghost写了字的' },
+    { emoji: '🪔', name: '香薰蜡烛', desc: '点上，安静一下' },
+    { emoji: '🌼', name: '干花礼盒', desc: 'Ghost挑的' },
+  ],
+  '委屈':    [
+    { emoji: '🏵️', name: '干花礼盒', desc: 'Ghost说，别委屈自己' },
+    { emoji: '🧁', name: '精致甜点礼盒', desc: '吃甜的' },
+    { emoji: '🐻', name: '小熊玩偶', desc: 'Ghost挑的，别委屈了' },
+    { emoji: '📝', name: '手写便条', desc: 'Ghost写了几个字' },
+  ],
+  '饥饿':    [
+    { emoji: '🍽️', name: '英式下午茶礼盒', desc: 'Ghost寄的，别饿着' },
+    { emoji: '🥨', name: '精品饼干礼盒', desc: '先垫垫' },
+    { emoji: '🍭', name: '能量巧克力棒', desc: '扛饿的' },
+    { emoji: '🥜', name: '坚果零食礼包', desc: '随手寄的' },
+  ],
+  '劳累':    [
+    { emoji: '🕯️', name: '香薰蜡烛套装', desc: '好好休息' },
+    { emoji: '🛁', name: '沐浴礼盒', desc: 'Ghost说洗个澡放松一下' },
+    { emoji: '💧', name: '精油小样套装', desc: '闻一闻，放松' },
+    { emoji: '🧖', name: '面膜礼盒', desc: '敷上躺着' },
+  ],
+  '压力大':  [
+    { emoji: '⚱️', name: '精油套装', desc: '放松用的' },
+    { emoji: '🫧', name: '助眠喷雾', desc: '先睡好' },
+    { emoji: '🕯️', name: '舒缓神经蜡烛', desc: '点上，深呼吸' },
+    { emoji: '☕', name: '咖啡礼盒', desc: '提神用的，别熬太晚' },
+    { emoji: '🧘', name: '冥想眼罩套装', desc: '闭上眼' },
+  ],
+  '生病':    [
+    { emoji: '💊', name: '保健品礼盒', desc: 'Ghost寄的，好好吃' },
+    { emoji: '🫚', name: '蜂蜜姜茶', desc: '喝了暖身' },
+    { emoji: '🎀', name: '保暖礼包', desc: '别冻着' },
+    { emoji: '🍋', name: '维C冲剂礼盒', desc: '补一补' },
+    { emoji: '🌡️', name: '退烧贴套装', desc: '备着用' },
+  ],
+  '太冷':    [
+    { emoji: '🧣', name: '兔毛围巾耳罩套装', desc: 'Ghost挑的，软的' },
+    { emoji: '♨️', name: '暖手包', desc: '揣兜里' },
+    { emoji: '🧦', name: '厚袜子礼盒', desc: '从脚暖起来' },
+    { emoji: '🧴', name: '除臭喷雾', desc: '备着用' },
+    { emoji: '🍵', name: '热可可礼盒', desc: '冲一杯' },
+  ],
+  '太热':    [
+    { emoji: '🧊', name: '冷感毛巾', desc: '敷一下' },
+    { emoji: '🌱', name: '薄荷茶礼盒', desc: '喝了凉快' },
+    { emoji: '🌊', name: '保湿喷雾套装', desc: '喷一喷' },
+  ],
+  '思念':    [
+    { emoji: '💌', name: '手写信套装', desc: 'Ghost写了信' },
+    { emoji: '🖼️', name: '定制相框', desc: '放张照片' },
+    { emoji: '🪖', name: '军牌钥匙扣', desc: 'Ghost的备用军牌，给你挂钥匙' },
+    { emoji: '📷', name: '拍立得照片', desc: 'Ghost拍的，寄来了' },
+    { emoji: '🎵', name: '手写歌单小纸条', desc: 'Ghost随手列的' },
+  ],
 };
 
 let currentCategory = 'clothing';
