@@ -1,11 +1,12 @@
 // ===== 钱包系统 (wallet.js) =====
 // ===== 钱包系统 =====
 function getBalance() {
-  // 迁移：旧版用wallet字段存余额，新版从transactions算
-  // 只执行一次迁移
-  if (!localStorage.getItem('walletMigrated')) {
-    localStorage.setItem('walletMigrated', '1');
-    // 发£500迁移补偿
+  // 迁移v2：清空旧transactions，统一发£500补偿
+  if (!localStorage.getItem('walletMigrated_v2')) {
+    localStorage.setItem('walletMigrated_v2', '1');
+    localStorage.removeItem('walletMigrated');
+    localStorage.removeItem('transactions');
+    localStorage.removeItem('wallet');
     addTransaction({ icon: '🎁', name: '专属补偿金', amount: 500 });
   }
   // 从transactions算余额
