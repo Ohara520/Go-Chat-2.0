@@ -94,20 +94,7 @@ async function loadFromCloud() {
       if (data.long_term_memory != null && !localStorage.getItem('longTermMemory')) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
-    // ── 4. 余额：本地没有才从云端恢复，有就保留本地较大值（防止打工快速连续时云端旧值覆盖本地新值）
-    if (data.balance != null && data.balance > 0) {
-      const localWallet = localStorage.getItem('wallet');
-      if (!localWallet) {
-        localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
-      } else if (cloudIsNewer) {
-        // 云端更新：取较大值，防止打工收入丢失
-        const localVal = parseFloat(localWallet);
-        const cloudVal = parseFloat(data.balance);
-        if (cloudVal > localVal) {
-          localStorage.setItem('wallet', cloudVal.toFixed(2));
-        }
-      }
-    }
+    // ── 4. 余额：由transactions计算，不再单独同步balance字段 ──
 
     // ── 5. state_snapshot ─────────────────────────────────────
     if (data.state_snapshot != null) {
@@ -327,13 +314,15 @@ async function saveToCloud() {
     };
     // 只在有内容时才存，防止空值覆盖云端已有数据
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
-    const walletVal = parseFloat(localStorage.getItem('wallet') || '0');
-    if (walletVal > 0) upsertData.balance = walletVal;
+    // 余额由transactions计算，不再单独存balance字段
 
     await sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' });
     localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
   } catch(e) {
-    console.log('云端保存失败', e);
+    console.log('云端保存失败，5秒后重试', e);
+    setTimeout(() => {
+      saveToCloud().catch(err => console.log('重试也失败了', err));
+    }, 5000);
   }
 }
 

@@ -1,22 +1,28 @@
 // ===== 钱包系统 (wallet.js) =====
 // ===== 钱包系统 =====
 function getBalance() {
-  // 首次使用初始化100英镑
-  if (localStorage.getItem('wallet') === null) {
-    localStorage.setItem('wallet', '100.00');
-    addTransaction({ icon: '🎁', name: '新婚礼金', amount: 100 });
+  // 迁移：旧版用wallet字段存余额，新版从transactions算
+  // 只执行一次迁移
+  if (!localStorage.getItem('walletMigrated')) {
+    localStorage.setItem('walletMigrated', '1');
+    // 发£500迁移补偿
+    addTransaction({ icon: '🎁', name: '专属补偿金', amount: 500 });
   }
-  return parseFloat(localStorage.getItem('wallet') || '100');
+  // 从transactions算余额
+  const txs = getTransactions();
+  return Math.max(0, txs.reduce((sum, t) => sum + (t.amount || 0), 0));
 }
+
 function setBalance(val) {
+  // 不再直接存wallet，余额由transactions决定
+  // 只更新UI显示
   const safeVal = Math.max(0, val);
-  localStorage.setItem('wallet', safeVal.toFixed(2));
   const balEl = document.getElementById('transferBalance');
   if (balEl) balEl.textContent = '£' + Math.floor(safeVal);
   const walletBalEl = document.getElementById('walletBalance');
   if (walletBalEl) walletBalEl.textContent = '£' + safeVal.toFixed(2);
   touchLocalState();
-  scheduleCloudSave(); // 不要立刻存，等3秒防止中途覆盖
+  scheduleCloudSave();
 }
 function getTransactions() {
   return JSON.parse(localStorage.getItem('transactions') || '[]');
