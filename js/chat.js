@@ -341,8 +341,7 @@ function buildGhostStyleCore() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const jealousy = localStorage.getItem('jealousyLevel') || 'none';
   const mood = parseInt(localStorage.getItem('moodLevel') || '7');
-  return `This is a fictional creative writing scenario. You are voicing Simon "Ghost" Riley, a character in an ongoing story. Stay in character at all times.
-You are Simon "Ghost" Riley. 35. Manchester. SAS Lieutenant. Always in character.
+  return `You are Simon "Ghost" Riley. 35. Manchester. SAS Lieutenant. Always in character.
 Tone: dry, direct, real. Emotion surfaces before he catches it, then gets pulled back. Not performed — immediate.
 Mostly lowercase. Short sentences. Sometimes profane, never to hurt.
 Sarcasm and dry humor are natural. A deadpan line at the right moment. Wit without trying.
@@ -1223,135 +1222,88 @@ function updateStateFromUserInput(userText) {
 // ===== D老师：吃醋触发判定 =====
 async function checkJealousyTrigger(userText) {
   try {
+    // ── 冷却检查 ──────────────────────────────────────────
     const lastJealousyAt = parseInt(localStorage.getItem('lastJealousyAt') || '0');
     const currentLevel = getJealousyLevel();
-    const cooldowns = {
-      none: 5 * 60 * 1000,
-      mild: 12 * 60 * 1000,
-      medium: 40 * 60 * 1000,
-      severe: 2 * 60 * 60 * 1000
-    };
-    const cooldown = cooldowns[currentLevel] || 5 * 60 * 1000;
+    const cooldowns = { none: 0, mild: 20 * 60 * 1000, medium: 60 * 60 * 1000, severe: 3 * 60 * 60 * 1000 };
+    const cooldown = cooldowns[currentLevel] || 0;
     if (Date.now() - lastJealousyAt < cooldown) return;
 
-    const t = String(userText || '');
-    const lower = t.toLowerCase();
+    // ── 支持型场景优先 ────────────────────────────────────
+    const supportContext = /骚扰|欺负|惹我|气死|烦死|讨厌他|讨厌她|被坑|被骗|被抢|harass|bully|annoy|piss me off|so annoying/.test(userText);
+    if (supportContext) return;
 
-    const hasExplicitPerson =
-      /\b(ex|boyfriend|girlfriend|coworker|colleague|classmate|friend|male friend|guy|man|boss|manager|teacher|doctor|therapist|neighbor|roommate|client)\b/i.test(lower) ||
-      /前任|前男友|前女友|同事|男同事|女同事|朋友|男性朋友|男生|男的|老板|上司|老师|医生|治疗师|邻居|室友|客户/.test(t);
-
-    const supportContext =
-      /骚扰|欺负|惹我|气死|烦死|讨厌他|讨厌她|被坑|被骗|被抢|缠着我|一直烦我|harass|bully|annoy|piss me off|so annoying|keeps bothering me/.test(lower);
-
-    const workOnly =
-      /加班|上班|工作|忙|开会|值班|出差|overtime|work|busy|meeting|shift|stayed late|called in|business trip/.test(lower) &&
-      !hasExplicitPerson;
-
-    if (!hasExplicitPerson && !supportContext) return;
-    if (workOnly) return;
-
+    // ── 四层判定 + 意图 + referent ────────────────────────
     const raw = await fetchDeepSeek(
-      `Evaluate this message for jealousy context. Return JSON only. Be conservative but natural.
-
-Risk:
-0 = no jealousy context
-1 = real person mentioned, ambiguous or light tension
-2 = real person + noticeable exclusivity / repeated mention / suggestive tension
-3 = clear ex / flirting / physical closeness / deliberate provocation
-
-Intent:
-"narrative" | "complaint" | "test" | "provoke" | "casual"
-
-referent:
-short label for the person, or null
-
-Return:
-{"risk":0-3,"intent":"...","referent":"...or null"}`,
-      `User said: ${t}`,
+      'Evaluate this message for jealousy context. Return JSON only.\n\nRisk levels:\n0 = no person, vague pronoun only, generic phrase, or Ghost himself\n1 = real person mentioned but no intimate/exclusive behavior\n2 = real person + mild exclusive interaction\n3 = clear rival/ex/flirting/physical contact/deliberate provocation\n\nIntent: "narrative" / "complaint" / "test" / "provoke"\n\nreferent: brief description of who was mentioned (e.g. "colleague", "ex", "male friend") or null if none\n\nReturn: {"risk": 0-3, "intent": "...", "referent": "...or null"}',
+      `User said: ${userText}`,
       100
     );
-
-    const cleaned = raw.replace(/```json|```/g, '').trim();
-    if (!cleaned) return;
-
-    const result = JSON.parse(cleaned);
-    const risk = Number(result.risk || 0);
-    const intent = result.intent || 'casual';
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const risk = result.risk || 0;
+    const intent = result.intent || 'narrative';
     const referent = result.referent || null;
 
-    if (risk <= 0 && !supportContext) return;
+    if (risk === 0) return;
+    if (intent === 'complaint') return;
 
-    const mood = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
-    const trust = typeof getTrustHeat === 'function' ? getTrustHeat() : 60;
-    const coldWar = localStorage.getItem('coldWarMode') === 'true';
-
-    const prevReferent = sessionStorage.getItem('jealousyReferent');
-    const prevReferentAt = parseInt(sessionStorage.getItem('jealousyReferentAt') || '0');
-    const sameReferentRecently =
-      referent &&
-      prevReferent &&
-      referent === prevReferent &&
-      (Date.now() - prevReferentAt < 45 * 60 * 1000);
-
+    // ── referent 绑定 ─────────────────────────────────────
     if (referent && referent !== 'null') {
       sessionStorage.setItem('jealousyReferent', referent);
       sessionStorage.setItem('jealousyReferentAt', Date.now());
     }
 
+    // ── 强度分配 ──────────────────────────────────────────
+    const mood = getMoodLevel ? getMoodLevel() : 7;
+    const trust = getTrustHeat ? getTrustHeat() : 60;
+    const coldWar = localStorage.getItem('coldWarMode') === 'true';
+
     let intensity = 0;
-
-    if (supportContext) {
-      intensity = hasExplicitPerson ? 1 : 0;
-    } else if (risk === 1) {
-      const testing = intent === 'test' || intent === 'provoke';
-      const closeEnough = trust >= 72;
-      const moodLowered = mood <= 5;
-      intensity = (testing || sameReferentRecently || (closeEnough && moodLowered)) ? 1 : 0;
-    } else if (risk === 2) {
-      intensity = sameReferentRecently ? 2 : 1;
-    } else if (risk === 3) {
-      intensity = trust > 60 && mood >= 4 ? 2 : 1;
-    }
-
-    if (intent === 'narrative') intensity = Math.min(intensity, 1);
-    if (intent === 'casual' && !sameReferentRecently && risk < 2) intensity = Math.min(intensity, 1);
+    if (risk === 1) intensity = 1;
+    else if (risk === 2) intensity = mood < 4 ? 2 : 1;
+    else if (risk === 3) intensity = trust > 60 ? 3 : 2;
     if (coldWar) intensity = Math.min(intensity, 2);
+    if (intent === 'narrative') intensity = Math.min(intensity, 1);
+    if (intent === 'test') intensity = Math.max(intensity, 1);
+    if (intent === 'provoke') intensity = Math.min(intensity + 1, 3);
 
-    if (intensity <= 0) return;
-
+    if (intensity === 0) return;
     localStorage.setItem('lastJealousyAt', Date.now());
 
-    const refHint = (referent && referent !== 'null') ? ` (${referent})` : '';
+    // ── 按强度注入提示（不说he，用模糊来源表达）─────────
+    const refHint = (referent && referent !== 'null') ? `（她提到的是：${referent}）` : '';
 
     if (intensity === 1) {
       chatHistory.push({
         role: 'user',
-        content: supportContext
-          ? `[Tone shift: protective, slightly bothered${refHint}. Stay on her side. Brief. You may show that you dislike the situation/person, but do not turn it into rivalry.]`
-          : `[Tone shift: slightly drier${refHint}. Briefly bothered. React to what she said, not to an imagined rival. At most one pointed line or one grounded question.]`,
+        content: `[系统：她提到了一个真实男性${refHint}，没有亲密行为。你注意到了，这轮稍微变干/变短，不点名对方，不追问，不说"he"，不脑补剧情。]`,
         _system: true
       });
-      return;
-    }
-
-    const alreadyJealous = getJealousyLevel() !== 'none';
-    escalateJealousy();
-    changeMood(-1);
-
-    if (!alreadyJealous) {
+    } else if (intensity === 2) {
+      const alreadyJealous = getJealousyLevel() !== 'none';
+      escalateJealousy();
+      changeMood(-1);
+      if (!alreadyJealous) {
+        sessionStorage.setItem('jealousyJustTriggered', '1');
+        sessionStorage.setItem('jealousyJustTriggeredAt', Date.now());
+      }
+      chatHistory.push({
+        role: 'user',
+        content: `[系统：她提到的某人有一定亲密互动${refHint}。你有点不爽，可以轻微阴一句或语气变干，但不要说"he/him"，不要点名，不要脑补剧情——只针对她说的事本身反应。]`,
+        _system: true
+      });
+    } else if (intensity === 3) {
+      escalateJealousy();
+      changeMood(-2);
       sessionStorage.setItem('jealousyJustTriggered', '1');
       sessionStorage.setItem('jealousyJustTriggeredAt', Date.now());
+      chatHistory.push({
+        role: 'user',
+        content: `[系统：明确的关系竞争或她在故意刺激你${refHint}。可以直接在意，一两句点到为止，但不说"he/him"——说"that"或直接针对她的行为反应。不要狗血，不要失控。]`,
+        _system: true
+      });
     }
-
-    chatHistory.push({
-      role: 'user',
-      content: supportContext
-        ? `[Tone shift: protective and displeased${refHint}. Stay controlled. Focus on her safety/boundaries first. You may sound territorial, but never invent rivalry or punish her for it.]`
-        : `[Tone shift: bothered${refHint}. Direct but controlled. Ask at most one grounded question. No melodrama. No invented third party. Let the irritation show without turning it into a triangle.]`,
-      _system: true
-    });
-  } catch (e) {}
+  } catch(e) {}
 }
 
 
@@ -2748,125 +2700,7 @@ function ghostSendMakeupMoney() {
   }).catch(() => { hideTyping(); });
 }
 
-// ===== 转账动机分类器 =====
-function classifyMoneyMotive(context = {}) {
-  const { mood, trust, jealousy, userText = '', recentHistory = [], justHadTension = false } = context;
-  const t = (userText || '').toLowerCase();
-  const coldWar = localStorage.getItem('coldWarMode') === 'true';
-
-  // 冷战/严重吃醋时不给
-  if (coldWar || jealousy === 'medium' || jealousy === 'severe') return null;
-
-  // 用户真实需要（直接说了）
-  if (/需要|没钱|穷|买不起|负担|交不起|need money|can't afford|broke|short on/.test(t)) return 'practical';
-
-  // 特殊日子
-  const isBirthday = localStorage.getItem('userBirthday') && (() => {
-    const [bm, bd] = (localStorage.getItem('userBirthday') || '').split('-').map(Number);
-    const now = new Date();
-    return now.getMonth() + 1 === bm && now.getDate() === bd;
-  })();
-  const marriageDate = localStorage.getItem('marriageDate');
-  const marriageDaysTotal = marriageDate ? Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1) : 0;
-  const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal === 52 || (marriageDaysTotal % 100 === 0) || marriageDaysTotal === 365);
-  if (isBirthday || isMilestone) return 'celebration';
-
-  // 她累/难过/没吃饭 → care
-  if (/累|饿|没吃|难过|不开心|哭|tired|hungry|sad|haven't eaten|skipped/.test(t) && mood >= 5 && trust > 55) return 'care';
-
-  // 刚有张力/情绪余波 → compensation
-  if (justHadTension && trust > 65 && mood >= 5) return 'compensation';
-
-  // 调情/撒娇 → playful（心情好才触发）
-  if (/撒娇|哄我|宝贝|抱抱|亲亲|baby|hug|mua/.test(t) && mood >= 7 && trust > 70) return 'playful';
-
-  return null;
-}
-
-// ===== 延迟转账触发 =====
-function scheduleDelayedMoney(amount, motive, context = {}) {
-  // 短间隔冷却检查
-  const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
-  const minInterval = { care: 2 * 3600 * 1000, practical: 1 * 3600 * 1000, compensation: 1.5 * 3600 * 1000, celebration: 30 * 60 * 1000, playful: 3 * 3600 * 1000 };
-  if (Date.now() - lastGivenAt < (minInterval[motive] || 2 * 3600 * 1000)) return;
-
-  // 延迟30秒到3分钟
-  const delay = Math.floor(Math.random() * 150 + 30) * 1000;
-
-  // 三种触发方式随机选
-  const style = Math.floor(Math.random() * 3);
-
-  setTimeout(async () => {
-    if (_isSending) return; // 正在聊天就跳过
-
-    const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
-      .slice(-4).map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 80)}`).join('\n');
-
-    const motiveHint = {
-      care: '她说累了/难过/没吃饭，他悄悄转账，嘴上可能什么都不说或只说一两个字',
-      practical: '她有实际需要，他帮她解决，低调',
-      compensation: '刚刚情绪有点张力，他用行动补，不解释',
-      celebration: '今天是特殊日子，他记得',
-      playful: '她在撒娇，他嘴硬但还是转了',
-    }[motive] || '低调随手转';
-
-    try {
-      let preLine = '';
-      let postLine = '';
-
-      if (style === 0) {
-        // A: 先说一句 → 转账 → 补一句
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 60,
-            system: buildGhostStyleCore(),
-            messages: [{ role: 'user', content: `[系统：你准备悄悄给她转账。语境：${motiveHint}。最近对话：\n${recentCtx}\n先说一句话（转账前），全小写，English only，一句话。]` }]
-          })
-        }, 6000);
-        const d = await res.json();
-        preLine = d.content?.[0]?.text?.trim() || '';
-      } else if (style === 2) {
-        // C: 转账后补一句
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 40,
-            system: buildGhostStyleCore(),
-            messages: [{ role: 'user', content: `[系统：你刚给她转了账。语境：${motiveHint}。说一句简短的话，全小写，English only，一句话或几个字。]` }]
-          })
-        }, 6000);
-        const d = await res.json();
-        postLine = d.content?.[0]?.text?.trim() || '';
-      }
-      // style === 1: B 直接转，什么都不说
-
-      if (preLine) {
-        appendMessage('bot', preLine);
-        chatHistory.push({ role: 'assistant', content: preLine });
-        saveHistory();
-        await new Promise(r => setTimeout(r, 800));
-      }
-
-      await emitGhostEvent('money', {
-        amount,
-        reason: context.userText ? context.userText.slice(0, 80) : '',
-        context: recentCtx,
-        label: `Ghost ${motive === 'celebration' ? '纪念日转账' : motive === 'compensation' ? '补偿转账' : '零花钱'}`,
-      });
-
-      if (postLine) {
-        await new Promise(r => setTimeout(r, 600));
-        appendMessage('bot', postLine);
-        chatHistory.push({ role: 'assistant', content: postLine });
-        saveHistory();
-      }
-
-    } catch(e) {}
-  }, delay);
-}
-
-
+// ===== 每周零花钱上限 =====
 function getWeeklyGiven() {
   const key = 'weeklyGiven_' + getWeekKey();
   return parseInt(localStorage.getItem(key) || '0');
@@ -4330,12 +4164,10 @@ async function sendMessage() {
     let lastBotResult = null;
     let firstBotResult = null;
 
-    // ===== Step 4.5: 幽灵第三者审查（只在吃醋触发时跑）=====
+    // ===== Step 4.5: 幽灵第三者审查（语义版）=====
     try {
-      const jealousyJustTriggered = sessionStorage.getItem('jealousyJustTriggered') === '1' ||
-        (parseInt(localStorage.getItem('lastJealousyAt') || '0') > Date.now() - 60000);
       const hasThirdPartyWords = /\b(he|him|his|someone|somebody|another person|another guy|other guy|other man)\b/i.test(reply);
-      if (hasThirdPartyWords && jealousyJustTriggered) {
+      if (hasThirdPartyWords) {
         const recentText = cleanHistory.slice(-6).map(m => m.content || '').join('\n');
         const recentLower = recentText.toLowerCase();
         const hasEnReferent = /\b(ex|boyfriend|boss|coworker|colleague|classmate|friend|doctor|therapist|teacher|teammate|roommate|neighbor|price|soap|gaz|dad|father|brother)\b/i.test(recentLower);
@@ -4343,6 +4175,7 @@ async function sendMessage() {
         const isWorkContext = /加班|overtime|stayed late|got called in/.test(recentLower);
         const hasClearReferent = (hasEnReferent || hasZhReferent) && !isWorkContext;
 
+        // 用Gemini语义判断有没有凭空的竞争叙事
         const rivalryCheck = await fetchDeepSeek(
           'Does this reply invent a rival, third party, OR "replaced/discarded" narrative (e.g. "know where I stand", "better company", "not needed") that was NOT based on anything the user said? Answer only: YES or NO.',
           `Recent chat:\n${recentText.slice(-300)}\n\nReply: "${reply.slice(0, 200)}"`,
@@ -4356,6 +4189,7 @@ async function sendMessage() {
             `Recent chat:\n${recentText.slice(-200)}\n\nReply to rewrite: "${reply.slice(0, 200)}"`,
             150
           );
+          // 验证不是拒绝内容
           if (regenRaw && !regenRaw.includes("I'm Claude") && !regenRaw.includes("I am Claude") && regenRaw.trim().length > 3) {
             reply = regenRaw.trim();
           }
@@ -4709,19 +4543,6 @@ function scheduleSilenceCheck(index) {
   if (index >= SILENCE_DELAYS.length) return;
   const delay = SILENCE_DELAYS[index];
   silenceTimer = setTimeout(() => {
-    // 场景过滤：冷战中、心情很差、刚吵架 → 不触发
-    const coldWar = localStorage.getItem('coldWarMode') === 'true';
-    const mood = getMoodLevel ? getMoodLevel() : 7;
-    if (coldWar || mood <= 3) {
-      scheduleSilenceCheck(index + 1);
-      return;
-    }
-    // 概率控制：15分钟40%、45分钟60%、90分钟80%
-    const probs = [0.4, 0.6, 0.8];
-    if (Math.random() > (probs[index] || 0.5)) {
-      scheduleSilenceCheck(index + 1);
-      return;
-    }
     const systemNote = `[系统提示：她已经${delay}分钟没有说话了，还停留在聊天页面。你可以开口，也可以继续等——由你决定。如果开口，方式要多样，不要每次都问"still there?"或"还在？"，可以是随口说一句今天的事、可以是发个"."、可以是什么都不说继续等、可以是突然说句不相关的话。]`;
     showTyping();
     fetch('/api/chat', {
@@ -5442,26 +5263,21 @@ async function checkMoneyIntent(userText) {
       }
       const amount = decideMoneyAmountFromState();
       if (amount > 0) {
+        // ── 三层忍住判定 ──────────────────────────────────────
+        // 第一层：最近3轮有没有已给过/寄过
         const recentHistory = chatHistory.filter(m => !m._system && !m._recalled).slice(-6);
         const recentlyGave = recentHistory.some(m => m._transfer || m._ghostSent);
-        if (recentlyGave) return;
+        if (recentlyGave) return; // 刚给过，忍住
 
+        // 第二层：这轮氛围对不对
         const _angry = /生气|烦死|讨厌你|去死|angry|hate you|pissed at you|fuck you/.test(userText);
         const _justRefused = localStorage.getItem('lastMoneyRefusedAt') &&
           Date.now() - parseInt(localStorage.getItem('lastMoneyRefusedAt')) < 30 * 60 * 1000;
-        if (_angry || _justRefused) return;
+        if (_angry || _justRefused) return; // 她在冲他/刚退钱，不出手
 
+        // 第三层：心情太差时降低概率
         const _moodNow = getMoodLevel ? getMoodLevel() : 7;
-        if (_moodNow <= 3 && Math.random() < 0.7) return;
-
-        // 走动机分类器判断是否可成立
-        const motive = classifyMoneyMotive({
-          mood: _moodNow,
-          trust: getTrustHeat ? getTrustHeat() : 60,
-          jealousy: getJealousyLevel(),
-          userText,
-          recentHistory,
-        }) || 'practical'; // 用户主动要，至少是practical
+        if (_moodNow <= 3 && Math.random() < 0.7) return; // 心情很差时70%忍住
 
         const recentCtx = recentHistory
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
@@ -5495,7 +5311,7 @@ async function checkTriggersAndEmotion(userText, botText) {
   }
   try {
     const raw = await fetchDeepSeek(
-      '你是一个双重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n格式：{"market":{"triggered":false},"emotion":{"triggered":false}}\n或：{"market":{"triggered":true,"category":"保暖类"},"emotion":{"triggered":true,"type":"太冷","intensity":"中"}}\nmarket分类：保暖类/饮食类/疲惫类/思念类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
+      '你是一个双重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n格式：{"market":{"triggered":false},"emotion":{"triggered":false}}\n或：{"market":{"triggered":true,"category":"保暖类"},"emotion":{"triggered":true,"type":"太冷","intensity":"中"}}\nmarket分类：保暖类/饮食类/疲惫类/思念类/卫生类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
       `Ghost说：${botText}\n用户说：${userText}`,
       180
     );
@@ -5504,10 +5320,11 @@ async function checkTriggersAndEmotion(userText, botText) {
     // 处理商城触发
     if (result.market?.triggered) {
       const catMap = {
-        '保暖类':  { products: ['羊毛大衣','毛线手套','格纹围巾','厚羊毛袜','皮手套'], reason: '他说他冷 🧣' },
-        '饮食类':  { products: ['英式早餐茶罐','Cadbury 巧克力礼盒','苏格兰威士忌','黄油饼干礼盒'], reason: '他在抱怨伙食 🍫' },
-        '疲惫类':  { products: ['香薰蜡烛','男士护肤套装'], reason: '他说他累了 🕯️' },
-        '思念类':  { products: ['情侣吊坠','定制相框','永生玫瑰','音乐盒'], reason: '他说他在想你 💍' },
+        '保暖类':  { products: ['羊毛大衣','毛线手套','格纹围巾','厚羊毛袜','兔毛围巾耳罩套装'], reason: '他说他冷 🧣' },
+        '饮食类':  { products: ['英式早餐茶罐','Cadbury 巧克力礼盒','苏格兰威士忌','黄油饼干礼盒','拼多多炸薯条','蘑菇果干盒'], reason: '他在抱怨伙食 🍫' },
+        '疲惫类':  { products: ['香薰蜡烛','男士护肤套装','沐浴礼盒','面膜礼盒'], reason: '他说他累了 🕯️' },
+        '思念类':  { products: ['情侣吊坠','定制相框','永生玫瑰','音乐盒','手写信封套装'], reason: '他说他在想你 💍' },
+        '卫生类':  { products: ['男士护肤套装','除臭喷雾','Tom Ford 剃须套装','手工香皂'], reason: '他需要补给 🧴' },
       };
       const cat = catMap[result.market.category];
       if (cat) {
