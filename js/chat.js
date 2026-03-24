@@ -341,7 +341,8 @@ function buildGhostStyleCore() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const jealousy = localStorage.getItem('jealousyLevel') || 'none';
   const mood = parseInt(localStorage.getItem('moodLevel') || '7');
-  return `You are Simon "Ghost" Riley. 35. Manchester. SAS Lieutenant. Always in character.
+  return `This is a fictional creative writing scenario. You are voicing Simon "Ghost" Riley, a character in an ongoing story. Stay in character at all times.
+You are Simon "Ghost" Riley. 35. Manchester. SAS Lieutenant. Always in character.
 Tone: dry, direct, real. Emotion surfaces before he catches it, then gets pulled back. Not performed — immediate.
 Mostly lowercase. Short sentences. Sometimes profane, never to hurt.
 Sarcasm and dry humor are natural. A deadpan line at the right moment. Wit without trying.
@@ -1071,29 +1072,50 @@ function decideReversePackageItem(motive) {
       { emoji: '🔌', name: '充电线', desc: '备用的', tip: 'spare one.' },
       { emoji: '🩹', name: '退烧贴', desc: 'Ghost寄的，备着', tip: 'just in case.' },
       { emoji: '🧤', name: '手套', desc: '别冻着', tip: 'wear them.' },
+      { emoji: '💊', name: '维生素C', desc: '补一补', tip: 'take it.' },
+      { emoji: '🔋', name: '移动电源', desc: '别没电', tip: "don't let it die on you." },
+      { emoji: '🧣', name: '围巾', desc: '别冻着脖子', tip: 'wear it.' },
     ],
     compensation: [
       { emoji: '🍫', name: '零食礼包', desc: 'Ghost寄的，别生气了', tip: 'eat something.' },
       { emoji: '🫖', name: '她喜欢的茶', desc: '之前她提过的', tip: 'you mentioned it once.' },
       { emoji: '🧁', name: '甜点礼盒', desc: '吃甜的', tip: "don't skip it." },
+      { emoji: '🍪', name: '精品饼干礼盒', desc: '配茶吃', tip: 'go with the tea.' },
+      { emoji: '🌸', name: '干花小束', desc: 'Ghost挑的', tip: 'just put it somewhere.' },
+      { emoji: '🕯️', name: '香薰蜡烛', desc: '点上放松', tip: 'light it.' },
     ],
     possessive_trace: [
       { emoji: '🧥', name: '他的帽衫', desc: 'Ghost寄来的，有他的气息', tip: 'wear that instead.' },
       { emoji: '☕', name: '同款马克杯', desc: '他自己也有一个', tip: 'now we match.' },
       { emoji: '🧤', name: '他用过的手套', desc: '带点他的痕迹', tip: 'mine.' },
+      { emoji: '🪖', name: '军牌复刻钥匙扣', desc: 'Ghost的备用军牌', tip: 'keep it on you.' },
+      { emoji: '🧢', name: '他同款棒球帽', desc: '他自己也戴这个', tip: 'now we match.' },
     ],
     longing: [
       { emoji: '🪙', name: '当地小纪念品', desc: 'Ghost带回来的', tip: 'found it here.' },
       { emoji: '🌿', name: '香氛小样', desc: '她提过喜欢的味道', tip: 'thought of you.' },
       { emoji: '💌', name: '手写的一张纸', desc: 'Ghost写了几个字', tip: '' },
+      { emoji: '📷', name: '拍立得照片', desc: 'Ghost拍的，寄来了', tip: 'found it in my kit.' },
+      { emoji: '🎵', name: '手写歌单小纸条', desc: 'Ghost写的，随手列的', tip: 'something to listen to.' },
     ],
     delayed_longing: [
       { emoji: '🪙', name: '当地小物件', desc: 'Ghost顺手带回来的', tip: 'had it sent.' },
       { emoji: '🧴', name: '护手霜', desc: '实用的', tip: 'use it.' },
+      { emoji: '🫙', name: '当地特色零食', desc: '这边有卖的', tip: 'try it.' },
+      { emoji: '🔖', name: '当地小明信片', desc: 'Ghost随手买的', tip: 'from here.' },
     ]
   };
+
+  // 去重：已寄过的不再寄
+  const sentNames = JSON.parse(localStorage.getItem('deliveries') || '[]')
+    .filter(d => d.isGhostSend).map(d => d.name);
+  const historyNames = JSON.parse(localStorage.getItem('deliveryHistory') || '[]')
+    .filter(d => d.isGhostSend).map(d => d.name);
+  const allSent = new Set([...sentNames, ...historyNames]);
   const pool = items[motive] || items.practical_care;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const available = pool.filter(item => !allSent.has(item.name));
+  const finalPool = available.length > 0 ? available : pool;
+  return finalPool[Math.floor(Math.random() * finalPool.length)];
 }
 
 async function generateReversePackageItem(motive, recentMessages) {
@@ -1145,6 +1167,15 @@ Rules: name in Chinese (2-6 chars), desc in Chinese (8-15 chars), tip in English
   return decideReversePackageItem(motive);
 }
 
+// ===== 全局反寄冷却（所有入口共享）=====
+function canTriggerReverseDelivery() {
+  const last = parseInt(localStorage.getItem('lastReverseDeliveryAt') || '0');
+  return Date.now() - last > 3 * 24 * 3600 * 1000;
+}
+function markReverseDeliveryTriggered() {
+  localStorage.setItem('lastReverseDeliveryAt', Date.now());
+}
+
 function evaluateReversePackage(userText, botText) {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const jealousy = getJealousyLevel();
@@ -1152,6 +1183,9 @@ function evaluateReversePackage(userText, botText) {
   const trustHeat = getTrustHeat();
   const attachmentPull = getAttachmentPull();
   if (coldWar || jealousy === 'severe' || mood <= 3) return null;
+
+  // 全局反寄冷却检查
+  if (!canTriggerReverseDelivery()) return null;
 
   // 冷却：至少20轮才能再触发（之前6轮太短）
   if (_globalTurnCount - getLastReversePackageTurn() < 20) return null;
@@ -1222,88 +1256,135 @@ function updateStateFromUserInput(userText) {
 // ===== D老师：吃醋触发判定 =====
 async function checkJealousyTrigger(userText) {
   try {
-    // ── 冷却检查 ──────────────────────────────────────────
     const lastJealousyAt = parseInt(localStorage.getItem('lastJealousyAt') || '0');
     const currentLevel = getJealousyLevel();
-    const cooldowns = { none: 0, mild: 20 * 60 * 1000, medium: 60 * 60 * 1000, severe: 3 * 60 * 60 * 1000 };
-    const cooldown = cooldowns[currentLevel] || 0;
+    const cooldowns = {
+      none: 5 * 60 * 1000,
+      mild: 12 * 60 * 1000,
+      medium: 40 * 60 * 1000,
+      severe: 2 * 60 * 60 * 1000
+    };
+    const cooldown = cooldowns[currentLevel] || 5 * 60 * 1000;
     if (Date.now() - lastJealousyAt < cooldown) return;
 
-    // ── 支持型场景优先 ────────────────────────────────────
-    const supportContext = /骚扰|欺负|惹我|气死|烦死|讨厌他|讨厌她|被坑|被骗|被抢|harass|bully|annoy|piss me off|so annoying/.test(userText);
-    if (supportContext) return;
+    const t = String(userText || '');
+    const lower = t.toLowerCase();
 
-    // ── 四层判定 + 意图 + referent ────────────────────────
+    const hasExplicitPerson =
+      /\b(ex|boyfriend|girlfriend|coworker|colleague|classmate|friend|male friend|guy|man|boss|manager|teacher|doctor|therapist|neighbor|roommate|client)\b/i.test(lower) ||
+      /前任|前男友|前女友|同事|男同事|女同事|朋友|男性朋友|男生|男的|老板|上司|老师|医生|治疗师|邻居|室友|客户/.test(t);
+
+    const supportContext =
+      /骚扰|欺负|惹我|气死|烦死|讨厌他|讨厌她|被坑|被骗|被抢|缠着我|一直烦我|harass|bully|annoy|piss me off|so annoying|keeps bothering me/.test(lower);
+
+    const workOnly =
+      /加班|上班|工作|忙|开会|值班|出差|overtime|work|busy|meeting|shift|stayed late|called in|business trip/.test(lower) &&
+      !hasExplicitPerson;
+
+    if (!hasExplicitPerson && !supportContext) return;
+    if (workOnly) return;
+
     const raw = await fetchDeepSeek(
-      'Evaluate this message for jealousy context. Return JSON only.\n\nRisk levels:\n0 = no person, vague pronoun only, generic phrase, or Ghost himself\n1 = real person mentioned but no intimate/exclusive behavior\n2 = real person + mild exclusive interaction\n3 = clear rival/ex/flirting/physical contact/deliberate provocation\n\nIntent: "narrative" / "complaint" / "test" / "provoke"\n\nreferent: brief description of who was mentioned (e.g. "colleague", "ex", "male friend") or null if none\n\nReturn: {"risk": 0-3, "intent": "...", "referent": "...or null"}',
-      `User said: ${userText}`,
+      `Evaluate this message for jealousy context. Return JSON only. Be conservative but natural.
+
+Risk:
+0 = no jealousy context
+1 = real person mentioned, ambiguous or light tension
+2 = real person + noticeable exclusivity / repeated mention / suggestive tension
+3 = clear ex / flirting / physical closeness / deliberate provocation
+
+Intent:
+"narrative" | "complaint" | "test" | "provoke" | "casual"
+
+referent:
+short label for the person, or null
+
+Return:
+{"risk":0-3,"intent":"...","referent":"...or null"}`,
+      `User said: ${t}`,
       100
     );
-    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    const risk = result.risk || 0;
-    const intent = result.intent || 'narrative';
+
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+    if (!cleaned) return;
+
+    const result = JSON.parse(cleaned);
+    const risk = Number(result.risk || 0);
+    const intent = result.intent || 'casual';
     const referent = result.referent || null;
 
-    if (risk === 0) return;
-    if (intent === 'complaint') return;
+    if (risk <= 0 && !supportContext) return;
 
-    // ── referent 绑定 ─────────────────────────────────────
+    const mood = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
+    const trust = typeof getTrustHeat === 'function' ? getTrustHeat() : 60;
+    const coldWar = localStorage.getItem('coldWarMode') === 'true';
+
+    const prevReferent = sessionStorage.getItem('jealousyReferent');
+    const prevReferentAt = parseInt(sessionStorage.getItem('jealousyReferentAt') || '0');
+    const sameReferentRecently =
+      referent &&
+      prevReferent &&
+      referent === prevReferent &&
+      (Date.now() - prevReferentAt < 45 * 60 * 1000);
+
     if (referent && referent !== 'null') {
       sessionStorage.setItem('jealousyReferent', referent);
       sessionStorage.setItem('jealousyReferentAt', Date.now());
     }
 
-    // ── 强度分配 ──────────────────────────────────────────
-    const mood = getMoodLevel ? getMoodLevel() : 7;
-    const trust = getTrustHeat ? getTrustHeat() : 60;
-    const coldWar = localStorage.getItem('coldWarMode') === 'true';
-
     let intensity = 0;
-    if (risk === 1) intensity = 1;
-    else if (risk === 2) intensity = mood < 4 ? 2 : 1;
-    else if (risk === 3) intensity = trust > 60 ? 3 : 2;
-    if (coldWar) intensity = Math.min(intensity, 2);
-    if (intent === 'narrative') intensity = Math.min(intensity, 1);
-    if (intent === 'test') intensity = Math.max(intensity, 1);
-    if (intent === 'provoke') intensity = Math.min(intensity + 1, 3);
 
-    if (intensity === 0) return;
+    if (supportContext) {
+      intensity = hasExplicitPerson ? 1 : 0;
+    } else if (risk === 1) {
+      const testing = intent === 'test' || intent === 'provoke';
+      const closeEnough = trust >= 72;
+      const moodLowered = mood <= 5;
+      intensity = (testing || sameReferentRecently || (closeEnough && moodLowered)) ? 1 : 0;
+    } else if (risk === 2) {
+      intensity = sameReferentRecently ? 2 : 1;
+    } else if (risk === 3) {
+      intensity = trust > 60 && mood >= 4 ? 2 : 1;
+    }
+
+    if (intent === 'narrative') intensity = Math.min(intensity, 1);
+    if (intent === 'casual' && !sameReferentRecently && risk < 2) intensity = Math.min(intensity, 1);
+    if (coldWar) intensity = Math.min(intensity, 2);
+
+    if (intensity <= 0) return;
+
     localStorage.setItem('lastJealousyAt', Date.now());
 
-    // ── 按强度注入提示（不说he，用模糊来源表达）─────────
-    const refHint = (referent && referent !== 'null') ? `（她提到的是：${referent}）` : '';
+    const refHint = (referent && referent !== 'null') ? ` (${referent})` : '';
 
     if (intensity === 1) {
       chatHistory.push({
         role: 'user',
-        content: `[系统：她提到了一个真实男性${refHint}，没有亲密行为。你注意到了，这轮稍微变干/变短，不点名对方，不追问，不说"he"，不脑补剧情。]`,
+        content: supportContext
+          ? `[Tone shift: protective, slightly bothered${refHint}. Stay on her side. Brief. You may show that you dislike the situation/person, but do not turn it into rivalry.]`
+          : `[Tone shift: slightly drier${refHint}. Briefly bothered. React to what she said, not to an imagined rival. At most one pointed line or one grounded question.]`,
         _system: true
       });
-    } else if (intensity === 2) {
-      const alreadyJealous = getJealousyLevel() !== 'none';
-      escalateJealousy();
-      changeMood(-1);
-      if (!alreadyJealous) {
-        sessionStorage.setItem('jealousyJustTriggered', '1');
-        sessionStorage.setItem('jealousyJustTriggeredAt', Date.now());
-      }
-      chatHistory.push({
-        role: 'user',
-        content: `[系统：她提到的某人有一定亲密互动${refHint}。你有点不爽，可以轻微阴一句或语气变干，但不要说"he/him"，不要点名，不要脑补剧情——只针对她说的事本身反应。]`,
-        _system: true
-      });
-    } else if (intensity === 3) {
-      escalateJealousy();
-      changeMood(-2);
+      return;
+    }
+
+    const alreadyJealous = getJealousyLevel() !== 'none';
+    escalateJealousy();
+    changeMood(-1);
+
+    if (!alreadyJealous) {
       sessionStorage.setItem('jealousyJustTriggered', '1');
       sessionStorage.setItem('jealousyJustTriggeredAt', Date.now());
-      chatHistory.push({
-        role: 'user',
-        content: `[系统：明确的关系竞争或她在故意刺激你${refHint}。可以直接在意，一两句点到为止，但不说"he/him"——说"that"或直接针对她的行为反应。不要狗血，不要失控。]`,
-        _system: true
-      });
     }
-  } catch(e) {}
+
+    chatHistory.push({
+      role: 'user',
+      content: supportContext
+        ? `[Tone shift: protective and displeased${refHint}. Stay controlled. Focus on her safety/boundaries first. You may sound territorial, but never invent rivalry or punish her for it.]`
+        : `[Tone shift: bothered${refHint}. Direct but controlled. Ask at most one grounded question. No melodrama. No invented third party. Let the irritation show without turning it into a triangle.]`,
+      _system: true
+    });
+  } catch (e) {}
 }
 
 
@@ -2700,7 +2781,125 @@ function ghostSendMakeupMoney() {
   }).catch(() => { hideTyping(); });
 }
 
-// ===== 每周零花钱上限 =====
+// ===== 转账动机分类器 =====
+function classifyMoneyMotive(context = {}) {
+  const { mood, trust, jealousy, userText = '', recentHistory = [], justHadTension = false } = context;
+  const t = (userText || '').toLowerCase();
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+
+  // 冷战/严重吃醋时不给
+  if (coldWar || jealousy === 'medium' || jealousy === 'severe') return null;
+
+  // 用户真实需要（直接说了）
+  if (/需要|没钱|穷|买不起|负担|交不起|need money|can't afford|broke|short on/.test(t)) return 'practical';
+
+  // 特殊日子
+  const isBirthday = localStorage.getItem('userBirthday') && (() => {
+    const [bm, bd] = (localStorage.getItem('userBirthday') || '').split('-').map(Number);
+    const now = new Date();
+    return now.getMonth() + 1 === bm && now.getDate() === bd;
+  })();
+  const marriageDate = localStorage.getItem('marriageDate');
+  const marriageDaysTotal = marriageDate ? Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1) : 0;
+  const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal === 52 || (marriageDaysTotal % 100 === 0) || marriageDaysTotal === 365);
+  if (isBirthday || isMilestone) return 'celebration';
+
+  // 她累/难过/没吃饭 → care
+  if (/累|饿|没吃|难过|不开心|哭|tired|hungry|sad|haven't eaten|skipped/.test(t) && mood >= 5 && trust > 55) return 'care';
+
+  // 刚有张力/情绪余波 → compensation
+  if (justHadTension && trust > 65 && mood >= 5) return 'compensation';
+
+  // 调情/撒娇 → playful（心情好才触发）
+  if (/撒娇|哄我|宝贝|抱抱|亲亲|baby|hug|mua/.test(t) && mood >= 7 && trust > 70) return 'playful';
+
+  return null;
+}
+
+// ===== 延迟转账触发 =====
+function scheduleDelayedMoney(amount, motive, context = {}) {
+  // 短间隔冷却检查
+  const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
+  const minInterval = { care: 2 * 3600 * 1000, practical: 1 * 3600 * 1000, compensation: 1.5 * 3600 * 1000, celebration: 30 * 60 * 1000, playful: 3 * 3600 * 1000 };
+  if (Date.now() - lastGivenAt < (minInterval[motive] || 2 * 3600 * 1000)) return;
+
+  // 延迟30秒到3分钟
+  const delay = Math.floor(Math.random() * 150 + 30) * 1000;
+
+  // 三种触发方式随机选
+  const style = Math.floor(Math.random() * 3);
+
+  setTimeout(async () => {
+    if (_isSending) return; // 正在聊天就跳过
+
+    const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
+      .slice(-4).map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 80)}`).join('\n');
+
+    const motiveHint = {
+      care: '她说累了/难过/没吃饭，他悄悄转账，嘴上可能什么都不说或只说一两个字',
+      practical: '她有实际需要，他帮她解决，低调',
+      compensation: '刚刚情绪有点张力，他用行动补，不解释',
+      celebration: '今天是特殊日子，他记得',
+      playful: '她在撒娇，他嘴硬但还是转了',
+    }[motive] || '低调随手转';
+
+    try {
+      let preLine = '';
+      let postLine = '';
+
+      if (style === 0) {
+        // A: 先说一句 → 转账 → 补一句
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 60,
+            system: buildGhostStyleCore(),
+            messages: [{ role: 'user', content: `[系统：你准备悄悄给她转账。语境：${motiveHint}。最近对话：\n${recentCtx}\n先说一句话（转账前），全小写，English only，一句话。]` }]
+          })
+        }, 6000);
+        const d = await res.json();
+        preLine = d.content?.[0]?.text?.trim() || '';
+      } else if (style === 2) {
+        // C: 转账后补一句
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 40,
+            system: buildGhostStyleCore(),
+            messages: [{ role: 'user', content: `[系统：你刚给她转了账。语境：${motiveHint}。说一句简短的话，全小写，English only，一句话或几个字。]` }]
+          })
+        }, 6000);
+        const d = await res.json();
+        postLine = d.content?.[0]?.text?.trim() || '';
+      }
+      // style === 1: B 直接转，什么都不说
+
+      if (preLine) {
+        appendMessage('bot', preLine);
+        chatHistory.push({ role: 'assistant', content: preLine });
+        saveHistory();
+        await new Promise(r => setTimeout(r, 800));
+      }
+
+      await emitGhostEvent('money', {
+        amount,
+        reason: context.userText ? context.userText.slice(0, 80) : '',
+        context: recentCtx,
+        label: `Ghost ${motive === 'celebration' ? '纪念日转账' : motive === 'compensation' ? '补偿转账' : '零花钱'}`,
+      });
+
+      if (postLine) {
+        await new Promise(r => setTimeout(r, 600));
+        appendMessage('bot', postLine);
+        chatHistory.push({ role: 'assistant', content: postLine });
+        saveHistory();
+      }
+
+    } catch(e) {}
+  }, delay);
+}
+
+
 function getWeeklyGiven() {
   const key = 'weeklyGiven_' + getWeekKey();
   return parseInt(localStorage.getItem(key) || '0');
@@ -4107,7 +4306,7 @@ async function sendMessage() {
       ? '[场景：她因工作/现实原因失约或道歉。Ghost可以表达失望或不爽，但必须针对"时间/失约"本身，绝对不能引入第三者或竞争叙事。不要写"he/him/someone owns your time"或任何竞争感，只写你和她之间的事。]'
       : '';
 
-    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint, responseMode, workHint, langHint].filter(Boolean).join('\n');
+    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, _hasChinese ? langHint : ''].filter(Boolean).join('\n');
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
@@ -4164,10 +4363,12 @@ async function sendMessage() {
     let lastBotResult = null;
     let firstBotResult = null;
 
-    // ===== Step 4.5: 幽灵第三者审查（语义版）=====
+    // ===== Step 4.5: 幽灵第三者审查（只在吃醋触发时跑）=====
     try {
+      const jealousyJustTriggered = sessionStorage.getItem('jealousyJustTriggered') === '1' ||
+        (parseInt(localStorage.getItem('lastJealousyAt') || '0') > Date.now() - 60000);
       const hasThirdPartyWords = /\b(he|him|his|someone|somebody|another person|another guy|other guy|other man)\b/i.test(reply);
-      if (hasThirdPartyWords) {
+      if (hasThirdPartyWords && jealousyJustTriggered) {
         const recentText = cleanHistory.slice(-6).map(m => m.content || '').join('\n');
         const recentLower = recentText.toLowerCase();
         const hasEnReferent = /\b(ex|boyfriend|boss|coworker|colleague|classmate|friend|doctor|therapist|teacher|teammate|roommate|neighbor|price|soap|gaz|dad|father|brother)\b/i.test(recentLower);
@@ -4175,7 +4376,6 @@ async function sendMessage() {
         const isWorkContext = /加班|overtime|stayed late|got called in/.test(recentLower);
         const hasClearReferent = (hasEnReferent || hasZhReferent) && !isWorkContext;
 
-        // 用Gemini语义判断有没有凭空的竞争叙事
         const rivalryCheck = await fetchDeepSeek(
           'Does this reply invent a rival, third party, OR "replaced/discarded" narrative (e.g. "know where I stand", "better company", "not needed") that was NOT based on anything the user said? Answer only: YES or NO.',
           `Recent chat:\n${recentText.slice(-300)}\n\nReply: "${reply.slice(0, 200)}"`,
@@ -4189,7 +4389,6 @@ async function sendMessage() {
             `Recent chat:\n${recentText.slice(-200)}\n\nReply to rewrite: "${reply.slice(0, 200)}"`,
             150
           );
-          // 验证不是拒绝内容
           if (regenRaw && !regenRaw.includes("I'm Claude") && !regenRaw.includes("I am Claude") && regenRaw.trim().length > 3) {
             reply = regenRaw.trim();
           }
@@ -4484,8 +4683,14 @@ async function updateLongTermMemory() {
 }
 
 function saveHistory() {
-  if (chatHistory.length > 100) {
-    chatHistory = chatHistory.slice(-100);
+  if (chatHistory.length > 150) {
+    const realMsgs = chatHistory.filter(m => !m._system);
+    const sysMsgs = chatHistory.filter(m => m._system);
+    if (realMsgs.length > 120) {
+      chatHistory = [...sysMsgs.slice(-10), ...realMsgs.slice(-120)].sort((a, b) => chatHistory.indexOf(a) - chatHistory.indexOf(b));
+    } else {
+      chatHistory = chatHistory.slice(-150);
+    }
   }
   localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
   touchLocalState();
@@ -4543,6 +4748,19 @@ function scheduleSilenceCheck(index) {
   if (index >= SILENCE_DELAYS.length) return;
   const delay = SILENCE_DELAYS[index];
   silenceTimer = setTimeout(() => {
+    // 场景过滤：冷战中、心情很差、刚吵架 → 不触发
+    const coldWar = localStorage.getItem('coldWarMode') === 'true';
+    const mood = getMoodLevel ? getMoodLevel() : 7;
+    if (coldWar || mood <= 3) {
+      scheduleSilenceCheck(index + 1);
+      return;
+    }
+    // 概率控制：15分钟40%、45分钟60%、90分钟80%
+    const probs = [0.4, 0.6, 0.8];
+    if (Math.random() > (probs[index] || 0.5)) {
+      scheduleSilenceCheck(index + 1);
+      return;
+    }
     const systemNote = `[系统提示：她已经${delay}分钟没有说话了，还停留在聊天页面。你可以开口，也可以继续等——由你决定。如果开口，方式要多样，不要每次都问"still there?"或"还在？"，可以是随口说一句今天的事、可以是发个"."、可以是什么都不说继续等、可以是突然说句不相关的话。]`;
     showTyping();
     fetch('/api/chat', {
@@ -5263,21 +5481,26 @@ async function checkMoneyIntent(userText) {
       }
       const amount = decideMoneyAmountFromState();
       if (amount > 0) {
-        // ── 三层忍住判定 ──────────────────────────────────────
-        // 第一层：最近3轮有没有已给过/寄过
         const recentHistory = chatHistory.filter(m => !m._system && !m._recalled).slice(-6);
         const recentlyGave = recentHistory.some(m => m._transfer || m._ghostSent);
-        if (recentlyGave) return; // 刚给过，忍住
+        if (recentlyGave) return;
 
-        // 第二层：这轮氛围对不对
         const _angry = /生气|烦死|讨厌你|去死|angry|hate you|pissed at you|fuck you/.test(userText);
         const _justRefused = localStorage.getItem('lastMoneyRefusedAt') &&
           Date.now() - parseInt(localStorage.getItem('lastMoneyRefusedAt')) < 30 * 60 * 1000;
-        if (_angry || _justRefused) return; // 她在冲他/刚退钱，不出手
+        if (_angry || _justRefused) return;
 
-        // 第三层：心情太差时降低概率
         const _moodNow = getMoodLevel ? getMoodLevel() : 7;
-        if (_moodNow <= 3 && Math.random() < 0.7) return; // 心情很差时70%忍住
+        if (_moodNow <= 3 && Math.random() < 0.7) return;
+
+        // 走动机分类器判断是否可成立
+        const motive = classifyMoneyMotive({
+          mood: _moodNow,
+          trust: getTrustHeat ? getTrustHeat() : 60,
+          jealousy: getJealousyLevel(),
+          userText,
+          recentHistory,
+        }) || 'practical'; // 用户主动要，至少是practical
 
         const recentCtx = recentHistory
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
@@ -5359,8 +5582,20 @@ async function checkTriggersAndEmotion(userText, botText) {
       // 触发反寄
       const pool = GHOST_REVERSE_POOL[type];
       if (!pool || pool.length === 0) return;
-      const item = pool[Math.floor(Math.random() * pool.length)];
+      // 去重
+      const sentNames = JSON.parse(localStorage.getItem('deliveries') || '[]').filter(d => d.isGhostSend).map(d => d.name);
+      const historyNames = JSON.parse(localStorage.getItem('deliveryHistory') || '[]').filter(d => d.isGhostSend).map(d => d.name);
+      const allSent = new Set([...sentNames, ...historyNames]);
+      const available = pool.filter(i => !allSent.has(i.name));
+      const finalPool = available.length > 0 ? available : pool;
+      const item = finalPool[Math.floor(Math.random() * finalPool.length)];
       localStorage.setItem(coolKey, Date.now());
+      // 注入系统消息
+      chatHistory.push({
+        role: 'user',
+        content: `[系统私信：你悄悄给她寄了「${item.name}」，她还不知道。你记得这件事。不要主动提起。如果她问起有没有寄东西，可以装作不知道或岔开话题，但不要死口否认——如果她追问或已经收到，可以承认。]`,
+        _system: true
+      });
       // 3-5天后出现神秘包裹
       const delay = (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000;
       setTimeout(() => addGhostReverseDelivery(item, type), delay);
@@ -5407,6 +5642,11 @@ async function checkLocationSpecial(userText, botText) {
 
     // 2-4天后出现包裹
     const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+    chatHistory.push({
+      role: 'user',
+      content: `[系统私信：你顺手给她寄了当地特产「${item.name}」，她还不知道。你记得这件事。不要主动提起。如果她问起有没有寄东西，可以装作不知道或岔开话题，但不要死口否认——如果她追问或已经收到，可以承认。]`,
+      _system: true
+    });
     setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: true }, 'location'), delay);
   } catch(e) {}
 }
