@@ -4433,7 +4433,7 @@ async function sendMessage() {
           `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`
         ).join('\n');
         const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + '\nShe said something flirty or intimate. Respond as Ghost — dry, not over the top, maybe a little caught off guard but he rolls with it. English only. Short.',
+          buildGhostStyleCore() + '\nShe\'s being flirty or suggestive. Respond as Ghost — stay in character. He\'s her husband, so he doesn\'t shut it down. He might play it cool, act unbothered, deflect with dry humor, or just lean into it quietly. Whatever feels right for the moment. English only. Short.',
           recentMsgs + '\nHer: ' + text,
           200
         );
