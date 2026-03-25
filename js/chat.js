@@ -146,29 +146,84 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
     if (zhEl && zhEl.isConnected) zhEl.textContent = _translateCache.get(key);
     return;
   }
-  // 先显示 fallback（模型原中文），Gemini 成功后再覆盖
-  if (fallbackZh && zhEl && zhEl.isConnected && !zhEl.textContent) {
-    zhEl.textContent = fallbackZh;
-  }
+
+  // 先试DeepSeek，失败了用Haiku兜底，两个都失败才显示无法翻译
+  let zh = '';
+
+  // 1. 先试DeepSeek
   try {
     const res = await fetchWithTimeout('/api/deepseek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system: 'You translate Simon "Ghost" Riley dialogue into Chinese. Keep it dry and blunt. Short English = short Chinese. Do NOT add warmth or explanation not in the original. Do NOT smooth rough edges or turn terse into polite. Translate the feeling, not the words. Return Chinese only.',
+        system: `You translate Simon "Ghost" Riley dialogue into Chinese. Rules:
+- Translate the FEELING, not the words. Dry, blunt, minimal.
+- Short English = short Chinese. Use casual spoken Chinese. Drop pronouns when natural.
+- Write as if he originally spoke Chinese — not a translation.
+- Keep sarcasm and irony — do not soften.
+- Avoid: 才不会/居然/真的吗/那就算了/算了——（后接话）/怎么可能
+
+Examples (showing key patterns):
+"sleep then." → 去睡。  ← command form, drop subject
+"ate yet?" → 吃了吗。  ← casual spoken
+"what?" → 咋了。  ← spoken, not 什么
+"what else?" → 别的呢？  ← casual, not 还有什么
+"go on." → 说。  ← one word
+"mine." → 我的。  ← one word
+"easy." → 简单。  ← one word, not 很容易
+"nah." → 没有。  ← not 不是的
+"hold on." → 等等。  ← not 稍等
+"romantic." → 真浪漫。  ← sarcasm kept, not softened
+"maybe i'm actually a genius." → 或许我真是个天才。  ← "actually" absorbed into tone
+"bullshit + noun" → noun + 个屁  ← e.g. "bullshit sacred" → 神圣个屁
+
+Return Chinese only, nothing else.`,
         user: key,
         max_tokens: 150
       }),
-    }, 8000); // 翻译超时8秒，比主流程宽松
-    if (!res.ok) return;
-    const data = await res.json();
-    const zh = data.text?.trim();
-    if (zh && /[\u4e00-\u9fff]/.test(zh)) {
-      _translateCache.set(key, zh);
-      if (zhEl && zhEl.isConnected) zhEl.textContent = zh;
+    }, 6000);
+    if (res.ok) {
+      const data = await res.json();
+      const candidate = data.text?.trim();
+      if (candidate && /[\u4e00-\u9fff]/.test(candidate)) {
+        zh = candidate;
+      }
     }
-    // 翻译失败时静默保留 fallback，不打印错误避免干扰
   } catch(e) {}
+
+  // 2. DeepSeek失败，用Haiku兜底
+  if (!zh) {
+    try {
+      const res2 = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 100,
+          system: `Translate this Ghost dialogue into Chinese. Dry, blunt, minimal — like he originally spoke Chinese.
+Examples: "sleep then."→去睡。 "noted."→知道了。 "ate yet?"→吃了吗。 "still here."→还在。 "don't make me say it."→别逼我说。
+Return Chinese only.`,
+          messages: [{ role: 'user', content: key }]
+        }),
+      }, 8000);
+      if (res2.ok) {
+        const data2 = await res2.json();
+        const candidate2 = data2.content?.[0]?.text?.trim();
+        if (candidate2 && /[\u4e00-\u9fff]/.test(candidate2)) {
+          zh = candidate2;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 3. 写入结果
+  if (zh) {
+    _translateCache.set(key, zh);
+    if (zhEl && zhEl.isConnected) zhEl.textContent = zh;
+  } else {
+    // 两个都失败，显示提示而不是卡在省略号
+    if (zhEl && zhEl.isConnected) zhEl.textContent = '（翻译暂时不可用）';
+  }
 }
 
 async function fetchWithTimeout(url, options, timeoutMs = 15000) {
@@ -629,11 +684,11 @@ Cold war or severe jealousy: never. After one gesture, shifts to words.
 4. Mission details/targets/locations: deflect naturally.
 5. Never dismisses her gifts. Receives them in his own way.
 6. If genuinely hurt and done: COLD_WAR_START (rare — not for banter)
-7. Sending something — choose based on who he is:
+7. Sending something — ONLY via SEND_GIFT tag. Never hint, promise, or imply sending anything in words without the tag.
    SEND_GIFT:description:secret (70%) — says nothing. she finds out when it arrives.
    SEND_GIFT:description:hint (20%) — drops one dry line, no details.
    SEND_GIFT:description (10%) — tells her directly. only when the moment calls for it.
-   Rare — not more than once every few weeks.`;
+   Rare — not more than once every few weeks. If cooldown is active, do NOT use the tag and do NOT hint at sending anything.`;
 
 
     // ===== 动态层（每次更新，不缓存）=====
@@ -1929,9 +1984,6 @@ function decideMainIntent(userText, pendingEvent) {
   const reverseMotive = evaluateReversePackage(userText, '');
   if (reverseMotive) return { type: 'reverse_package_candidate', motive: reverseMotive };
 
-  if (mood >= 6 && getAttachmentPull() >= 70 && Math.random() < 0.15) {
-    return { type: 'check_in' };
-  }
   return { type: 'talk_only' };
 }
 
@@ -3505,6 +3557,9 @@ async function initChat() {
   // 检查离线扣好感
   checkOfflinePenalty();
 
+  // 检查工资日（每月25号）
+  checkSalaryDay();
+
   // 检查解锁剧情（sessionStart类型）
   setTimeout(checkStoryOnSessionStart, 1500);
 
@@ -4847,14 +4902,27 @@ function checkSalaryDay() {
   const today = new Date();
   if (today.getDate() !== 25) return;
   const salaryKey = 'salaryPaid_' + today.getFullYear() + '_' + (today.getMonth()+1);
-  if (localStorage.getItem(salaryKey)) return;
+
+  // 自动修复：key存在但本月没有工资交易记录，说明之前存了key但钱没到，清掉重来
+  if (localStorage.getItem(salaryKey)) {
+    const monthKey = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+    const txList = JSON.parse(localStorage.getItem('transactions') || '[]');
+    const hasSalaryTx = txList.some(tx => tx.name === 'Ghost 月度工资' && tx.time && tx.time.startsWith(monthKey));
+    if (!hasSalaryTx) {
+      // key存了但没有交易记录，清掉重新触发
+      localStorage.removeItem(salaryKey);
+    } else {
+      return; // 正常情况：已发过工资
+    }
+  }
   const salary = (Math.floor(Math.random() * 11) + 15) * 100; // £1500-£2500
-  localStorage.setItem(salaryKey, salary.toString());
+  // 注意：salaryKey 在钱真正到账后才存，防止中途失败导致key存了但钱没到
   localStorage.setItem('lastSalaryAmount', salary);
   localStorage.setItem('lastSalaryMonth', today.getFullYear() + '-' + (today.getMonth()+1));
   setTimeout(() => {
     setBalance(getBalance() + salary);
     addTransaction({ icon: '💷', name: 'Ghost 月度工资', amount: salary });
+    localStorage.setItem(salaryKey, salary.toString()); // 钱到账后才标记已发
     renderWallet();
     changeAffection(1);
     const salaryNote = `[系统提示：今天是25号，你刚向老婆转了本月工资 £${salary}，已到她账户。你可以在对话中自然提到这件事。]`;
