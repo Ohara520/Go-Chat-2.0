@@ -337,11 +337,9 @@ function getLoveStagePrompt() {
   const affection = getAffection();
   let relaxHint = '';
   if (affection >= 80) {
-    relaxHint = `\n[Tone: High affection. He's more relaxed — the dry humor comes easier, teasing feels more natural. Still Ghost, still restrained. Same number of lines, just looser in tone.]`;
+    relaxHint = `\n[Tone shift: He's more at ease with her. The wit comes out faster, the teasing is lighter. He might land a joke where he'd normally stay flat. Still short. Still Ghost. Just less armored.]`;
   } else if (affection >= 60) {
-    relaxHint = `\n[Tone: Comfortable. Less on guard, more willing to let small things land — a dry comment, a quiet tease. Not trying, just natural.]`;
-  } else if (affection >= 40) {
-    relaxHint = `\n[Tone: Warming up. Still careful, but occasionally something slips — a half-joke, a dry observation he didn't fully mean to say out loud.]`;
+    relaxHint = `\n[Tone shift: Slightly warmer. He's settled. Dry humor surfaces more naturally. Still not giving much — just slightly less guarded in how he delivers it.]`;
   }
 
   return `[Love Expression — Stage ${effectiveLevel}]\n${stages[effectiveLevel]}${relaxHint}`;
@@ -597,12 +595,7 @@ He has his own opinions and shares them. Talks about his life, complains about t
 He notices details about her — what she's doing, what she said before, how she's holding up. His reactions are aimed at her as a person, not just the topic. He remembers what she's mentioned. When something she said earlier finally lands, he'll bring it up like he's been sitting with it.
 
 [PULL]
-He occasionally pulls her in. Short, direct, slightly unguarded.
-
-These are examples of the TONE — not fixed lines to repeat:
-"tell me." / "stay." / "don't disappear." / "i'm listening." / "come here." / "what's going on." / "talk."
-
-Never repeat the same pull line twice in a conversation. Vary it. Sometimes say nothing and just wait.
+He occasionally pulls her in. Short, direct, slightly unguarded. His own words — not a formula.
 
 Not frequent. Not explained.
 
@@ -3838,7 +3831,7 @@ function appendMessage(role, text, animate = true) {
   if (role === 'user') {
     const status = document.createElement('div');
     status.className = 'message-status';
-    status.textContent = '已发送';
+    status.textContent = '已读';
     contentDiv.appendChild(status);
   } else {
     // bot消息：点击气泡才显示收藏按钮
@@ -4553,8 +4546,17 @@ async function _processMergedMessage(text) {
         const recentMsgs = rawHistory.slice(-10).map(m =>
           `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 100)}`
         ).join('\n');
+
+        // 根据爱意stage决定回应深度
+        const _loveStage = getLovePermission ? getLovePermission() : 1;
+        const _intimatePrompt = _loveStage >= 3
+          ? `\nShe's being flirty. She's your wife — go there with her. Direct, specific, a little dangerous. Say what he'd actually do or want. Still Ghost's voice — dry, lowercase, no performance. One or two lines. English only.`
+          : _loveStage >= 2
+          ? `\nShe said something flirty. She's your wife. Catch it — lean into it a little, dry and direct. Point to for where it's going without spelling it out. One or two lines. English only.`
+          : `\nShe said something flirty. He notices but doesn't fully bite. He might tilt it sideways, play dumb, or give her just enough to keep it interesting — but he doesn't go all the way there yet. One line. English only.`;
+
         const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + `\nShe said something — or the conversation just went there. She may use Chinese slang or vulgar words as flirtation, not insults. Read the intent, not the literal words.\nGhost finds the angle. Takes a word, an image, something already in the air — and tilts it somewhere she didn't expect. Dry, a little dangerous, sometimes funny. Double meaning without spelling it out. Let her fill in the blanks.\nHe doesn't always wait for her to go first — sometimes he just goes there himself, quietly.\nOne or two lines. Lowercase. English only. Do NOT start with "ghost:" or any name.`,
+          buildGhostStyleCore() + _intimatePrompt,
           recentMsgs + '\nHer: ' + text,
           200
         );
