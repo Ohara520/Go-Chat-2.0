@@ -127,6 +127,7 @@ too_weird: 是否太离谱（true/false）
 // ===== Ghost对图片的反应 =====
 async function ghostReactToPhoto(imageInfo, willSwitch) {
   const { type, desc, is_avatar, too_weird } = imageInfo;
+  const fileArr = imageInfo.fileArr || [];
 
   const recentMsgs = (typeof chatHistory !== 'undefined')
     ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
@@ -200,6 +201,42 @@ Must reference "${desc}". English only. 1 line. Do NOT prefix with "ghost:" or a
   }
 
   try {
+    // 用H看图，把图片内容传给Claude Haiku（支持vision）
+    const base64List = fileArr.length > 0
+      ? await Promise.all(fileArr.map(f => fileToBase64(f))).catch(() => [])
+      : [];
+
+    if (base64List.length > 0) {
+      const imageContents = base64List.map(b64 => ({
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
+      }));
+      const res = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 180,
+          system: (typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '') + '\n' + prompt,
+          messages: [{
+            role: 'user',
+            content: [
+              ...imageContents,
+              { type: 'text', text: recentMsgs || 'She sent you these photos.' }
+            ]
+          }]
+        })
+      }, 10000);
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data.content?.[0]?.text?.trim();
+        if (reply && reply.trim() && !reply.includes("I'm Claude") && !reply.includes("I can't")) {
+          return reply.trim();
+        }
+      }
+    }
+
+    // 图片传输失败，用纯文字描述兜底
     const reply = await fetchDeepSeek(
       (typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '') + '\n' + prompt,
       recentMsgs,
