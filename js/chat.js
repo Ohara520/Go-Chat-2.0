@@ -4408,7 +4408,7 @@ async function sendMessage() {
     }
 
     const _hasChinese = /[\u4e00-\u9fff]/.test(text);
-    const langHint = _hasChinese ? '[LANGUAGE REMINDER: Reply in English first, Chinese translation on next line. Never reply in Chinese only, even if the user writes in Chinese.]' : '';
+    const langHint = _hasChinese ? '[LANGUAGE: Reply in English first, then Chinese translation. Do NOT tell her to speak English — she can write in any language she wants.]' : '';
 
     // 工作/加班/失约场景：禁止第三者竞争叙事，优先关系修补
     const _workApology = /加班|overtime|上班|开会|值班|早班|晚班|工作|临时有事|class|meeting|shift|deadline|work kept/.test(text);
@@ -4418,7 +4418,7 @@ async function sendMessage() {
       : '';
 
     // 情头请求场景：检测是否在要求换情头，已拒绝过一次就松口
-    const _isAvatarRequest = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar/i.test(text);
+    const _isAvatarRequest = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头|头像.*换|换.*头像/i.test(text);
     let avatarHint = '';
     if (_isAvatarRequest) {
       const recentBotMsgs = chatHistory.filter(m => m.role === 'assistant' && !m._recalled).slice(-6).map(m => m.content).join(' ');
@@ -4475,7 +4475,7 @@ async function sendMessage() {
           `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`
         ).join('\n');
         const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + '\nShe just said something to him. Respond as Ghost — flat delivery, plain words. If there\'s a second meaning available, he uses it without flagging it. One line, maybe two. He doesn\'t explain. He doesn\'t retreat. If he closes it, he closes it clean. English only. Short.',
+          buildGhostStyleCore() + '\nShe just said something to him. Respond as Ghost — flat delivery, plain words. If there\'s a second meaning available, he uses it without flagging it. One line, maybe two. He doesn\'t explain. He doesn\'t retreat. If he closes it, he closes it clean. English only. Short. Do NOT start your response with "ghost:" or any name or label.',
           recentMsgs + '\nHer: ' + text,
           200
         );
