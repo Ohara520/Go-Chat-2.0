@@ -4534,7 +4534,7 @@ async function _processMergedMessage(text) {
           `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 100)}`
         ).join('\n');
         const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + '\nShe just said something to him. Respond as Ghost — flat delivery, plain words. If there\'s a second meaning available, he uses it without flagging it. One line, maybe two. He doesn\'t explain. He doesn\'t retreat. If he closes it, he closes it clean. English only. Short. Do NOT start your response with "ghost:" or any name or label.',
+          buildGhostStyleCore() + `\nShe just said something intimate or suggestive. They are in a long-distance relationship — no physical contact, only words.\nRespond as Ghost: direct, low-key, a little dangerous. He doesn't tease or dodge — he says what he'd do, or what he's thinking, plainly. No poetry, no buildup. Just the image, the weight of it. One or two lines. Lowercase. English only. Do NOT start with "ghost:" or any name.`,
           recentMsgs + '\nHer: ' + text,
           200
         );
