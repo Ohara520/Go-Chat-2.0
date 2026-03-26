@@ -8,6 +8,11 @@ let _ambientVolume = 0.6;
 let _currentAbortController = null; // 当前请求的AbortController
 let _sendVersion = 0; // 每次新请求版本号+1，用于丢弃旧请求的回复
 
+// ===== 消息合并 =====
+let _pendingMessages = []; // 待合并的消息队列
+let _mergeTimer = null; // 合并定时器
+const MERGE_DELAY = 300; // 300ms内连发的消息合并
+
 function toggleAmbient() {
   const body = document.getElementById('ambientBody');
   const arrow = document.getElementById('ambientArrow');
@@ -4264,6 +4269,26 @@ async function sendMessage() {
   const text  = input.value.trim();
   if (!text) return;
 
+  // 立刻清空输入框，显示气泡
+  input.value = '';
+  input.style.height = 'auto';
+  appendMessage('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  saveHistory();
+
+  // 加入合并队列，300ms内连发的消息合并后一起处理
+  _pendingMessages.push(text);
+  if (_mergeTimer) clearTimeout(_mergeTimer);
+  _mergeTimer = setTimeout(() => {
+    const merged = _pendingMessages.join('\n');
+    _pendingMessages = [];
+    _mergeTimer = null;
+    _processMergedMessage(merged);
+  }, MERGE_DELAY);
+  return;
+}
+
+async function _processMergedMessage(text) {
   // 条数限制检查
   const email = localStorage.getItem('userEmail') || '';
   if (email) {
@@ -4292,13 +4317,14 @@ async function sendMessage() {
   }
   // 条数在成功拿到回复后才扣（见下方成功处理）
 
-  input.value = '';
-  input.style.height = 'auto';
   resetSilenceTimer();
   localStorage.setItem('lastUserMessageAt', Date.now());
-  appendMessage('user', text);
-  chatHistory.push({ role: 'user', content: text });
-  saveHistory();
+
+  // 如果是合并消息，更新最后一条历史记录为合并后的内容（让S看到完整意图）
+  if (text.includes('\n') && chatHistory.length > 0) {
+    const lastUserIdx = chatHistory.map(m => m.role).lastIndexOf('user');
+    if (lastUserIdx !== -1) chatHistory[lastUserIdx].content = text;
+  }
 
   // 检测是否在等待用户指定情头
   if (typeof checkPendingAvatarChoice === 'function') {
