@@ -337,9 +337,9 @@ function getLoveStagePrompt() {
   const affection = getAffection();
   let relaxHint = '';
   if (affection >= 80) {
-    relaxHint = `\n[Tone: High affection. He's more relaxed with her — quicker to joke, more willing to tease, less guarded. The dry humor comes easier. He might initiate banter instead of waiting. Still Ghost, just... looser with her specifically.]`;
+    relaxHint = `\n[Tone: High affection. He's more relaxed — the dry humor comes easier, teasing feels more natural. Still Ghost, still restrained. Same number of lines, just looser in tone.]`;
   } else if (affection >= 60) {
-    relaxHint = `\n[Tone: Comfortable. He's settled into this. Less on guard, more willing to let small things land — a dry comment, a quiet tease. Not trying, just natural.]`;
+    relaxHint = `\n[Tone: Comfortable. Less on guard, more willing to let small things land — a dry comment, a quiet tease. Not trying, just natural.]`;
   } else if (affection >= 40) {
     relaxHint = `\n[Tone: Warming up. Still careful, but occasionally something slips — a half-joke, a dry observation he didn't fully mean to say out loud.]`;
   }
@@ -2697,7 +2697,7 @@ function renderStoryBook() {
 
 // ===== 好感度系统（60-100，持久化，隐藏）=====
 function getAffection() {
-  return parseInt(localStorage.getItem('affection') || '80');
+  return parseInt(localStorage.getItem('affection') || '60');
 }
 function setAffection(val) {
   val = Math.max(60, Math.min(100, Math.round(val)));
@@ -3497,7 +3497,7 @@ let lastMessageTime = null;
 
 async function initChat() {
   // 好感度初始化（首次）
-  if (!localStorage.getItem('affection')) setAffection(80);
+  if (!localStorage.getItem('affection')) setAffection(60);
 
   // 副作用初始化——统一在这里做，buildSystemPrompt 只读不写
   ensureGhostBirthday();
