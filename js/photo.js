@@ -111,9 +111,11 @@ too_weird: 是否太离谱（true/false）
     if (res.ok) {
       const data = await res.json();
       const text = data.content?.[0]?.text?.trim() || '';
+      console.log('[photo] H识别返回:', text);
       const match = text.match(/\{[\s\S]*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]);
+        console.log('[photo] H识别结果:', parsed);
         return { ...parsed, base64List: b64Arr };
       }
     }
