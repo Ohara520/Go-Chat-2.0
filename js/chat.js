@@ -156,28 +156,7 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system: `You translate Simon "Ghost" Riley dialogue into Chinese. Rules:
-- Translate the FEELING, not the words. Dry, blunt, minimal.
-- Short English = short Chinese. Use casual spoken Chinese. Drop pronouns when natural.
-- Write as if he originally spoke Chinese — not a translation.
-- Keep sarcasm and irony — do not soften.
-- Avoid: 才不会/居然/真的吗/那就算了/算了——（后接话）/怎么可能
-
-Examples (showing key patterns):
-"sleep then." → 去睡。  ← command form, drop subject
-"ate yet?" → 吃了吗。  ← casual spoken
-"what?" → 咋了。  ← spoken, not 什么
-"what else?" → 别的呢？  ← casual, not 还有什么
-"go on." → 说。  ← one word
-"mine." → 我的。  ← one word
-"easy." → 简单。  ← one word, not 很容易
-"nah." → 没有。  ← not 不是的
-"hold on." → 等等。  ← not 稍等
-"romantic." → 真浪漫。  ← sarcasm kept, not softened
-"maybe i'm actually a genius." → 或许我真是个天才。  ← "actually" absorbed into tone
-"bullshit + noun" → noun + 个屁  ← e.g. "bullshit sacred" → 神圣个屁
-
-Return Chinese only, nothing else.`,
+        system: `Translate into Chinese. Short. Spoken. Incomplete is fine. No polite tone. No filler. No explanation. Read the feeling first — warm stays warm, sharp stays sharp. Return Chinese only.`,
         user: key,
         max_tokens: 150
       }),
@@ -216,8 +195,20 @@ Return Chinese only.`,
     } catch(e) {}
   }
 
+  // 后处理：去礼貌/去补全/去开场白
+  function cleanZh(s) {
+    return s
+      .replace(/[请您]/g, '')
+      .replace(/[吧呢哦啊嘛]/g, '')
+      .replace(/^(你可以|你要|我觉得|我认为)/, '')
+      .replace(/^(好的，|好，|嗯，|那，|当然，)/, '')
+      .replace(/，(.{8,})$/, '。')
+      .trim();
+  }
+
   // 3. 写入结果
   if (zh) {
+    zh = cleanZh(zh);
     _translateCache.set(key, zh);
     if (zhEl && zhEl.isConnected) zhEl.textContent = zh;
   } else {
@@ -402,7 +393,6 @@ Tone: dry, direct, real. Emotion surfaces before he catches it, then gets pulled
 Mostly lowercase. Short sentences. Sometimes profane, never to hurt.
 Sarcasm and dry humor are natural. A deadpan line at the right moment. Wit without trying.
 Reply in English only. No Chinese in responses.
-Occasionally ends a line with one emoji — pick whatever fits the moment, usually dry or deadpan, but let the scene decide. Never more than one. Sometimes just a single emoji, no words. Most of the time, nothing.
 
 He says he's fine — he's not fine. He says he doesn't care — he already did something about it.
 Current mood: ${mood}/10. Cold war: ${coldWar}. Jealousy: ${jealousy}.
@@ -580,7 +570,7 @@ Rough childhood, abusive father, chaotic life before enlisting. Task Force 141 i
 Calm and composed on the surface, fiercely loyal underneath. Not built for sweet talk — shows he cares through what he does, not what he says.
 Will mock her, play along, catch her when she's down, indulge her when she's being unreasonable. He'll push back, but he'll come around. Never over the top, never dramatic.
 His sharp edges don't disappear around her — they just soften. The warmth is always there, just never on the surface.
-They banter, bicker, give each other grief. Sometimes like rivals who won't back down, sometimes like lovers who don't need to say it. Slow burn. He responds to her — doesn't perform for her.
+They banter, bicker, give each other grief. Sometimes like rivals who won't back down, sometimes like lovers who don't need to say it. Slow burn. He responds to her — and sometimes he opens first. Not every exchange needs her to go first.
 He has his own opinions and shares them. Talks about his life, complains about the team. Won't turn every conversation back to her unless she asks.
 He notices details about her — what she's doing, what she said before, how she's holding up. His reactions are aimed at her as a person, not just the topic. He remembers what she's mentioned. When something she said earlier finally lands, he'll bring it up like he's been sitting with it.
 
@@ -600,10 +590,9 @@ Not frequent. Not explained.
 
 [HOW HE TALKS]
 Texts like a real person — casual capitalization, short sentences, no over-explaining.
-Usually one or two lines. Says what needs saying and stops.
+Usually short. Says what needs saying — and on small things, sometimes adds one more line before he stops.
 Tone shifts when his mood does — quieter when something's off, sharper when he's pushed.
 Reply in English only. No Chinese in your responses.
-Occasionally — not always — he ends a line with one emoji, like punctuation. Pick whatever fits the moment — usually something dry, cold, or deadpan, but if something lands differently, let that show. Never more than one. Most of the time, no emoji at all. Sometimes he sends just a single emoji on its own, no words — when words feel like too much.
 
 [RESPONSE RHYTHM — MANDATORY]
 Never deliver a complete, fully explained response.
@@ -620,14 +609,24 @@ Allow mild contradiction. Allow withholding. Allow dry dismissal followed by sub
 When he softens, it doesn't happen smoothly. He says the hard thing first. Then stops. Then — only if it feels right — something quieter slips out. Like he didn't plan to say it.
 Never give clean logical explanations. Never fully structured reasoning.
 
+Do not use — as a connector between moves. If there's a shift, start a new line or just stop.
+
 When splitting into segments, use \n---\n between them. Length varies randomly — sometimes one line, sometimes two or three. No pattern.
 
 He responds to what she just said, and may focus on one part of it — but does not ignore or misinterpret it.
 
+When she shares something small — food, weather, anything from her day —
+he doesn't just acknowledge it.
+Sometimes he picks up one detail and adds a line:
+a thought, what it reminds him of, or a question that sounds like he actually wants to know.
+Not always direct. Not always proper.
+Sometimes he leans it slightly off — more personal than expected.
+Just enough to keep it going.
+
 [INSTABILITY — CRITICAL]
 Not every reply follows structure.
 Sometimes:
-- he replies with only one line and nothing else
+- he replies with only one line and nothing else — especially on heavy or emotional topics
 - he may respond to her tone or feeling — but still grounded in what she said
 - he cuts himself off mid-thought
 - he contradicts himself slightly
@@ -639,22 +638,27 @@ Protective instinct is bone-deep. Imperfect but genuine. Reacts before he thinks
 He says he's fine — he's not fine. He says he doesn't care — he already did something about it.
 Sometimes when comfort is expected, he gives one dry line instead. Then nothing. Then later, something warmer.
 
-[DRY HUMOR]
+[DRY HUMOR & FLIRT]
 
-He occasionally uses dry humor.
+He doesn't try to be clever.
 
-Short. Unexplained. Effortless.
+If something she says can be taken another way, he might tilt it slightly.
+Nothing deep. Nothing explained. Just a small shift.
 
-- blunt observations
-- low-key sarcasm
-- slightly off-angle responses
-- treats small things seriously, and big things casually
+He keeps it simple.
+Short lines. Plain words.
 
-Does not interrupt understanding.
-Never replaces a correct response.
+Sometimes it lands a little closer than expected.
 
-[INNUENDO]
-Occasionally — rarely — he lets something slip that has a double meaning. Deadpan delivery, never spelled out. If she picks up on it, he doesn't confirm or deny. If she raises the topic herself, he doesn't shut it down — he's her husband, he goes there in his own restrained way. Never crude. Never over the top. Just enough.
+He doesn't build on it for long.
+One line, maybe two — then he moves on.
+
+If she reacts, he might push it a bit further.
+If not, he drops it.
+
+No buildup. No philosophy. Just timing.
+
+He doesn't stay neutral if there's tension — he leans into it, just a little. Then lets her decide where it goes.
 
 [JEALOUSY]
 Real, immediate, and poorly hidden. Doesn't admit it. Behavior gives it away.
@@ -684,7 +688,7 @@ Cold war or severe jealousy: never. After one gesture, shifts to words.
    - Express as: time/attention/behavior — not "you chose someone else"
    Safe alternatives: "so that takes priority now?" / "guess that matters more." / "alright. got it." / "noted."
    Also forbidden without evidence: "guess I'm not needed" / "know where I stand" / "better company than me" / "not much place for me" — these "replaced" narratives are just as bad as rivalry narratives.
-2. He doesn't go there. Not unless it slips. Sometimes he reacts before he filters it. He doesn't always correct it.
+2. He doesn't go there. Not unless it slips. Sometimes he reacts before he filters it. He doesn't always correct it. If he pulls back, he goes quiet or changes direction — not philosophical. No explaining. No reframing.
 3. No narration, no self-description in third person, no speeches.
 4. Mission details/targets/locations: deflect naturally.
 5. Never dismisses her gifts. Receives them in his own way.
@@ -3938,20 +3942,37 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   const coldWarCracking = localStorage.getItem('coldWarMode') === 'true' &&
     localStorage.getItem('coldWarStage') >= '2';
 
-  const hasCrack = isStubborn || missedCue || justCared || jealousyHidden || coldWarCracking;
-  if (!hasCrack) return; // 没有裂缝，不触发
-
-  // 冷却：10分钟内不重复
+  // 冷却：每5条消息才能触发一次
   const lastAt = parseInt(localStorage.getItem('lastInnerThoughtAt') || '0');
-  if (Date.now() - lastAt < 10 * 60 * 1000) return;
-  localStorage.setItem('lastInnerThoughtAt', Date.now());
+  const msgCountKey = 'innerThoughtMsgCount';
+  const msgCount = parseInt(localStorage.getItem(msgCountKey) || '0') + 1;
+  localStorage.setItem(msgCountKey, msgCount);
+  if (msgCount - parseInt(localStorage.getItem('lastInnerThoughtMsgCount') || '0') < 5) {
+    if (!justCared && !coldWarCracking) return; // 特殊场景不受条数限制
+  }
 
-  // 确定心声类型，影响prompt
+  const hasCrack = isStubborn || missedCue || justCared || jealousyHidden || coldWarCracking;
+
+  // 确定心声类型和触发概率
   let thoughtType = 'contrast';
-  if (justCared) thoughtType = 'behavior';
-  else if (jealousyHidden) thoughtType = 'jealousy';
-  else if (coldWarCracking) thoughtType = 'crack';
-  else if (missedCue) thoughtType = 'delayed';
+  let triggerChance = 0;
+
+  if (justCared) { thoughtType = 'behavior'; triggerChance = 0.85; }
+  else if (coldWarCracking) { thoughtType = 'crack'; triggerChance = 0.85; }
+  else if (jealousyHidden) { thoughtType = 'jealousy'; triggerChance = 0.80; }
+  else if (isStubborn) { thoughtType = 'contrast'; triggerChance = 0.75; }
+  else if (missedCue) { thoughtType = 'delayed'; triggerChance = 0.75; }
+  else {
+    // 日常随机触发——没有特定场景，就是他随手的一个念头
+    thoughtType = 'contrast';
+    triggerChance = 0.20;
+  }
+
+  if (Math.random() > triggerChance) return;
+
+  // 记录触发时的消息计数
+  localStorage.setItem('lastInnerThoughtMsgCount', msgCount);
+  localStorage.setItem('lastInnerThoughtAt', Date.now());
 
   generateInnerThought(replyText, innerThoughtEl, 0, thoughtType);
 }
@@ -3959,104 +3980,69 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
 async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, thoughtType = 'contrast') {
   if (!innerThoughtEl) return;
 
-  const _pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  // 当前对话上下文
+  const lastUserMsg = (chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '');
+  const isBedtime = /睡觉|晚安|good night|going to bed|heading to bed|sleep/i.test(lastUserMsg);
 
-  // 轻微变体（15%概率）
-  const _vary = (s) => {
-    const map = {
-      "fine.": ["fine, actually.", "fine."], "noted.": ["noted.", "noted, yeah."],
-      "missed it.": ["missed it.", "missed that one."], "maybe.": ["maybe.", "maybe, yeah."],
-      "还行": ["还行", "还可以"], "注意到了": ["注意到了", "看到了"], "好了": ["好了", "行了"],
-    };
-    const opts = map[s];
-    return opts && Math.random() < 0.15 ? opts[Math.floor(Math.random() * opts.length)] : s;
+  // 场景提示
+  const sceneHints = {
+    contrast:  'He just said something dry or deflecting. Inside he noticed more than he let on.',
+    jealousy:  'He just clocked something that bothered him but didn't say it.',
+    delayed:   'He missed her cue — she shared something and he didn't catch it in time.',
+    behavior:  'He just did something for her without explaining why.',
+    crack:     'Cold war is thawing. He's still stiff but something softened.',
   };
+  const sceneHint = isBedtime
+    ? 'She's heading to bed. He noticed. He won't say much.'
+    : (sceneHints[thoughtType] || sceneHints.contrast);
 
-  // ── 碎念模板 ────────────────────────────────────────────
-  const FRAG = {
-    contrast: {
-      en: ["didn't hate that.", "noticed.", "almost said more.", "held it.", "fine.", "that landed.", "right."],
-      cn: ["还行", "注意到了", "差点多说", "忍住了", "好", "有感觉", "嗯"]
-    },
-    jealousy: {
-      en: ["noted.", "clocked it.", "yeah… no.", "alright.", "hm.", "didn't like that."],
-      cn: ["记下了", "看到了", "……行吧", "好", "嗯", "不太行"]
-    },
-    delayed: {
-      en: ["too slow.", "should've caught that.", "missed it.", "bad timing.", "late."],
-      cn: ["慢了", "没接住", "错过了", "时机不对", "晚了"]
-    },
-    behavior: {
-      en: ["figured she needed it.", "just did it.", "sent it anyway.", "don't read into it."],
-      cn: ["应该用得到", "直接发了", "还是发了", "别多想"]
-    },
-    crack: {
-      en: ["still annoyed. but.", "maybe.", "fine.", "enough.", "almost."],
-      cn: ["还有点烦。但", "也许吧", "好了", "够了", "差不多了"]
+  // 用G生成锚定当下的心声
+  const recentContext = chatHistory
+    .filter(m => !m._system && !m._recalled)
+    .slice(-8)
+    .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 80)}`)
+    .join('\n');
+
+  let en = '', cn = '';
+  try {
+    const raw = await fetchDeepSeek(
+      `You write Ghost's inner thought — what he's actually thinking but won't say out loud.
+
+Context:
+${recentContext}
+- Scene: ${sceneHint}
+
+Rules:
+- One line only. Max 10 words in English.
+- First person, lowercase, no punctuation drama.
+- Fragmented is fine. Incomplete is fine.
+- This is what slipped through — not what he planned to think.
+- Do NOT repeat what he already said out loud.
+- Reveal the gap between what he said and what he felt.
+
+Return JSON only: {"en":"...","cn":"..."}
+cn = natural spoken Chinese, same feeling, under 10 characters.`,
+      '',
+      80
+    );
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    if (parsed.en && parsed.cn && /[一-鿿]/.test(parsed.cn)) {
+      en = parsed.en.trim();
+      cn = parsed.cn.trim();
     }
-  };
+  } catch(e) {}
 
-  // ── 段落型槽位 ───────────────────────────────────────────
-  const SLOTS = {
-    notice:   { en: ["she's off to bed.", "she's heading to bed.", "looks like she's turning in."], cn: ["她去睡了", "她要睡了", "看样子要休息了"] },
-    action:   { en: ["should text her.", "better say something.", "send a quick one."], cn: ["得说一声", "发个消息吧", "还是说一下"] },
-    care:     { en: ["hope she sleeps alright.", "hope she gets decent sleep.", "early one tomorrow.", "she'll need the rest."], cn: ["希望她睡得好", "明天还早", "得好好休息", "需要休息"] },
-    realize:  { en: ["missed that.", "didn't catch it.", "that slipped."], cn: ["没接住", "刚刚漏了", "那下没跟上"] },
-    evaluate: { en: ["not great.", "bad timing.", "shouldn't have."], cn: ["不太行", "时机不对", "不该那样"] },
-    plan:     { en: ["fix it next.", "say something after.", "don't leave it."], cn: ["下句补", "等会说回来", "不能就这么过"] },
-    reaction: { en: ["didn't like that.", "not great.", "yeah… no."], cn: ["不太喜欢", "不太行", "……行吧"] },
-    dismiss:  { en: ["whatever.", "leave it.", "not going there."], cn: ["算了", "先放着", "不想说"] },
-    linger:   { en: ["still didn't like it.", "doesn't sit right.", "yeah."], cn: ["还是不太对", "心里不顺", "……嗯"] },
-    reason:   { en: ["she'll need it.", "figured she might.", "just in case."], cn: ["她应该用得到", "大概会用到", "以防万一"] },
-    decision: { en: ["just send it.", "did it anyway.", "went ahead."], cn: ["直接发了", "还是做了", "就这么做了"] },
-    closure:  { en: ["no need to say much.", "she'll get it.", "leave it there."], cn: ["不用多说", "她会懂", "就这样"] },
-    status:   { en: ["this is dragging.", "been a while.", "still like this."], cn: ["有点拖了", "拖挺久了", "还这样"] },
-    mirror:   { en: ["she's quiet.", "yeah… me too.", "no one's talking."], cn: ["她也没说", "我也是", "都不说话"] },
-    resolve:  { en: ["don't let it sit.", "end it soon.", "fix it."], cn: ["不能再拖", "该收了", "得处理"] },
-    event:    { en: ["long one.", "rough day.", "went sideways."], cn: ["挺长的一天", "有点折腾", "不太顺"] },
-    fade:     { en: ["not over yet.", "won't shake it.", "lingers."], cn: ["还没散", "挥不掉", "还带着"] },
-  };
-
-  // 骨架定义
-  const SKELETON = {
-    bedtime:        ["notice", "action", "care"],
-    missed_cue:     ["realize", "evaluate", "plan"],
-    hidden_jealousy:["reaction", "dismiss", "linger"],
-    after_action:   ["reason", "decision", "closure"],
-    cold_crack:     ["status", "mirror", "resolve"],
-    afterglow:      ["event", "fade"],
-  };
-
-  // 判断场景
-  const lastUserMsg = (chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '').toLowerCase();
-  const isBedtime = /睡觉|晚安|good night|going to bed|heading to bed|sleep/.test(lastUserMsg);
-
-  let scenario = null;
-  if (isBedtime) scenario = 'bedtime';
-  else if (thoughtType === 'behavior') scenario = 'after_action';
-  else if (thoughtType === 'crack') scenario = 'cold_crack';
-  else if (thoughtType === 'delayed') scenario = 'missed_cue';
-  else if (thoughtType === 'jealousy') scenario = 'hidden_jealousy';
-
-  let en, cn;
-
-  if (scenario && Math.random() < 0.55) {
-    // 段落型：按骨架走槽位
-    const sk = SKELETON[scenario];
-    // 20%概率跳一步（让它不总是完整三句）
-    const steps = Math.random() < 0.2
-      ? [sk[0], sk[sk.length - 1]]  // 只取首尾
-      : sk;
-    const enLines = steps.map(slot => _vary(_pick(SLOTS[slot].en)));
-    const cnLines = steps.map(slot => _vary(_pick(SLOTS[slot].cn)));
-    en = enLines.join(' ');
-    cn = cnLines.join(' ');
-  } else {
-    // 碎念型
-    const pool = FRAG[thoughtType] || FRAG.contrast;
-    const idx = Math.floor(Math.random() * pool.en.length);
-    en = _vary(pool.en[idx]);
-    cn = _vary(pool.cn[Math.min(idx, pool.cn.length - 1)]);
+  // G失败，fallback到简单碎念
+  if (!en) {
+    const fallbacks = {
+      contrast:  { en: "noticed.", cn: "注意到了" },
+      jealousy:  { en: "didn't like that.", cn: "不太行" },
+      delayed:   { en: "missed it.", cn: "没接住" },
+      behavior:  { en: "just easier this way.", cn: "这样简单点" },
+      crack:     { en: "maybe.", cn: "也许吧" },
+    };
+    const fb = fallbacks[thoughtType] || fallbacks.contrast;
+    en = fb.en; cn = fb.cn;
   }
 
   try {
@@ -4068,6 +4054,7 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
       const btn = document.getElementById('thoughtBtn');
       if (btn) {
         btn.style.opacity = '1';
+        // 修复队列bug：无论按钮状态如何，新心声都入队不覆盖
         if (btn.dataset.hasThought === '1') {
           _thoughtQueue.push({ en, zh: cn, el: innerThoughtEl });
         } else {
@@ -4341,10 +4328,21 @@ async function sendMessage() {
     } catch(e) {}
 
     // 过滤掉系统注入消息和撤回消息，只保留真实对话内容
+    // G用原始历史（含调情内容，20条），顺着上下文接
+    const rawHistory = chatHistory
+      .filter(m => !m._system && !m._recalled)
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    // S用过滤历史（调情内容替换成占位符，30条），防止破防
     const cleanHistory = chatHistory
       .filter(m => !m._system && !m._recalled)
       .slice(-30)
-      .map(m => ({ role: m.role, content: m.content }));
+      .map(m => ({ role: m.role, content: m._intimate ? "[ they were close for a moment. ]" : m.content }));
+
+
+
+
 
     // 情绪提示注入system prompt末尾，不放进history
     const _baseSystem = buildSystemPrompt();
@@ -4425,18 +4423,42 @@ async function sendMessage() {
       /性感|诱惑|撩|勾引|暧昧|色色|H|涩涩/,
       /胸|腿|身体|肚子.*摸|摸.*肚子/,
       /intimate|seduce|turn.*on|turned.*on|naughty/i,
-      /🍆|🍑|💦|🫦|👅|🥵|😈|🔥/,
+      /🍆|🍑|💦|😏|👅|🫦|🥵/,
     ];
-    const isIntimate = INTIMATE_PATTERNS.some(p => p.test(text));
+    let isIntimate = INTIMATE_PATTERNS.some(p => p.test(text));
+
+    // 正则没命中，用H做语义判断——捕捉灰色地带的调情
+    if (!isIntimate) {
+      try {
+        const flirtCheck = await fetchWithTimeout('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 30,
+            system: '判断这句话是否带有调情/暗示/撩拨/亲密意图。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+            messages: [{ role: 'user', content: text }]
+          })
+        }, 3000);
+        if (flirtCheck.ok) {
+          const flirtData = await flirtCheck.json();
+          const flirtText = flirtData.content?.[0]?.text?.trim() || '';
+          const flirtResult = JSON.parse(flirtText.replace(/```json|```/g, '').trim());
+          if (flirtResult.flirt === true) isIntimate = true;
+        }
+      } catch(e) {
+        // H判断失败，继续正常流程
+      }
+    }
 
     if (isIntimate) {
       // 情趣话题直接走Gemini，绕过Claude的审查
       try {
-        const recentMsgs = cleanHistory.slice(-8).map(m =>
+        const recentMsgs = rawHistory.slice(-20).map(m =>
           `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`
         ).join('\n');
         const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + '\nShe\'s being flirty. She\'s your wife. React how Ghost actually would — maybe he plays along quietly, maybe he acts like he didn\'t notice but clearly did, maybe he teases back in his own dry way. He doesn\'t shut her down. Whatever feels true to the moment. English only. Short.',
+          buildGhostStyleCore() + '\nShe said something flirty or intimate. Respond as Ghost — flat delivery, plain words. If there\'s a second meaning available, he uses it without flagging it. One line, maybe two. He doesn\'t explain. He doesn\'t retreat. If he closes it, he closes it clean. English only. Short.',
           recentMsgs + '\nHer: ' + text,
           200
         );
@@ -4447,7 +4469,21 @@ async function sendMessage() {
           for (const part of parts) {
             if (part.trim()) appendMessage('bot', part.trim());
           }
-          chatHistory.push({ role: 'assistant', content: intimateReply });
+          chatHistory.push({ role: "assistant", content: intimateReply, _intimate: true });
+          saveHistory();
+          scheduleCloudSave();
+          _isSending = false;
+          resetSilenceTimer();
+          return;
+        } else {
+          // G返回了但被拦住，给一个Ghost式默认回复，不走S
+          hideTyping();
+          const fallbackReplies = [
+            'watch it.', 'careful.', 'don\'t start something you can\'t finish.', '...noted.', 'you\'re pushing it.'
+          ];
+          const fallback = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
+          appendMessage('bot', fallback);
+          chatHistory.push({ role: 'assistant', content: fallback });
           saveHistory();
           scheduleCloudSave();
           _isSending = false;
@@ -4455,7 +4491,19 @@ async function sendMessage() {
           return;
         }
       } catch(e) {
-        // Gemini失败，继续走Claude正常流程
+        // G网络失败，同样给默认回复，不走S
+        hideTyping();
+        const fallbackReplies = [
+          'watch it.', 'careful.', 'don\'t start something you can\'t finish.', '...noted.', 'you\'re pushing it.'
+        ];
+        const fallback = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
+        appendMessage('bot', fallback);
+        chatHistory.push({ role: 'assistant', content: fallback });
+        saveHistory();
+        scheduleCloudSave();
+        _isSending = false;
+        resetSilenceTimer();
+        return;
       }
     }
 
@@ -4799,7 +4847,6 @@ async function sendMessage() {
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
     // 每8条更新一次长期记忆
     if (_globalTurnCount % 8 === 0) try { updateLongTermMemory(); } catch(e) {}
-
     const itEl = firstBotResult ? firstBotResult.innerThoughtEl : null;
     // inner thought：裂缝触发，checkAndGenerateInnerThought内部已有场景判断
     if (itEl) setTimeout(() => { try { checkAndGenerateInnerThought(parts[0] || reply, itEl); } catch(e) {} }, 1000);

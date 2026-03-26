@@ -18,14 +18,6 @@ const DELIVERY_STAGES_GHOST = [
   { status: '✅ 已签收',      en: 'Delivered.',                        zh: '已签收。' },
 ];
 
-// 运费吐槽台词
-const SHIPPING_COMPLAINTS = [
-  "You paid £{fee} shipping for this. You're insane.\n你花了£{fee}运费寄这个。你疯了。",
-  "£{fee} in shipping. I hope it was worth it.\n£{fee}运费。我希望值得。",
-  "Next time just wire me the money. The shipping alone was £{fee}.\n下次直接给我转账算了。光运费就£{fee}了。",
-  "The shipping cost more than my dignity. £{fee}.\n运费比我的尊严还贵。£{fee}。",
-];
-
 function addDelivery(product, isGhostSend, isLuxury) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
   const totalMs = isGhostSend
@@ -370,7 +362,7 @@ function showMysteryPackage(delivery) {
         <div style="font-size:13px;color:rgba(109,40,217,0.6);margin-bottom:20px;line-height:1.6;">来自英国的包裹已送达<br>去商城签收一下？</div>
         <div style="display:flex;gap:10px;">
           <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;">待会再说</button>
-          <button onclick="this.closest('div[style*=fixed]').remove();openScreen('shopScreen');" style="flex:1;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">去签收</button>
+          <button onclick="this.closest('div[style*=fixed]').remove();openScreen('marketScreen');" style="flex:1;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">去签收</button>
         </div>
       </div>
     `;
