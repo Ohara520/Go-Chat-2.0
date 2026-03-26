@@ -4440,7 +4440,7 @@ async function sendMessage() {
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
             max_tokens: 30,
-            system: '判断这句话是否带有调情/暗示/撩拨/亲密意图。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+            system: '判断这句话是否带有调情/暗示/撩拨/亲密意图。注意：提到换头像、情侣头像、profile picture、couple avatar、couple photo、情头等不算调情。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
             messages: [{ role: 'user', content: text }]
           })
         }, 3000);
@@ -4483,7 +4483,7 @@ async function sendMessage() {
           // G返回了但被拦住，给一个Ghost式默认回复，不走S
           hideTyping();
           const fallbackReplies = [
-            'watch it.', 'careful.', 'don\'t start something you can\'t finish.', '...noted.', 'you\'re pushing it.'
+            'noted.', '...yeah.', 'alright.', 'give me a second.', 'right.'
           ];
           const fallback = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
           appendMessage('bot', fallback);
@@ -4498,7 +4498,7 @@ async function sendMessage() {
         // G网络失败，同样给默认回复，不走S
         hideTyping();
         const fallbackReplies = [
-          'watch it.', 'careful.', 'don\'t start something you can\'t finish.', '...noted.', 'you\'re pushing it.'
+          'noted.', '...yeah.', 'alright.', 'give me a second.', 'right.'
         ];
         const fallback = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
         appendMessage('bot', fallback);
