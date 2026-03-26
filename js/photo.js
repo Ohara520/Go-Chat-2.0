@@ -148,59 +148,43 @@ async function handlePhotoUpload(fileDataList) {
     ];
 
     let reply = '';
-    let imageDesc = '';
 
-    // Step 1: H先看图，生成描述
+    // S直接看图回复（支持vision）
     try {
-      const descRes = await fetchWithTimeout('/api/chat', {
+      const sRes = await fetchWithTimeout('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 80,
-          system: '用一句话描述这张/这几张图片的内容，要具体，比如"蓝兔子舔粉兔子屁股的配对情头"或"两个卡通小熊配对头像"。只返回描述，不要其他文字。',
-          messages: [{ role: 'user', content: [...imageContents, { type: 'text', text: '描述这张图片' }] }]
+          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
+          max_tokens: 300,
+          system: _sys + '\n' + photoHint,
+          messages: [
+            ...cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了')).slice(0, -1),
+            {
+              role: 'user',
+              content: [
+                ...imageContents,
+                { type: 'text', text: cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.' }
+              ]
+            }
+          ]
         })
-      }, 8000);
-      if (descRes.ok) {
-        const descData = await descRes.json();
-        imageDesc = descData.content?.[0]?.text?.trim() || '';
+      }, 20000);
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        const text = sData.content?.[0]?.text?.trim() || '';
+        const isBreakout = /I'm Claude, made by|I cannot continue|I need to stop/i.test(text);
+        if (!isBreakout && text) reply = text;
       }
     } catch(e) {}
-
-    // Step 2: S拿到描述，生成有性格的回复
-    if (imageDesc) {
-      const sceneDesc = isAvatarContext
-        ? `[场景：她发来了情侣头像，图片内容是：${imageDesc}。看图做出Ghost式真实反应——说清楚你看到了什么，可以吐槽，可以嘴硬，但最终大概率换上。如果决定换在回复里自然带出来比如"fine. it's up."。如果太离谱就说"not putting that up."。]`
-        : `[场景：她发来了一张图片，内容是：${imageDesc}。用Ghost的方式回应，说清楚你看到了什么，1-2句话。]`;
-
-      try {
-        const sRes = await fetchWithTimeout('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
-            max_tokens: 300,
-            system: _sys + '\n' + sceneDesc,
-            messages: cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了'))
-          })
-        }, 20000);
-        if (sRes.ok) {
-          const sData = await sRes.json();
-          const text = sData.content?.[0]?.text?.trim() || '';
-          const isBreakout = /I'm Claude, made by|I cannot continue|I need to stop|as an AI/i.test(text);
-          if (!isBreakout && text) reply = text;
-        }
-      } catch(e) {}
-    }
 
     // S失败，G兜底
     if (!reply && typeof fetchDeepSeek === 'function') {
       const core = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
-      const hint = imageDesc
-        ? `She sent a photo: "${imageDesc}". React as Ghost — specific, dry. ${isAvatarContext ? 'If putting it up say so naturally.' : ''} English only. Short.`
-        : photoHint + '\nRespond as Ghost. English only. Short.';
-      reply = await fetchDeepSeek(core + '\n' + hint, recentText.slice(-200), 150).catch(() => '');
+      reply = await fetchDeepSeek(
+        core + '\n' + photoHint + '\nRespond as Ghost. English only. Short.',
+        recentText.slice(-200), 150
+      ).catch(() => '');
     }
 
     if (!reply) reply = 'noted.';
