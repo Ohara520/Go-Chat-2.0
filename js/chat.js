@@ -4480,7 +4480,7 @@ async function _processMergedMessage(text) {
     }
 
     const _hasChinese = /[\u4e00-\u9fff]/.test(text);
-    const langHint = _hasChinese ? '[LANGUAGE: Reply in English first, then Chinese translation. Do NOT tell her to speak English — she can write in any language she wants.]' : '';
+    const langHint = _hasChinese ? '[LANGUAGE: Reply in English only. Do NOT mix Chinese words into English sentences. Do NOT add Chinese translation unless using the 收 format on a new line.]' : '';
 
     // 工作/加班/失约场景：禁止第三者竞争叙事，优先关系修补
     const _workApology = /加班|overtime|上班|开会|值班|早班|晚班|工作|临时有事|class|meeting|shift|deadline|work kept/.test(text);
