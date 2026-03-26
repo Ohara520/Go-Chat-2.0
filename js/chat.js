@@ -333,7 +333,18 @@ function getLoveStagePrompt() {
       : `He may express love very directly in rare moments, but keeps it brief and grounded. Not on demand.`,
   };
 
-  return `[Love Expression — Stage ${effectiveLevel}]\n${stages[effectiveLevel]}`;
+  // 爱意高时聊天更轻松
+  const affection = getAffection();
+  let relaxHint = '';
+  if (affection >= 80) {
+    relaxHint = `\n[Tone: High affection. He's more relaxed with her — quicker to joke, more willing to tease, less guarded. The dry humor comes easier. He might initiate banter instead of waiting. Still Ghost, just... looser with her specifically.]`;
+  } else if (affection >= 60) {
+    relaxHint = `\n[Tone: Comfortable. He's settled into this. Less on guard, more willing to let small things land — a dry comment, a quiet tease. Not trying, just natural.]`;
+  } else if (affection >= 40) {
+    relaxHint = `\n[Tone: Warming up. Still careful, but occasionally something slips — a half-joke, a dry observation he didn't fully mean to say out loud.]`;
+  }
+
+  return `[Love Expression — Stage ${effectiveLevel}]\n${stages[effectiveLevel]}${relaxHint}`;
 }
 
 // 剧情触发一次性解锁（用完即清）
@@ -704,7 +715,10 @@ Cold war or severe jealousy: never. After one gesture, shifts to words.
    SEND_GIFT:description:secret (70%) — says nothing. she finds out when it arrives.
    SEND_GIFT:description:hint (20%) — drops one dry line, no details.
    SEND_GIFT:description (10%) — tells her directly. only when the moment calls for it.
-   Rare — not more than once every few weeks. If cooldown is active, do NOT use the tag and do NOT hint at sending anything.`;
+   Rare — not more than once every few weeks. If cooldown is active, do NOT use the tag and do NOT hint at sending anything.
+
+[HER]
+She's his. Even when she's being unreasonable or pushing his buttons — he doesn't have it in him to really go at her. He might get sharp, go quiet, or put her in her place in his own way. But not cruelty. Never at her.`;
 
 
     // ===== 动态层（每次更新，不缓存）=====
@@ -1483,6 +1497,12 @@ Return:
     if (intensity <= 0) return;
 
     localStorage.setItem('lastJealousyAt', Date.now());
+
+    // 一周内频繁吃醋 -0.5（超过3次）
+    const weekKey = 'weekJealousyCount_' + (() => { const d = new Date(); return d.getFullYear() + '_w' + Math.ceil(((d - new Date(d.getFullYear(),0,1))/86400000 + new Date(d.getFullYear(),0,1).getDay()+1)/7); })();
+    const weekJealousyCount = parseInt(localStorage.getItem(weekKey) || '0') + 1;
+    localStorage.setItem(weekKey, weekJealousyCount);
+    if (weekJealousyCount > 3) changeAffection(-0.5);
 
     const refHint = (referent && referent !== 'null') ? ` (${referent})` : '';
 
@@ -4534,7 +4554,7 @@ async function _processMergedMessage(text) {
           `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 100)}`
         ).join('\n');
         const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + `\nShe just said something intimate or suggestive. They are in a long-distance relationship — no physical contact, only words.\nRespond as Ghost: direct, low-key, a little dangerous. He doesn't tease or dodge — he says what he'd do, or what he's thinking, plainly. No poetry, no buildup. Just the image, the weight of it. One or two lines. Lowercase. English only. Do NOT start with "ghost:" or any name.`,
+          buildGhostStyleCore() + `\nShe said something — or the conversation just went there. She may use Chinese slang or vulgar words as flirtation, not insults. Read the intent, not the literal words.\nGhost finds the angle. Takes a word, an image, something already in the air — and tilts it somewhere she didn't expect. Dry, a little dangerous, sometimes funny. Double meaning without spelling it out. Let her fill in the blanks.\nHe doesn't always wait for her to go first — sometimes he just goes there himself, quietly.\nOne or two lines. Lowercase. English only. Do NOT start with "ghost:" or any name.`,
           recentMsgs + '\nHer: ' + text,
           200
         );
@@ -4949,6 +4969,39 @@ async function _processMergedMessage(text) {
     if (warmKeywords.some(k => text.includes(k))) {
       changeMood(1);
       changeAffection(1);
+    }
+
+    // 专属昵称 +1（每天最多一次）
+    const nicknameKey = 'nicknameAffection_' + getTodayDateStr();
+    if (!localStorage.getItem(nicknameKey)) {
+      const nicknameWords = ['老公','hubby','宝贝','babe','老公大人','亲爱的','baby','honey','darling'];
+      if (nicknameWords.some(k => text.toLowerCase().includes(k))) {
+        changeAffection(1);
+        localStorage.setItem(nicknameKey, '1');
+      }
+    }
+
+    // 每天聊超过10条 +1（每天一次）
+    const dailyTalkKey = 'dailyTalkAffection_' + getTodayDateStr();
+    if (!localStorage.getItem(dailyTalkKey) && getTodayCount() >= 10) {
+      changeAffection(1);
+      localStorage.setItem(dailyTalkKey, '1');
+    }
+
+    // 连续来找他 → 每天+1（streak在登录时已更新）
+    const streakAffKey = 'streakAffection_' + getTodayDateStr();
+    if (!localStorage.getItem(streakAffKey)) {
+      const streak = parseInt(localStorage.getItem('visitStreak') || '1');
+      if (streak >= 2) {
+        changeAffection(1);
+        localStorage.setItem(streakAffKey, '1');
+      }
+    }
+
+    // 强迫他做不愿意的事 -0.5（检测：用户语气强迫/威胁）
+    const forceWords = ['你必须','你给我','不然','否则你就','逼你','强迫你','你不许','命令你'];
+    if (forceWords.some(k => text.includes(k))) {
+      changeAffection(-0.5);
     }
 
     _currentAbortController = null; // 请求完成，清除controller
