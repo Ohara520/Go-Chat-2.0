@@ -72,22 +72,30 @@ async function detectImageInfo(files) {
     }));
 
     const systemPrompt = fileArr.length > 1
-      ? `分析这${fileArr.length}张图片，判断它们是否是一套配对情头。返回JSON：
-type: couple(情侣配对头像)/selfie(自拍)/funny(搞笑恶搞)/animal(动物)/other
+      ? `分析这${fileArr.length}张图片，判断是否是一套配对情侣头像。
+
+配对情头的判断标准（满足以下任意几条即是）：
+- 风格统一：同一画风、同一套插画、同一IP形象
+- 有互动或呼应：颜色对应（一蓝一粉等）、共用元素、动作有联系、互相看着
+- 明显是一套设计，即使是恶搞图只要配套就算
+- 不需要是真人，卡通/动物/表情包/恶搞图都可以是情头
+
+返回JSON：
+type: couple(配对情头)/selfie(自拍)/funny(搞笑恶搞)/animal(动物)/other
 is_avatar: 是否是头像（true/false）
-is_pair: 是否是配对的两张（true/false）
-ghost_img: 如果是配对情头，哪张给Ghost用？填图片序号1或2（不是配对填0）
-desc: 10字以内描述内容，要具体，比如"蓝兔子舔粉兔子屁股配对情头"
+is_pair: 是否是配对的一套（true/false）
+ghost_img: 配对时哪张给Ghost？填1或2，判断依据：颜色较深/偏男性/偏酷的那张给Ghost；不确定填0
+desc: 10字以内具体描述这套图，要说清楚是什么、有什么互动关系
 too_weird: 是否恶搞/不雅（true/false）
-只返回JSON。`
+只返回JSON，不要其他文字。`
       : `分析这张图片，返回JSON：
 type: couple(情侣头像)/selfie(自拍)/funny(搞笑恶搞)/animal(动物)/food(食物)/other
-is_avatar: 是否适合当头像
+is_avatar: 是否适合当头像（true/false）
 is_pair: false
 ghost_img: 0
-desc: 10字以内具体描述，比如"卡通大便配手纸"
-too_weird: 是否太离谱
-只返回JSON。`;
+desc: 10字以内具体描述，要具体说清楚是什么
+too_weird: 是否太离谱（true/false）
+只返回JSON，不要其他文字。`;
 
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
@@ -150,7 +158,7 @@ Your response must mention what's actually in "${desc}". English only. 2-3 lines
     } else {
       prompt = `You are Ghost. She sent you "${desc}" as a couples avatar.
 Name what it is, then refuse in one dry line. Tell her to pick something else.
-Must reference "${desc}" specifically. English only.`;
+Must reference "${desc}" specifically. English only. Do NOT prefix with "ghost:" or any name.`;
     }
   } else if (type === 'couple') {
     if (is_pair) {
@@ -164,7 +172,7 @@ Examples:
 - "a blue rabbit licking a pink rabbit. and she wants this as our profile pictures. ...fine."
 - "matching rabbits. she picked the weird one for me. noted. it's up."
 
-Must reference "${desc}" specifically. English only. 2-3 lines.`;
+Must reference "${desc}" specifically. English only. Do NOT prefix with "ghost:" or any name. 2-3 lines. Do NOT prefix with "ghost:" or any name.`;
     } else {
       prompt = `You are Ghost. She just sent you "${desc}" as your chat avatar.
 
@@ -176,7 +184,7 @@ Examples:
 - "two people at the beach. backs to the camera. ...when was this."
 - "that's the one she picked. alright."
 
-Must reference "${desc}". English only. 1-2 lines.`;
+Must reference "${desc}". English only. 1-2 lines. Do NOT prefix with "ghost:" or any name.`;
     }
   } else if (type === 'selfie') {
     prompt = `You are Ghost. She sent you a selfie: "${desc}".
@@ -184,11 +192,11 @@ Must reference "${desc}". English only. 1-2 lines.`;
 Name what you see first. Then react as Ghost — one dry comment, maybe something he noticed.
 ${willSwitch ? 'Imply you kept it without making a big deal.' : ''}
 
-Must reference "${desc}". English only. 1-2 lines.`;
+Must reference "${desc}". English only. 1-2 lines. Do NOT prefix with "ghost:" or any name.`;
   } else {
     prompt = `You are Ghost. She sent you a photo: "${desc}".
 Name what it is, react briefly. ${willSwitch ? 'Imply you put it up.' : ''}
-Must reference "${desc}". English only. 1 line.`;
+Must reference "${desc}". English only. 1 line. Do NOT prefix with "ghost:" or any name.`;
   }
 
   try {
@@ -259,8 +267,9 @@ async function handlePhotoUpload(files) {
     if (container) {
       const div = document.createElement('div');
       div.className = 'message user';
-      div.innerHTML = `<div class="message-bubble" style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${urls.map(url => `<img src="${url}" style="max-width:160px;border-radius:12px;display:block;cursor:pointer;" onclick="window.open('${url}')" />`).join('')}
+      div.style.cssText = 'display:flex;justify-content:flex-end;';
+      div.innerHTML = `<div class="message-bubble" style="padding:4px;display:inline-flex;gap:6px;flex-wrap:wrap;width:fit-content;max-width:280px;background:transparent;box-shadow:none;border:none;">
+        ${urls.map(url => `<img src="${url}" style="max-width:${urls.length > 1 ? '130px' : '220px'};border-radius:12px;display:block;cursor:pointer;" onclick="showPhotoPreview('${url}')" />`).join('')}
       </div>`;
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
@@ -402,4 +411,20 @@ async function checkPendingAvatarChoice(userText) {
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
   return true; // 告诉调用方这条消息已被处理
+}
+
+// ===== 图片预览 =====
+function showPhotoPreview(url) {
+  let overlay = document.getElementById('photoPreviewOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'photoPreviewOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.onclick = () => overlay.style.display = 'none';
+    overlay.innerHTML = '<img id="photoPreviewImg" style="max-width:95%;max-height:90vh;border-radius:8px;object-fit:contain;" />';
+    document.body.appendChild(overlay);
+  }
+  const img = overlay.querySelector('#photoPreviewImg');
+  if (img) img.src = url;
+  overlay.style.display = 'flex';
 }
