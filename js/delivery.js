@@ -375,14 +375,13 @@ function showMysteryPackage(delivery) {
       <div style="background:rgba(255,255,255,0.97);backdrop-filter:blur(20px);border-radius:24px;padding:28px 24px;max-width:300px;width:88%;text-align:center;box-shadow:0 16px 48px rgba(139,92,246,0.2);border:1.5px solid rgba(168,85,247,0.15);">
         <div style="font-size:48px;margin-bottom:12px;">📦</div>
         <div style="font-size:16px;font-weight:700;color:#3b0764;margin-bottom:8px;">有快递到了</div>
-        <div style="font-size:13px;color:rgba(109,40,217,0.6);margin-bottom:20px;line-height:1.6;">来自英国的包裹已送达<br>去商城签收一下？</div>
-        <div style="display:flex;gap:10px;">
-          <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;">待会再说</button>
-          <button onclick="this.closest('div[style*=fixed]').remove();openScreen('marketScreen');" style="flex:1;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">去签收</button>
-        </div>
+        <div style="font-size:13px;color:rgba(109,40,217,0.6);margin-bottom:20px;line-height:1.6;">来自英国的包裹已送达<br>已自动签收 ✓</div>
+        <button id="_closeSignBtn" style="width:100%;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">好的</button>
       </div>
     `;
     document.body.appendChild(overlay);
+    const _closeBtn = overlay.querySelector('#_closeSignBtn');
+    if (_closeBtn) _closeBtn.onclick = () => overlay.remove();
   }, 1500);
 
   // 签收后Sonnet生成台词
