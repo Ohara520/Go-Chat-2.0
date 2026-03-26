@@ -4696,22 +4696,38 @@ async function sendMessage() {
         showTyping();
         _isSending = true;
         try {
-          const res2 = await fetchWithTimeout('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'claude-haiku-4-5-20251001',
-              max_tokens: 150,
-              ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
-              messages: [...chatHistory.slice(-8), {
-                role: 'user',
-                content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，English only.]'
-              }]
-            })
-          });
-          const d2 = await res2.json();
-          hideTyping();
-          const reply2 = d2.content?.[0]?.text?.trim() || '';
+          // 撤回后重发：如果是调情场景走G，否则走H
+          const _recallIsIntimate = chatHistory.slice(-6).some(m => m._intimate);
+          let reply2 = '';
+          if (_recallIsIntimate) {
+            // 调情场景走G
+            const recentMsgs2 = chatHistory.filter(m => !m._system && !m._recalled).slice(-8)
+              .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`).join('\n');
+            reply2 = await fetchDeepSeek(
+              buildGhostStyleCore() + '\nYou just sent a message and took it back. Now send another — different angle, same tension. Flat delivery. English only. Short.',
+              recentMsgs2,
+              150
+            );
+            reply2 = reply2?.trim() || '';
+            hideTyping();
+          } else {
+            const res2 = await fetchWithTimeout('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 150,
+                ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+                messages: [...chatHistory.slice(-8), {
+                  role: 'user',
+                  content: '[系统：你刚才发了一条消息，然后撤回了，现在重新发一条——可以是换了说法，可以是简短了，可以是别的角度。全小写，English only.]'
+                }]
+              })
+            });
+            const d2 = await res2.json();
+            hideTyping();
+            reply2 = d2.content?.[0]?.text?.trim() || '';
+          }
           if (reply2) {
             appendMessage('bot', reply2);
             chatHistory.push({ role: 'assistant', content: reply2 });
