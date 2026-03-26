@@ -4,6 +4,9 @@ let _ambientAudio = null;
 let _ambientPlaying = null;
 let _ambientVolume = 0.6;
 
+// ===== 打断控制 =====
+let _currentAbortController = null; // 当前请求的AbortController
+
 function toggleAmbient() {
   const body = document.getElementById('ambientBody');
   const arrow = document.getElementById('ambientArrow');
@@ -3079,13 +3082,14 @@ function applyMoneyEffect(amount, options = {}) {
   // 转账后立刻存云端，防止关页面丢数据
   saveToCloud().catch(() => {});
 
-  // 渲染转账卡片
+  // 渲染转账卡片——直接渲染不用setTimeout
   if (options.showCard !== false) {
-    setTimeout(() => {
-      const container = document.getElementById('messagesContainer');
-      if (container) showGhostTransferCard(container, actualAmount, options.note || '', false);
-    }, options.cardDelay || 600);
+    const container = document.getElementById('messagesContainer');
+    if (container) {
+      showGhostTransferCard(container, actualAmount, options.note || '', false);
+    }
   }
+  renderWallet(); // 确保钱包UI更新
 
   return actualAmount;
 }
@@ -3633,6 +3637,20 @@ async function initChat() {
         }
         return;
       }
+      // 检测用户发的图片
+      if (msg._photoUrls && msg._photoUrls.length > 0) {
+        const container = document.getElementById('messagesContainer');
+        if (container) {
+          const div = document.createElement('div');
+          div.className = 'message user';
+          div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
+          div.innerHTML = `<div style="display:inline-flex;gap:6px;flex-wrap:wrap;max-width:280px;">
+            ${msg._photoUrls.map(url => `<img src="${url}" style="max-width:${msg._photoUrls.length > 1 ? '130px' : '220px'};border-radius:12px;display:block;cursor:pointer;" onclick="showPhotoPreview('${url}')" />`).join('')}
+          </div>`;
+          container.appendChild(div);
+        }
+        return;
+      }
       appendMessage('user', msg.content, false);
     } else if (msg.role === 'assistant') {
       if (msg._recalled) return;
@@ -3729,6 +3747,9 @@ function appendMessage(role, text, animate = true) {
   if (role === 'bot' || role === 'assistant') {
     text = text.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
   }
+
+  // 空内容不渲染
+  if (!text || !text.trim()) return { msgDiv: null, bubble: null, innerThoughtEl: null };
 
   if (animate && shouldShowTime(now)) {
     appendTimeDivider(now);
@@ -4004,9 +4025,10 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
     .join('\n');
 
   let en = '', cn = '';
-  try {
-    const raw = await fetchDeepSeek(
-      `You are Ghost. Something just happened. This is what crossed your mind — one fragment, unfiltered.
+
+  // 判断是否是调情/露骨场景——用G；其他用S更稳定
+  const _isIntimateThought = chatHistory.slice(-6).some(m => m._intimate);
+  const thoughtPrompt = `You are Ghost. Something just happened. This is what crossed your mind — one fragment, unfiltered.
 
 ${recentContext}
 Scene: ${sceneHint}
@@ -4016,21 +4038,42 @@ What slipped through — not what he planned to think.
 Not what he already said out loud.
 The gap between what he said and what he felt.
 
-{"en":"...","cn":"..."}
-cn under 10 characters, spoken Chinese, same feeling.`,
-      '',
-      80
-    );
-    // 宽松解析，从G返回的任意内容里提取JSON
-    const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
-    if (jsonMatch) {
-      en = jsonMatch[1].trim();
-      cn = jsonMatch[2].trim();
+Return JSON only: {"en":"...","cn":"..."}
+cn under 10 characters, spoken Chinese, same feeling.`;
+
+  try {
+    if (_isIntimateThought) {
+      // 调情场景用G
+      const raw = await fetchDeepSeek(thoughtPrompt, '', 80);
+      const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
+      if (jsonMatch) { en = jsonMatch[1].trim(); cn = jsonMatch[2].trim(); }
+    } else {
+      // 普通场景用S，更稳定更有人设
+      const res = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: getMainModel(),
+          max_tokens: 80,
+          system: thoughtPrompt,
+          messages: [{ role: 'user', content: 'inner thought now.' }]
+        })
+      }, 8000);
+      if (res.ok) {
+        const data = await res.json();
+        const raw = data.content?.[0]?.text?.trim() || '';
+        const isBreakout = /I'm Claude|I cannot|I need to stop/i.test(raw);
+        if (!isBreakout) {
+          const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
+          if (jsonMatch) { en = jsonMatch[1].trim(); cn = jsonMatch[2].trim(); }
+        }
+      }
     }
-  } catch(e) {}
+  } catch(e) { console.warn('[心声] 调用失败:', e); }
 
   // G失败，fallback到简单碎念
   if (!en) {
+    console.warn('[心声] G未返回内容，使用fallback, thoughtType:', thoughtType);
     const fallbacks = {
       contrast:  { en: "noticed.", cn: "注意到了" },
       jealousy:  { en: "didn't like that.", cn: "不太行" },
@@ -4051,12 +4094,14 @@ cn under 10 characters, spoken Chinese, same feeling.`,
       const btn = document.getElementById('thoughtBtn');
       if (btn) {
         btn.style.opacity = '1';
-        // 修复队列bug：无论按钮状态如何，新心声都入队不覆盖
-        if (btn.dataset.hasThought === '1') {
-          _thoughtQueue.push({ en, zh: cn, el: innerThoughtEl });
-        } else {
-          btn.classList.add('thought-btn-pulse');
-          btn.dataset.hasThought = '1';
+        // ready=1才触发pulse，防止空心声气泡闪烁
+        if (en && cn) {
+          if (btn.dataset.hasThought === '1') {
+            _thoughtQueue.push({ en, zh: cn, el: innerThoughtEl });
+          } else {
+            btn.classList.add('thought-btn-pulse');
+            btn.dataset.hasThought = '1';
+          }
         }
       }
 
@@ -4256,7 +4301,21 @@ async function sendMessage() {
     if (handled) return;
   }
 
+  // 检测是否想重新换头像
+  if (typeof checkAvatarReplace === 'function') {
+    const handled = await checkAvatarReplace(text);
+    if (handled) return;
+  }
+
+  // 打断上一个正在进行的请求
+  if (_currentAbortController) {
+    _currentAbortController.abort();
+    _currentAbortController = null;
+    hideTyping();
+    _isSending = false;
+  }
   _isSending = true; // 立刻锁定，防止切页面重渲染吞消息
+  _currentAbortController = new AbortController();
 
   // 爱意抗拒值更新 + 剧情解锁检测
   updateLoveResistance(text);
@@ -4524,6 +4583,32 @@ async function sendMessage() {
       }
     }
 
+    // 检查上一条用户消息是否是图片——如果是，把图片带进这条消息
+    const lastPhotoMsg = chatHistory.filter(m => m.role === 'user' && m._photoBase64 && !m._system).slice(-1)[0];
+    const isRecentPhoto = lastPhotoMsg && chatHistory.indexOf(lastPhotoMsg) >= chatHistory.length - 4;
+    let messagesForRequest = cleanHistory;
+    if (isRecentPhoto && lastPhotoMsg._photoBase64.length > 0) {
+      // 把图片注入到当前这条消息里
+      const currentMsg = messagesForRequest[messagesForRequest.length - 1];
+      if (currentMsg && currentMsg.role === 'user' && typeof currentMsg.content === 'string') {
+        messagesForRequest = [
+          ...messagesForRequest.slice(0, -1),
+          {
+            role: 'user',
+            content: [
+              ...lastPhotoMsg._photoBase64.map(b64 => ({
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
+              })),
+              { type: 'text', text: currentMsg.content }
+            ]
+          }
+        ];
+      }
+    }
+
+    // 主请求绑定AbortController，支持打断
+    const _abortCtrl = _currentAbortController;
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -4531,9 +4616,10 @@ async function sendMessage() {
         model: getMainModel(),
         max_tokens: 1000,
         system: finalSystem, systemParts: buildSystemPromptParts(_baseSystem),
-        messages: cleanHistory
-      })
-    }, 20000, 1); // 超时改成20秒，最多重试1次，共最多40秒
+        messages: messagesForRequest
+      }),
+      signal: _abortCtrl ? _abortCtrl.signal : undefined
+    }, 20000, 1);
 
     if (!response.ok) {
       const errText = await response.text();
@@ -4816,6 +4902,7 @@ async function sendMessage() {
       changeAffection(1);
     }
 
+    _currentAbortController = null; // 请求完成，清除controller
     chatHistory.push({ role: 'assistant', content: reply, ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
     saveHistory();
 
@@ -4897,6 +4984,9 @@ async function sendMessage() {
   } catch (err) {
     hideTyping();
     _isSending = false;
+    _currentAbortController = null;
+    // 用户主动打断，静默处理
+    if (err?.name === 'AbortError') return;
     console.error('sendMessage error:', err?.name, err?.message);
     const isTimeout = err?.name === 'AbortError';
     const isNetwork = err?.message?.includes('fetch') || err?.message?.includes('Failed');

@@ -106,18 +106,26 @@ async function handlePhotoUpload(fileDataList) {
       container.scrollTop = container.scrollHeight;
     }
 
-    // 3. 存入聊天历史
+    // 3. 存入聊天历史（带base64供后续文字消息使用）
     if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({ role: 'user', content: `[用户发了${base64List.length}张图片]` });
+      chatHistory.push({
+        role: 'user',
+        content: `[用户发了${base64List.length}张图片]`,
+        _photoBase64: base64List // 供后续文字消息携带图片用
+      });
       if (typeof saveHistory === 'function') saveHistory();
     }
 
     // 4. 判断场景
     const recentText = typeof chatHistory !== 'undefined'
-      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-8).map(m => m.content || '').join(' ')
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => m.content || '').join(' ')
       : '';
-    const isAvatarContext = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头/i.test(recentText);
-    console.log('[photo] isAvatarContext:', isAvatarContext, 'recentText片段:', recentText.slice(-100));
+    // 检测情头上下文：最近20条 OR sessionStorage有标记
+    const _avatarKeyword = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头|情侣头像|头像.*换|换.*头像/i;
+    const isAvatarContext = _avatarKeyword.test(recentText) || sessionStorage.getItem('avatarRequestPending') === '1';
+    // 用户提过换情头，记录pending状态
+    if (_avatarKeyword.test(recentText)) sessionStorage.setItem('avatarRequestPending', '1');
+    console.log('[photo] isAvatarContext:', isAvatarContext);
 
     const photoHint = isAvatarContext
       ? `[场景：她发来了情侣头像图片想换情头。
@@ -220,6 +228,7 @@ async function handlePhotoUpload(fileDataList) {
 
         // 先用base64临时显示
         updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
+        sessionStorage.removeItem('avatarRequestPending'); // 换上了，清除pending
 
         // 异步上传Storage，完成后更新为正式URL
         uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
@@ -231,12 +240,30 @@ async function handlePhotoUpload(fileDataList) {
       }
     }
 
-    // 8. 异步上传所有图片到Storage存档，完成后替换气泡里的base64为正式URL
-    const photoImgs = container ? Array.from(container.querySelectorAll('img[src^="data:image"]')).slice(-base64List.length) : [];
-    base64List.forEach((b64, i) => {
+    // 8. 异步上传所有图片到Storage，完成后更新历史记录和气泡
+    const photoUrls = new Array(base64List.length).fill(null);
+    const photoMsgIdx = chatHistory.length - (reply ? 2 : 1); // 找到刚存的图片消息
+    const uploadPromises = base64List.map((b64, i) =>
       uploadToStorage(b64, PHOTO_BUCKET, `photo_${Date.now()}_${i}.jpg`).then(url => {
-        if (url && photoImgs[i]) photoImgs[i].src = url;
-      });
+        if (url) {
+          photoUrls[i] = url;
+          // 更新气泡里的img src
+          const imgs = container ? container.querySelectorAll(`img[src^="data:image"]`) : [];
+          const targetImg = Array.from(imgs).find(img => img.src.includes(base64List[i].slice(0, 20)));
+          if (targetImg) targetImg.src = url;
+        }
+      })
+    );
+    Promise.all(uploadPromises).then(() => {
+      // 存入历史记录，重建时可以显示图片
+      const validUrls = photoUrls.filter(Boolean);
+      if (validUrls.length > 0 && typeof chatHistory !== 'undefined') {
+        const msgIdx = chatHistory.findIndex(m => m.content && m.content.includes('[用户发了') && !m._photoUrls);
+        if (msgIdx !== -1) {
+          chatHistory[msgIdx]._photoUrls = validUrls;
+          if (typeof saveHistory === 'function') saveHistory();
+        }
+      }
     });
 
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
@@ -299,4 +326,51 @@ async function handlePhotoInputChange(e) {
   } catch(e) {
     if (typeof showToast === 'function') showToast('读取图片失败，请重试');
   }
+}
+
+// ===== 检测是否想重新换头像 =====
+async function checkAvatarReplace(userText) {
+  const text = userText.toLowerCase();
+
+  // 检测换头像意图
+  const wantReplace = /换错了|换另.个|不喜欢这个|换一张|重新换|换回|换个别的|这个不好|不要这个|换掉|switch.*avatar|change.*avatar|different.*avatar|want.*change/i.test(text);
+  if (!wantReplace) return false;
+
+  // 有没有之前存的图片可以重新选
+  const lastPhotoMsg = typeof chatHistory !== 'undefined'
+    ? chatHistory.filter(m => m.role === 'user' && m._photoBase64 && m._photoBase64.length > 0).slice(-1)[0]
+    : null;
+
+  if (!lastPhotoMsg) return false; // 没有之前的图片，走正常流程
+
+  const base64List = lastPhotoMsg._photoBase64;
+
+  // Ghost回应
+  if (typeof showTyping === 'function') showTyping();
+  await new Promise(r => setTimeout(r, 800));
+
+  let reply = '';
+  if (base64List.length > 1) {
+    // 多张图，问用户要哪张
+    reply = "which one.";
+    _pendingAvatarChoice = { base64List };
+  } else {
+    // 只有一张，直接换
+    const ghostB64 = base64List[0];
+    updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
+    uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
+      if (url) updateGhostAvatar(url);
+    });
+    reply = "changed.";
+    sessionStorage.removeItem('avatarRequestPending');
+  }
+
+  if (typeof hideTyping === 'function') hideTyping();
+  if (typeof appendMessage === 'function') appendMessage('bot', reply);
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({ role: 'assistant', content: reply });
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  return true;
 }
