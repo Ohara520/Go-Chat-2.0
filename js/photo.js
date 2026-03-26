@@ -148,11 +148,12 @@ async function handlePhotoUpload(fileDataList) {
         }))
       : [];
 
-    // 构建带图片的最后一条消息，用实际mime类型
-    const imageContents = base64List.map((b64, i) => ({
+    // 压缩后统一用jpeg（canvas.toDataURL输出的是jpeg）
+    const imageContents = base64List.map(b64 => ({
       type: 'image',
-      source: { type: 'base64', media_type: items[i]?.type || 'image/jpeg', data: b64 }
+      source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
     }));
+    console.log('[photo] 发给S的图片数量:', imageContents.length, '第一张base64长度:', base64List[0]?.length);
 
     const lastUserText = cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.';
     const msgsWithPhoto = [
@@ -165,7 +166,7 @@ async function handlePhotoUpload(fileDataList) {
 
     let reply = '';
 
-    // S直接看图回复（支持vision）
+    // S直接看图回复
     try {
       const sRes = await fetchWithTimeout('/api/chat', {
         method: 'POST',
@@ -178,10 +179,7 @@ async function handlePhotoUpload(fileDataList) {
             ...cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了')).slice(0, -1),
             {
               role: 'user',
-              content: [
-                ...imageContents,
-                { type: 'text', text: '.' }
-              ]
+              content: [...imageContents, { type: 'text', text: recentText.slice(-100) || '.' }]
             }
           ]
         })
@@ -197,10 +195,7 @@ async function handlePhotoUpload(fileDataList) {
     // S失败，G兜底
     if (!reply && typeof fetchDeepSeek === 'function') {
       const core = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
-      reply = await fetchDeepSeek(
-        core + '\n' + photoHint + '\nRespond as Ghost. English only. Short.',
-        recentText.slice(-200), 150
-      ).catch(() => '');
+      reply = await fetchDeepSeek(core + '\n' + photoHint + '\nRespond as Ghost. English only. Short.', recentText.slice(-200), 150).catch(() => '');
     }
 
     if (!reply) reply = 'noted.';

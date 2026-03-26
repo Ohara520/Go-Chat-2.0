@@ -4069,9 +4069,14 @@ cn under 10 characters, spoken Chinese, same feeling.`;
         const data = await res.json();
         const raw = data.content?.[0]?.text?.trim() || '';
         const isBreakout = /I'm Claude|I cannot|I need to stop/i.test(raw);
-        if (!isBreakout) {
-          const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
-          if (jsonMatch) { en = jsonMatch[1].trim(); cn = jsonMatch[2].trim(); }
+        if (!isBreakout && raw) {
+          // 宽松JSON解析
+          const jsonMatch = raw.match(/"en"\s*:\s*"([^"]+)"/);
+          const cnMatch = raw.match(/"cn"\s*:\s*"([^"]+)"/);
+          if (jsonMatch) en = jsonMatch[1].trim();
+          if (cnMatch) cn = cnMatch[1].trim();
+          // 如果没有JSON格式，直接用返回内容作为en
+          if (!en && raw.length < 50 && !raw.includes('{')) en = raw;
         }
       }
     }
