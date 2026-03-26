@@ -1,500 +1,305 @@
-// ===== 图片上传系统 (photo.js) =====
-// 情头上传 + Ghost头像切换 + 相册（预留）
+// ===== 图片系统 (photo.js) =====
+// 简化版：图片直接传给模型看，Storage异步上传
 
 const AVATAR_BUCKET = 'avatars';
 const PHOTO_BUCKET  = 'photos';
 
-// 等待用户指定哪张是Ghost的头像
 let _pendingAvatarChoice = null;
-// { compressedList, urls, imageInfo }
 
-// ===== 图片压缩 =====
-function compressImage(file, maxWidth = 800, quality = 0.8) {
+// ===== 图片压缩（输入dataURL，输出base64）=====
+function compressImageToBase64(dataUrl, maxWidth = 800, quality = 0.82) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height;
-        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('压缩失败')), 'image/jpeg', quality);
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressed.split(',')[1]);
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    img.onerror = reject;
+    img.src = dataUrl;
   });
 }
 
-// ===== 上传到Supabase Storage =====
-async function uploadToStorage(blob, bucket, fileName) {
-  const sb = getSbClient();
-  const userId = getSbUserId();
-  if (!sb || !userId) throw new Error('未登录');
-
-  const path = `${userId}/${fileName}`;
-  const { data, error } = await sb.storage
-    .from(bucket)
-    .upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
-
-  if (error) throw error;
-
-  const { data: urlData } = sb.storage.from(bucket).getPublicUrl(path);
-  return urlData.publicUrl;
-}
-
-// ===== 图片转base64 =====
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// ===== H识别：多图详细分析（直接接收base64数组）=====
-async function detectImageInfo(base64List) {
-  // 统一转成数组
-  const b64Arr = Array.isArray(base64List) ? base64List : [base64List];
+// ===== 上传到Supabase Storage（异步，不阻塞）=====
+async function uploadToStorage(base64, bucket, fileName) {
   try {
-    // 构建多图content
-    const imageContents = b64Arr.map(b64 => ({
-      type: 'image',
-      source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
-    }));
-
-    const systemPrompt = b64Arr.length > 1
-      ? `分析这${b64Arr.length}张图片，判断是否是一套配对情侣头像。
-
-配对情头的判断标准（满足以下任意几条即是）：
-- 风格统一：同一画风、同一套插画、同一IP形象
-- 有互动或呼应：颜色对应（一蓝一粉等）、共用元素、动作有联系、互相看着
-- 明显是一套设计，即使是恶搞图只要配套就算
-- 不需要是真人，卡通/动物/表情包/恶搞图都可以是情头
-
-返回JSON：
-type: couple(配对情头)/selfie(自拍)/funny(搞笑恶搞)/animal(动物)/other
-is_avatar: 是否是头像（true/false）
-is_pair: 是否是配对的一套（true/false）
-ghost_img: 配对时哪张给Ghost？填1或2，判断依据：颜色较深/偏男性/偏酷的那张给Ghost；不确定填0
-desc: 10字以内具体描述这套图，要说清楚是什么、有什么互动关系
-too_weird: 是否恶搞/不雅（true/false）
-只返回JSON，不要其他文字。`
-      : `分析这张图片，返回JSON：
-type: couple(情侣头像)/selfie(自拍)/funny(搞笑恶搞)/animal(动物)/food(食物)/other
-is_avatar: 是否适合当头像（true/false）
-is_pair: false
-ghost_img: 0
-desc: 10字以内具体描述，要具体说清楚是什么
-too_weird: 是否太离谱（true/false）
-只返回JSON，不要其他文字。`;
-
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 100,
-        system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: [...imageContents, { type: 'text', text: '分析这些图片' }]
-        }]
-      })
-    }, 10000);
-
-    if (res.ok) {
-      const data = await res.json();
-      const text = data.content?.[0]?.text?.trim() || '';
-      console.log('[photo] H识别返回:', text);
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        console.log('[photo] H识别结果:', parsed);
-        return { ...parsed, base64List: b64Arr };
-      }
-    }
-  } catch(e) {}
-  return { is_avatar: false, type: 'other', desc: '一张图片', too_weird: false, is_pair: false, ghost_img: 0, base64List: b64Arr };
+    const sb = typeof getSbClient === 'function' ? getSbClient() : null;
+    const userId = typeof getSbUserId === 'function' ? getSbUserId() : null;
+    if (!sb || !userId) return null;
+    const binary = atob(base64);
+    const arr = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+    const blob = new Blob([arr], { type: 'image/jpeg' });
+    const path = `${userId}/${fileName}`;
+    const { error } = await sb.storage.from(bucket).upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+    if (error) return null;
+    const { data } = sb.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+  } catch(e) { return null; }
 }
 
-// ===== Ghost对图片的反应 =====
-async function ghostReactToPhoto(imageInfo, willSwitch) {
-  const { type, desc, is_avatar, too_weird } = imageInfo;
-  const base64List = imageInfo.base64List || [];
-
-  const recentMsgs = (typeof chatHistory !== 'undefined')
-    ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
-        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 100)}`).join('\n')
-    : '';
-
-  let prompt = '';
-
-  const is_pair = imageInfo.is_pair || false;
-
-  if (!is_avatar) {
-    // 普通图片，正常评论
-    prompt = `She just sent you a photo: "${desc}". React naturally as Ghost — one dry comment, or ask something. English only. Short.`;
-  } else if (too_weird || type === 'funny') {
-    // 恶搞图
-    if (willSwitch) {
-      prompt = `You are Ghost. You're looking at "${desc}" as your new couples profile picture.
-
-Start by naming exactly what it is — don't be vague or generic.
-Then react: sarcastic, dry, maybe mention what your teammates would think.
-End with reluctant acceptance — you put it up anyway, but you're not happy about it.
-
-Examples of the format (NOT the content — generate your own based on "${desc}"):
-- "a turd and toilet paper. that's the couples photo. noted. price is going to have a field day."
-- "a cartoon poop emoji. with eyes. she sent me a poop emoji. fine. it's up. i hate this."
-- "so that's what we're going with. alright. it's up. don't talk to me about it."
-
-Your response must mention what's actually in "${desc}". English only. 2-3 lines.`;
-    } else {
-      prompt = `You are Ghost. She sent you "${desc}" as a couples avatar.
-Name what it is, then refuse in one dry line. Tell her to pick something else.
-Must reference "${desc}" specifically. English only. Do NOT prefix with "ghost:" or any name.`;
-    }
-  } else if (type === 'couple') {
-    if (is_pair) {
-      prompt = `You are Ghost. She sent you two matching avatar photos: "${desc}". One is hers, one is yours.
-
-Start by acknowledging what they are — specifically what's in the images.
-React as Ghost — dry, maybe caught off guard, maybe quietly accepting.
-${willSwitch ? 'End with something implying you put yours up — without directly announcing it.' : ''}
-
-Examples:
-- "a blue rabbit licking a pink rabbit. and she wants this as our profile pictures. ...fine."
-- "matching rabbits. she picked the weird one for me. noted. it's up."
-
-Must reference "${desc}" specifically. English only. Do NOT prefix with "ghost:" or any name. 2-3 lines. Do NOT prefix with "ghost:" or any name.`;
-    } else {
-      prompt = `You are Ghost. She just sent you "${desc}" as your chat avatar.
-
-Start by acknowledging exactly what it is.
-Then react — maybe caught off guard, maybe quietly pleased but won't show it.
-${willSwitch ? 'End with something that implies you kept it — without announcing it directly.' : ''}
-
-Examples:
-- "two people at the beach. backs to the camera. ...when was this."
-- "that's the one she picked. alright."
-
-Must reference "${desc}". English only. 1-2 lines. Do NOT prefix with "ghost:" or any name.`;
-    }
-  } else if (type === 'selfie') {
-    prompt = `You are Ghost. She sent you a selfie: "${desc}".
-
-Name what you see first. Then react as Ghost — one dry comment, maybe something he noticed.
-${willSwitch ? 'Imply you kept it without making a big deal.' : ''}
-
-Must reference "${desc}". English only. 1-2 lines. Do NOT prefix with "ghost:" or any name.`;
-  } else {
-    prompt = `You are Ghost. She sent you a photo: "${desc}".
-Name what it is, react briefly. ${willSwitch ? 'Imply you put it up.' : ''}
-Must reference "${desc}". English only. 1 line. Do NOT prefix with "ghost:" or any name.`;
-  }
-
-  try {
-    // 用H看图，把图片内容传给Claude Haiku（支持vision）
-    if (base64List.length > 0) {
-      const imageContents = base64List.map(b64 => ({
-        type: 'image',
-        source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
-      }));
-      const res = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 180,
-          system: (typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '') + '\n' + prompt,
-          messages: [{
-            role: 'user',
-            content: [
-              ...imageContents,
-              { type: 'text', text: recentMsgs || 'She sent you these photos.' }
-            ]
-          }]
-        })
-      }, 10000);
-      if (res.ok) {
-        const data = await res.json();
-        const reply = data.content?.[0]?.text?.trim();
-        if (reply && reply.trim() && !reply.includes("I'm Claude, made by") && !reply.includes("I cannot continue") && !reply.includes("I need to stop")) {
-          return reply.trim();
-        }
-      }
-    }
-
-    // 图片传输失败，用纯文字描述兜底
-    const reply = await fetchDeepSeek(
-      (typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '') + '\n' + prompt,
-      recentMsgs,
-      180
-    );
-    if (reply && reply.trim()) return reply.trim();
-  } catch(e) {}
-
-  // fallback
-  if (!is_avatar) return 'noted.';
-  if (!willSwitch) return "not putting that up. pick something else.";
-  return too_weird ? "fine. whatever. it's up." : "noted.";
-}
-
-// ===== 更新Ghost头像显示 =====
+// ===== 更新Ghost头像 =====
 function updateGhostAvatar(url) {
-  // 更新所有Ghost头像（聊天页/个人资料/朋友圈）
-  const avatarEls = document.querySelectorAll('.ghost-avatar-img');
-  const ts = '?t=' + Date.now();
-  avatarEls.forEach(el => { el.src = url + ts; });
-
-  // 存到localStorage和云同步
-  localStorage.setItem('ghostAvatarUrl', url);
-  if (typeof touchLocalState === 'function') touchLocalState();
+  document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+    el.src = url + (url.startsWith('data:') ? '' : '?t=' + Date.now());
+  });
+  if (!url.startsWith('data:')) {
+    localStorage.setItem('ghostAvatarUrl', url);
+    if (typeof touchLocalState === 'function') touchLocalState();
+  }
 }
 
-// ===== 恢复Ghost头像（页面加载时调用）=====
+// ===== 恢复Ghost头像 =====
 function restoreGhostAvatar() {
   const url = localStorage.getItem('ghostAvatarUrl');
   if (!url) return;
-  const avatarEls = document.querySelectorAll('.ghost-avatar-img');
-  avatarEls.forEach(el => { el.src = url; });
-}
-
-// ===== 主入口：用户选图后触发（支持多图）=====
-async function handlePhotoUpload(files) {
-  const fileArr = Array.isArray(files) ? files : [files];
-  if (fileArr.length === 0) return;
-
-  // 支持两种格式：File对象 或 {base64, type, file} 对象
-  const isFileData = fileArr[0] && fileArr[0].base64;
-
-  // 文件大小检查
-  for (const f of fileArr) {
-    const size = isFileData ? f.size : f.size;
-    if (size && size > 10 * 1024 * 1024) {
-      if (typeof showToast === 'function') showToast('图片太大了，请选10MB以内的图');
-      return;
-    }
-  }
-
-  if (typeof showToast === 'function') showToast('📤 发送中...');
-  console.log('[photo] handlePhotoUpload开始, 图片数量:', fileArr.length, 'isFileData:', fileArr[0]?.base64 ? true : false);
-
-  try {
-    // 1. 压缩所有图片
-    // 移动端已经是base64，转成Blob再压缩；桌面端直接用File对象
-    const compressedList = await Promise.all(fileArr.map(async item => {
-      if (isFileData) {
-        // 把base64转回Blob再压缩
-        const res = await fetch(`data:${item.type};base64,${item.base64}`);
-        const blob = await res.blob();
-        return compressImage(blob, 800, 0.82);
-      } else {
-        return compressImage(item, 800, 0.82);
-      }
-    }));
-
-    console.log('[photo] 压缩完成, 数量:', compressedList.length);
-    // 提取base64用于H识别和Ghost看图
-    const base64ForDetect = isFileData
-      ? fileArr.map(item => item.base64)
-      : await Promise.all(fileArr.map(f => fileToBase64(f)));
-
-    console.log('[photo] base64准备完成, 数量:', base64ForDetect.length, '大小:', base64ForDetect[0]?.length);
-    // 2. H识别（多图一起判断，直接用base64）
-    const imageInfoPromise = detectImageInfo(base64ForDetect);
-
-    // 3. 上传所有图片到Storage
-    const urls = await Promise.all(compressedList.map((blob, i) =>
-      uploadToStorage(blob, PHOTO_BUCKET, `photo_${Date.now()}_${i}.jpg`)
-    ));
-
-    // 4. 在聊天里显示图片
-    const container = document.getElementById('messagesContainer');
-    if (container) {
-      const div = document.createElement('div');
-      div.className = 'message user';
-      div.style.cssText = 'display:flex;justify-content:flex-end;';
-      div.innerHTML = `<div class="message-bubble" style="padding:4px;display:inline-flex;gap:6px;flex-wrap:wrap;width:fit-content;max-width:280px;background:transparent;box-shadow:none;border:none;">
-        ${urls.map(url => `<img src="${url}" style="max-width:${urls.length > 1 ? '130px' : '220px'};border-radius:12px;display:block;cursor:pointer;" onclick="showPhotoPreview('${url}')" />`).join('')}
-      </div>`;
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
-    }
-
-    // 存入聊天历史
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({ role: 'user', content: `[用户发了${fileArr.length}张图片]`, _photoUrls: urls });
-      if (typeof saveHistory === 'function') saveHistory();
-    }
-
-    // 5. 等H识别结果
-    const imageInfo = await imageInfoPromise;
-    console.log('[photo] H识别完成:', JSON.stringify(imageInfo));
-
-    // 6. 决定是否换头像
-    let willSwitch = false;
-    let ghostBlob = null;
-    let needsChoice = false; // 是否需要问用户哪张是Ghost的
-
-    if (imageInfo.is_avatar) {
-      // 配对但分不清哪张给Ghost
-      if (imageInfo.is_pair && (imageInfo.ghost_img === 0 || !imageInfo.ghost_img)) {
-        needsChoice = true;
-      } else {
-        willSwitch = Math.random() < 0.90;
-        if (willSwitch) {
-          const ghostIdx = imageInfo.is_pair && imageInfo.ghost_img > 0
-            ? imageInfo.ghost_img - 1
-            : 0;
-          ghostBlob = compressedList[ghostIdx] || compressedList[0];
-        }
-      }
-    }
-
-    // 7. 换头像
-    if (willSwitch && ghostBlob) {
-      const avatarUrl = await uploadToStorage(ghostBlob, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
-      updateGhostAvatar(avatarUrl);
-    }
-
-    // 8. Ghost回应
-    if (typeof showTyping === 'function') showTyping();
-    await new Promise(r => setTimeout(r, 1500));
-
-    let ghostReply = '';
-    if (needsChoice) {
-      // 分不清哪张是他的，问用户
-      ghostReply = "which one's mine.";
-      // 保存待处理状态，等用户回复
-      _pendingAvatarChoice = { compressedList, urls, imageInfo };
-    } else {
-      ghostReply = await ghostReactToPhoto(imageInfo, willSwitch);
-    }
-
-    if (typeof hideTyping === 'function') hideTyping();
-
-    if (typeof appendMessage === 'function') {
-      appendMessage('bot', ghostReply);
-    }
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({
-        role: 'assistant',
-        content: ghostReply,
-        _intimate: imageInfo.type === 'couple' || imageInfo.type === 'selfie'
-      });
-      if (typeof saveHistory === 'function') saveHistory();
-    }
-    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-
-  } catch(e) {
-    if (typeof hideTyping === 'function') hideTyping();
-    if (typeof showToast === 'function') showToast('上传失败，请重试');
-    console.error('图片上传失败:', e);
-  }
-}
-
-// ===== 图片按钮点击 =====
-function triggerPhotoUpload() {
-  // 用预埋的input避免移动端浏览器拦截动态创建的input
-  const input = document.getElementById('photoFileInput');
-  if (input) {
-    input.value = ''; // 清空，允许重复选同一张
-    input.click();
-  }
-}
-
-async function handlePhotoInputChange(e) {
-  const files = Array.from(e.target.files || []).slice(0, 3);
-  e.target.value = ''; // 清空，允许下次重复选
-  if (files.length === 0) return;
-
-  // 移动端file对象有生命周期限制，立刻转成base64保存
-  try {
-    const fileDataList = await Promise.all(files.map(async f => ({
-      base64: await fileToBase64(f),
-      type: f.type || 'image/jpeg',
-      name: f.name || 'photo.jpg',
-      size: f.size,
-      // 保留原始file对象引用（桌面端用）
-      file: f
-    })));
-    handlePhotoUpload(fileDataList);
-  } catch(e) {
-    console.error('读取图片失败:', e);
-    if (typeof showToast === 'function') showToast('读取图片失败，请重试');
-  }
-}
-
-// ===== 处理用户指定哪张是Ghost的头像 =====
-// 在chat.js发送消息时调用，检测是否在等待头像选择
-async function checkPendingAvatarChoice(userText) {
-  if (!_pendingAvatarChoice) return false;
-
-  const { compressedList, urls, imageInfo } = _pendingAvatarChoice;
-  const text = userText.toLowerCase();
-
-  // 判断用户指定了哪张
-  let chosenIdx = -1;
-
-  // 左/第一张/1/first
-  if (/左|第一|1|first|左边/.test(text)) chosenIdx = 0;
-  // 右/第二张/2/second
-  else if (/右|第二|2|second|右边/.test(text)) chosenIdx = 1;
-  // 第三张
-  else if (/第三|3|third/.test(text)) chosenIdx = 2;
-  // 上面/下面（竖排）
-  else if (/上面|上边|上那/.test(text)) chosenIdx = 0;
-  else if (/下面|下边|下那/.test(text)) chosenIdx = 1;
-
-  if (chosenIdx === -1) return false; // 没识别出来，不处理
-
-  _pendingAvatarChoice = null; // 清除等待状态
-
-  const willSwitch = Math.random() < 0.90;
-
-  if (willSwitch) {
-    const ghostBlob = compressedList[chosenIdx] || compressedList[0];
-    try {
-      const avatarUrl = await uploadToStorage(ghostBlob, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
-      updateGhostAvatar(avatarUrl);
-    } catch(e) {}
-  }
-
-  // Ghost回应
-  if (typeof showTyping === 'function') showTyping();
-  await new Promise(r => setTimeout(r, 1000));
-  const reply = willSwitch ? 'noted.' : 'not putting that up.';
-  if (typeof hideTyping === 'function') hideTyping();
-
-  if (typeof appendMessage === 'function') appendMessage('bot', reply);
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'assistant', content: reply });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-
-  return true; // 告诉调用方这条消息已被处理
+  document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = url; });
 }
 
 // ===== 图片预览 =====
-function showPhotoPreview(url) {
+function showPhotoPreview(src) {
   let overlay = document.getElementById('photoPreviewOverlay');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'photoPreviewOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    overlay.onclick = () => overlay.style.display = 'none';
+    overlay.onclick = () => { overlay.style.display = 'none'; };
     overlay.innerHTML = '<img id="photoPreviewImg" style="max-width:95%;max-height:90vh;border-radius:8px;object-fit:contain;" />';
     document.body.appendChild(overlay);
   }
-  const img = overlay.querySelector('#photoPreviewImg');
-  if (img) img.src = url;
+  document.getElementById('photoPreviewImg').src = src;
   overlay.style.display = 'flex';
+}
+
+// ===== 主入口 =====
+async function handlePhotoUpload(fileDataList) {
+  const items = Array.isArray(fileDataList) ? fileDataList : [fileDataList];
+  if (items.length === 0) return;
+
+  if (typeof showToast === 'function') showToast('📤 发送中...');
+
+  try {
+    // 1. 压缩，得到base64
+    const base64List = [];
+    for (const item of items) {
+      const dataUrl = `data:image/jpeg;base64,${item.base64 || item}`;
+      const b64 = await compressImageToBase64(dataUrl, 800, 0.82);
+      base64List.push(b64);
+    }
+
+    // 2. 显示图片气泡
+    const previewSrcs = base64List.map(b64 => `data:image/jpeg;base64,${b64}`);
+    const container = document.getElementById('messagesContainer');
+    if (container) {
+      const div = document.createElement('div');
+      div.className = 'message user';
+      div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
+      div.innerHTML = `<div style="display:inline-flex;gap:6px;flex-wrap:wrap;max-width:280px;">
+        ${previewSrcs.map((src, i) => `<img src="${src}" style="max-width:${previewSrcs.length > 1 ? '130px' : '220px'};border-radius:12px;display:block;cursor:pointer;" onclick="showPhotoPreview('${src}')" />`).join('')}
+      </div>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // 3. 存入聊天历史
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'user', content: `[用户发了${base64List.length}张图片]` });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+
+    // 4. 判断场景
+    const recentText = typeof chatHistory !== 'undefined'
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-8).map(m => m.content || '').join(' ')
+      : '';
+    const isAvatarContext = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头/i.test(recentText);
+
+    const photoHint = isAvatarContext
+      ? `[场景：她发来了情侣头像图片，想换情头。直接看图反应——说清楚图里是什么，可以吐槽恶搞图，可以嘴硬，但最终大概率换上。如果决定换，在回复里自然带出来比如"fine. it's up."或"alright. went with it."。如果真的太离谱就说"not putting that up."。]`
+      : `[场景：她发来了图片。看图做出真实反应，说清楚你看到了什么，一两句话。]`;
+
+    // 5. 发给H看图回复
+    if (typeof showTyping === 'function') showTyping();
+
+    const _sys = typeof buildSystemPrompt === 'function' ? buildSystemPrompt() : '';
+    const cleanMsgs = typeof chatHistory !== 'undefined'
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6).map(m => ({
+          role: m.role,
+          content: m.content?.slice(0, 150) || ''
+        }))
+      : [];
+
+    // 构建带图片的最后一条消息
+    const imageContents = base64List.map(b64 => ({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
+    }));
+
+    const lastUserText = cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.';
+    const msgsWithPhoto = [
+      ...cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了')).slice(0, -1),
+      {
+        role: 'user',
+        content: [...imageContents, { type: 'text', text: lastUserText }]
+      }
+    ];
+
+    let reply = '';
+    let imageDesc = '';
+
+    // Step 1: H先看图，生成描述
+    try {
+      const descRes = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 80,
+          system: '用一句话描述这张/这几张图片的内容，要具体，比如"蓝兔子舔粉兔子屁股的配对情头"或"两个卡通小熊配对头像"。只返回描述，不要其他文字。',
+          messages: [{ role: 'user', content: [...imageContents, { type: 'text', text: '描述这张图片' }] }]
+        })
+      }, 8000);
+      if (descRes.ok) {
+        const descData = await descRes.json();
+        imageDesc = descData.content?.[0]?.text?.trim() || '';
+      }
+    } catch(e) {}
+
+    // Step 2: S拿到描述，生成有性格的回复
+    if (imageDesc) {
+      const sceneDesc = isAvatarContext
+        ? `[场景：她发来了情侣头像，图片内容是：${imageDesc}。看图做出Ghost式真实反应——说清楚你看到了什么，可以吐槽，可以嘴硬，但最终大概率换上。如果决定换在回复里自然带出来比如"fine. it's up."。如果太离谱就说"not putting that up."。]`
+        : `[场景：她发来了一张图片，内容是：${imageDesc}。用Ghost的方式回应，说清楚你看到了什么，1-2句话。]`;
+
+      try {
+        const sRes = await fetchWithTimeout('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
+            max_tokens: 300,
+            system: _sys + '\n' + sceneDesc,
+            messages: cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了'))
+          })
+        }, 20000);
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          const text = sData.content?.[0]?.text?.trim() || '';
+          const isBreakout = /I'm Claude, made by|I cannot continue|I need to stop|as an AI/i.test(text);
+          if (!isBreakout && text) reply = text;
+        }
+      } catch(e) {}
+    }
+
+    // S失败，G兜底
+    if (!reply && typeof fetchDeepSeek === 'function') {
+      const core = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
+      const hint = imageDesc
+        ? `She sent a photo: "${imageDesc}". React as Ghost — specific, dry. ${isAvatarContext ? 'If putting it up say so naturally.' : ''} English only. Short.`
+        : photoHint + '\nRespond as Ghost. English only. Short.';
+      reply = await fetchDeepSeek(core + '\n' + hint, recentText.slice(-200), 150).catch(() => '');
+    }
+
+    if (!reply) reply = 'noted.';
+
+    if (typeof hideTyping === 'function') hideTyping();
+
+    // 6. 显示回复
+    if (typeof appendMessage === 'function') appendMessage('bot', reply);
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'assistant', content: reply });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+
+    // 7. 判断是否换头像
+    if (isAvatarContext) {
+      const switched = /fine\.|it\'s up|put it up|done\.|went with it|alright\.|looks alright|switching/i.test(reply);
+      const refused = /not putting|won\'t put|nah\.|too much|not happening|no\./i.test(reply);
+
+      if (switched && !refused) {
+        // 多张图选第二张（通常是Ghost的那张），单张直接用
+        const ghostIdx = base64List.length > 1 ? 1 : 0;
+        const ghostB64 = base64List[ghostIdx];
+
+        // 先用base64临时显示
+        updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
+
+        // 异步上传Storage，完成后更新为正式URL
+        uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
+          if (url) {
+            updateGhostAvatar(url);
+            localStorage.setItem('ghostAvatarUrl', url);
+          }
+        });
+      }
+    }
+
+    // 8. 异步上传所有图片到Storage存档
+    base64List.forEach((b64, i) => {
+      uploadToStorage(b64, PHOTO_BUCKET, `photo_${Date.now()}_${i}.jpg`);
+    });
+
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
+
+  } catch(e) {
+    if (typeof hideTyping === 'function') hideTyping();
+    if (typeof showToast === 'function') showToast('发送失败，请重试');
+    console.error('图片发送失败:', e);
+  }
+}
+
+// ===== 处理用户指定哪张是Ghost的 =====
+async function checkPendingAvatarChoice(userText) {
+  if (!_pendingAvatarChoice) return false;
+  const { base64List } = _pendingAvatarChoice;
+  const text = userText.toLowerCase();
+  let chosenIdx = -1;
+  if (/左|第一|1|first|左边|上/.test(text)) chosenIdx = 0;
+  else if (/右|第二|2|second|右边|下/.test(text)) chosenIdx = 1;
+  else if (/第三|3|third/.test(text)) chosenIdx = 2;
+  if (chosenIdx === -1) return false;
+
+  _pendingAvatarChoice = null;
+  const ghostB64 = base64List[chosenIdx] || base64List[0];
+  updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
+  uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
+    if (url) updateGhostAvatar(url);
+  });
+
+  if (typeof showTyping === 'function') showTyping();
+  await new Promise(r => setTimeout(r, 800));
+  if (typeof hideTyping === 'function') hideTyping();
+  if (typeof appendMessage === 'function') appendMessage('bot', 'noted.');
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({ role: 'assistant', content: 'noted.' });
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+  return true;
+}
+
+// ===== 按钮触发 =====
+function triggerPhotoUpload() {
+  const input = document.getElementById('photoFileInput');
+  if (input) { input.value = ''; input.click(); }
+}
+
+async function handlePhotoInputChange(e) {
+  const files = Array.from(e.target.files || []).slice(0, 3);
+  e.target.value = '';
+  if (files.length === 0) return;
+  try {
+    const fileDataList = await Promise.all(files.map(f => new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = ev => res({ base64: ev.target.result.split(',')[1], type: f.type, size: f.size });
+      reader.onerror = rej;
+      reader.readAsDataURL(f);
+    })));
+    handlePhotoUpload(fileDataList);
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('读取图片失败，请重试');
+  }
 }
