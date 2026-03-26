@@ -4440,7 +4440,7 @@ async function sendMessage() {
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
             max_tokens: 30,
-            system: '判断这句话是否带有调情/暗示/撩拨/亲密意图。注意：提到换头像、情侣头像、profile picture、couple avatar、couple photo、情头等不算调情。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+            system: '判断这句话是否带有明确的调情/身体暗示/露骨撩拨意图。注意：单纯的撒娇（babe/hubby/宝贝/老公）、表达想念（miss you/想你）、日常亲昵不算调情。只有明显的身体接触暗示、露骨描述、或刻意挑逗才算。提到换头像/情头也不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
             messages: [{ role: 'user', content: text }]
           })
         }, 3000);
@@ -4462,7 +4462,7 @@ async function sendMessage() {
           `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`
         ).join('\n');
         const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + '\nShe said something flirty or intimate. Respond as Ghost — flat delivery, plain words. If there\'s a second meaning available, he uses it without flagging it. One line, maybe two. He doesn\'t explain. He doesn\'t retreat. If he closes it, he closes it clean. English only. Short.',
+          buildGhostStyleCore() + '\nShe just said something to him. Respond as Ghost — flat delivery, plain words. If there\'s a second meaning available, he uses it without flagging it. One line, maybe two. He doesn\'t explain. He doesn\'t retreat. If he closes it, he closes it clean. English only. Short.',
           recentMsgs + '\nHer: ' + text,
           200
         );
