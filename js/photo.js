@@ -118,8 +118,14 @@ async function handlePhotoUpload(fileDataList) {
     const isAvatarContext = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头/i.test(recentText);
 
     const photoHint = isAvatarContext
-      ? `[场景：她发来了情侣头像图片，想换情头。直接看图反应——说清楚图里是什么，可以吐槽恶搞图，可以嘴硬，但最终大概率换上。如果决定换，在回复里自然带出来比如"fine. it's up."或"alright. went with it."。如果真的太离谱就说"not putting that up."。]`
-      : `[场景：她发来了图片。看图做出真实反应，说清楚你看到了什么，一两句话。]`;
+      ? `[场景：她发来了情侣头像图片想换情头。
+看图做出Ghost式真实反应：
+- 说清楚你看到了什么，要具体（比如"a blue rabbit with its tongue out"不是"cute"）
+- 如果图很离谱/搞笑，要吐槽那个具体的细节，干燥地嘲讽
+- 可以嘴硬，但90%最终换上——如果换了，用"fine. it's up."/"already set it."/"done."等自然带出
+- 只有真的太离谱才说"not putting that up."
+英文回复，1-2句话，不要太礼貌，不要用"cute"这种通用词。]`
+      : `[场景：她发来了图片。直接说你看到了什么，具体描述，Ghost式反应，1句话。]`;
 
     // 5. 发给H看图回复
     if (typeof showTyping === 'function') showTyping();
@@ -200,8 +206,8 @@ async function handlePhotoUpload(fileDataList) {
 
     // 7. 判断是否换头像
     if (isAvatarContext) {
-      const switched = /fine\.|it\'s up|put it up|done\.|went with it|alright\.|looks alright|switching/i.test(reply);
-      const refused = /not putting|won\'t put|nah\.|too much|not happening|no\./i.test(reply);
+      const switched = /fine\.|it\'s up|put it up|done\.|went with it|alright\.|looks alright|switching|already set|set it|changed it|up now|using it|keeping it/i.test(reply);
+      const refused = /not putting|won\'t put|not happening/i.test(reply);
 
       if (switched && !refused) {
         // 多张图选第二张（通常是Ghost的那张），单张直接用
