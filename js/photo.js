@@ -86,7 +86,8 @@ async function handlePhotoUpload(fileDataList) {
     // 1. 压缩，得到base64
     const base64List = [];
     for (const item of items) {
-      const dataUrl = `data:image/jpeg;base64,${item.base64 || item}`;
+      const mimeType = item.type || 'image/jpeg';
+      const dataUrl = `data:${mimeType};base64,${item.base64 || item}`;
       const b64 = await compressImageToBase64(dataUrl, 800, 0.82);
       base64List.push(b64);
     }
@@ -116,6 +117,7 @@ async function handlePhotoUpload(fileDataList) {
       ? chatHistory.filter(m => !m._system && !m._recalled).slice(-8).map(m => m.content || '').join(' ')
       : '';
     const isAvatarContext = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头/i.test(recentText);
+    console.log('[photo] isAvatarContext:', isAvatarContext, 'recentText片段:', recentText.slice(-100));
 
     const photoHint = isAvatarContext
       ? `[场景：她发来了情侣头像图片想换情头。
