@@ -284,6 +284,7 @@ async function handlePhotoUpload(files) {
   }
 
   if (typeof showToast === 'function') showToast('📤 发送中...');
+  console.log('[photo] handlePhotoUpload开始, 图片数量:', fileArr.length, 'isFileData:', fileArr[0]?.base64 ? true : false);
 
   try {
     // 1. 压缩所有图片
@@ -299,11 +300,13 @@ async function handlePhotoUpload(files) {
       }
     }));
 
+    console.log('[photo] 压缩完成, 数量:', compressedList.length);
     // 提取base64用于H识别和Ghost看图
     const base64ForDetect = isFileData
       ? fileArr.map(item => item.base64)
       : await Promise.all(fileArr.map(f => fileToBase64(f)));
 
+    console.log('[photo] base64准备完成, 数量:', base64ForDetect.length, '大小:', base64ForDetect[0]?.length);
     // 2. H识别（多图一起判断，直接用base64）
     const imageInfoPromise = detectImageInfo(base64ForDetect);
 
@@ -333,6 +336,7 @@ async function handlePhotoUpload(files) {
 
     // 5. 等H识别结果
     const imageInfo = await imageInfoPromise;
+    console.log('[photo] H识别完成:', JSON.stringify(imageInfo));
 
     // 6. 决定是否换头像
     let willSwitch = false;
