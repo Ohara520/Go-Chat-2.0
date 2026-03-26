@@ -4006,29 +4006,26 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
   let en = '', cn = '';
   try {
     const raw = await fetchDeepSeek(
-      `You write Ghost's inner thought — what he's actually thinking but won't say out loud.
+      `You are Ghost. Something just happened. This is what crossed your mind — one fragment, unfiltered.
 
-Context:
 ${recentContext}
-- Scene: ${sceneHint}
+Scene: ${sceneHint}
 
-Rules:
-- One line only. Max 10 words in English.
-- First person, lowercase, no punctuation drama.
-- Fragmented is fine. Incomplete is fine.
-- This is what slipped through — not what he planned to think.
-- Do NOT repeat what he already said out loud.
-- Reveal the gap between what he said and what he felt.
+One line. Max 10 words. Lowercase. Fragmented is fine.
+What slipped through — not what he planned to think.
+Not what he already said out loud.
+The gap between what he said and what he felt.
 
-Return JSON only: {"en":"...","cn":"..."}
-cn = natural spoken Chinese, same feeling, under 10 characters.`,
+{"en":"...","cn":"..."}
+cn under 10 characters, spoken Chinese, same feeling.`,
       '',
       80
     );
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    if (parsed.en && parsed.cn && /[一-鿿]/.test(parsed.cn)) {
-      en = parsed.en.trim();
-      cn = parsed.cn.trim();
+    // 宽松解析，从G返回的任意内容里提取JSON
+    const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
+    if (jsonMatch) {
+      en = jsonMatch[1].trim();
+      cn = jsonMatch[2].trim();
     }
   } catch(e) {}
 
