@@ -208,7 +208,8 @@ async function handlePhotoUpload(fileDataList) {
     if (isAvatarContext) {
       // 默认换，除非明确拒绝
       const refused = /not putting|won\'t put|not happening|not doing that/i.test(reply);
-      const willSwitch = !refused && Math.random() < 0.90; // 90%换，10%随机不换
+      const willSwitch = !refused && Math.random() < 0.90;
+      console.log('[photo] 换头像判断: refused=', refused, 'willSwitch=', willSwitch, 'reply=', reply.slice(0, 50));
 
       if (willSwitch) {
         // 多张图选第二张（通常是Ghost的那张），单张直接用
@@ -228,9 +229,12 @@ async function handlePhotoUpload(fileDataList) {
       }
     }
 
-    // 8. 异步上传所有图片到Storage存档
+    // 8. 异步上传所有图片到Storage存档，完成后替换气泡里的base64为正式URL
+    const photoImgs = container ? Array.from(container.querySelectorAll('img[src^="data:image"]')).slice(-base64List.length) : [];
     base64List.forEach((b64, i) => {
-      uploadToStorage(b64, PHOTO_BUCKET, `photo_${Date.now()}_${i}.jpg`);
+      uploadToStorage(b64, PHOTO_BUCKET, `photo_${Date.now()}_${i}.jpg`).then(url => {
+        if (url && photoImgs[i]) photoImgs[i].src = url;
+      });
     });
 
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
