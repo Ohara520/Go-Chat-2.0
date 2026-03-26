@@ -276,10 +276,13 @@ async function handlePhotoUpload(files) {
   const fileArr = Array.isArray(files) ? files : [files];
   if (fileArr.length === 0) return;
 
+  // 支持两种格式：File对象 或 {base64, type, file} 对象
+  const isFileData = fileArr[0] && fileArr[0].base64;
+
   // 文件大小检查
   for (const f of fileArr) {
-    if (!f.type.startsWith('image/')) continue;
-    if (f.size > 10 * 1024 * 1024) {
+    const size = isFileData ? f.size : f.size;
+    if (size && size > 10 * 1024 * 1024) {
       if (typeof showToast === 'function') showToast('图片太大了，请选10MB以内的图');
       return;
     }
@@ -289,10 +292,25 @@ async function handlePhotoUpload(files) {
 
   try {
     // 1. 压缩所有图片
-    const compressedList = await Promise.all(fileArr.map(f => compressImage(f, 800, 0.82)));
+    // 移动端已经是base64，转成Blob再压缩；桌面端直接用File对象
+    const compressedList = await Promise.all(fileArr.map(async item => {
+      if (isFileData) {
+        // 把base64转回Blob再压缩
+        const res = await fetch(`data:${item.type};base64,${item.base64}`);
+        const blob = await res.blob();
+        return compressImage(blob, 800, 0.82);
+      } else {
+        return compressImage(item, 800, 0.82);
+      }
+    }));
+
+    // 原始file对象（用于H识别）
+    const originalFiles = isFileData
+      ? fileArr.map(item => item.file).filter(Boolean)
+      : fileArr;
 
     // 2. H识别（多图一起判断）
-    const imageInfoPromise = detectImageInfo(fileArr);
+    const imageInfoPromise = detectImageInfo(originalFiles.length > 0 ? originalFiles : fileArr);
 
     // 3. 上传所有图片到Storage
     const urls = await Promise.all(compressedList.map((blob, i) =>
@@ -393,10 +411,26 @@ function triggerPhotoUpload() {
   }
 }
 
-function handlePhotoInputChange(e) {
+async function handlePhotoInputChange(e) {
   const files = Array.from(e.target.files || []).slice(0, 3);
   e.target.value = ''; // 清空，允许下次重复选
-  if (files.length > 0) handlePhotoUpload(files);
+  if (files.length === 0) return;
+
+  // 移动端file对象有生命周期限制，立刻转成base64保存
+  try {
+    const fileDataList = await Promise.all(files.map(async f => ({
+      base64: await fileToBase64(f),
+      type: f.type || 'image/jpeg',
+      name: f.name || 'photo.jpg',
+      size: f.size,
+      // 保留原始file对象引用（桌面端用）
+      file: f
+    })));
+    handlePhotoUpload(fileDataList);
+  } catch(e) {
+    console.error('读取图片失败:', e);
+    if (typeof showToast === 'function') showToast('读取图片失败，请重试');
+  }
 }
 
 // ===== 处理用户指定哪张是Ghost的头像 =====
