@@ -3747,6 +3747,8 @@ function appendMessage(role, text, animate = true) {
   if (role === 'bot' || role === 'assistant') {
     text = text.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
   }
+    // 去掉G偶尔加的'ghost:'前缀
+    text = text.replace(/^ghost\s*:\s*/i, '').trim();
 
   // 空内容不渲染
   if (!text || !text.trim()) return { msgDiv: null, bubble: null, innerThoughtEl: null };
@@ -4411,7 +4413,7 @@ async function sendMessage() {
     const _baseSystem = buildSystemPrompt();
 
     // 钱场景判断：没有明确钱场景时，注入"本轮不要给钱"
-    const moneyHint = hasMoneyContext(text) ? '' : '[No money this reply — there is no clear financial or care context in this message. Do NOT output GIVE_MONEY tag.]';
+    const moneyHint = hasMoneyContext(text) ? '' : '[No money this reply — there is no clear financial or care context in this message. Do NOT output GIVE_MONEY tag. Note: if she mentions money as a bribe or bargaining chip (e.g. "I will give you £50 if you..."), do NOT transfer — react to the offer instead.]';
 
     // 场景分类 — 按输入决定补充规则
     const t = text.toLowerCase();
