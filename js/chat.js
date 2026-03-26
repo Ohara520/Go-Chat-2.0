@@ -6,6 +6,7 @@ let _ambientVolume = 0.6;
 
 // ===== 打断控制 =====
 let _currentAbortController = null; // 当前请求的AbortController
+let _sendVersion = 0; // 每次新请求版本号+1，用于丢弃旧请求的回复
 
 function toggleAmbient() {
   const body = document.getElementById('ambientBody');
@@ -4318,7 +4319,9 @@ async function sendMessage() {
     hideTyping();
     _isSending = false;
   }
-  _isSending = true; // 立刻锁定，防止切页面重渲染吞消息
+  _sendVersion++; // 版本号+1，旧请求回调会因版本不对被丢弃
+  const _myVersion = _sendVersion;
+  _isSending = true;
   _currentAbortController = new AbortController();
 
   // 爱意抗拒值更新 + 剧情解锁检测
@@ -4632,6 +4635,14 @@ async function sendMessage() {
     }
 
     const data = await response.json();
+
+    // 版本号检查——如果已经被新请求打断，丢弃这个回复
+    if (_myVersion !== _sendVersion) {
+      hideTyping();
+      _isSending = false;
+      return;
+    }
+
     hideTyping();
 
     let reply = data.content?.[0]?.text || '';
