@@ -208,9 +208,10 @@ Must reference "${desc}". English only. 1 line.`;
 
 // ===== 更新Ghost头像显示 =====
 function updateGhostAvatar(url) {
-  // 更新聊天页头像
-  const avatarEls = document.querySelectorAll('.ghost-avatar img, #chatAvatar, .chat-avatar img');
-  avatarEls.forEach(el => { el.src = url + '?t=' + Date.now(); });
+  // 更新所有Ghost头像（聊天页/个人资料/朋友圈）
+  const avatarEls = document.querySelectorAll('.ghost-avatar-img');
+  const ts = '?t=' + Date.now();
+  avatarEls.forEach(el => { el.src = url + ts; });
 
   // 存到localStorage和云同步
   localStorage.setItem('ghostAvatarUrl', url);
@@ -221,7 +222,7 @@ function updateGhostAvatar(url) {
 function restoreGhostAvatar() {
   const url = localStorage.getItem('ghostAvatarUrl');
   if (!url) return;
-  const avatarEls = document.querySelectorAll('.ghost-avatar img, #chatAvatar, .chat-avatar img');
+  const avatarEls = document.querySelectorAll('.ghost-avatar-img');
   avatarEls.forEach(el => { el.src = url; });
 }
 
