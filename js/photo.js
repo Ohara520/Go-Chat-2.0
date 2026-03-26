@@ -57,22 +57,19 @@ function fileToBase64(file) {
   });
 }
 
-// ===== H识别：多图详细分析 =====
-async function detectImageInfo(files) {
+// ===== H识别：多图详细分析（直接接收base64数组）=====
+async function detectImageInfo(base64List) {
   // 统一转成数组
-  const fileArr = Array.isArray(files) ? files : [files];
+  const b64Arr = Array.isArray(base64List) ? base64List : [base64List];
   try {
-    // 所有图片转base64
-    const base64List = await Promise.all(fileArr.map(f => fileToBase64(f)));
-
     // 构建多图content
-    const imageContents = base64List.map(b64 => ({
+    const imageContents = b64Arr.map(b64 => ({
       type: 'image',
       source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
     }));
 
-    const systemPrompt = fileArr.length > 1
-      ? `分析这${fileArr.length}张图片，判断是否是一套配对情侣头像。
+    const systemPrompt = b64Arr.length > 1
+      ? `分析这${b64Arr.length}张图片，判断是否是一套配对情侣头像。
 
 配对情头的判断标准（满足以下任意几条即是）：
 - 风格统一：同一画风、同一套插画、同一IP形象
@@ -117,17 +114,17 @@ too_weird: 是否太离谱（true/false）
       const match = text.match(/\{[\s\S]*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]);
-        return { ...parsed, fileArr };
+        return { ...parsed, base64List: b64Arr };
       }
     }
   } catch(e) {}
-  return { is_avatar: false, type: 'other', desc: '一张图片', too_weird: false, is_pair: false, ghost_img: 0, fileArr };
+  return { is_avatar: false, type: 'other', desc: '一张图片', too_weird: false, is_pair: false, ghost_img: 0, base64List: b64Arr };
 }
 
 // ===== Ghost对图片的反应 =====
 async function ghostReactToPhoto(imageInfo, willSwitch) {
   const { type, desc, is_avatar, too_weird } = imageInfo;
-  const fileArr = imageInfo.fileArr || [];
+  const base64List = imageInfo.base64List || [];
 
   const recentMsgs = (typeof chatHistory !== 'undefined')
     ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
@@ -202,10 +199,6 @@ Must reference "${desc}". English only. 1 line. Do NOT prefix with "ghost:" or a
 
   try {
     // 用H看图，把图片内容传给Claude Haiku（支持vision）
-    const base64List = fileArr.length > 0
-      ? await Promise.all(fileArr.map(f => fileToBase64(f))).catch(() => [])
-      : [];
-
     if (base64List.length > 0) {
       const imageContents = base64List.map(b64 => ({
         type: 'image',
@@ -304,13 +297,13 @@ async function handlePhotoUpload(files) {
       }
     }));
 
-    // 原始file对象（用于H识别）
-    const originalFiles = isFileData
-      ? fileArr.map(item => item.file).filter(Boolean)
-      : fileArr;
+    // 提取base64用于H识别和Ghost看图
+    const base64ForDetect = isFileData
+      ? fileArr.map(item => item.base64)
+      : await Promise.all(fileArr.map(f => fileToBase64(f)));
 
-    // 2. H识别（多图一起判断）
-    const imageInfoPromise = detectImageInfo(originalFiles.length > 0 ? originalFiles : fileArr);
+    // 2. H识别（多图一起判断，直接用base64）
+    const imageInfoPromise = detectImageInfo(base64ForDetect);
 
     // 3. 上传所有图片到Storage
     const urls = await Promise.all(compressedList.map((blob, i) =>
