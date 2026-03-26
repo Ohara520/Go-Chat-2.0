@@ -148,10 +148,10 @@ async function handlePhotoUpload(fileDataList) {
         }))
       : [];
 
-    // 构建带图片的最后一条消息
-    const imageContents = base64List.map(b64 => ({
+    // 构建带图片的最后一条消息，用实际mime类型
+    const imageContents = base64List.map((b64, i) => ({
       type: 'image',
-      source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
+      source: { type: 'base64', media_type: items[i]?.type || 'image/jpeg', data: b64 }
     }));
 
     const lastUserText = cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.';
@@ -180,7 +180,7 @@ async function handlePhotoUpload(fileDataList) {
               role: 'user',
               content: [
                 ...imageContents,
-                { type: 'text', text: cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.' }
+                { type: 'text', text: '.' }
               ]
             }
           ]

@@ -235,10 +235,11 @@ async function fetchWithTimeout(url, options, timeoutMs = 15000) {
 
 async function fetchWithRetry(url, options, timeoutMs = 30000, maxRetries = 2) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // 如果signal已经abort，立刻停止重试
+    if (options?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     try {
       const res = await fetchWithTimeout(url, options, timeoutMs);
       if (res.status === 529 || res.status === 503 || res.status === 502) {
-        // 服务器忙，等一下再试
         if (attempt < maxRetries) {
           await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
           continue;
@@ -246,7 +247,8 @@ async function fetchWithRetry(url, options, timeoutMs = 30000, maxRetries = 2) {
       }
       return res;
     } catch(e) {
-      if (attempt < maxRetries && e?.name !== 'AbortError') {
+      if (e?.name === 'AbortError') throw e; // 打断直接抛出，不重试
+      if (attempt < maxRetries) {
         await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
         continue;
       }
