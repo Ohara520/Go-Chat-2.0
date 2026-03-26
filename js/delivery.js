@@ -1,3 +1,19 @@
+// ===== 快递破防检测 =====
+function _isDeliveryBreakout(text) {
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  return ["i'm claude", "i am claude", "made by anthropic", "i can't roleplay",
+    "i cannot roleplay", "as an ai", "i need to be direct", "i should have caught",
+    "system instructions", "character persona"].some(p => lower.includes(p));
+}
+
+// ===== 快递专用system prompt（简化版，不说roleplay避免出戏）=====
+function buildDeliverySystem() {
+  const base = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
+  return base + `
+You are Simon "Ghost" Riley. Reply naturally and briefly in character. Lowercase, English only. Do not explain yourself or break character under any circumstances.`;
+}
+
 // ===== 快递系统 (delivery.js) =====
 // ===== 快递系统 =====
 const DELIVERY_STAGES_USER = [
@@ -237,7 +253,7 @@ async function onGhostReceived(delivery) {
       body: JSON.stringify({
         model: pd.isLuxury ? getMainModel() : 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+        system: buildDeliverySystem(),
         messages: [...chatHistory.slice(-10), {
           role: 'user',
           content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || ''}
@@ -251,7 +267,7 @@ async function onGhostReceived(delivery) {
     });
     const data = await res.json();
     const reply = data.content?.[0]?.text?.trim() || '';
-    if (reply) {
+    if (reply && !_isDeliveryBreakout(reply)) {
       appendMessage('bot', reply);
       chatHistory.push({ role: 'assistant', content: reply });
       saveHistory();
@@ -271,7 +287,7 @@ async function onGhostReceived(delivery) {
           body: JSON.stringify({
             model: getMainModel(),
             max_tokens: 400,
-            ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+            system: buildDeliverySystem(),
             messages: [...chatHistory.slice(-15), {
               role: 'user',
               content: `[系统：你收到了一件奢侈品「${delivery.name}」，这不是普通礼物，有分量。
@@ -314,7 +330,7 @@ async function onGhostReceived(delivery) {
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 100,
-              ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+              system: buildDeliverySystem(),
               messages: [...chatHistory.slice(-6), {
                 role: 'user',
                 content: `[系统：几天前你收到了老婆寄来的「${delivery.name}」，现在你想起来说一句感受，可能是吃完了/试过了/还在想那个味道。简短，全小写，English only.不要太刻意，就是随口一提。]`
@@ -378,7 +394,7 @@ function showMysteryPackage(delivery) {
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 300,
-          ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+          system: buildDeliverySystem(),
           messages: [...chatHistory.slice(-10), {
             role: 'user',
             content: `[系统：你悄悄寄了「${delivery.name}」给老婆（${delivery.productData?.desc || ''}），她刚收到了。如果她问是不是你寄的，你可以承认也可以否认，看你当下心情——否认的话要装得像，别穿帮太明显。你不主动提是从哪里寄的。${delivery.productData?.tip ? `参考语气：「${delivery.productData.tip}」——这是你的风格，不用照抄，意思到了就行。` : ''}现在她告诉你收到了，你用西蒙的方式回应——装淡定，嘴硬，但明显在意。全小写，English only.]`
@@ -387,7 +403,7 @@ function showMysteryPackage(delivery) {
       });
       const data = await res.json();
       const reply = data.content?.[0]?.text?.trim() || '';
-      if (reply) {
+      if (reply && !_isDeliveryBreakout(reply)) {
         appendMessage('bot', reply);
         chatHistory.push({ role: 'assistant', content: reply });
         saveHistory();
@@ -437,7 +453,7 @@ async function handleLostPackageClaim(userText) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
-        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+        system: buildDeliverySystem(),
         messages: chatHistory.slice(-20)
       })
     });

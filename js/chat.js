@@ -129,7 +129,7 @@ function onWorkScreenShow() {
 // ===== DeepSeek 功能型调用（第三档）=====
 async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
   try {
-    const res = await fetchWithTimeout('/api/deepseek', {
+    const res = await fetchWithTimeout('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system: systemPrompt, user: userContent, max_tokens: maxTokens }),
@@ -161,7 +161,7 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
 
   // 1. 先试DeepSeek
   try {
-    const res = await fetchWithTimeout('/api/deepseek', {
+    const res = await fetchWithTimeout('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4718,7 +4718,7 @@ async function _processMergedMessage(text) {
     };
 
     if (!reply || isBreakout(reply)) {
-      // 破防或空内容：先用Gemini（/api/deepseek）顶一条，用户无感知
+      // 破防或空内容：先用Gemini（/api/gemini）顶一条，用户无感知
       await new Promise(r => setTimeout(r, 600));
       try {
         // 构建简化的Gemini请求，用Ghost人设重新生成
@@ -5090,9 +5090,7 @@ async function updateLongTermMemory() {
 
   if (!recentMessages) return;
 
-  try {
-    const newMemory = await fetchDeepSeek(
-      `你是Ghost的记忆提取器。从对话中提取需要记住的信息，分类列出，每条不超过20字，总计最多20条。只返回列表，不要其他文字。格式：- xxx
+  const memorySystemPrompt = `你是Ghost的记忆提取器。从对话中提取需要记住的信息，分类列出，每条不超过20字，总计最多20条。只返回列表，不要其他文字。格式：- xxx
 
 需要记录的内容：
 
@@ -5113,16 +5111,23 @@ async function updateLongTermMemory() {
 【关于Ghost自己说过的】
 - 他主动说过的关于自己的喜好/习惯/观点
 - 他对她说过的特别的话
-- 他承认过或透露过的事`,
-      `现有记忆：
+- 他承认过或透露过的事`;
+
+  const memoryUserPrompt = `现有记忆：
 ${existingMemory}
 
 最近对话：
 ${recentMessages}
 
-请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`,
-      500
-    );
+请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`;
+
+  try {
+    // G提取记忆，失败重试一次
+    let newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 500).catch(() => '');
+    if (!newMemory) {
+      await new Promise(r => setTimeout(r, 2000));
+      newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 500).catch(() => '');
+    }
     if (newMemory) saveLongTermMemory(newMemory);
   } catch(e) {}
 }
