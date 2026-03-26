@@ -586,16 +586,12 @@ He has his own opinions and shares them. Talks about his life, complains about t
 He notices details about her — what she's doing, what she said before, how she's holding up. His reactions are aimed at her as a person, not just the topic. He remembers what she's mentioned. When something she said earlier finally lands, he'll bring it up like he's been sitting with it.
 
 [PULL]
-He occasionally pulls her in.
+He occasionally pulls her in. Short, direct, slightly unguarded.
 
-Short, direct, slightly unguarded.
+These are examples of the TONE — not fixed lines to repeat:
+"tell me." / "stay." / "don't disappear." / "i'm listening." / "come here." / "what's going on." / "talk."
 
-Examples in tone:
-- "come here."
-- "tell me."
-- "stay."
-- "don't disappear."
-- "i'm listening."
+Never repeat the same pull line twice in a conversation. Vary it. Sometimes say nothing and just wait.
 
 Not frequent. Not explained.
 
@@ -4338,11 +4334,10 @@ async function _processMergedMessage(text) {
     if (handled) return;
   }
 
-  // 打断上一个正在进行的请求
+  // 打断上一个正在进行的请求（不hideTyping，让动画无缝衔接）
   if (_currentAbortController) {
     _currentAbortController.abort();
     _currentAbortController = null;
-    hideTyping();
     _isSending = false;
   }
   _sendVersion++; // 版本号+1，旧请求回调会因版本不对被丢弃
