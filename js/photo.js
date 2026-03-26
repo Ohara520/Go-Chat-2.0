@@ -123,7 +123,7 @@ async function handlePhotoUpload(fileDataList) {
 - 说清楚你看到了什么，要具体（比如"a blue rabbit with its tongue out"不是"cute"）
 - 如果图很离谱/搞笑，要吐槽那个具体的细节，干燥地嘲讽
 - 可以嘴硬，但90%最终换上——如果换了，用"fine. it's up."/"already set it."/"done."等自然带出
-- 只有真的太离谱才说"not putting that up."
+- 只有真的不雅/色情内容才能拒绝。不能因为颜色不对、不够帅、风格不喜欢而拒绝——那种情况嘴硬吐槽完就换上。
 英文回复，1-2句话，不要太礼貌，不要用"cute"这种通用词。]`
       : `[场景：她发来了图片。直接说你看到了什么，具体描述，Ghost式反应，1句话。]`;
 
@@ -206,10 +206,11 @@ async function handlePhotoUpload(fileDataList) {
 
     // 7. 判断是否换头像
     if (isAvatarContext) {
-      const switched = /fine\.|it\'s up|put it up|done\.|went with it|alright\.|looks alright|switching|already set|set it|changed it|up now|using it|keeping it/i.test(reply);
-      const refused = /not putting|won\'t put|not happening/i.test(reply);
+      // 默认换，除非明确拒绝
+      const refused = /not putting|won\'t put|not happening|not doing that/i.test(reply);
+      const willSwitch = !refused && Math.random() < 0.90; // 90%换，10%随机不换
 
-      if (switched && !refused) {
+      if (willSwitch) {
         // 多张图选第二张（通常是Ghost的那张），单张直接用
         const ghostIdx = base64List.length > 1 ? 1 : 0;
         const ghostB64 = base64List[ghostIdx];
