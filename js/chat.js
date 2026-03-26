@@ -4417,7 +4417,20 @@ async function sendMessage() {
       ? '[场景：她因工作/现实原因失约或道歉。Ghost可以表达失望或不爽，但必须针对"时间/失约"本身，绝对不能引入第三者或竞争叙事。不要写"he/him/someone owns your time"或任何竞争感，只写你和她之间的事。]'
       : '';
 
-    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, _hasChinese ? langHint : ''].filter(Boolean).join('\n');
+    // 情头请求场景：检测是否在要求换情头，已拒绝过一次就松口
+    const _isAvatarRequest = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar/i.test(text);
+    let avatarHint = '';
+    if (_isAvatarRequest) {
+      const recentBotMsgs = chatHistory.filter(m => m.role === 'assistant' && !m._recalled).slice(-6).map(m => m.content).join(' ');
+      const alreadyRefused = /nah|too much|busy|not now|don't bother|not necessary/i.test(recentBotMsgs);
+      if (alreadyRefused) {
+        avatarHint = '[场景：她在要求换情头，你之前已经拒绝过一次了。这次松口——可以说"fine. send them over."或者"alright. show me."或者干脆什么都不说等她发图。不要再拒绝。]';
+      } else {
+        avatarHint = '[场景：她在要求换情头。你可以推回去一次——嘴硬说不用或者没必要，但语气里留点余地，不要完全关死门。]';
+      }
+    }
+
+    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, _hasChinese ? langHint : ''].filter(Boolean).join('\n');
 
     // ===== 情趣话题检测：直接走Gemini，不走Claude =====
     const INTIMATE_PATTERNS = [
