@@ -78,6 +78,11 @@ async function loadFromCloud() {
       if (p.userAvatarBase64 && !localStorage.getItem('userAvatarBase64')) {
         localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
       }
+      // Ghost情头URL
+      if (p.ghostAvatarUrl) {
+        localStorage.setItem('ghostAvatarUrl', p.ghostAvatarUrl);
+        if (typeof restoreGhostAvatar === 'function') restoreGhostAvatar();
+      }
       // 冷战状态：取最新
       if (p.coldWarMode != null && cloudIsNewer) localStorage.setItem('coldWarMode', String(p.coldWarMode));
     }
@@ -256,6 +261,7 @@ async function saveToCloud() {
       vocabLastDay: localStorage.getItem('vocabLastDay') || '',
       lastSalaryAmount: localStorage.getItem('lastSalaryAmount') || '',
       lastSalaryMonth: localStorage.getItem('lastSalaryMonth') || '',
+      ghostAvatarUrl: localStorage.getItem('ghostAvatarUrl') || '',
     };
     const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw

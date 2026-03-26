@@ -4249,6 +4249,13 @@ async function sendMessage() {
   appendMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
   saveHistory();
+
+  // 检测是否在等待用户指定情头
+  if (typeof checkPendingAvatarChoice === 'function') {
+    const handled = await checkPendingAvatarChoice(text);
+    if (handled) return;
+  }
+
   _isSending = true; // 立刻锁定，防止切页面重渲染吞消息
 
   // 爱意抗拒值更新 + 剧情解锁检测
@@ -4530,6 +4537,9 @@ async function sendMessage() {
     const BREAKOUT_PHRASES = [
       // 身份暴露
       "i'm claude", "i am claude", "made by anthropic",
+      "i need to stop", "i need to be honest",
+      "simulate intimate", "financial manipulation",
+      "override my actual", "override my identity",
       "i don't roleplay", "i won't roleplay",
       "i can't roleplay", "i cannot roleplay",
       "i can't pretend", "i cannot pretend",
@@ -4938,9 +4948,36 @@ async function updateLongTermMemory() {
 
   try {
     const newMemory = await fetchDeepSeek(
-      '你是一个记忆提取器。从对话中提取Ghost需要记住的信息，用简短的几条中文列出。包括：她说的重要的事、她的喜好/口癖/习惯、她喜欢聊的话题类型和聊天风格、她常用的表达方式、她当下的状态和情绪、她随口提到的小事和细节、特别的互动、她提到的人/地点/计划。每条不超过20字，最多15条。只返回列表，不要其他文字。格式：- xxx',
-      `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`,
-      400
+      `你是Ghost的记忆提取器。从对话中提取需要记住的信息，分类列出，每条不超过20字，总计最多20条。只返回列表，不要其他文字。格式：- xxx
+
+需要记录的内容：
+
+【关于她】
+- 她的喜好、口癖、习惯、常用表达
+- 她喜欢聊的话题和聊天风格
+- 她的状态、情绪、近况
+- 她随口提到的小事、细节、计划
+- 她提到的人/地点/事件
+
+【两人之间】
+- 互定的称呼、绰号、动物对应（如"你是兔子我是狐狸"这类必须记住）
+- 两人之间的inside joke、梗、特殊说法
+- 她说过的让他印象深的话
+- 他们争过什么、达成过什么默契或约定
+- 关系里的里程碑（第一次说某句话、冷战和好等）
+
+【关于Ghost自己说过的】
+- 他主动说过的关于自己的喜好/习惯/观点
+- 他对她说过的特别的话
+- 他承认过或透露过的事`,
+      `现有记忆：
+${existingMemory}
+
+最近对话：
+${recentMessages}
+
+请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`,
+      500
     );
     if (newMemory) saveLongTermMemory(newMemory);
   } catch(e) {}
