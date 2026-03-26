@@ -338,15 +338,18 @@ async function handlePhotoUpload(files) {
 
 // ===== 图片按钮点击 =====
 function triggerPhotoUpload() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.multiple = true; // 支持多选，最多3张
-  input.onchange = e => {
-    const files = Array.from(e.target.files || []).slice(0, 3);
-    if (files.length > 0) handlePhotoUpload(files);
-  };
-  input.click();
+  // 用预埋的input避免移动端浏览器拦截动态创建的input
+  const input = document.getElementById('photoFileInput');
+  if (input) {
+    input.value = ''; // 清空，允许重复选同一张
+    input.click();
+  }
+}
+
+function handlePhotoInputChange(e) {
+  const files = Array.from(e.target.files || []).slice(0, 3);
+  e.target.value = ''; // 清空，允许下次重复选
+  if (files.length > 0) handlePhotoUpload(files);
 }
 
 // ===== 处理用户指定哪张是Ghost的头像 =====

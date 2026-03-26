@@ -621,6 +621,9 @@
       </div>
 
       <!-- +号展开面板 -->
+      <!-- 预埋图片上传input，避免移动端浏览器拦截 -->
+      <input type="file" id="photoFileInput" accept="image/*" multiple style="display:none" onchange="handlePhotoInputChange(event)">
+
       <div class="plus-panel" id="plusPanel" style="display:none">
         <div class="plus-panel-actions">
           <div class="plus-action-btn" onclick="closePlusPanel(); openTransfer();">
