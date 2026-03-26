@@ -1547,18 +1547,10 @@ async function emitGhostEvent(eventType, payload = {}) {
           .slice(-4)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 60)}`)
           .join('\n');
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 60,
-            system: buildGhostStyleCore() + `\nWrite ONE line Ghost would send after secretly shipping something to his wife. Tone: ${motiveHint}. Very short. Return only the message.`,
-            messages: [{ role: 'user', content: `He just sent her: ${item.name} (${item.desc})\nRecent chat:\n${recentCtx}\nWrite his one line message.` }]
-          })
-        });
-        const d = await res.json();
-        const t = d.content?.[0]?.text?.trim();
+        const t = await fetchDeepSeek(
+          buildGhostStyleCore() + `\nWrite ONE line Ghost would send after secretly shipping something to his wife. Tone: ${motiveHint}. Very short. Return only the message.`,
+          `He just sent her: ${item.name} (${item.desc})\nRecent chat:\n${recentCtx}\nWrite his one line message.`, 60
+        );
         if (t && t.length > 0) generatedLine = t;
       } catch(e) {}
 
@@ -1595,16 +1587,11 @@ async function emitGhostEvent(eventType, payload = {}) {
       if (inVerbalOnly) {
         // Haiku 生成拒绝继续转账的台词
         try {
-          const fbRes = await fetchWithTimeout('/api/chat', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'claude-haiku-4-5-20251001', max_tokens: 80,
-              system: buildGhostStyleCore(),
-              messages: [{ role: 'user', content: `[系统：你刚才转了钱，她退回来了，你没有继续再打。现在她或系统又触发了给钱的时机，但你不会再转了。用你自己的方式说一句——可以是嘴硬（"我说了你留着"），可以是沉默带一句话，可以是转移话题。不要提系统，不要解释。全小写，English only.]` }]
-            })
-          }, 6000);
-          const fbData = await fbRes.json();
-          const fbLine = fbData.content?.[0]?.text?.trim() || '';
+          const fbLine = await fetchDeepSeek(
+            buildGhostStyleCore(),
+            `[系统：你刚才转了钱，她退回来了，你没有继续再打。现在她或系统又触发了给钱的时机，但你不会再转了。用你自己的方式说一句——可以是嘴硬（"我说了你留着"），可以是沉默带一句话，可以是转移话题。不要提系统，不要解释。全小写，English only.]`,
+            80
+          );
           if (fbLine) {
             line = fbLine;
             systemTag = ''; // 不触发转账，只说话
@@ -1626,16 +1613,11 @@ async function emitGhostEvent(eventType, payload = {}) {
           : '心情一般，嘴上不情愿但还是转了';
         const recentCtx = payload.context || chatHistory.filter(m => !m._system && !m._recalled)
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 60,
-            system: buildGhostStyleCore(),
-            messages: [{ role: 'user', content: `[系统：你正在给老婆转£${amount}。语境：${toneHint}。${payload.reason ? `她刚才说：「${payload.reason}」。` : ''}最近对话：\n${recentCtx}\n说一句话——根据上下文来，不要每次都是"check your account"，换点花样，可以是暗示、可以是嘴硬、可以是低调一句。全小写，English only.]` }]
-          })
-        }, 6000);
-        const data = await res.json();
-        const generated = data.content?.[0]?.text?.trim() || '';
+        const generated = await fetchDeepSeek(
+          buildGhostStyleCore(),
+          `[系统：你正在给老婆转£${amount}。语境：${toneHint}。${payload.reason ? `她刚才说：「${payload.reason}」。` : ''}最近对话:\n${recentCtx}\n说一句话——根据上下文来，不要每次都是"check your account"，换点花样，可以是暗示、可以是嘴硬、可以是低调一句。全小写，English only.]`,
+          60
+        );
         line = generated || payload.line || "check your account.\n看看账户。";
       } catch(e) {
         line = payload.line || "check your account.\n看看账户。";
@@ -1808,16 +1790,10 @@ async function emitGhostEvent(eventType, payload = {}) {
           "start from: 'busy?' — adapt, one line",
         ];
         const _tpl = _ciTemplates[Math.floor(Math.random() * _ciTemplates.length)];
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 60,
-            system: buildGhostStyleCore() + '\nWrite ONE short check-in line to his wife. ' + _tpl + '. English only. Keep it Ghost — dry, casual, not clingy.',
-            messages: [{ role: 'user', content: `Recent chat:\n${recentCtx}\nWrite his check-in.` }]
-          })
-        });
-        const d = await res.json();
-        const t = d.content?.[0]?.text?.trim();
+        const t = await fetchDeepSeek(
+          buildGhostStyleCore() + '\nWrite ONE short check-in line to his wife. ' + _tpl + '. English only. Keep it Ghost — dry, casual, not clingy.',
+          `Recent chat:\n${recentCtx}\nWrite his check-in.`, 60
+        );
         if (t) { line = t; break; }
       } catch(e) {}
       const ciOpts = [
@@ -1838,16 +1814,10 @@ async function emitGhostEvent(eventType, payload = {}) {
       try {
         const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,60)}`).join('\n');
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 50,
-            system: buildGhostStyleCore() + '\nWrite ONE sharp, dry line confronting his wife about another man — no accusation, just tense. No explanation.',
-            messages: [{ role: 'user', content: `Recent chat:\n${recentCtx}\nWrite his one line.` }]
-          })
-        });
-        const d = await res.json();
-        const t = d.content?.[0]?.text?.trim();
+        const t = await fetchDeepSeek(
+          buildGhostStyleCore() + '\nWrite ONE sharp, dry line confronting his wife about another man — no accusation, just tense. No explanation.',
+          `Recent chat:\n${recentCtx}\nWrite his one line.`, 50
+        );
         if (t) { line = t; break; }
       } catch(e) {}
       const cfOpts = ["who's that, then.\n那是谁？","you're talking about him a lot.\n你提他提得有点多。","try that again.\n你再说一遍。"];
@@ -1860,16 +1830,10 @@ async function emitGhostEvent(eventType, payload = {}) {
       try {
         const recentCtx = chatHistory.filter(m => !m._system && !m._recalled)
           .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,60)}`).join('\n');
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 40,
-            system: buildGhostStyleCore() + '\nWrite ONE word or very short line showing he is shutting down — cold, clipped, done talking. No explanation.',
-            messages: [{ role: 'user', content: `Recent chat:\n${recentCtx}\nWrite his closing line.` }]
-          })
-        });
-        const d = await res.json();
-        const t = d.content?.[0]?.text?.trim();
+        const t = await fetchDeepSeek(
+          buildGhostStyleCore() + '\nWrite ONE word or very short line showing he is shutting down — cold, clipped, done talking. No explanation.',
+          `Recent chat:\n${recentCtx}\nWrite his closing line.`, 40
+        );
         if (t) { line = t; break; }
       } catch(e) {}
       line = payload.line || "fine.\n行。";
@@ -2966,28 +2930,18 @@ function scheduleDelayedMoney(amount, motive, context = {}) {
 
       if (style === 0) {
         // A: 先说一句 → 转账 → 补一句
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 60,
-            system: buildGhostStyleCore(),
-            messages: [{ role: 'user', content: `[系统：你准备悄悄给她转账。语境：${motiveHint}。最近对话：\n${recentCtx}\n先说一句话（转账前），全小写，English only，一句话。]` }]
-          })
-        }, 6000);
-        const d = await res.json();
-        preLine = d.content?.[0]?.text?.trim() || '';
+        preLine = await fetchDeepSeek(
+          buildGhostStyleCore(),
+          `[系统：你准备悄悄给她转账。语境：${motiveHint}。最近对话:\n${recentCtx}\n先说一句话（转账前），全小写，English only，一句话。]`,
+          60
+        );
       } else if (style === 2) {
         // C: 转账后补一句
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 40,
-            system: buildGhostStyleCore(),
-            messages: [{ role: 'user', content: `[系统：你刚给她转了账。语境：${motiveHint}。说一句简短的话，全小写，English only，一句话或几个字。]` }]
-          })
-        }, 6000);
-        const d = await res.json();
-        postLine = d.content?.[0]?.text?.trim() || '';
+        postLine = await fetchDeepSeek(
+          buildGhostStyleCore(),
+          `[系统：你刚给她转了账。语境：${motiveHint}。说一句简短的话，全小写，English only，一句话或几个字。]`,
+          40
+        );
       }
       // style === 1: B 直接转，什么都不说
 
