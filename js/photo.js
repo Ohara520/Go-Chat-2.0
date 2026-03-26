@@ -30,7 +30,7 @@ async function uploadToStorage(base64, bucket, fileName) {
     const sb = typeof getSbClient === 'function' ? getSbClient() : null;
     const userId = typeof getSbUserId === 'function' ? getSbUserId() : null;
     if (!sb || !userId) return null;
-    const binary = atob(base64);
+    const binary = atob(base64.replace(/\s/g, ''));
     const arr = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
     const blob = new Blob([arr], { type: 'image/jpeg' });
