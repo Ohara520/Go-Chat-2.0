@@ -223,7 +223,7 @@ Must reference "${desc}". English only. 1 line. Do NOT prefix with "ghost:" or a
       if (res.ok) {
         const data = await res.json();
         const reply = data.content?.[0]?.text?.trim();
-        if (reply && reply.trim() && !reply.includes("I'm Claude") && !reply.includes("I can't")) {
+        if (reply && reply.trim() && !reply.includes("I'm Claude, made by") && !reply.includes("I cannot continue") && !reply.includes("I need to stop")) {
           return reply.trim();
         }
       }
