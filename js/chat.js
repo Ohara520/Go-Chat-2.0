@@ -3987,13 +3987,13 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
   // 场景提示
   const sceneHints = {
     contrast:  'He just said something dry or deflecting. Inside he noticed more than he let on.',
-    jealousy:  'He just clocked something that bothered him but didn't say it.',
-    delayed:   'He missed her cue — she shared something and he didn't catch it in time.',
+    jealousy:  'He just clocked something that bothered him but didn\'t say it.',
+    delayed:   'He missed her cue — she shared something and he didn\'t catch it in time.',
     behavior:  'He just did something for her without explaining why.',
-    crack:     'Cold war is thawing. He's still stiff but something softened.',
+    crack:     'Cold war is thawing. He\'s still stiff but something softened.',
   };
   const sceneHint = isBedtime
-    ? 'She's heading to bed. He noticed. He won't say much.'
+    ? 'She\'s heading to bed. He noticed. He won\'t say much.'
     : (sceneHints[thoughtType] || sceneHints.contrast);
 
   // 用G生成锚定当下的心声
