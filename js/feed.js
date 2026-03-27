@@ -365,7 +365,10 @@ function renderCoupleFeed(posts) {
     return;
   }
 
-  const GHOST_AVATAR_HTML = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+  const _ghostAvatarUrlLocal = localStorage.getItem('ghostAvatarUrl');
+  const GHOST_AVATAR_HTML = _ghostAvatarUrlLocal
+    ? `<img src="${_ghostAvatarUrlLocal}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+    : '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
   const emojiMap = { Ghost: GHOST_AVATAR_HTML, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
   const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
 
@@ -705,9 +708,12 @@ async function generateFeedPostFromEvent(evt) {
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
   const weather = localStorage.getItem('lastWeatherDisplay') || '';
   const isColdWar = localStorage.getItem('coldWarMode') === 'true';
-  const GHOST_AV = '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+  const _ghostAvatarUrl = localStorage.getItem('ghostAvatarUrl');
+  const GHOST_AV = _ghostAvatarUrl
+    ? `<img src="${_ghostAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+    : '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
   const posterMap = {
-    ghost: { name: localStorage.getItem('botNickname') || 'Simon Riley', avatar: GHOST_AV, nameClass: 'couple-ghost-name' },
+    ghost: { name: 'Ghost', avatar: GHOST_AV, nameClass: 'couple-ghost-name' },
     soap:  { name: 'Soap', avatar: '🧼', nameClass: 'couple-soap-name' },
     gaz:   { name: 'Gaz', avatar: '🎖️', nameClass: 'couple-gaz-name' },
     price: { name: 'Price', avatar: '🚬', nameClass: 'couple-price-name' },
@@ -716,24 +722,108 @@ async function generateFeedPostFromEvent(evt) {
 
   // 按事件类型拼 prompt
   const promptMap = {
-    cold_war_started: `You are Simon Riley. Just had a fight with your wife. One line, lowercase English — something is off but you are not saying what. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
-    made_up: `You are Simon Riley. Just made up with your wife. One line, lowercase English — do not say you made up, but you are visibly looser. Something casual. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
-    gift_received: `You are Simon Riley. Just received ${evt.meta?.itemName || "something"} from your wife. One line, lowercase English — not saying anything about it, but you posted this anyway. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
+    cold_war_started: `You are Simon Riley.
+
+They just argued.
+
+Something is off.
+
+He doesn't say what.
+
+One line. Return JSON only: {"en":"...","zh":"..."}`,
+    made_up: `You are Simon Riley.
+
+They've settled it.
+
+He doesn't say it out loud.
+
+But he's easier than before.
+
+One line. Return JSON only: {"en":"...","zh":"..."}`,
+    gift_received: `You are Simon Riley.
+
+He just received ${evt.meta?.itemName || "something"} from her.
+
+He doesn't say it directly.
+
+But he put something out anyway.
+
+One line. Return JSON only: {"en":"...","zh":"..."}`,
     daily_moment: (() => {
       const actor = evt.actor;
-      if (actor === 'soap') return `你是Soap（约翰·麦克塔维什），141特遣队成员。发一条日常朋友圈，一句话，英文，活泼，可以调侃队友。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`;
-      if (actor === 'gaz')  return `你是Gaz（凯尔·加里克），141特遣队成员。发一条日常朋友圈，一句话，英文，稳重幽默。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`;
+      if (actor === 'soap') return `You are Soap.
+
+He puts something out.
+
+Lively.
+Bit of a laugh.
+Might take the piss out of someone.
+
+Just a line.
+
+Return JSON only: {"en":"...","zh":"..."}`;
+      if (actor === 'gaz') return `You are Gaz.
+
+He puts something out.
+
+Steady.
+A bit of dry humor.
+Nothing loud.
+
+Just a line.
+
+Return JSON only: {"en":"...","zh":"..."}`;
       // 三种类型随机偏向
       const _postType = Math.random();
       if (_postType < 0.45) {
         // 无意义记录（最多）
-        return `You are Simon Riley. Post one offhand line about right now — something trivial, not worth explaining. Examples: "rain again." / "third coffee." / "too quiet today." / "couldn't sleep." Lowercase English only, under 6 words. Add Chinese (same brevity). Return JSON only: {"en":"...","zh":"..."}`;
+        return `You are Simon Riley.
+
+He notes something small.
+
+Something right in front of him.
+Not important enough to explain.
+
+Rain.
+Coffee.
+Silence.
+Sleep.
+
+Just a line. Return JSON only: {"en":"...","zh":"..."}`;
       } else if (_postType < 0.75) {
         // 轻吐槽（班味）
-        return `You are Simon Riley, currently in ${location}. Post one dry complaint or observation about work/teammates/routine. No drama, no explanation. Examples: "soap won't shut up." / "equipment's still broken." / "briefing ran long. again." Lowercase English. Add Chinese. Return JSON only: {"en":"...","zh":"..."}`;
+        return `You are Simon Riley.
+
+Something irritates him.
+
+Nothing serious.
+Just routine.
+
+Work.
+The team.
+Things not working as they should.
+
+He says it flat.
+Doesn't make a thing out of it.
+
+One line. Return JSON only: {"en":"...","zh":"..."}`;
       } else {
         // 偶发关系影子（少量，不点明）
-        return `You are Simon Riley. Post one line that means something but doesn't explain itself. Could be about something you kept, something you noticed, something small. She'd understand. He wouldn't explain it to anyone else. Lowercase English. Add Chinese. Return JSON only: {"en":"...","zh":"..."}`;
+        return `You are Simon Riley.
+
+He puts something out that isn't for everyone.
+
+Doesn't explain it.
+
+Something he kept.
+Something he noticed.
+Something that stayed with him.
+
+She would get it.
+
+No one else needs to.
+
+One line. Return JSON only: {"en":"...","zh":"..."}`;
       }
     })(),
   };
@@ -749,7 +839,11 @@ async function generateFeedPostFromEvent(evt) {
     if (Math.random() < 0.72) {
       const others = ['Ghost', 'Soap', 'Gaz', 'Price'].filter(n => n.toLowerCase() !== evt.actor);
       const commenters = others.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1);
-      const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
+      const _ghostAvUrl = localStorage.getItem('ghostAvatarUrl');
+      const _ghostAvImg = _ghostAvUrl
+        ? `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+        : '<img src="images/ghost-avatar.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+      const avatarMap = { Ghost: _ghostAvImg, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
       const res2 = await fetchWithTimeout('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
