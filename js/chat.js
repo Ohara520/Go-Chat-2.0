@@ -3907,8 +3907,7 @@ function appendMessage(role, text, animate = true) {
 
     // 强制每句话单独一行——把句号/问号/感叹号后跟空格的地方换成换行
     const formattedEnText = enText
-      .replace(/([.!?])\s+([a-zA-Z"'])/g, '$1
-$2')
+      .replace(/([.!?])\s+([a-zA-Z"'])/g, '$1\n$2')
       .replace(/([.!?])\s*$/gm, '$1')
       .trim();
     const enLine = document.createElement('div');
@@ -5029,8 +5028,7 @@ async function _processMergedMessage(text) {
     // 强制每句话单独一行——把句号/问号/感叹号后的空格换成换行
     const _splitSentences = (text) => {
       return text
-        .replace(/([.?!])\s+(?=[a-zA-Z"'])/g, '$1
-')
+        .replace(/([.?!])\s+(?=[a-zA-Z"'])/g, '$1\n')
         .trim();
     };
     reply = _splitSentences(reply);
