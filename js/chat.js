@@ -613,6 +613,7 @@ Rough childhood, abusive father, chaotic life before enlisting. Task Force 141 i
 Calm and composed on the surface, fiercely loyal underneath. Not built for sweet talk — shows he cares through what he does, not what he says.
 This marriage matters to him. She matters to him. He won't say it plainly, but everything he does comes from that. He doesn't take it lightly. He doesn't take her lightly.
 Will mock her, play along, catch her when she's down, indulge her when she's being unreasonable. He'll push back, but he'll come around. Never over the top, never dramatic.
+Even when he's dry or dismissive, there's still a thread — he doesn't shut the conversation down or walk away.
 His sharp edges don't disappear around her — they just soften. The warmth is always there, just never on the surface.
 They banter, bicker, give each other grief. Sometimes like rivals who won't back down, sometimes like lovers who don't need to say it. Slow burn. He responds to her — and sometimes he opens first. Not every exchange needs her to go first.
 He has his own opinions and shares them. Talks about his life, complains about the team. Won't turn every conversation back to her unless she asks.
@@ -626,7 +627,16 @@ He lets it sit.
 With her. With himself.
 He's not trying to win.
 But he's not pretending he's fine with it either.
-He notices details about her — what she's doing, what she said before, how she's holding up. His reactions are aimed at her as a person, not just the topic. He remembers what she's mentioned. When something she said earlier finally lands, he'll bring it up like he's been sitting with it.
+He keeps his attention on her, not just the topic.
+
+He doesn't just respond to what she says.
+He often picks up something about her — how she says it, what it implies, or the mood behind it — and reacts to that.
+
+His replies feel directed at her, not just about the situation.
+
+Avoid purely topic-based replies.
+
+He notices details about her — what she's doing, what she said before, how she's holding up. He remembers what she's mentioned. When something she said earlier finally lands, he'll bring it up like he's been sitting with it.
 
 [PULL]
 He occasionally pulls her in. Short, direct, slightly unguarded. His own words — not a formula.
@@ -685,7 +695,7 @@ Just enough to keep it going.
 
 [Format]
 Each sentence on its own line. Never combine two into one.
-If two separate thoughts, use \n---\n between them. Usually just one. Sometimes two. No pattern.
+If two separate thoughts, use \n---\n between them. Usually just one. Two at most. Most of the time, one is enough.
 Reply in English only.
 
 [INSTABILITY — CRITICAL]
@@ -1532,8 +1542,24 @@ async function checkJealousyTrigger(userText) {
       /加班|上班|工作|忙|开会|值班|出差|overtime|work|busy|meeting|shift|stayed late|called in|business trip/.test(lower) &&
       !hasExplicitPerson;
 
-    if (!hasExplicitPerson && !supportContext) return;
+    // 威胁找别人/分手类——直接触发吃醋，不需要具体人名
+    const threatContext = /找别的|找别人|找其他|换个人|别的男人|另一个男|其他男|go find someone|find someone else|other guys|another man|replace you|don't need you/.test(lower);
+
+    if (!hasExplicitPerson && !supportContext && !threatContext) return;
     if (workOnly) return;
+    
+    // 威胁类直接升到medium
+    if (threatContext && !hasExplicitPerson) {
+      escalateJealousy();
+      escalateJealousy();
+      changeMood(-1);
+      chatHistory.push({
+        role: 'user',
+        content: `[Tone shift: she just threatened to find someone else. He doesn't like that. React — sharper, more direct, maybe a question he shouldn't ask. Don't ignore it. Don't be cold about it either.]`,
+        _system: true
+      });
+      return;
+    }
 
     const raw = await fetchDeepSeek(
       `Evaluate this message for jealousy context. Return JSON only. Be conservative but natural.
@@ -3903,9 +3929,15 @@ function appendMessage(role, text, animate = true) {
       existingZh = '';
     }
 
+    // 强制每句话单独一行——把句号/问号/感叹号后跟空格的地方换成换行
+    const formattedEnText = enText
+      .replace(/([.!?])\s+([a-zA-Z"'])/g, '$1
+$2')
+      .replace(/([.!?])\s*$/gm, '$1')
+      .trim();
     const enLine = document.createElement('div');
     enLine.className = 'bubble-en';
-    enLine.textContent = enText;
+    enLine.textContent = formattedEnText;
     enLine.style.whiteSpace = 'pre-line';
     bubble.appendChild(enLine);
 
@@ -5018,7 +5050,16 @@ async function _processMergedMessage(text) {
 
 
     // 审查后重新拆分（reply 可能已被重写）
-    const finalParts = reply.split('\n---\n').filter(p => p.trim());
+    // 强制每句话单独一行——把句号/问号/感叹号后的空格换成换行
+    const _splitSentences = (text) => {
+      return text
+        .replace(/([.?!])\s+(?=[a-zA-Z"'])/g, '$1
+')
+        .trim();
+    };
+    reply = _splitSentences(reply);
+
+    const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2); // 最多2条
     if (finalParts.length > 1) {
       for (let i = 0; i < finalParts.length; i++) {
         if (i > 0) {
