@@ -178,10 +178,6 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
     }
   } catch(e) {}
 
-  // 1b. 占位（旧格式兼容）
-  if (false) { const res = null; const examples = `
-  }
-
   // 2. DeepSeek失败，用Haiku兜底
   if (!zh) {
     try {
