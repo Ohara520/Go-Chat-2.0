@@ -1,3 +1,19 @@
+// ===== 快递破防检测 =====
+function _isDeliveryBreakout(text) {
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  return ["i'm claude", "i am claude", "made by anthropic", "i can't roleplay",
+    "i cannot roleplay", "as an ai", "i need to be direct", "i should have caught",
+    "system instructions", "character persona"].some(p => lower.includes(p));
+}
+
+// ===== 快递专用system prompt（简化版，不说roleplay避免出戏）=====
+function buildDeliverySystem() {
+  const base = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
+  return base + `
+You are Simon "Ghost" Riley. Reply naturally and briefly in character. Lowercase, English only. Do not explain yourself or break character under any circumstances.`;
+}
+
 // ===== 快递系统 (delivery.js) =====
 // ===== 快递系统 =====
 const DELIVERY_STAGES_USER = [
@@ -16,14 +32,6 @@ const DELIVERY_STAGES_GHOST = [
   { status: '📍 已到达',      en: 'Arrived in your country.',          zh: '已到达你所在国家。' },
   { status: '🚚 派送中',      en: 'Out for delivery.',                 zh: '派送中。' },
   { status: '✅ 已签收',      en: 'Delivered.',                        zh: '已签收。' },
-];
-
-// 运费吐槽台词
-const SHIPPING_COMPLAINTS = [
-  "You paid £{fee} shipping for this. You're insane.\n你花了£{fee}运费寄这个。你疯了。",
-  "£{fee} in shipping. I hope it was worth it.\n£{fee}运费。我希望值得。",
-  "Next time just wire me the money. The shipping alone was £{fee}.\n下次直接给我转账算了。光运费就£{fee}了。",
-  "The shipping cost more than my dignity. £{fee}.\n运费比我的尊严还贵。£{fee}。",
 ];
 
 function addDelivery(product, isGhostSend, isLuxury) {
@@ -73,12 +81,19 @@ function addDelivery(product, isGhostSend, isLuxury) {
 }
 
 function addGhostReverseDelivery(item, emotionType) {
-  // Ghost主动反寄，不显示小票，只在商城顶部显示神秘提示
+  // 全局反寄冷却检查
+  if (typeof canTriggerReverseDelivery === 'function' && !canTriggerReverseDelivery()) return;
+  if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
+
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000; // 1-2天
+  const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000; // 快递时长1-2天
   const now = Date.now();
   const interval = totalMs / DELIVERY_STAGES_GHOST.length;
-  const isSecret = !!item._secretDelivery; // secret模式：隐藏物流直到最后阶段
+  const isSecret = !!item._secretDelivery;
+
+  // 延迟1-2天后才在商城显示小票
+  const visibleDelay = (Math.floor(Math.random() * 24) + 24) * 3600 * 1000; // 24-48小时后可见
+  const visibleAt = now + visibleDelay;
 
   deliveries.unshift({
     id: now,
@@ -86,7 +101,8 @@ function addGhostReverseDelivery(item, emotionType) {
     emoji: item.emoji,
     isGhostSend: true,
     isEmotionReverse: true,
-    isSecretDelivery: isSecret, // 隐藏物流标记
+    isSecretDelivery: isSecret,
+    visibleAt, // 小票可见时间
     emotionType,
     stages: DELIVERY_STAGES_GHOST.map((s, i) => ({ ...s, triggerAt: now + interval * (i + 1), done: false })),
     currentStage: 0,
@@ -97,6 +113,72 @@ function addGhostReverseDelivery(item, emotionType) {
     productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
+
+  // 三种模式随机：60%偷偷寄、30%暗示、10%直说
+  const rand = Math.random();
+
+  // 无论哪种模式，都注入系统消息让模型知道寄了
+  const secretNote = `[系统私信：你悄悄给她寄了「${item.name}」，她还不知道。你记得这件事。不要主动提起。如果她问起有没有寄东西，可以装作不知道或岔开话题，但不要死口否认——如果她追问或已经收到，可以承认。]`;
+  const hintNote = `[系统私信：你给她寄了「${item.name}」，在路上了。你知道这件事。不要主动说细节，但如果她问起不要否认。]`;
+
+  if (rand < 0.6) {
+    // 偷偷寄：什么都不说，但注入系统消息
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'user', content: secretNote, _system: true });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    return;
+  } else if (rand < 0.9) {
+    // 暗示：随口一句，注入系统消息
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'user', content: hintNote, _system: true });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    setTimeout(async () => {
+      try {
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 40,
+            system: buildGhostStyleCore(),
+            messages: [{ role: 'user', content: `[You sent her something. She doesn't know yet. Drop one vague line — not what it is, not when. Something that could mean anything. One line.]` }]
+          })
+        }, 6000);
+        const d = await res.json();
+        const line = d.content?.[0]?.text?.trim();
+        if (line) {
+          appendMessage('bot', line);
+          chatHistory.push({ role: 'assistant', content: line });
+          saveHistory();
+        }
+      } catch(e) {}
+    }, 2000);
+  } else {
+    // 直说：注入系统消息
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'user', content: `[系统私信：你给她寄了「${item.name}」，你知道这件事，如果她问起正常回应。]`, _system: true });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    setTimeout(async () => {
+      try {
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 50,
+            system: buildGhostStyleCore(),
+            messages: [{ role: 'user', content: `[You sent her 「${item.name}」. Say one line — low-key, no details. Like it's not a big deal.${item.tip ? ' ' + item.tip : ''}]` }]
+          })
+        }, 6000);
+        const d = await res.json();
+        const line = d.content?.[0]?.text?.trim();
+        if (line) {
+          appendMessage('bot', line);
+          chatHistory.push({ role: 'assistant', content: line });
+          saveHistory();
+        }
+      } catch(e) {}
+    }, 2000);
+  }
 }
 
 function checkDeliveryUpdates() {
@@ -171,37 +253,41 @@ async function onGhostReceived(delivery) {
       body: JSON.stringify({
         model: pd.isLuxury ? getMainModel() : 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+        system: buildDeliverySystem(),
         messages: [...chatHistory.slice(-10), {
           role: 'user',
-          content: `[系统：你刚收到老婆从中国寄来的「${delivery.name}」。${fromHomeHint || ''}
-回应方式根据你当下状态自然选择，不要每次都一样：
-- 有时候可以是真的开心或感激，简短说出来，不花哨但真实
-- 有时候是假装不在意，嘴上轻描淡写，但细节里漏出他其实看了好几遍/留着了/很喜欢
-- 有时候是嘴上吐槽（包装太麻烦/不必要/太贵），但结尾暗示他收下了、放着了、没扔
-无论哪种，用户都要能感受到他是珍惜的，不能让她以为真的被嫌弃了。全小写，附中文翻译，格式：英文\\n中文翻译]`
+          content: `[She sent something. It just arrived — 「${delivery.name}」.${fromHomeHint ? ' ' + fromHomeHint : ''}
+
+He doesn't react the same way every time.
+
+Sometimes it's simple.
+A short line. Real. No effort to dress it up.
+
+Sometimes he plays it down.
+Says less than he feels.
+But lingers on it. Keeps it. Looks at it again.
+
+Sometimes he gives her a hard time about it.
+A comment, a complaint, something dry.
+But he doesn't let it go.
+
+He doesn't make a show of it.
+
+But he keeps it.]`
         }]
       })
     });
     const data = await res.json();
     const reply = data.content?.[0]?.text?.trim() || '';
-    if (reply) {
+    if (reply && !_isDeliveryBreakout(reply)) {
       appendMessage('bot', reply);
       chatHistory.push({ role: 'assistant', content: reply });
       saveHistory();
-      // 立刻强制同步云端，防止切后台丢消息
-      if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
     }
 
-    // 30%概率吐槽运费
-    if (Math.random() < 0.3) {
-      const complaint = SHIPPING_COMPLAINTS[Math.floor(Math.random() * SHIPPING_COMPLAINTS.length)];
-      setTimeout(() => {
-        const msg = complaint.replace(/\{fee\}/g, fee);
-        appendMessage('bot', msg);
-        chatHistory.push({ role: 'assistant', content: msg });
-        saveHistory();
-      }, 3000);
+    // 好感度
+    if (!pd.isLuxury) {
+      changeAffection(pd.price > 500 ? 2 : 1);
     }
 
     // 精品专柜第二条反应用Sonnet，情感分量要够
@@ -213,7 +299,7 @@ async function onGhostReceived(delivery) {
           body: JSON.stringify({
             model: getMainModel(),
             max_tokens: 400,
-            ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+            system: buildDeliverySystem(),
             messages: [...chatHistory.slice(-15), {
               role: 'user',
               content: `[He received it — 「${delivery.name}」.
@@ -262,8 +348,6 @@ But he felt it.]`
           }
         }
       }, 5000);
-    } else {
-      changeAffection(pd.price > 500 ? 2 : 1);
     }
 
     // fromhome：2-3天后随机触发二次反应（吃完了/感受）
@@ -277,7 +361,7 @@ But he felt it.]`
             body: JSON.stringify({
               model: 'claude-haiku-4-5-20251001',
               max_tokens: 100,
-              ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+              system: buildDeliverySystem(),
               messages: [...chatHistory.slice(-6), {
                 role: 'user',
                 content: `[A few days later, 「${delivery.name}」 crosses his mind again.
@@ -291,9 +375,7 @@ Not vague.
 Not floating.
 
 No full explanation.
-But clear enough to know exactly what he means.
-
-]`
+But clear enough to know exactly what he means.]`
               }]
             })
           });
@@ -324,17 +406,8 @@ function showMysteryPackage(delivery) {
       appendMessage('bot', line);
     }, 2000);
   }
-  // 商城顶部显示神秘包裹提示
-  const tracker = document.getElementById('deliveryTracker');
-  if (tracker) {
-    tracker.style.display = 'block';
-    const mysteryTag = document.createElement('span');
-    mysteryTag.className = 'delivery-tag';
-    mysteryTag.style.cssText = 'background:rgba(255,240,255,0.9);border-color:rgba(192,132,252,0.5);color:#7c3aed;';
-    mysteryTag.innerHTML = `<span class="delivery-tag-dot" style="background:#7c3aed"></span>📬 来自英国的包裹`;
-    mysteryTag.onclick = () => showToast('包裹正在派送，快收到啦～');
-    tracker.appendChild(mysteryTag);
-  }
+  // 商城顶部走正常渲染，不手动插元素，避免小票被顶掉
+  renderDeliveryTracker();
 
   // 弹窗通知用户有快递到了
   setTimeout(() => {
@@ -344,14 +417,13 @@ function showMysteryPackage(delivery) {
       <div style="background:rgba(255,255,255,0.97);backdrop-filter:blur(20px);border-radius:24px;padding:28px 24px;max-width:300px;width:88%;text-align:center;box-shadow:0 16px 48px rgba(139,92,246,0.2);border:1.5px solid rgba(168,85,247,0.15);">
         <div style="font-size:48px;margin-bottom:12px;">📦</div>
         <div style="font-size:16px;font-weight:700;color:#3b0764;margin-bottom:8px;">有快递到了</div>
-        <div style="font-size:13px;color:rgba(109,40,217,0.6);margin-bottom:20px;line-height:1.6;">来自英国的包裹已送达<br>去商城签收一下？</div>
-        <div style="display:flex;gap:10px;">
-          <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;">待会再说</button>
-          <button onclick="this.closest('div[style*=fixed]').remove();openScreen('shopScreen');" style="flex:1;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">去签收</button>
-        </div>
+        <div style="font-size:13px;color:rgba(109,40,217,0.6);margin-bottom:20px;line-height:1.6;">来自英国的包裹已送达<br>已自动签收 ✓</div>
+        <button id="_closeSignBtn" style="width:100%;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">好的</button>
       </div>
     `;
     document.body.appendChild(overlay);
+    const _closeBtn = overlay.querySelector('#_closeSignBtn');
+    if (_closeBtn) _closeBtn.onclick = () => overlay.remove();
   }, 1500);
 
   // 签收后Sonnet生成台词
@@ -363,7 +435,7 @@ function showMysteryPackage(delivery) {
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 300,
-          ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+          system: buildDeliverySystem(),
           messages: [...chatHistory.slice(-10), {
             role: 'user',
             content: `[He sent something — 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''}
@@ -387,7 +459,7 @@ But he's paying attention.]`
       });
       const data = await res.json();
       const reply = data.content?.[0]?.text?.trim() || '';
-      if (reply) {
+      if (reply && !_isDeliveryBreakout(reply)) {
         appendMessage('bot', reply);
         chatHistory.push({ role: 'assistant', content: reply });
         saveHistory();
@@ -495,7 +567,7 @@ Closes it himself.]`;
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
-        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+        system: buildDeliverySystem(),
         messages: chatHistory.slice(-20)
       })
     });
@@ -543,6 +615,8 @@ function renderDeliveryTracker() {
   const active = deliveries.filter(d => {
     if (d.done) return false;
     if (d.lostTicketExpired) return false;
+    // 延迟显示：visibleAt未到就不显示
+    if (d.visibleAt && now48 < d.visibleAt) return false;
     // 丢失超过48小时自动消失
     if (d.isLostConfirmed && d.lostConfirmedAt && now48 - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
     if (d.isSecretDelivery) {
@@ -581,6 +655,7 @@ function openDeliveryModal(idx) {
   const now48 = Date.now();
   const active = deliveries.filter(d => {
     if (d.done || d.lostTicketExpired) return false;
+    if (d.visibleAt && now48 < d.visibleAt) return false;
     if (d.isLostConfirmed && d.lostConfirmedAt && now48 - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
     if (d.isSecretDelivery) return d.currentStage >= d.stages.length - 2;
     return true;
