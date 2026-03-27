@@ -159,36 +159,12 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
   // 先试DeepSeek，失败了用Haiku兜底，两个都失败才显示无法翻译
   let zh = '';
 
-  // 1. 先试DeepSeek
+  // 1. 先试DeepSeek翻译接口
   try {
-    const res = await fetchWithTimeout('/api/gemini', {
+    const res = await fetchWithTimeout('/api/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system: `Translate Simon "Ghost" Riley's dialogue into Chinese. Rules:
-- Translate the FEELING, not the words. Dry, blunt, minimal.
-- Short English = short Chinese. Use casual spoken Chinese. Drop pronouns when natural.
-- Keep sarcasm and irony — do not soften.
-- Avoid: 才不会/居然/真的吗/那就算了/算了——（后接话）/怎么可能
-- "plus" → 再说 / "plus, you've got me" → 再说了，你还有我
-
-Examples:
-"sleep then." → 去睡。  ← command form
-"ate yet?" → 吃了吗。  ← casual spoken
-"what?" → 咋了。  ← spoken, not 什么
-"what else?" → 别的呢？
-"go on." → 说。  ← one word
-"mine." → 我的。
-"easy." → 简单。
-"nah." → 没有。
-"hold on." → 等等。
-"romantic." → 真浪漫。  ← sarcasm kept
-"i'm blocking you." → 拉黑了。
-"maybe i'm actually a genius." → 或许我真是个天才。
-"bullshit + noun" → noun + 个屁
-
-If input has multiple lines, translate each line separately and keep the same line breaks.
-Return Chinese only, nothing else.`,
         user: key,
         max_tokens: 150
       }),
@@ -196,11 +172,15 @@ Return Chinese only, nothing else.`,
     if (res.ok) {
       const data = await res.json();
       const candidate = data.text?.trim();
-      if (candidate && /[\u4e00-\u9fff]/.test(candidate)) {
+      if (candidate && /[一-鿿]/.test(candidate)) {
         zh = candidate;
       }
     }
   } catch(e) {}
+
+  // 1b. 占位（旧格式兼容）
+  if (false) { const res = null; const examples = `
+  }
 
   // 2. DeepSeek失败，用Haiku兜底
   if (!zh) {
