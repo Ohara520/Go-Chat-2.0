@@ -242,17 +242,62 @@ async function onGhostReceived(delivery) {
   if (!container) return;
   const pd = delivery.productData;
 
-  // 愚人节限定：用特殊prompt
+  // 愚人节限定：用特殊prompt，按收到数量递进
   if (pd.isAprilFool && pd.aprilFoolPrompt) {
     try {
+      // 读取今天收到的愚人节礼物数量
+      const today = new Date().toDateString();
+      const afKey = 'aprilFoolReceivedCount_' + today;
+      const afCount = parseInt(localStorage.getItem(afKey) || '0') + 1;
+      localStorage.setItem(afKey, afCount);
+
+      // 根据数量选不同的反应层次
+      let afPrompt;
+      if (afCount === 1) {
+        afPrompt = `[April Fool's event. She sent him "${pd.name}" as a gift.
+
+He just received it. First one.
+
+It's obviously ridiculous. He's caught off guard — didn't expect this.
+
+React: dry, a little confused, but there's quiet fondness. He doesn't know what she's playing at yet.
+
+Keep it brief. One or two lines. lowercase.]`;
+      } else if (afCount === 2) {
+        afPrompt = `[April Fool's event. She sent him "${pd.name}". This is the second ridiculous thing today.
+
+He's starting to understand what she's doing.
+
+React: dry, slightly exasperated, but still putting up with it. A hint of "really? again?"
+
+Keep it brief. One or two lines. lowercase.]`;
+      } else if (afCount === 3) {
+        afPrompt = `[April Fool's event. She sent him "${pd.name}". Third one today.
+
+He's done being surprised. Now he's just shaking his head.
+
+React: flat, unimpressed, maybe a single line of complaint. Still accepted it though.
+
+Keep it brief. One line. lowercase.]`;
+      } else {
+        afPrompt = `[April Fool's event. She sent him "${pd.name}". This is the ${afCount}th ridiculous thing today.
+
+He's completely numb at this point. No reaction left.
+
+React: one flat line. Maybe just acknowledges it without any feeling. Or says nothing meaningful. 
+He's given up being surprised.
+
+One line max. lowercase.]`;
+      }
+
       const res = await fetchWithTimeout('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 150,
+          max_tokens: 100,
           ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
-          messages: [...chatHistory.slice(-10), { role: 'user', content: pd.aprilFoolPrompt }]
+          messages: [...chatHistory.slice(-10), { role: 'user', content: afPrompt }]
         })
       });
       const data = await res.json();
