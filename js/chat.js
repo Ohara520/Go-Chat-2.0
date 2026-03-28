@@ -156,13 +156,7 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
     return;
   }
 
-  // 取最近3条对话作为上下文
-  const recentCtx = (chatHistory || [])
-    .filter(m => !m._system && !m._recalled && m.content && m.content.length < 200)
-    .slice(-3)
-    .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content}`)
-    .join('\n');
-  const userContent = recentCtx ? `Context:\n${recentCtx}\n\nTranslate this line:\n${key}` : key;
+  const userContent = key;
 
   // 先试DeepSeek，失败了用Haiku兜底，两个都失败才显示无法翻译
   let zh = '';
