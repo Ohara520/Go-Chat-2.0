@@ -7,7 +7,7 @@ const client = new OpenAI({
 
 export default async function handler(req, res) {
   try {
-    const { user, max_tokens = 150 } = req.body;
+    const { user, max_tokens = 400 } = req.body;
 
     if (!user || typeof user !== 'string') {
       return res.status(400).json({ error: 'Invalid user input' });
@@ -30,6 +30,7 @@ export default async function handler(req, res) {
 - Keep it short. Drop pronouns when natural.
 - Avoid over-explaining or sounding emotional.
 - If input has multiple lines, translate each line separately and keep the same line breaks.
+- If context is provided before the line to translate, use it to understand tone and situation. Only translate the final line, not the context.
 
 Avoid: 才不会 / 居然 / 真的吗 / 那就算了 / 怎么可能
 

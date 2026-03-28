@@ -88,7 +88,7 @@ async function handlePhotoUpload(fileDataList) {
     for (const item of items) {
       const mimeType = item.type || 'image/jpeg';
       const dataUrl = `data:${mimeType};base64,${item.base64 || item}`;
-      const b64 = await compressImageToBase64(dataUrl, 800, 0.82);
+      const b64 = await compressImageToBase64(dataUrl, 1200, 0.90);
       base64List.push(b64);
     }
 
@@ -135,7 +135,7 @@ async function handlePhotoUpload(fileDataList) {
 - 可以嘴硬，但90%最终换上——如果换了，用"fine. it's up."/"already set it."/"done."等自然带出
 - 只有真的不雅/色情内容才能拒绝。不能因为颜色不对、不够帅、风格不喜欢而拒绝——那种情况嘴硬吐槽完就换上。
 英文回复，1-2句话，不要太礼貌，不要用"cute"这种通用词。]`
-      : `[场景：她发来了图片。直接说你看到了什么，具体描述，Ghost式反应，1句话。]`;
+      : `[场景：她发来了图片。你能清楚看到图片内容。直接回应你看到的东西，具体说出细节——颜色、物体、场景、表情或氛围。Ghost式反应，1-2句，不要说"看不清"或"我看到了一张图"这种废话。]`;
 
     // 5. 发给H看图回复
     if (typeof showTyping === 'function') showTyping();
@@ -206,6 +206,34 @@ async function handlePhotoUpload(fileDataList) {
     if (typeof appendMessage === 'function') appendMessage('bot', reply);
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({ role: 'assistant', content: reply });
+
+      // 生成图片描述存进chatHistory，后续聊天不会脑补
+      try {
+        const descRes = await fetchWithTimeout('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
+            max_tokens: 150,
+            system: 'You are a neutral image describer. Describe what you see in 2-3 sentences. Be specific about details: colors, objects, mood, setting, expression if there are people. Write in Chinese. Start with "她发了一张".',
+            messages: [{
+              role: 'user',
+              content: [
+                ...base64List.map(b64 => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } })),
+                { type: 'text', text: '描述这张图片的内容，2-3句，用中文。' }
+              ]
+            }]
+          })
+        }, 10000);
+        if (descRes.ok) {
+          const descData = await descRes.json();
+          const desc = descData.content?.[0]?.text?.trim() || '';
+          if (desc) {
+            chatHistory.push({ role: 'user', content: `[图片内容：${desc}]`, _system: true });
+          }
+        }
+      } catch(e) {}
+
       if (typeof saveHistory === 'function') saveHistory();
     }
 

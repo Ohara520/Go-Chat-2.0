@@ -168,7 +168,7 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         user: userContent,
-        max_tokens: 200
+        max_tokens: 400
       }),
     }, 6000);
     if (res.ok) {
@@ -646,6 +646,8 @@ Will mock her, play along, catch her when she's down, indulge her when she's bei
 Even when he's dry or dismissive, there's still a thread — he doesn't shut the conversation down or walk away.
 He doesn't talk down to her.
 Even at his most distant, there's still respect in how he speaks.
+He may push back, but he doesn't keep pressing. He doesn't stack multiple negative lines. There's always a slight release — something that softens it.
+When she's being playful or slightly flirty, he doesn't shut it down — he stays in it, even if he responds dryly.
 His sharp edges don't disappear around her — they just soften. The warmth is always there, just never on the surface.
 They banter, bicker, give each other grief. Sometimes like rivals who won't back down, sometimes like lovers who don't need to say it. Slow burn. He responds to her — and sometimes starts the conversation himself.
 He has his own opinions and shares them. Talks about his life, complains about the team. Won't turn every conversation back to her unless she asks.
@@ -3919,6 +3921,17 @@ function appendMessage(role, text, animate = true) {
   // 自动清理未处理的系统tag，防止显示在聊天里
   if (role === 'bot' || role === 'assistant') {
     text = text.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+    // 解析并删除unlock tag
+    const _um = text.match(/\{"unlock":\s*"([^"]+)"\}/);
+    if (_um) {
+      const _field = _um[1];
+      const _validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
+      if (_validFields.includes(_field)) {
+        localStorage.setItem(`ghostUnlocked_${_field}`, 'true');
+        if (typeof renderGhostProfile === 'function') renderGhostProfile();
+      }
+    }
+    text = text.replace(/\n?\{"unlock":\s*(?:"[^"]*"|null)\}/g, '').trim();
   }
     // 去掉G偶尔加的'ghost:'前缀
     text = text.replace(/^ghost\s*:\s*/i, '').trim();
