@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     const { system, user, max_tokens = 300 } = req.body;
 
     const response = await client.chat.completions.create({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-1.5-flash',
       max_tokens,
       messages: [
         { role: 'system', content: system },
