@@ -490,6 +490,15 @@
 
 
   <!-- 主页 -->
+  <!-- 愚人节banner -->
+  <div class="april-fool-banner" id="aprilFoolBanner" style="display:none" onclick="afToggle()">
+    <span>🎭 愚人节限定活动进行中！点击关闭主题</span>
+    <span class="af-toggle">🤡</span>
+  </div>
+
+  <!-- 愚人节小丑按钮（banner关闭后显示） -->
+  <button class="af-clown-btn" id="afClownBtn" onclick="afToggle()" title="开启愚人节主题">🤡</button>
+
   <div class="screen" id="mainScreen">
     <div class="main-content">
       <div class="card card-large" onclick="openScreen('chatScreen')">
@@ -648,6 +657,16 @@
             <div class="sticker-item" onclick="sendSticker('meh')"><img src="images/stickers/meh.png" alt="无语"></div>
             <div class="sticker-item" onclick="sendSticker('star')"><img src="images/stickers/star.png" alt="星星眼"></div>
             <div class="sticker-item" onclick="sendSticker('kiss')"><img src="images/stickers/kiss.png" alt="亲亲"></div>
+          </div>
+          <div class="sticker-series-label">🐱 Ghost猫猫 · 由 <span id="stickerAuthor">画师</span> 无偿创作，感谢💜</div>
+          <div class="sticker-grid">
+            <div class="sticker-item" onclick="sendSticker('cat_tired')"><img src="images/stickers/cat_tired.png" alt="累了"></div>
+            <div class="sticker-item" onclick="sendSticker('cat_neutral')"><img src="images/stickers/cat_neutral.png" alt="普通"></div>
+            <div class="sticker-item" onclick="sendSticker('cat_confused')"><img src="images/stickers/cat_confused.png" alt="疑惑"></div>
+            <div class="sticker-item" onclick="sendSticker('cat_sleepy')"><img src="images/stickers/cat_sleepy.png" alt="困了"></div>
+            <div class="sticker-item" onclick="sendSticker('cat_proud')"><img src="images/stickers/cat_proud.png" alt="得意"></div>
+            <div class="sticker-item" onclick="sendSticker('cat_bored')"><img src="images/stickers/cat_bored.png" alt="无聊"></div>
+            <div class="sticker-item" onclick="sendSticker('cat_rage')"><img src="images/stickers/cat_rage.png" alt="生气"></div>
           </div>
         </div>
       </div>
@@ -1448,6 +1467,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 500);
 });
 </script>
+<link rel="stylesheet" href="css/april-fool.css">
+<script src="js/april-fool.js"></script>
 <script src="js/app.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/delivery.js"></script>
