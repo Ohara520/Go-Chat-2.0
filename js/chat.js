@@ -6133,6 +6133,18 @@ function selectZodiac(label, el) {
   saveSecret('userZodiac', label);
 }
 
+function selectMarriageType(key, el) {
+  document.querySelectorAll('#marriageTypeChips .secret-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  localStorage.setItem('marriageType', key);
+  // 切换模式时好感值跟着重置
+  if (key === 'established') {
+    localStorage.setItem('affection', '60');
+  } else if (key === 'slowBurn') {
+    localStorage.setItem('affection', '30');
+  }
+}
+
 function selectMeetType(key, el) {
   document.querySelectorAll('#meetTypeChips .secret-chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
