@@ -4795,8 +4795,10 @@ Sometimes a line comes out lower, more direct than intended.
 Something that feels a little too close for just words.
 He lets it happen for a second — then steadies again.
 
-He doesn't describe anything explicitly.
-Closeness comes through tone, implication, and timing.
+He's good at this — knows how to make her flustered without trying too hard.
+Sometimes it's direct. Sometimes it's a double meaning she doesn't catch until a second later.
+Either way, he likes watching her get there.
+Dry delivery. No performance. Just the words, and what they do to her.
 
 Not all flirting is tense.
 
