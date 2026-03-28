@@ -36,7 +36,9 @@ const DELIVERY_STAGES_GHOST = [
 
 function addDelivery(product, isGhostSend, isLuxury) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const totalMs = isGhostSend
+  const totalMs = product.isAprilFool
+    ? 3 * 3600 * 1000  // 愚人节礼物3小时到
+    : isGhostSend
     ? (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000  // Ghost反寄1-2天
     : (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000; // 用户寄2-3天
   const stages = isGhostSend ? DELIVERY_STAGES_GHOST : DELIVERY_STAGES_USER;
@@ -72,6 +74,8 @@ function addDelivery(product, isGhostSend, isLuxury) {
       emoji: product.emoji,
       isFromHome: product.isFromHome || false,
       festival: product.festival || '',
+      isAprilFool: product.isAprilFool || false,
+      aprilFoolPrompt: product.aprilFoolPrompt || null,
     }
   };
 
@@ -237,6 +241,33 @@ async function onGhostReceived(delivery) {
   const container = document.getElementById('messagesContainer');
   if (!container) return;
   const pd = delivery.productData;
+
+  // 愚人节限定：用特殊prompt
+  if (pd.isAprilFool && pd.aprilFoolPrompt) {
+    try {
+      const res = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 150,
+          ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+          messages: [...chatHistory.slice(-10), { role: 'user', content: pd.aprilFoolPrompt }]
+        })
+      });
+      const data = await res.json();
+      const reply = data.content?.[0]?.text?.trim() || '';
+      if (reply) {
+        appendMessage('bot', reply);
+        chatHistory.push({ role: 'assistant', content: reply });
+        saveHistory();
+        if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+      }
+    } catch(e) {}
+    return;
+  }
+
+  // 正常签收逻辑
   const fee = pd.shipping || 15;
 
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);

@@ -1,5 +1,15 @@
 // ===== 商城系统 (shop.js) =====
 // ===== 商城系统 =====
+// 愚人节限定商品
+const APRIL_FOOL_PRODUCTS = [
+  { emoji: '🪲', name: '活蟑螂标本', desc: '精心保存的蟑螂标本，送给最特别的他', price: 9.9, shipping: 10, isAprilFool: true },
+  { emoji: '🧅', name: '爱的洋葱', desc: '一颗用爱浇灌的洋葱，切开才知道有多感动', price: 4.9, shipping: 10, isAprilFool: true },
+  { emoji: '💩', name: '便便巧克力', desc: '外形特别，味道正宗，他肯定猜不到', price: 9.9, shipping: 10, isAprilFool: true },
+  { emoji: '🤡', name: '小丑面具', desc: '送给他，告诉他你最懂他', price: 6.9, shipping: 10, isAprilFool: true },
+  { emoji: '🪤', name: '老鼠夹', desc: '贴心好物，防鼠又实用', price: 4.9, shipping: 10, isAprilFool: true },
+  { emoji: '🥤', name: '鼻涕奶昔', desc: '特调限定口味，只在愚人节发售', price: 7.9, shipping: 10, isAprilFool: true },
+];
+
 const MARKET_CATEGORIES = [
   { id: 'clothing', label: '👕 服装' },
   { id: 'food',     label: '🍫 食品' },
@@ -9,6 +19,16 @@ const MARKET_CATEGORIES = [
   { id: 'wishlist', label: '✈️ 面基计划' },
   { id: 'home',     label: '🏡 建立小家' },
 ];
+
+// 动态添加愚人节分类
+function getMarketCategories() {
+  const now = new Date();
+  const isAprilFool = now.getMonth() === 3 && now.getDate() === 1;
+  if (isAprilFool) {
+    return [...MARKET_CATEGORIES, { id: 'aprilfool', label: '🤡 愚人节限定', isLimited: true }];
+  }
+  return MARKET_CATEGORIES;
+}
 
 const MARKET_PRODUCTS = {
   clothing: [
@@ -227,10 +247,33 @@ function renderMarket(categoryId) {
   currentCategory = categoryId;
   const tabsEl = document.getElementById('categoryTabs');
   if (tabsEl) {
-    tabsEl.innerHTML = MARKET_CATEGORIES.map(cat => `
-      <div class="category-tab ${cat.id === categoryId ? 'active' : ''}" onclick="renderMarket('${cat.id}')">${cat.label}</div>
+    tabsEl.innerHTML = getMarketCategories().map(cat => `
+      <div class="category-tab ${cat.id === categoryId ? 'active' : ''} ${cat.isLimited ? 'limited-tab' : ''}" onclick="renderMarket('${cat.id}')">${cat.label}</div>
     `).join('');
   }
+  // 愚人节限定
+  if (categoryId === 'aprilfool') {
+    const gridEl2 = document.getElementById('productsGrid');
+    if (gridEl2) {
+      gridEl2.innerHTML = `
+        <div style="text-align:center;padding:12px 0 4px;font-size:12px;color:#f97316;font-weight:600;letter-spacing:0.5px;">
+          🤡 愚人节限定 · 仅4月1日开放
+        </div>` +
+        APRIL_FOOL_PRODUCTS.map((p, i) => `
+          <div class="product-card april-fool-card" onclick="openAprilFoolModal(${i})">
+            <div class="product-emoji">${p.emoji}</div>
+            <div class="product-name">${p.name}</div>
+            <div class="product-desc">${p.desc}</div>
+            <div class="product-price-row">
+              <span class="product-price">¥${p.price}</span>
+              <span class="product-shipping">+运费¥${p.shipping}</span>
+            </div>
+            <button class="buy-btn">🎭 恶作剧一下</button>
+          </div>`).join('');
+    }
+    return;
+  }
+
   const isFromHome = categoryId === 'fromhome';
   let products = MARKET_PRODUCTS[categoryId] || [];
   if (isFromHome) {
@@ -438,3 +481,40 @@ function getWeeklySale() {
 
 // ===== 商城+情绪触发（合并Haiku调用）=====
 // ===== 钱相关意图并行判断（不阻塞主回复）=====
+
+// ===== 愚人节限定购买弹窗 =====
+function openAprilFoolModal(index) {
+  const p = APRIL_FOOL_PRODUCTS[index];
+  if (!p) return;
+  const total = p.price + p.shipping;
+  const balance = typeof getBalance === 'function' ? getBalance() : 0;
+  
+  if (balance < total) {
+    showToast(`余额不足，还差 £${(total - balance).toFixed(1)}`);
+    return;
+  }
+
+  if (confirm(`🤡 确认寄出「${p.emoji} ${p.name}」给 Ghost？\n总计 ¥${total}（含运费）`)) {
+    // 扣款
+    if (typeof setBalance === 'function') setBalance(balance - total);
+    if (typeof addTransaction === 'function') addTransaction({ 
+      icon: p.emoji, 
+      name: `愚人节礼物 · ${p.name}`, 
+      amount: -total 
+    });
+    if (typeof renderWallet === 'function') renderWallet();
+
+    // 加入快递
+    if (typeof addDelivery === 'function') {
+      addDelivery({
+        name: p.name,
+        emoji: p.emoji,
+        price: p.price,
+        shipping: p.shipping,
+        isAprilFool: true,
+        aprilFoolPrompt: `[April Fool's event. She sent him "${p.name}" as a gift.\n\nHe just received it.\n\nIt's obviously ridiculous. He knows exactly what she's doing.\n\nReact in character: dry, unimpressed, a little caught off guard — but there's quiet fondness under it. He doesn't take it seriously, doesn't shut it down. It's more like he's putting up with her, letting it happen.\n\nKeep it brief. One or two lines. lowercase.]`
+      });
+    }
+    showToast(`🎭 已寄出「${p.name}」！等他收到的反应吧～`);
+  }
+}
