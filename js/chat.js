@@ -3358,6 +3358,14 @@ const STICKER_META = {
   meh:   { label: '无语',  emotion: 'meh',   ghostHint: '用户发了无语/嫌弃的表情包，可能觉得他说的话很欠揍，干脆回应。' },
   star:  { label: '星星眼',emotion: 'want',  ghostHint: '用户发了星星眼/渴望/期待的表情包，她在期待或者想要什么，顺着语境回应。' },
   kiss:  { label: '亲亲',  emotion: 'love',  ghostHint: '用户发了亲亲/示爱的表情包，她在撒娇或表达亲热，Ghost可以嘴硬但不能冷漠。' },
+  // Ghost猫猫系列（k教练无偿创作）
+  'cat-tired':   { label: '累了',  emotion: 'tired',   ghostHint: '用户发了一只累趴的猫猫表情包，她可能很累或者在撒娇说累，简短回应，可以关心一下。' },
+  'cat-neutral': { label: '普通',  emotion: 'neutral', ghostHint: '用户发了一只普通坐着的猫猫表情包，语气中性，顺着对话语境自然回应。' },
+  'cat-confused':{ label: '疑惑',  emotion: 'confused',ghostHint: '用户发了一只打问号的猫猫表情包，她不懂或者在问什么，简短解释或反问。' },
+  'cat-sleepy':  { label: '困了',  emotion: 'sleepy',  ghostHint: '用户发了一只睡觉的猫猫表情包，她困了或者在暗示要睡，叫她去睡或者简短回应。' },
+  'cat-proud':   { label: '得意',  emotion: 'proud',   ghostHint: '用户发了一只拿着茶杯竖大拇指的猫猫表情包，她在得意或者认可什么，干脆回应。' },
+  'cat-bored':   { label: '无聊',  emotion: 'bored',   ghostHint: '用户发了一只抱着毛线球发呆的猫猫表情包，她无聊或者在等他，简短回应。' },
+  'cat-rage':    { label: '生气',  emotion: 'rage',    ghostHint: '用户发了一只炸毛的猫猫表情包，她在生气或者假装生气，根据上下文判断是撒娇还是真的不高兴。' },
 };
 
 function togglePlusPanel() {
