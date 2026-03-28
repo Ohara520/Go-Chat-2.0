@@ -913,7 +913,16 @@ ${getLoveStagePrompt()}
 
 `;
 
-  const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt;
+  const relationshipModeBlock = getRelationshipBlock();
+  const unlockInstruction = `
+
+[PROFILE UNLOCK]
+After your reply, on a new line, add JSON: {"unlock": "field"} or {"unlock": null}
+Fields: birthday, zodiac, height, weight, blood_type, hometown
+Only unlock if you actually revealed that specific information in your reply.
+Do not invent information just to unlock. If you avoided or deflected, return null.`;
+
+  const fullPrompt = fixedPrompt + relationshipModeBlock + unlockInstruction + '\n\n' + dynamicPrompt;
   return fullPrompt;
 }
 
