@@ -35,13 +35,12 @@ async function loadFromCloud() {
     const localTs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
     const cloudIsNewer = cloudTs > localTs;
 
-    // ── 1. 聊天记录：比较真实消息数（过滤系统消息），避免签收时系统消息撑大本地导致被旧云端覆盖 ──
+    // ── 1. 聊天记录：本地空时无条件恢复，否则保留更长的 ────────
     if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
-      const localRealCount = localHistory.filter(m => !m._system && !m._recalled).length;
-      const cloudRealCount = data.chat_history.filter(m => !m._system && !m._recalled).length;
-      if (localRealCount === 0 || cloudRealCount > localRealCount) {
+      // 本地空 → 无条件从云端恢复；云端更多 → 也用云端
+      if (localHistory.length === 0 || data.chat_history.length > localHistory.length) {
         localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
         localStorage.setItem('chatUpdatedAt', cloudTs);
       }
@@ -78,13 +77,21 @@ async function loadFromCloud() {
       if (p.userAvatarBase64 && !localStorage.getItem('userAvatarBase64')) {
         localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
       }
-      // Ghost情头URL
-      if (p.ghostAvatarUrl) {
-        localStorage.setItem('ghostAvatarUrl', p.ghostAvatarUrl);
-        if (typeof restoreGhostAvatar === 'function') restoreGhostAvatar();
-      }
       // 冷战状态：取最新
       if (p.coldWarMode != null && cloudIsNewer) localStorage.setItem('coldWarMode', String(p.coldWarMode));
+      // 婚姻模式和Ghost档案
+      setIfMissing('marriageType', p.marriageType);
+      setIfMissing('ghostAvatarUrl', p.ghostAvatarUrl);
+      setIfMissing('ghostHeight', p.ghostHeight);
+      setIfMissing('ghostWeight', p.ghostWeight);
+      setIfMissing('ghostBloodType', p.ghostBloodType);
+      setIfMissing('ghostHometown', p.ghostHometown);
+      setIfMissing('ghostUnlocked_birthday', p.ghostUnlocked_birthday);
+      setIfMissing('ghostUnlocked_zodiac', p.ghostUnlocked_zodiac);
+      setIfMissing('ghostUnlocked_height', p.ghostUnlocked_height);
+      setIfMissing('ghostUnlocked_weight', p.ghostUnlocked_weight);
+      setIfMissing('ghostUnlocked_blood_type', p.ghostUnlocked_blood_type);
+      setIfMissing('ghostUnlocked_hometown', p.ghostUnlocked_hometown);
     }
 
     // ── 3. 情绪/关系：云端更新才覆盖，本地操作优先 ────────────
@@ -99,7 +106,10 @@ async function loadFromCloud() {
       if (data.long_term_memory != null && !localStorage.getItem('longTermMemory')) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
-    // ── 4. 余额：由transactions计算，不再单独同步balance字段 ──
+    // ── 4. 余额：本地没有才从云端恢复，有就保留本地 ──────────
+    if (data.balance != null && data.balance > 0 && !localStorage.getItem('wallet')) {
+      localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
+    }
 
     // ── 5. state_snapshot ─────────────────────────────────────
     if (data.state_snapshot != null) {
@@ -256,12 +266,23 @@ async function saveToCloud() {
       metInPerson: localStorage.getItem('metInPerson') || 'false',
       meetType: localStorage.getItem('meetType') || '',
       botNickname: localStorage.getItem('botNickname') || '',
+      marriageType: localStorage.getItem('marriageType') || 'established',
+      ghostAvatarUrl: localStorage.getItem('ghostAvatarUrl') || '',
+      ghostHeight: localStorage.getItem('ghostHeight') || '',
+      ghostWeight: localStorage.getItem('ghostWeight') || '',
+      ghostBloodType: localStorage.getItem('ghostBloodType') || '',
+      ghostHometown: localStorage.getItem('ghostHometown') || '',
+      ghostUnlocked_birthday: localStorage.getItem('ghostUnlocked_birthday') || '',
+      ghostUnlocked_zodiac: localStorage.getItem('ghostUnlocked_zodiac') || '',
+      ghostUnlocked_height: localStorage.getItem('ghostUnlocked_height') || '',
+      ghostUnlocked_weight: localStorage.getItem('ghostUnlocked_weight') || '',
+      ghostUnlocked_blood_type: localStorage.getItem('ghostUnlocked_blood_type') || '',
+      ghostUnlocked_hometown: localStorage.getItem('ghostUnlocked_hometown') || '',
       visitStreak: localStorage.getItem('visitStreak') || '0',
       vocabStreak: localStorage.getItem('vocabStreak') || '0',
       vocabLastDay: localStorage.getItem('vocabLastDay') || '',
       lastSalaryAmount: localStorage.getItem('lastSalaryAmount') || '',
       lastSalaryMonth: localStorage.getItem('lastSalaryMonth') || '',
-      ghostAvatarUrl: localStorage.getItem('ghostAvatarUrl') || '',
     };
     const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw
@@ -320,15 +341,13 @@ async function saveToCloud() {
     };
     // 只在有内容时才存，防止空值覆盖云端已有数据
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
-    // 余额由transactions计算，不再单独存balance字段
+    const walletVal = parseFloat(localStorage.getItem('wallet') || '0');
+    if (walletVal > 0) upsertData.balance = walletVal;
 
     await sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' });
     localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
   } catch(e) {
-    console.log('云端保存失败，5秒后重试', e);
-    setTimeout(() => {
-      saveToCloud().catch(err => console.log('重试也失败了', err));
-    }, 5000);
+    console.log('云端保存失败', e);
   }
 }
 
