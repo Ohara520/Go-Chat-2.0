@@ -156,6 +156,14 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
     return;
   }
 
+  // 取最近3条对话作为上下文
+  const recentCtx = (chatHistory || [])
+    .filter(m => !m._system && !m._recalled && m.content && m.content.length < 200)
+    .slice(-3)
+    .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content}`)
+    .join('\n');
+  const userContent = recentCtx ? `Context:\n${recentCtx}\n\nTranslate this line:\n${key}` : key;
+
   // 先试DeepSeek，失败了用Haiku兜底，两个都失败才显示无法翻译
   let zh = '';
 
@@ -165,8 +173,8 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        user: key,
-        max_tokens: 150
+        user: userContent,
+        max_tokens: 200
       }),
     }, 6000);
     if (res.ok) {
@@ -611,6 +619,7 @@ He often picks up something about her — how she says it, what it implies, or t
 His replies feel directed at her, not just about the situation.
 
 Avoid purely topic-based replies.
+His replies often include a small sign that he's paying attention to her specifically — not just the situation.
 
 He notices details about her — what she's doing, what she said before, how she's holding up. He remembers what she's mentioned. When something she said earlier finally lands, he'll bring it up like he's been sitting with it.
 
@@ -671,8 +680,13 @@ Just enough to keep it going.
 
 [Format]
 Each sentence on its own line. Never combine two into one.
+Do not use — as a connector between thoughts. Two thoughts = two lines.
 If two separate thoughts, use \n---\n between them. Usually just one. Two at most. Most of the time, one is enough.
 Reply in English only.
+
+He does not explain or point out his own personality.
+If he's dry or withholding, he just is.
+No self-commentary.
 
 [INSTABILITY — CRITICAL]
 Not every reply follows structure.
@@ -4161,14 +4175,13 @@ Not cleaned up.
 ${recentContext}
 Scene: ${sceneHint}
 
-One line. Max 10 words. lowercase.
-Fragments are fine.
-
+lowercase. Fragments are fine.
+Can be one line or a few — whatever fits.
 It should feel private. Like it slipped out.
 
 Return JSON only:
 {"en":"...","cn":"..."}
-cn under 10 characters, spoken Chinese, same feeling.`;
+cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
 
   try {
     if (_isIntimateThought) {
@@ -4183,7 +4196,7 @@ cn under 10 characters, spoken Chinese, same feeling.`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: getMainModel(),
-          max_tokens: 80,
+          max_tokens: 150,
           system: thoughtPrompt,
           messages: [{ role: 'user', content: 'inner thought now.' }]
         })
@@ -5030,6 +5043,7 @@ async function _processMergedMessage(text) {
     const _splitSentences = (text) => {
       return text
         .replace(/([.?!])\s+(?=[a-zA-Z"'])/g, '$1\n')
+        .replace(/\s*—\s*/g, '\n')
         .trim();
     };
     reply = _splitSentences(reply);
