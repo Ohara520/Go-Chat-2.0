@@ -150,13 +150,15 @@ const _translateCache = new Map();
 async function translateWithGemini(enText, zhEl, fallbackZh = '') {
   if (!enText || !enText.trim()) return;
   const key = enText.trim();
-  // 命中缓存直接写入，不重复请求
-  if (_translateCache.has(key)) {
-    if (zhEl && zhEl.isConnected) zhEl.textContent = _translateCache.get(key);
-    return;
-  }
+  // 不使用缓存，每次都用DeepSeek重新翻译，保证质量
 
-  const userContent = key;
+  // 带最近3条对话作为上下文，帮助翻译理解语气
+  const recentCtx = (chatHistory || [])
+    .filter(m => !m._system && !m._recalled && m.content && m.content.length < 200)
+    .slice(-3)
+    .map(m => (m.role === 'user' ? 'Her: ' : 'Ghost: ') + m.content.replace(/\n/g, ' '))
+    .join(' | ');
+  const userContent = recentCtx ? `Context: ${recentCtx} | Translate this Ghost line: ${key}` : key;
 
   // 先试DeepSeek，失败了用Haiku兜底，两个都失败才显示无法翻译
   let zh = '';
@@ -3983,13 +3985,13 @@ function appendMessage(role, text, animate = true) {
 
     let enText, existingZh;
     if (firstZhIdx > 0) {
-      // Ghost输出了双语：分离英文和中文
+      // Ghost输出了双语：只取英文，中文交给DeepSeek重新翻
       enText = lines.slice(0, firstZhIdx).join('\n');
-      existingZh = lines.slice(firstZhIdx).join('');
+      existingZh = ''; // 忽略S自带的中文，强制走DeepSeek
     } else if (firstZhIdx === 0 && lines.length > 1) {
       // 中文在前（少见）：英文提到前面
       enText = lines.filter(l => !isChinese(l)).join('\n');
-      existingZh = lines.filter(l => isChinese(l)).join('');
+      existingZh = ''; // 忽略S自带的中文
     } else {
       // 纯英文
       enText = text;
