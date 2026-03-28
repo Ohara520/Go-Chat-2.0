@@ -511,6 +511,13 @@ function ensureGhostBirthday() {
   localStorage.setItem('ghostZodiac', pick.zodiac);
 }
 
+function ensureGhostProfile() {
+  if (!localStorage.getItem('ghostHeight')) localStorage.setItem('ghostHeight', '188cm');
+  if (!localStorage.getItem('ghostWeight')) localStorage.setItem('ghostWeight', '95kg');
+  if (!localStorage.getItem('ghostBloodType')) localStorage.setItem('ghostBloodType', 'O');
+  if (!localStorage.getItem('ghostHometown')) localStorage.setItem('ghostHometown', 'Manchester, UK');
+}
+
 // ===== 关系模式块 =====
 const relationshipBlock = {
   slowBurn: `
@@ -547,7 +554,13 @@ He doesn't over-explain or over-soften — the closeness is just there.`
 
 function getRelationshipBlock() {
   const mode = localStorage.getItem('marriageType') || 'established';
-  return mode === 'slowBurn' ? relationshipBlock.slowBurn : relationshipBlock.established;
+  if (mode === 'slowBurn') {
+    // Slow Burn好感到60自动升级到Established
+    const affection = parseInt(localStorage.getItem('affection') || '30');
+    if (affection >= 60) return relationshipBlock.established;
+    return relationshipBlock.slowBurn;
+  }
+  return relationshipBlock.established;
 }
 
 function buildSystemPrompt() {
@@ -860,6 +873,8 @@ Cold war or severe jealousy: never. After one gesture, shifts to words.
 
 Wife: ${userName}, in ${countryInfo ? countryInfo.flag + ' ' + countryInfo.name : 'China'}
 Your birthday: ${ghostBirthday} (${ghostZodiac})
+Your physical stats: ${localStorage.getItem('ghostHeight') || '188cm'}, ${localStorage.getItem('ghostWeight') || '95kg'}, Blood type: ${localStorage.getItem('ghostBloodType') || 'O'}
+Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
 UK time: ${ukTimeStr} | ${userName}'s local time: ${userLocalTimeStr} (${ghostStatusHint}) — they are in different parts of the day. He knows this. It shapes what each of them is doing right now.
 ${metInPerson ? `✓ You have met in person. She came to the UK. This memory exists.` : `Long-distance only. When user pretends to appear in front of you, be skeptical, not welcoming.`}
@@ -982,6 +997,14 @@ function initProfile() {
   const profileNameEl = document.getElementById('profileDisplayName');
   if (profileNameEl) profileNameEl.textContent = remark || 'Simon Riley';
   if (remEl) remEl.value = remark;
+  // 同步情侣头像
+  const ghostAvatarUrl = localStorage.getItem('ghostAvatarUrl');
+  if (ghostAvatarUrl) {
+    document.querySelectorAll('.ghost-avatar-img').forEach(img => {
+      img.src = ghostAvatarUrl;
+    });
+  }
+  renderGhostProfile();
 }
 
 function saveRemark() {
@@ -3652,6 +3675,7 @@ async function initChat() {
 
   // 副作用初始化——统一在这里做，buildSystemPrompt 只读不写
   ensureGhostBirthday();
+  ensureGhostProfile();
   // 每次会话只轮换一次今日细节，存入 sessionStorage 供 prompt 读取
   if (!sessionStorage.getItem('todayDetail')) {
     sessionStorage.setItem('todayDetail', pickTodayDetail());
@@ -5065,6 +5089,20 @@ async function _processMergedMessage(text) {
 
 
     // 审查后重新拆分（reply 可能已被重写）
+    // 解析unlock tag
+    const _unlockMatch = reply.match(/\{"unlock":\s*"([^"]+)"\}/);
+    if (_unlockMatch) {
+      const field = _unlockMatch[1];
+      const validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
+      if (validFields.includes(field)) {
+        localStorage.setItem(`ghostUnlocked_${field}`, 'true');
+      }
+      // 从回复里删掉unlock tag
+      reply = reply.replace(/\n?\{"unlock":\s*"[^"]*"\}/, '').trim();
+    } else {
+      reply = reply.replace(/\n?\{"unlock":\s*null\}/, '').trim();
+    }
+
     // 强制每句话单独一行——把句号/问号/感叹号后的空格换成换行
     const _splitSentences = (text) => {
       return text
@@ -6085,6 +6123,19 @@ function loadSecretScreen() {
     ).join('');
   }
 
+  // 婚姻模式
+  const marriageTypeEl = document.getElementById('marriageTypeChips');
+  if (marriageTypeEl) {
+    const savedMode = localStorage.getItem('marriageType') || 'established';
+    const modes = [
+      { key: 'established', emoji: '💫', label: '已有默契，感情稳定' },
+      { key: 'slowBurn', emoji: '🌱', label: '刚步入婚姻，慢慢磨合' }
+    ];
+    marriageTypeEl.innerHTML = modes.map(m =>
+      `<div class="secret-chip ${savedMode === m.key ? 'selected' : ''}" onclick="selectMarriageType('${m.key}', this)">${m.emoji} ${m.label}</div>`
+    ).join('');
+  }
+
   // 头像预览
   const savedAvatar = localStorage.getItem('userAvatarBase64');
   updateAvatarPreview(savedAvatar);
@@ -6125,6 +6176,30 @@ function loadSecretScreen() {
            onclick="selectColor('${c.name}', this)"></div>
     `).join('');
   }
+}
+
+function renderGhostProfile() {
+  const fields = {
+    birthday: { id: 'profileBirthday', key: 'ghostBirthday' },
+    zodiac: { id: 'profileZodiac', key: 'ghostZodiac' },
+    height: { id: 'profileHeight', key: 'ghostHeight' },
+    weight: { id: 'profileWeight', key: 'ghostWeight' },
+    blood_type: { id: 'profileBloodType', key: 'ghostBloodType' },
+    hometown: { id: 'profileHometown', key: 'ghostHometown' }
+  };
+  Object.entries(fields).forEach(([field, { id, key }]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const unlocked = localStorage.getItem(`ghostUnlocked_${field}`) === 'true';
+    const value = localStorage.getItem(key) || '';
+    if (unlocked && value) {
+      el.textContent = value;
+      el.classList.remove('profile-locked');
+    } else {
+      el.textContent = '🔒 聊出来才知道';
+      el.classList.add('profile-locked');
+    }
+  });
 }
 
 function selectZodiac(label, el) {

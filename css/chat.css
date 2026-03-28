@@ -2583,3 +2583,11 @@
   box-shadow: 0 3px 14px rgba(196,148,255,0.3);
   transform: translateY(-1px);
 }
+
+/* Ghost档案解锁样式 */
+.profile-locked {
+  color: #ccc !important;
+  font-weight: 400 !important;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}

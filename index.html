@@ -693,15 +693,31 @@
       <div class="profile-info-table">
         <div class="profile-item">
           <span class="profile-label">年龄 / Age</span>
-          <span class="profile-value" id="profileAge">35</span>
+          <span class="profile-value">35</span>
         </div>
         <div class="profile-item">
-          <span class="profile-label">位置 / Location</span>
-          <span class="profile-value" id="profileLocation">Hereford Base</span>
+          <span class="profile-label">家乡 / Hometown</span>
+          <span class="profile-value">Manchester, UK</span>
         </div>
         <div class="profile-item">
-          <span class="profile-label">状态 / Status</span>
-          <span class="profile-value">已婚 ❤️</span>
+          <span class="profile-label">生日 / Birthday</span>
+          <span class="profile-value profile-locked" id="profileBirthday">🔒 聊出来才知道</span>
+        </div>
+        <div class="profile-item">
+          <span class="profile-label">星座 / Zodiac</span>
+          <span class="profile-value profile-locked" id="profileZodiac">🔒 聊出来才知道</span>
+        </div>
+        <div class="profile-item">
+          <span class="profile-label">身高 / Height</span>
+          <span class="profile-value profile-locked" id="profileHeight">🔒 聊出来才知道</span>
+        </div>
+        <div class="profile-item">
+          <span class="profile-label">体重 / Weight</span>
+          <span class="profile-value profile-locked" id="profileWeight">🔒 聊出来才知道</span>
+        </div>
+        <div class="profile-item">
+          <span class="profile-label">血型 / Blood Type</span>
+          <span class="profile-value profile-locked" id="profileBloodType">🔒 聊出来才知道</span>
         </div>
       </div>
 
@@ -1248,11 +1264,7 @@
           <label class="secret-label">💫 我们的相遇方式</label>
           <div class="secret-chips" id="meetTypeChips"></div>
         </div>
-        <div class="secret-field">
-          <label class="secret-label">💬 他说过最让你心动的一句话</label>
-          <textarea class="secret-textarea" id="sec_bestline" placeholder="写下来吧..." maxlength="100" maxlength="100"
-                    onchange="saveSecret('ghostBestLine', this.value)"></textarea>
-        </div>
+
         <div class="secret-field">
           <label class="secret-label">💍 你们的婚姻状态</label>
           <div style="font-size:11px;color:#c9aee0;margin-bottom:8px;">会影响 Ghost 跟你相处的方式</div>
