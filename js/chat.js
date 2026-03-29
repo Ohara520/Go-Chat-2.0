@@ -152,13 +152,13 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
   const key = enText.trim();
   // 不使用缓存，每次都用DeepSeek重新翻译，保证质量
 
-  // 带最近3条对话作为上下文，帮助翻译理解语气
+  // 带最近2条对话作为上下文，帮助翻译理解语气（限制长度防止超时）
   const recentCtx = (chatHistory || [])
-    .filter(m => !m._system && !m._recalled && m.content && m.content.length < 200)
-    .slice(-3)
-    .map(m => (m.role === 'user' ? 'Her: ' : 'Ghost: ') + m.content.replace(/\n/g, ' '))
+    .filter(m => !m._system && !m._recalled && m.content && m.content.length < 80)
+    .slice(-2)
+    .map(m => (m.role === 'user' ? 'Her: ' : 'Ghost: ') + m.content.replace(/\n/g, ' ').slice(0, 60))
     .join(' | ');
-  const userContent = recentCtx ? `Context: ${recentCtx} | Translate this Ghost line: ${key}` : key;
+  const userContent = recentCtx ? `Context: ${recentCtx} | Translate: ${key}` : key;
 
   // 先试DeepSeek，失败了用Haiku兜底，两个都失败才显示无法翻译
   let zh = '';
@@ -215,6 +215,7 @@ Return Chinese only.`,
       .replace(/^(你可以|你要|我觉得|我认为)/, '')
       .replace(/^(好的，|好，|嗯，|那，|当然，)/, '')
       .replace(/，(.{8,})$/, '。')
+      .replace(/\n/g, '') // 中文不分段，挤在一起
       .trim();
   }
 
@@ -3389,7 +3390,7 @@ async function sendSticker(id) {
   }
 
   // 存进历史——带情绪描述让Ghost理解
-  const stickerMsg = `[用户发了表情包：${meta.label}]`;
+  const stickerMsg = `[用户发了表情包id：${id}，标签：${meta.label}]`;
   chatHistory.push({ role: 'user', content: stickerMsg });
   saveHistory();
 
@@ -3775,10 +3776,10 @@ async function initChat() {
         return;
       }
       // 检测用户发的表情包
-      const userStickerMatch = msg.content.match(/^\[用户发了表情包：(.+)\]$/);
+      const userStickerMatch = msg.content.match(/^\[用户发了表情包id：(.+)，标签：(.+)\]$/) || msg.content.match(/^\[用户发了表情包：(.+)\]$/);
       if (userStickerMatch) {
-        const label = userStickerMatch[1];
-        const stickerId = Object.keys(STICKER_META).find(k => STICKER_META[k].label === label) || label;
+        const stickerId = userStickerMatch[1];
+        const label = userStickerMatch[2] || userStickerMatch[1];
         const container = document.getElementById('messagesContainer');
         if (container) {
           const div = document.createElement('div');
@@ -3898,16 +3899,17 @@ function appendMessage(role, text, animate = true) {
   if (role === 'bot' || role === 'assistant') {
     text = text.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
     // 解析并删除unlock tag
-    const _um = text.match(/\{"unlock":\s*"([^"]+)"\}/);
+    // 宽松匹配unlock tag，支持多种格式
+    const _um = text.match(/"unlock"\s*:\s*"([^"]+)"/);
     if (_um) {
-      const _field = _um[1];
+      const _field = _um[1].trim();
       const _validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
       if (_validFields.includes(_field)) {
         localStorage.setItem(`ghostUnlocked_${_field}`, 'true');
         if (typeof renderGhostProfile === 'function') renderGhostProfile();
       }
     }
-    text = text.replace(/\n?\{"unlock":\s*(?:"[^"]*"|null)\}/g, '').trim();
+    text = text.replace(/\n?\{?\s*"unlock"\s*:\s*(?:"[^"]*"|null)\s*\}?/g, '').trim();
   }
     // 去掉G偶尔加的'ghost:'前缀
     text = text.replace(/^ghost\s*:\s*/i, '').trim();
@@ -5138,7 +5140,14 @@ One or two lines. English only. lowercase.`;
     // 强制每句话单独一行——把句号/问号/感叹号后的空格换成换行
     const _splitSentences = (text) => {
       return text
-        .replace(/([.?!])\s+(?=[a-zA-Z"'])/g, '$1\n')
+        .replace(/([.?!])\s+(?=[a-zA-Z"'])/g, (match, p1, offset, str) => {
+          // 只有前面这句超过8个词才换行
+          const before = str.slice(0, offset + 1);
+          const lastNewline = before.lastIndexOf('\n');
+          const currentLine = before.slice(lastNewline + 1);
+          const wordCount = currentLine.trim().split(/\s+/).length;
+          return wordCount >= 8 ? p1 + '\n' : match;
+        })
         .replace(/\s*—\s*/g, '\n')
         .trim();
     };
