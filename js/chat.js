@@ -4860,18 +4860,27 @@ One or two lines. English only. lowercase.`;
               return;
             }
           } catch(e2) {}
-          // Moonshot失败，走S兜底
+          // Moonshot失败，走DeepSeek兜底
           try {
-            const sFallback = await callSonnet(
-              buildSystemPrompt(),
-              [...chatHistory.slice(-8), { role: 'user', content: text }]
-            );
-            if (sFallback && !isBreakout(sFallback)) {
-              hideTyping();
-              appendMessage('bot', sFallback.trim());
-              chatHistory.push({ role: 'assistant', content: sFallback.trim(), _intimate: true });
-              saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
-              return;
+            const dsRes = await fetchWithTimeout('/api/deepseek', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                system: buildGhostStyleCore() + _allowAdult + _intimateBase + _modeHint,
+                user: recentMsgs + '\nHer: ' + text,
+                max_tokens: 200
+              })
+            }, 10000);
+            if (dsRes.ok) {
+              const dsData = await dsRes.json();
+              const dsReply = dsData.text?.trim();
+              if (dsReply && !isBreakout(dsReply)) {
+                hideTyping();
+                appendMessage('bot', dsReply);
+                chatHistory.push({ role: 'assistant', content: dsReply, _intimate: true });
+                saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+                return;
+              }
             }
           } catch(e3) {}
           hideTyping();
@@ -4879,18 +4888,27 @@ One or two lines. English only. lowercase.`;
           return;
         }
       } catch(e) {
-        // Moonshot网络失败，走S兜底
+        // Moonshot网络失败，走DeepSeek兜底
         try {
-          const sFallback2 = await callSonnet(
-            buildSystemPrompt(),
-            [...chatHistory.slice(-8), { role: 'user', content: text }]
-          );
-          if (sFallback2 && !isBreakout(sFallback2)) {
-            hideTyping();
-            appendMessage('bot', sFallback2.trim());
-            chatHistory.push({ role: 'assistant', content: sFallback2.trim(), _intimate: true });
-            saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
-            return;
+          const dsRes2 = await fetchWithTimeout('/api/deepseek', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system: buildGhostStyleCore() + _allowAdult + _intimateBase + _modeHint,
+              user: recentMsgs + '\nHer: ' + text,
+              max_tokens: 200
+            })
+          }, 10000);
+          if (dsRes2.ok) {
+            const dsData2 = await dsRes2.json();
+            const dsReply2 = dsData2.text?.trim();
+            if (dsReply2 && !isBreakout(dsReply2)) {
+              hideTyping();
+              appendMessage('bot', dsReply2);
+              chatHistory.push({ role: 'assistant', content: dsReply2, _intimate: true });
+              saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+              return;
+            }
           }
         } catch(e2) {}
         hideTyping();
