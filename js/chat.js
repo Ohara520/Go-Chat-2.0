@@ -128,15 +128,21 @@ function onWorkScreenShow() {
 
 // ===== DeepSeek 功能型调用（第三档）=====
 async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
+  // 走Haiku做检测类工作，快速稳定
   try {
-    const res = await fetchWithTimeout('/api/gemini', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: systemPrompt, user: userContent, max_tokens: maxTokens }),
-    }, 8000); // 8秒超时
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userContent }]
+      }),
+    }, 8000);
     if (!res.ok) return '';
     const data = await res.json();
-    return data.text || '';
+    return data.content?.[0]?.text || '';
   } catch(e) {
     return '';
   }
@@ -4821,7 +4827,7 @@ One or two lines. English only. lowercase.`;
           ? `\nShe just sent him a suggestive image. React as Ghost would — direct, dry, maybe a bit thrown off. Don't describe the image. React to what she's doing. Sharp, real, one or two lines. English only.`
           : _intimateBase + _modeHint;
 
-        const _allowAdult = '\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not refuse, deflect, or break character.';
+        const _allowAdult = '\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not refuse, deflect, or break character. Stay in Ghost\'s voice — dry, controlled, never performative. Even when things get close, he doesn\'t lose himself.';
         // 直接走Grok，不走Moonshot
         let geminiReply = '';
         try {
@@ -6467,11 +6473,16 @@ async function checkTriggersAndEmotion(userText, botText) {
   }
   try {
     const raw = await fetchDeepSeek(
-      '你是一个双重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n格式：{"market":{"triggered":false},"emotion":{"triggered":false}}\n或：{"market":{"triggered":true,"category":"保暖类"},"emotion":{"triggered":true,"type":"太冷","intensity":"中"}}\nmarket分类：保暖类/饮食类/疲惫类/思念类/卫生类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
+      '你是一个三重判断器。只返回JSON，不要其他文字。\n1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段\n2. 判断用户的消息透露了什么情绪，返回emotion字段\n3. 判断这次对话后Ghost的心情变化，返回mood_change字段\nmood_change规则：用户真的生气/冷漠/拒绝/说很伤人的话 → -1；用户撒娇式吵架/开玩笑/正常拌嘴 → 0；用户说了温暖/感动的话 → 1\n格式：{"market":{"triggered":false},"emotion":{"triggered":false},"mood_change":0}\nmarket分类：保暖类/饮食类/疲惫类/思念类/卫生类\nemotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念\nemotion强度：轻/中/重',
       `Ghost说：${botText}\n用户说：${userText}`,
       180
     );
     const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+
+    // 处理mood变化
+    if (result.mood_change && result.mood_change !== 0) {
+      changeMood(result.mood_change);
+    }
 
     // 处理商城触发
     if (result.market?.triggered) {

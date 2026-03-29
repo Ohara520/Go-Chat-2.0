@@ -120,11 +120,14 @@ async function handlePhotoUpload(fileDataList) {
     const recentText = typeof chatHistory !== 'undefined'
       ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => m.content || '').join(' ')
       : '';
-    // 检测情头上下文：最近20条 OR sessionStorage有标记
+    // 检测情头上下文：只看最近3条消息，避免误触发
     const _avatarKeyword = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头|情侣头像|头像.*换|换.*头像/i;
-    const isAvatarContext = _avatarKeyword.test(recentText) || sessionStorage.getItem('avatarRequestPending') === '1';
+    const recentFew = typeof chatHistory !== 'undefined'
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-3).map(m => m.content || '').join(' ')
+      : '';
+    const isAvatarContext = _avatarKeyword.test(recentFew) || sessionStorage.getItem('avatarRequestPending') === '1';
     // 用户提过换情头，记录pending状态
-    if (_avatarKeyword.test(recentText)) sessionStorage.setItem('avatarRequestPending', '1');
+    if (_avatarKeyword.test(recentFew)) sessionStorage.setItem('avatarRequestPending', '1');
     console.log('[photo] isAvatarContext:', isAvatarContext);
 
     const photoHint = isAvatarContext
@@ -192,15 +195,35 @@ async function handlePhotoUpload(fileDataList) {
       }
     } catch(e) {}
 
-    // S失败，G兜底
-    if (!reply && typeof fetchDeepSeek === 'function') {
-      const core = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
-      reply = await fetchDeepSeek(core + '\n' + photoHint + '\nRespond as Ghost. English only. Short.', recentText.slice(-200), 150).catch(() => '');
+    // S失败或破防，走Grok兜底（支持识图）
+    const _photoBreakout = reply && /I'm Claude|I cannot|I need to stop|I'm not able/i.test(reply);
+    if (!reply || _photoBreakout) {
+      try {
+        const core = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
+        const grokPhotoRes = await fetchWithTimeout('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system: core + '\n' + photoHint,
+            user: recentText.slice(-100) || 'she sent a photo.',
+            image_base64: base64List[0],
+            max_tokens: 200
+          })
+        }, 15000);
+        if (grokPhotoRes.ok) {
+          const grokData = await grokPhotoRes.json();
+          const grokText = grokData.text?.trim();
+          if (grokText) reply = grokText;
+        }
+      } catch(e) {}
     }
 
     if (!reply) reply = 'noted.';
 
     if (typeof hideTyping === 'function') hideTyping();
+
+    // 如果不是头像上下文，发完图就清掉pending，防止后续图片误触发
+    if (!isAvatarContext) sessionStorage.removeItem('avatarRequestPending');
 
     // 6. 显示回复
     if (typeof appendMessage === 'function') appendMessage('bot', reply);

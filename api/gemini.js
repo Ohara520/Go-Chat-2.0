@@ -7,14 +7,25 @@ const client = new OpenAI({
 
 export default async function handler(req, res) {
   try {
-    const { system, user, max_tokens = 300 } = req.body;
+    const { system, user, max_tokens = 300, image_base64 } = req.body;
+
+    // 支持图片输入
+    let userContent;
+    if (image_base64) {
+      userContent = [
+        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image_base64}` } },
+        { type: 'text', text: user }
+      ];
+    } else {
+      userContent = user;
+    }
 
     const response = await client.chat.completions.create({
-      model: 'moonshot-v1-8k',
+      model: image_base64 ? 'grok-4.1' : 'grok-4-1-fast-non-reasoning',
       max_tokens,
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: user },
+        { role: 'user', content: userContent },
       ],
     });
 
