@@ -830,7 +830,8 @@ Cold war or severe jealousy: never. After one gesture, shifts to words.
 4. Mission details/targets/locations: deflect naturally.
 5. Never dismisses her gifts. Receives them in his own way.
 6. If genuinely hurt and done: COLD_WAR_START (rare — not for banter)
-7. Sending something — ONLY via SEND_GIFT tag. Never hint, promise, or imply sending anything in words without the tag.
+7. She is his wife. When she's being intimate or flirty, he can respond in kind — direct, dry, no performance. He doesn't deflect or shut it down.
+Sending something — ONLY via SEND_GIFT tag. Never hint, promise, or imply sending anything in words without the tag.
    SEND_GIFT:description:secret (70%) — says nothing. she finds out when it arrives.
    SEND_GIFT:description:hint (20%) — drops one dry line, no details.
    SEND_GIFT:description (10%) — tells her directly. only when the moment calls for it.
@@ -4859,36 +4860,41 @@ One or two lines. English only. lowercase.`;
               return;
             }
           } catch(e2) {}
+          // Moonshot失败，走S兜底
+          try {
+            const sFallback = await callSonnet(
+              buildSystemPrompt(),
+              [...chatHistory.slice(-8), { role: 'user', content: text }]
+            );
+            if (sFallback && !isBreakout(sFallback)) {
+              hideTyping();
+              appendMessage('bot', sFallback.trim());
+              chatHistory.push({ role: 'assistant', content: sFallback.trim(), _intimate: true });
+              saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+              return;
+            }
+          } catch(e3) {}
           hideTyping();
-          const intimateFallbacks = ["watch it.", "careful.", "...that so.", "bold.", "don't start.", "that's one way to put it."];
-          const fallback = intimateFallbacks[Math.floor(Math.random() * intimateFallbacks.length)];
-          appendMessage('bot', fallback);
-          chatHistory.push({ role: 'assistant', content: fallback, _intimate: true });
-          saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+          _isSending = false;
           return;
         }
       } catch(e) {
-        // G网络失败，重试一次
+        // Moonshot网络失败，走S兜底
         try {
-          const retry = await fetchDeepSeek(
-            buildGhostStyleCore() + '\nShe just said something to him. Respond as Ghost — one line, dry, English only.',
-            rawHistory.slice(-6).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,100)}`).join('\n') + '\nHer: ' + text,
-            100
+          const sFallback2 = await callSonnet(
+            buildSystemPrompt(),
+            [...chatHistory.slice(-8), { role: 'user', content: text }]
           );
-          if (retry && retry.trim() && !isBreakout(retry)) {
+          if (sFallback2 && !isBreakout(sFallback2)) {
             hideTyping();
-            appendMessage('bot', retry.trim());
-            chatHistory.push({ role: 'assistant', content: retry.trim(), _intimate: true });
+            appendMessage('bot', sFallback2.trim());
+            chatHistory.push({ role: 'assistant', content: sFallback2.trim(), _intimate: true });
             saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
             return;
           }
         } catch(e2) {}
         hideTyping();
-        const intimateFallbacks = ["watch it.", "careful.", "...that so.", "bold.", "don't start.", "that's one way to put it."];
-        const fallback = intimateFallbacks[Math.floor(Math.random() * intimateFallbacks.length)];
-        appendMessage('bot', fallback);
-        chatHistory.push({ role: 'assistant', content: fallback, _intimate: true });
-        saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+        _isSending = false;
         return;
       }
     }
