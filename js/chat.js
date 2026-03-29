@@ -243,7 +243,7 @@ async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   }
 }
 
-async function fetchWithRetry(url, options, timeoutMs = 30000, maxRetries = 2) {
+async function fetchWithRetry(url, options, timeoutMs = 20000, maxRetries = 1) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // 如果signal已经abort，立刻停止重试
     if (options?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -891,7 +891,8 @@ ${getLoveStagePrompt()}
 After your reply, on a new line, add JSON: {"unlock": "field"} or {"unlock": null}
 Fields: birthday, zodiac, height, weight, blood_type, hometown
 Only unlock if you actually revealed that specific information in your reply.
-Do not invent information just to unlock. If you avoided or deflected, return null.`;
+Do not invent information just to unlock. If you avoided or deflected, return null.
+Only one field per reply. If multiple were revealed, pick the most significant one.`;
 
   const fullPrompt = fixedPrompt + relationshipModeBlock + unlockInstruction + '\n\n' + dynamicPrompt;
   return fullPrompt;
@@ -3909,7 +3910,7 @@ function appendMessage(role, text, animate = true) {
         if (typeof renderGhostProfile === 'function') renderGhostProfile();
       }
     }
-    text = text.replace(/\n?\{?\s*"unlock"\s*:\s*(?:"[^"]*"|null)\s*\}?/g, '').trim();
+    text = text.replace(/\n?\{[^}]*"unlock"[^}]*\}/g, '').trim();
   }
     // 去掉G偶尔加的'ghost:'前缀
     text = text.replace(/^ghost\s*:\s*/i, '').trim();
@@ -5138,20 +5139,8 @@ One or two lines. English only. lowercase.`;
     }
 
     // 强制每句话单独一行——把句号/问号/感叹号后的空格换成换行
-    const _splitSentences = (text) => {
-      return text
-        .replace(/([.?!])\s+(?=[a-zA-Z"'])/g, (match, p1, offset, str) => {
-          // 只有前面这句超过8个词才换行
-          const before = str.slice(0, offset + 1);
-          const lastNewline = before.lastIndexOf('\n');
-          const currentLine = before.slice(lastNewline + 1);
-          const wordCount = currentLine.trim().split(/\s+/).length;
-          return wordCount >= 8 ? p1 + '\n' : match;
-        })
-        .replace(/\s*—\s*/g, '\n')
-        .trim();
-    };
-    reply = _splitSentences(reply);
+    // 不强制分行，让模型自己决定
+    reply = reply.replace(/\s*—\s*/g, '\n').trim();
 
     const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2); // 最多2条
     if (finalParts.length > 1) {
