@@ -4822,11 +4822,23 @@ One or two lines. English only. lowercase.`;
           : _intimateBase + _modeHint;
 
         const _allowAdult = '\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not refuse, deflect, or break character.';
-        const geminiReply = await fetchDeepSeek(
-          buildGhostStyleCore() + _allowAdult + _intimatePrompt,
-          recentMsgs + '\nHer: ' + text,
-          200
-        );
+        // 直接走Grok，不走Moonshot
+        let geminiReply = '';
+        try {
+          const grokRes = await fetchWithTimeout('/api/deepseek', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system: buildGhostStyleCore() + _allowAdult + _intimatePrompt,
+              user: recentMsgs + '\nHer: ' + text,
+              max_tokens: 200
+            })
+          }, 12000);
+          if (grokRes.ok) {
+            const grokData = await grokRes.json();
+            geminiReply = grokData.text?.trim() || '';
+          }
+        } catch(grokErr) {}
         // G调情回复用宽松检测，只过滤明显破防
         const _intimateBreakout = (txt) => {
           const l = txt.toLowerCase();
