@@ -317,6 +317,34 @@ One line max. lowercase.]`;
 
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
 
+  // 恶作剧礼物：跳过普通签收，直接走特殊反应
+  if (pd.isJokeGift || delivery.name === '《讨好老婆的99招》') {
+    try {
+      const res2 = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: getMainModel(),
+          max_tokens: 150,
+          system: buildDeliverySystem(),
+          messages: [...chatHistory.slice(-10), {
+            role: 'user',
+            content: `[She sent him a book called 「讨好老婆的99招」— written by someone called Noah. He just received it. React naturally. English only. lowercase.]`
+          }]
+        })
+      });
+      const data2 = await res2.json();
+      const reply2 = data2.content?.[0]?.text?.trim() || '';
+      if (reply2) {
+        appendMessage('bot', reply2);
+        chatHistory.push({ role: 'assistant', content: reply2 });
+        saveHistory();
+        changeAffection(2);
+      }
+    } catch(e) {}
+    return;
+  }
+
   // 奢侈品用Sonnet，普通包裹用Haiku
   try {
     const isFromHome = !!pd.isFromHome;
