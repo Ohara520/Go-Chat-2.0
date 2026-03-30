@@ -499,7 +499,25 @@
   <!-- 愚人节小丑按钮（banner关闭后显示） -->
   <button class="af-clown-btn" id="afClownBtn" onclick="afToggle()" title="开启愚人节主题">🤡</button>
 
-  <div class="screen" id="mainScreen">
+  <!-- 未成年警告弹窗 -->
+<div id="ageWarningModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#1a0a2e;border:1px solid rgba(192,132,252,0.4);border-radius:20px;padding:32px 24px;max-width:320px;width:90%;text-align:center;">
+    <div style="font-size:36px;margin-bottom:16px;">🔞</div>
+    <div style="font-size:18px;font-weight:700;color:#e9d5ff;margin-bottom:12px;">年龄确认</div>
+    <div style="font-size:14px;color:#c9aee0;line-height:1.7;margin-bottom:24px;">
+      本应用含有成人向内容，仅限<strong style="color:#f0abfc;">18岁及以上</strong>用户使用。<br><br>
+      继续使用即表示您确认已年满18周岁，并自愿承担相应责任。
+    </div>
+    <button onclick="confirmAge()" style="width:100%;padding:14px;background:linear-gradient(135deg,#7c3aed,#be185d);border:none;border-radius:12px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+      我已年满18岁，继续
+    </button>
+    <button onclick="denyAge()" style="width:100%;padding:12px;background:transparent;border:1px solid rgba(192,132,252,0.3);border-radius:12px;color:#9ca3af;font-size:14px;cursor:pointer;">
+      我未满18岁，离开
+    </button>
+  </div>
+</div>
+
+<div class="screen" id="mainScreen">
     <div class="main-content">
       <div class="card card-large" onclick="openScreen('chatScreen')">
         <div class="card-icon">💬</div>
@@ -1495,5 +1513,23 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/sticker.js"></script>
 <script src="js/photo.js"></script>
 <script src="js/chat.js"></script>
+<script>
+function checkAgeWarning() {
+  if (!localStorage.getItem('ageConfirmed')) {
+    document.getElementById('ageWarningModal').style.display = 'flex';
+  }
+}
+function confirmAge() {
+  localStorage.setItem('ageConfirmed', '1');
+  document.getElementById('ageWarningModal').style.display = 'none';
+}
+function denyAge() {
+  window.location.href = 'https://www.google.com';
+}
+// 页面加载后检查
+window.addEventListener('load', function() {
+  setTimeout(checkAgeWarning, 300);
+});
+</script>
 </body>
 </html>
