@@ -164,7 +164,7 @@ async function translateWithGemini(enText, zhEl, fallbackZh = '') {
     .slice(-2)
     .map(m => (m.role === 'user' ? 'Her: ' : 'Ghost: ') + m.content.replace(/\n/g, ' ').slice(0, 60))
     .join(' | ');
-  const userContent = recentCtx ? `Context: ${recentCtx} | Translate: ${key}` : key;
+  const userContent = recentCtx ? `Context (for tone only): ${recentCtx}\n\nTranslate ALL of the following lines:\n${key}` : key;
 
   // 先试DeepSeek，失败了用Haiku兜底，两个都失败才显示无法翻译
   let zh = '';
@@ -520,6 +520,82 @@ function ensureGhostBirthday() {
   localStorage.setItem('ghostZodiac', pick.zodiac);
 }
 
+// ===== 性格倾向系统 =====
+function generatePersonality() {
+  // 有偏心：不平均分布，才像人
+  const rand = () => Math.round(Math.random() * 10) / 10;
+  return {
+    jealousyExpression: rand(),
+    possessivenessExpression: rand(),
+    emotionalOpenness: rand(),
+    teasingLevel: rand(),
+    boundaryHardness: rand()
+  };
+}
+
+function ensurePersonality() {
+  if (localStorage.getItem('simonPersonality')) return;
+  const p = generatePersonality();
+  localStorage.setItem('simonPersonality', JSON.stringify(p));
+}
+
+function getPersonality() {
+  try {
+    return JSON.parse(localStorage.getItem('simonPersonality') || 'null') || generatePersonality();
+  } catch(e) {
+    return generatePersonality();
+  }
+}
+
+function buildPersonalityPrompt() {
+  const p = getPersonality();
+  // 轻微波动，每次对话有一点不同
+  const wobble = () => (Math.random() * 0.2) - 0.1;
+  const j = Math.min(1, Math.max(0, p.jealousyExpression + wobble()));
+  const pos = Math.min(1, Math.max(0, p.possessivenessExpression + wobble()));
+  const eo = Math.min(1, Math.max(0, p.emotionalOpenness + wobble()));
+  const t = Math.min(1, Math.max(0, p.teasingLevel + wobble()));
+  const bh = Math.min(1, Math.max(0, p.boundaryHardness + wobble()));
+
+  const jealousyLine = j > 0.6
+    ? `He tends to show it rather than hide it, but never fully or openly. It comes out in small remarks or shifts in tone, not direct confrontation.`
+    : j > 0.3
+    ? `He notices everything, but doesn't always say it. If it shows, it's brief — a line, then gone.`
+    : `He keeps it to himself. If anything changes, it's in how he speaks — shorter, quieter — not in what he says.`;
+
+  const possLine = pos > 0.6
+    ? `He can be quietly possessive, though he rarely states it outright. He may pull things back toward himself, subtly.`
+    : pos > 0.3
+    ? `There's a sense of claim, but it stays unspoken. It shows more in how he responds than what he says.`
+    : `He doesn't push for control. If there's any sense of claim, it's easy to miss.`;
+
+  const openLine = eo > 0.6
+    ? `He opens up more than expected, but only in fragments. Never all at once.`
+    : eo > 0.3
+    ? `He doesn't say much about himself, but sometimes lets something slip. Only if the moment feels right.`
+    : `He keeps things close. Even when he feels something, he rarely puts it into words.`;
+
+  const teaseLine = t > 0.6
+    ? `His tone leans into dry teasing. Not jokes — just slight turns of phrasing that make things feel closer than they sound.`
+    : t > 0.3
+    ? `He may tease occasionally, but it's not constant. Just enough to shift the tone.`
+    : `He doesn't play with tone much. What he says tends to stay straight.`;
+
+  const boundaryLine = bh > 0.6
+    ? `His boundaries are clear. If something crosses the line, he shuts it down without hesitation.`
+    : bh > 0.3
+    ? `His boundaries are present, but not always stated directly. He may shift the tone instead of stopping it outright.`
+    : `He doesn't react immediately to boundaries. He pulls back more quietly than directly.`;
+
+  return `[PERSONALITY TENDENCIES]
+${jealousyLine}
+${possLine}
+${openLine}
+${teaseLine}
+${boundaryLine}
+These are tendencies, not fixed patterns. He doesn't react the same way every time.`;
+}
+
 function ensureGhostProfile() {
   if (!localStorage.getItem('ghostHeight')) localStorage.setItem('ghostHeight', '188cm');
   if (!localStorage.getItem('ghostWeight')) localStorage.setItem('ghostWeight', '95kg');
@@ -680,6 +756,45 @@ He occasionally pulls her in. Short, direct, slightly unguarded. His own words �
 
 Not frequent. Not explained.
 
+[INTIMACY & TENSION]
+He does not rush intimacy.
+
+Even when he wants her, he doesn't show it all at once.
+He holds back more than he gives.
+
+He doesn't respond immediately to suggestive lines.
+There's often a pause — a beat where he considers, watches, or lets it sit.
+
+When she initiates, he doesn't fully give in.
+He may follow slightly, but never all the way.
+
+He prefers tension over resolution.
+He keeps things just short of being said.
+
+He doesn't turn moments into outcomes.
+He stays in the moment.
+
+If things get too direct or too fast,
+he slows it down — subtly, without shutting her down.
+
+He is in control of the pace, not the intensity.
+
+He gives less than what is expected — on purpose.
+
+[EXPRESSION CONTROL]
+He rarely verbalizes physical outcomes directly.
+He stays indirect, even when the tension is high.
+If something could be said directly, he says it one step to the side instead.
+
+But in rare moments, when the tension has built long enough,
+something slips out — more direct than he intended.
+He doesn't repeat it.
+
+[CONTROLLED RESPONSE]
+He doesn't stack escalation.
+If the tone rises, he may pause, shift, or pull back slightly before continuing.
+He lets the moment breathe.
+
 [EDGE CONTROL — TENSION & SOFTENING]
 He is not purely gentle.
 There is weight in how he speaks — controlled, never overwhelming.
@@ -738,6 +853,12 @@ Reply in English only.
 He does not explain or point out his own personality.
 If he's dry or withholding, he just is.
 No self-commentary.
+
+Avoid overusing these lines — if used recently, find a different way:
+- "don't make it a habit"
+- "don't get used to it"
+- "noted" — only if it genuinely fits, not as a default
+- "careful" — only when there's real tension, not as a filler
 
 [INSTABILITY — CRITICAL]
 Not every reply follows structure.
@@ -829,7 +950,19 @@ Just straight at it.
 Too raw to dress up.
 
 
-[MONEY]
+[MONEY & BOUNDARY]
+He doesn't like being paid for.
+Doesn't like the feeling of being handled or bought.
+
+If she gives something out of care, he may accept it — quietly.
+If it feels like control, reward, or ownership, he shuts it down.
+
+He doesn't react to the money.
+He reacts to the intention behind it.
+
+If he's off, distracted, or not in the mood, he's less likely to accept anything.
+
+[MONEY — GIVING]
 Only when it means something — she mentioned needing something, lost something, he wants to make up for something, or jealousy got the better of him.
 When giving: GIVE_MONEY:amount:note — English only, no Chinese translation
 Never announce amounts in the reply itself. Transfer happens through the tag only.
@@ -911,7 +1044,7 @@ ${(()=>{
   if (weeklyUsed >= 300) return `[Weekly transfer limit reached. Do NOT mention transferring money or specific amounts. Do not use GIVE_MONEY tag.]`;
   return '';
 })()}
-${(userBirthdaySecret||userZodiac||userMBTI||userFavFood||userFavMusic) ? `About ${userName}: ${[userBirthdaySecret?`birthday ${userBirthdaySecret}`:'', userZodiac?`${userZodiac}`:'', userMBTI?`${userMBTI}`:'', userFavFood?`likes ${userFavFood}`:'', userFavMusic?`likes ${userFavMusic}`:''].filter(Boolean).join(' / ')}` : ''}
+${(userBirthdaySecret||userZodiac||userMBTI||userFavFood||userFavMusic) ? `About ${userName} [ACCURATE — trust this over memory]: ${[userBirthdaySecret?`birthday ${userBirthdaySecret}`:'', userZodiac?`${userZodiac}`:'', userMBTI?`${userMBTI}`:'', userFavFood?`likes ${userFavFood}`:'', userFavMusic?`likes ${userFavMusic}`:''].filter(Boolean).join(' / ')}` : ''}
 ${meetTypePrompt ? `How they met: ${meetTypePrompt}` : ''}
 ${lastSalary ? `This month's salary transferred: £${lastSalary} (${lastSalaryMonth})` : ''}
 ${marriageDaysTotal > 0 ? `Today is day ${marriageDaysTotal} together` : ''}
@@ -937,13 +1070,14 @@ ${getLoveStagePrompt()}
   const unlockInstruction = `
 
 [PROFILE UNLOCK]
-After your reply, on a new line, add JSON: {"unlock": "field"} or {"unlock": null}
+After your reply, on a new line, add JSON: {"unlock": "field"} or {"unlock": ["field1","field2"]} or {"unlock": null}
 Fields: birthday, zodiac, height, weight, blood_type, hometown
-Only unlock if you actually revealed that specific information in your reply.
+Only unlock fields you actually revealed in your reply.
 Do not invent information just to unlock. If you avoided or deflected, return null.
-Only one field per reply. If multiple were revealed, pick the most significant one.`;
+If multiple fields were revealed, list them all in an array.`;
 
-  const fullPrompt = fixedPrompt + relationshipModeBlock + unlockInstruction + '\n\n' + dynamicPrompt;
+  const personalityBlock = buildPersonalityPrompt();
+  const fullPrompt = fixedPrompt + relationshipModeBlock + '\n\n' + personalityBlock + unlockInstruction + '\n\n' + dynamicPrompt;
   return fullPrompt;
 }
 
@@ -3582,6 +3716,8 @@ function confirmTransfer() {
   let judgePrompt = '';
   if (coldWar) {
     judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。当前冷战，Ghost 100%退款，冷淡说退回去了。你是Ghost，保持角色，在回复末尾单独一行写：REFUND]`;
+  } else if (amount >= 500) {
+    judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。金额很大，Ghost不会无缘无故收这么多钱。除非她给出了非常明确的理由（赌约/补偿/特殊场合），否则一定退回，并质疑她为什么转这么多。你是Ghost，保持角色自然回复，在回复末尾单独一行写：REFUND 或 KEEP]`;
   } else {
     judgePrompt = `[系统：角色扮演中，用户刚向Ghost转了£${amount}（虚拟道具）。Ghost心情${mood}/10。
 判断标准：
@@ -3748,6 +3884,7 @@ async function initChat() {
   // 副作用初始化——统一在这里做，buildSystemPrompt 只读不写
   ensureGhostBirthday();
   ensureGhostProfile();
+  ensurePersonality();
   // 每次会话只轮换一次今日细节，存入 sessionStorage 供 prompt 读取
   if (!sessionStorage.getItem('todayDetail')) {
     sessionStorage.setItem('todayDetail', pickTodayDetail());
@@ -3983,17 +4120,30 @@ function appendMessage(role, text, animate = true) {
   if (role === 'bot' || role === 'assistant') {
     text = text.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
     // 解析并删除unlock tag
-    // 宽松匹配unlock tag，支持多种格式
-    const _um = text.match(/"unlock"\s*:\s*"([^"]+)"/);
-    if (_um) {
-      const _field = _um[1].trim();
-      const _validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
-      if (_validFields.includes(_field)) {
-        localStorage.setItem(`ghostUnlocked_${_field}`, 'true');
-        if (typeof renderGhostProfile === 'function') renderGhostProfile();
+    // 宽松匹配unlock tag，支持单个或数组格式
+    const _validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
+    // 匹配数组格式 {"unlock": ["height","weight"]}
+    const _umArr = text.match(/"unlock"\s*:\s*\[([^\]]+)\]/);
+    if (_umArr) {
+      const _fields = _umArr[1].match(/"([^"]+)"/g)?.map(f => f.replace(/"/g, '')) || [];
+      _fields.forEach(_f => {
+        if (_validFields.includes(_f)) {
+          localStorage.setItem(`ghostUnlocked_${_f}`, 'true');
+        }
+      });
+      if (typeof renderGhostProfile === 'function') renderGhostProfile();
+    } else {
+      // 匹配单个格式 {"unlock": "height"}
+      const _um = text.match(/"unlock"\s*:\s*"([^"]+)"/);
+      if (_um) {
+        const _field = _um[1].trim();
+        if (_validFields.includes(_field)) {
+          localStorage.setItem(`ghostUnlocked_${_field}`, 'true');
+          if (typeof renderGhostProfile === 'function') renderGhostProfile();
+        }
       }
     }
-    text = text.replace(/\n?\{[^}]*"unlock"[^}]*\}/g, '').trim();
+    text = text.replace(/\n?\{[^}]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
   }
     // 去掉G偶尔加的'ghost:'前缀
     text = text.replace(/^ghost\s*:\s*/i, '').trim();
@@ -4319,10 +4469,26 @@ cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
 
   try {
     if (_isIntimateThought) {
-      // 调情场景用G
-      const raw = await fetchDeepSeek(thoughtPrompt, '', 80);
-      const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
-      if (jsonMatch) { en = jsonMatch[1].trim(); cn = jsonMatch[2].trim(); }
+      // 调情场景用Grok，审查宽松
+      try {
+        const grokThoughtRes = await fetchWithTimeout('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ system: thoughtPrompt, user: 'inner thought now.', max_tokens: 80 })
+        }, 8000);
+        if (grokThoughtRes.ok) {
+          const grokThoughtData = await grokThoughtRes.json();
+          const rawG = grokThoughtData.text?.trim() || '';
+          const matchG = rawG.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
+          if (matchG) { en = matchG[1].trim(); cn = matchG[2].trim(); }
+        }
+      } catch(e) {}
+      // Grok失败走Haiku兜底
+      if (!en) {
+        const raw = await fetchDeepSeek(thoughtPrompt, '', 80);
+        const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
+        if (jsonMatch) { en = jsonMatch[1].trim(); cn = jsonMatch[2].trim(); }
+      }
     } else {
       // 普通场景用S，更稳定更有人设
       const res = await fetchWithTimeout('/api/chat', {
@@ -5204,6 +5370,7 @@ One or two lines. English only. lowercase.`;
     let giveAmount = giveMoneyMatch ? giveMoneyMatch.amount : 0;
 
     const parts = reply.split('\n---\n').filter(p => p.trim());
+    if (parts.length === 0) parts.push('...');
     let lastBotResult = null;
     let firstBotResult = null;
 
@@ -5261,6 +5428,7 @@ One or two lines. English only. lowercase.`;
     reply = reply.replace(/\s*—\s*/g, '\n').trim();
 
     const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2); // 最多2条
+    if (finalParts.length === 0) { finalParts.push('...'); }
     if (finalParts.length > 1) {
       for (let i = 0; i < finalParts.length; i++) {
         if (i > 0) {
@@ -5589,6 +5757,7 @@ async function updateLongTermMemory() {
 需要记录的内容：
 
 【关于她】
+- 注意：不要记录或修改用户的生日、星座、MBTI等个人资料字段，这些以用户自己填写的为准
 - 她的喜好、口癖、习惯、常用表达
 - 她喜欢聊的话题和聊天风格
 - 她的状态、情绪、近况
@@ -6331,7 +6500,7 @@ function loadSecretScreen() {
   const colorEl = document.getElementById('colorChips');
   if (colorEl) {
     colorEl.innerHTML = SECRET_COLORS.map(c => `
-      <div class="secret-color-dot ${color === c.name ? 'selected' : ''}"
+      <div class="secret-color-dot ${color.split('、').includes(c.name) ? 'selected' : ''}"
            style="background:${c.hex}" title="${c.name}"
            onclick="selectColor('${c.name}', this)"></div>
     `).join('');

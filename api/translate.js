@@ -36,7 +36,7 @@ Rules:
 - Use casual spoken Chinese. No subtitles, no formal phrasing.
 - Keep it short. Drop pronouns when natural.
 - If multiple lines, translate each separately, keep line breaks.
-- If context is provided before "Translate:", use it to understand tone. Only translate the final line.
+- If context is provided before "Translate ALL of the following lines:", use it to understand tone only. Translate ALL lines that follow, not just the last one.
 
 Avoid: 才不会 / 居然 / 真的吗 / 那就算了 / 怎么可能
 
