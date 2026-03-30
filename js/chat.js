@@ -5572,7 +5572,8 @@ function incrementMemoryCount() {
 
 async function updateLongTermMemory() {
   const count = incrementMemoryCount();
-  if (count % 5 !== 0) return; // 每5次（约40条消息）触发一次
+  if (count % 1 !== 0) return; // 每次都检查，但靠_globalTurnCount控制频率
+  if (_globalTurnCount % 6 !== 0) return; // 每6轮（约12条消息）触发一次
 
   const existingMemory = getLongTermMemory();
   const recentMessages = chatHistory
@@ -5627,10 +5628,21 @@ ${recentMessages}
 请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`;
 
   try {
-    // G提取记忆，失败重试一次
-    let newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 500).catch(() => '');
+    // DeepSeek提取记忆，失败用Haiku兜底
+    let newMemory = '';
+    try {
+      const dsMemRes = await fetchWithTimeout('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: memorySystemPrompt + '\n\n' + memoryUserPrompt, max_tokens: 500 })
+      }, 12000);
+      if (dsMemRes.ok) {
+        const dsMemData = await dsMemRes.json();
+        newMemory = dsMemData.text?.trim() || '';
+      }
+    } catch(e) {}
+    // DeepSeek失败，Haiku兜底
     if (!newMemory) {
-      await new Promise(r => setTimeout(r, 2000));
       newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 500).catch(() => '');
     }
     if (newMemory) saveLongTermMemory(newMemory);
