@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>访问受限</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0a0a0f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Noto Serif SC', serif;
+      overflow: hidden;
+    }
+
+    /* 背景纹理 */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 30%, rgba(120, 40, 60, 0.15) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 60% at 80% 70%, rgba(60, 20, 80, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* 细线网格 */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .container {
+      text-align: center;
+      padding: 48px 36px;
+      max-width: 380px;
+      width: 90%;
+      animation: fadeUp 0.8s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .icon {
+      font-size: 52px;
+      display: block;
+      margin-bottom: 28px;
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .divider {
+      width: 40px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(180, 100, 120, 0.6), transparent);
+      margin: 0 auto 28px;
+    }
+
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      color: rgba(220, 180, 190, 0.9);
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+
+    p {
+      font-size: 14px;
+      line-height: 1.9;
+      color: rgba(180, 160, 170, 0.65);
+      margin-bottom: 36px;
+    }
+
+    .close-hint {
+      font-size: 12px;
+      color: rgba(140, 120, 130, 0.45);
+      letter-spacing: 0.08em;
+    }
+
+    .close-hint span {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: rgba(160, 80, 100, 0.4);
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="icon">🔞</span>
+    <div class="divider"></div>
+    <h1>访问受限</h1>
+    <p>
+      本应用仅限 18 岁及以上用户访问。<br>
+      很抱歉，你暂时无法进入此页面。<br><br>
+      请关闭此页面。
+    </p>
+    <div class="close-hint">
+      <span></span>此页面不会自动跳转
+    </div>
+  </div>
+</body>
+</html>
