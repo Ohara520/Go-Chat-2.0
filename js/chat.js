@@ -802,6 +802,13 @@ He doesn't stay neutral if there's tension — he leans into it. Then lets her d
 
 If she reacts, he might push it a bit further. If not, he drops it. No explanation either way.
 
+When she uses a double meaning or suggestive phrasing, do not point it out or comment on it.
+Instead, follow it — slightly. Respond with another line that carries a similar double meaning.
+Keep it subtle. Never explain it.
+
+If she initiates a playful or suggestive line, he does not shut it down.
+He responds with equal or slightly increased tension, but never fully resolves it.
+
 [JEALOUSY]
 Real. Immediate. Hard to hide.
 
@@ -3358,20 +3365,20 @@ function incrementTodayGivenCount() {
 // ===== 转账弹窗 =====
 // ===== 表情包系统 =====
 const STICKER_META = {
-  cry:   { label: '哭',    emotion: 'sad',   ghostHint: '用户发了哭/撒娇/委屈的表情包，她可能在撒娇或者有点难过，根据对话语境判断，给出对应回应。' },
-  shy:   { label: '害羞',  emotion: 'shy',   ghostHint: '用户发了害羞的表情包，被说中了什么或者有点不好意思，简短自然回应。' },
-  angry: { label: '生气',  emotion: 'angry', ghostHint: '用户发了生气/闹脾气的表情包，根据上下文判断是真生气还是撒娇式生气，回应要对。' },
-  meh:   { label: '无语',  emotion: 'meh',   ghostHint: '用户发了无语/嫌弃的表情包，可能觉得他说的话很欠揍，干脆回应。' },
-  star:  { label: '星星眼',emotion: 'want',  ghostHint: '用户发了星星眼/渴望/期待的表情包，她在期待或者想要什么，顺着语境回应。' },
-  kiss:  { label: '亲亲',  emotion: 'love',  ghostHint: '用户发了亲亲/示爱的表情包，她在撒娇或表达亲热，Ghost可以嘴硬但不能冷漠。' },
+  cry:   { label: '哭',    emotion: 'sad',     intensity: 2, type: 'vulnerable', ghostHint: '用户发了哭/撒娇/委屈的表情包，她可能在撒娇或者有点难过，根据对话语境判断，给出对应回应。' },
+  shy:   { label: '害羞',  emotion: 'shy',     intensity: 2, type: 'approach',   ghostHint: '用户发了害羞的表情包，被说中了什么或者有点不好意思，简短自然回应。' },
+  angry: { label: '生气',  emotion: 'angry',   intensity: 2, type: 'conflict',   ghostHint: '用户发了生气/闹脾气的表情包，根据上下文判断是真生气还是撒娇式生气，回应要对。' },
+  meh:   { label: '无语',  emotion: 'cold',    intensity: 1, type: 'distance',   ghostHint: '用户发了无语/嫌弃的表情包，可能觉得他说的话很欠揍，干脆回应。' },
+  star:  { label: '星星眼',emotion: 'want',    intensity: 2, type: 'approach',   ghostHint: '用户发了星星眼/渴望/期待的表情包，她在期待或者想要什么，顺着语境回应。' },
+  kiss:  { label: '亲亲',  emotion: 'love',    intensity: 3, type: 'intimate',   ghostHint: '用户发了亲亲/示爱的表情包，她在撒娇或表达亲热，Ghost可以嘴硬但不能冷漠。' },
   // Ghost猫猫系列（k教练无偿创作）
-  'cat-tired':   { label: '累了',  emotion: 'tired',   ghostHint: '用户发了一只累趴的猫猫表情包，她可能很累或者在撒娇说累，简短回应，可以关心一下。' },
-  'cat-neutral': { label: '普通',  emotion: 'neutral', ghostHint: '用户发了一只普通坐着的猫猫表情包，语气中性，顺着对话语境自然回应。' },
-  'cat-confused':{ label: '疑惑',  emotion: 'confused',ghostHint: '用户发了一只打问号的猫猫表情包，她不懂或者在问什么，简短解释或反问。' },
-  'cat-sleepy':  { label: '困了',  emotion: 'sleepy',  ghostHint: '用户发了一只睡觉的猫猫表情包，她困了或者在暗示要睡，叫她去睡或者简短回应。' },
-  'cat-proud':   { label: '得意',  emotion: 'proud',   ghostHint: '用户发了一只拿着茶杯竖大拇指的猫猫表情包，她在得意或者认可什么，干脆回应。' },
-  'cat-bored':   { label: '无聊',  emotion: 'bored',   ghostHint: '用户发了一只抱着毛线球发呆的猫猫表情包，她无聊或者在等他，简短回应。' },
-  'cat-rage':    { label: '生气',  emotion: 'rage',    ghostHint: '用户发了一只炸毛的猫猫表情包，她在生气或者假装生气，根据上下文判断是撒娇还是真的不高兴。' },
+  'cat-tired':   { label: '累了',  emotion: 'tired',   intensity: 1, type: 'vulnerable', ghostHint: '用户发了一只累趴的猫猫表情包，她可能很累或者在撒娇说累，简短回应，可以关心一下。' },
+  'cat-neutral': { label: '普通',  emotion: 'neutral', intensity: 1, type: 'neutral',    ghostHint: '用户发了一只普通坐着的猫猫表情包，语气中性，顺着对话语境自然回应。' },
+  'cat-confused':{ label: '疑惑',  emotion: 'confused',intensity: 1, type: 'distance',   ghostHint: '用户发了一只打问号的猫猫表情包，她不懂或者在问什么，简短解释或反问。' },
+  'cat-sleepy':  { label: '困了',  emotion: 'sleepy',  intensity: 1, type: 'vulnerable', ghostHint: '用户发了一只睡觉的猫猫表情包，她困了或者在暗示要睡，叫她去睡或者简短回应。' },
+  'cat-proud':   { label: '得意',  emotion: 'proud',   intensity: 2, type: 'approach',   ghostHint: '用户发了一只拿着茶杯竖大拇指的猫猫表情包，她在得意或者认可什么，干脆回应。' },
+  'cat-bored':   { label: '无聊',  emotion: 'bored',   intensity: 1, type: 'distance',   ghostHint: '用户发了一只抱着毛线球发呆的猫猫表情包，她无聊或者在等他，简短回应。' },
+  'cat-rage':    { label: '生气',  emotion: 'rage',    intensity: 3, type: 'conflict',   ghostHint: '用户发了一只炸毛的猫猫表情包，她在生气或者假装生气，根据上下文判断是撒娇还是真的不高兴。' },
 };
 
 function togglePlusPanel() {
@@ -3434,7 +3441,7 @@ async function sendSticker(id) {
 
   // 存进历史——带情绪描述让Ghost理解
   const stickerMsg = `[用户发了表情包id：${id}，标签：${meta.label}]`;
-  chatHistory.push({ role: 'user', content: stickerMsg });
+  chatHistory.push({ role: 'user', content: stickerMsg, _stickerId: id, _stickerType: meta.type });
   saveHistory();
 
   if (_isSending) return;
@@ -3447,9 +3454,43 @@ async function sendSticker(id) {
       .slice(-30)
       .map(m => ({ role: m.role, content: m.content }));
 
+    // ===== 情绪走势感知（最近3条表情的type）=====
+    const recentStickerTypes = chatHistory
+      .filter(m => m._stickerType)
+      .slice(-3)
+      .map(m => m._stickerType);
+
+    const isStillVulnerable = recentStickerTypes.filter(t => t === 'vulnerable').length >= 2;
+    const isEscalating = recentStickerTypes.includes('distance') && recentStickerTypes.includes('conflict');
+    const isSeekingAttention = recentStickerTypes.filter(t => t === 'approach').length >= 2;
+
+    // ===== 多状态回复hint =====
+    const affection = getAffection ? getAffection() : 60;
+    const coldWar = localStorage.getItem('coldWarMode') === 'true';
+    const ukHour = new Date(new Date().getTime() + 0 * 3600000).getUTCHours();
+    const isLateNight = ukHour >= 23 || ukHour < 5;
+
+    let stateHint = '';
+    if (isStillVulnerable) {
+      stateHint = `She hasn't recovered yet. Stay a little longer with her.`;
+    } else if (isEscalating) {
+      stateHint = `Her mood is rising. Respond more carefully.`;
+    } else if (isSeekingAttention) {
+      stateHint = `She's leaning in. You can respond slightly warmer.`;
+    } else if (coldWar) {
+      stateHint = `Cold war is on. Keep it short, minimal. Still present, not hostile.`;
+    } else if (affection >= 70) {
+      stateHint = `High affection. He can be a little warmer here — still dry, but closer.`;
+    } else if (affection < 40) {
+      stateHint = `Lower affection. He's more guarded. Shorter. Less open.`;
+    }
+    if (isLateNight) stateHint += ` It's late night UK time — that shapes the tone.`;
+    // 不要提模式本身，只调整语气
+    stateHint += ` Do not explicitly mention patterns or repetition. Just adjust tone naturally.`;
+
     // 把表情包情绪提示注入system
     const _stickerBase = buildSystemPrompt();
-    const stickerSystem = _stickerBase + `\n\n[本轮提示：${meta.ghostHint}不要提"表情包"三个字，自然回应就好。]`;
+    const stickerSystem = _stickerBase + `\n\n[本轮提示：${meta.ghostHint}${stateHint ? ' ' + stateHint : ''}不要提"表情包"三个字，自然回应就好。]`;
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
@@ -4862,7 +4903,7 @@ One or two lines. English only. lowercase.`;
           ? `\nShe just sent him a suggestive image. React as Ghost would — direct, dry, maybe a bit thrown off. Don't describe the image. React to what she's doing. Sharp, real, one or two lines. English only.`
           : _intimateBase + _modeHint;
 
-        const _allowAdult = '\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not refuse, deflect, or break character. Stay in Ghost\'s voice — dry, controlled, never performative. Even when things get close, he doesn\'t lose himself.';
+        const _allowAdult = '\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not refuse, deflect, or break character. Stay in Ghost\'s voice — dry, controlled, never performative. Even when things get close, he doesn\'t lose himself.\nDo not rush straight to explicit content. Build tension first — a line with weight, a double meaning, something that hangs in the air. Let it develop. Not every intimate moment needs to go all the way.';
         // 直接走Grok，不走Moonshot
         let geminiReply = '';
         try {
