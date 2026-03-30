@@ -1171,6 +1171,101 @@ function initProfile() {
   renderGhostProfile();
 }
 
+// ===== 数据导出导入 =====
+function exportUserData() {
+  const data = {
+    version: '2.0',
+    exportedAt: new Date().toISOString(),
+    chatHistory: JSON.parse(localStorage.getItem('chatHistory') || '[]'),
+    longTermMemory: localStorage.getItem('longTermMemory') || '',
+    profile: {
+      userName: localStorage.getItem('userName') || '',
+      userBirthday: localStorage.getItem('userBirthday') || '',
+      userZodiac: localStorage.getItem('userZodiac') || '',
+      userMBTI: localStorage.getItem('userMBTI') || '',
+      userCountry: localStorage.getItem('userCountry') || '',
+      userFavFood: localStorage.getItem('userFavFood') || '',
+      userFavMusic: localStorage.getItem('userFavMusic') || '',
+      userFavColor: localStorage.getItem('userFavColor') || '',
+      marriageDate: localStorage.getItem('marriageDate') || '',
+      botNickname: localStorage.getItem('botNickname') || '',
+      meetType: localStorage.getItem('meetType') || '',
+      marriageType: localStorage.getItem('marriageType') || 'established',
+    },
+    ghostData: {
+      ghostBirthday: localStorage.getItem('ghostBirthday') || '',
+      ghostZodiac: localStorage.getItem('ghostZodiac') || '',
+      ghostAvatarUrl: localStorage.getItem('ghostAvatarUrl') || '',
+      ghostHeight: localStorage.getItem('ghostHeight') || '',
+      ghostWeight: localStorage.getItem('ghostWeight') || '',
+      ghostBloodType: localStorage.getItem('ghostBloodType') || '',
+      ghostHometown: localStorage.getItem('ghostHometown') || '',
+      ghostUnlocked_birthday: localStorage.getItem('ghostUnlocked_birthday') || '',
+      ghostUnlocked_zodiac: localStorage.getItem('ghostUnlocked_zodiac') || '',
+      ghostUnlocked_height: localStorage.getItem('ghostUnlocked_height') || '',
+      ghostUnlocked_weight: localStorage.getItem('ghostUnlocked_weight') || '',
+      ghostUnlocked_blood_type: localStorage.getItem('ghostUnlocked_blood_type') || '',
+      ghostUnlocked_hometown: localStorage.getItem('ghostUnlocked_hometown') || '',
+    },
+    relationship: {
+      affection: localStorage.getItem('affection') || '60',
+      moodLevel: localStorage.getItem('moodLevel') || '7',
+      simonPersonality: localStorage.getItem('simonPersonality') || '',
+      relationshipFlags: localStorage.getItem('relationshipFlags') || '{}',
+      metInPerson: localStorage.getItem('metInPerson') || 'false',
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ghost-memory-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ 记忆已导出，请保存好文件');
+}
+
+function importUserData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.version || !data.chatHistory) {
+        showToast('❌ 文件格式不对，请选择正确的记忆文件');
+        return;
+      }
+      // 恢复聊天记录
+      if (data.chatHistory?.length > 0) {
+        localStorage.setItem('chatHistory', JSON.stringify(data.chatHistory));
+      }
+      if (data.longTermMemory) localStorage.setItem('longTermMemory', data.longTermMemory);
+      // 恢复个人资料
+      if (data.profile) {
+        Object.entries(data.profile).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
+      }
+      // 恢复Ghost数据
+      if (data.ghostData) {
+        Object.entries(data.ghostData).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
+      }
+      // 恢复关系数据
+      if (data.relationship) {
+        Object.entries(data.relationship).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
+      }
+      showToast('✅ 记忆已恢复！正在刷新...');
+      setTimeout(() => location.reload(), 1500);
+    } catch(e) {
+      showToast('❌ 导入失败，文件可能已损坏');
+    }
+  };
+  input.click();
+}
+
 function saveRemark() {
   const val = document.getElementById('profileRemark').value.trim();
   localStorage.setItem('botNickname', val);

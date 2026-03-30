@@ -1293,6 +1293,22 @@
 
       <div class="secret-save-hint">✅ 所有内容自动保存，Ghost 会悄悄记住这些</div>
 
+      <!-- 记忆导出导入 -->
+      <div class="secret-section" style="margin-top:16px;">
+        <div class="secret-section-title">💾 记忆备份</div>
+        <div style="font-size:12px;color:#c9aee0;margin-bottom:12px;line-height:1.6;">
+          导出记忆文件可以在换设备或正式版上线时恢复你们的故事。
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="exportUserData()" style="flex:1;padding:10px;background:linear-gradient(135deg,rgba(192,132,252,0.2),rgba(244,114,182,0.2));border:1px solid rgba(192,132,252,0.4);border-radius:12px;color:#7c3aed;font-size:13px;cursor:pointer;">
+            📤 导出记忆
+          </button>
+          <button onclick="importUserData()" style="flex:1;padding:10px;background:linear-gradient(135deg,rgba(192,132,252,0.2),rgba(244,114,182,0.2));border:1px solid rgba(192,132,252,0.4);border-radius:12px;color:#7c3aed;font-size:13px;cursor:pointer;">
+            📥 导入记忆
+          </button>
+        </div>
+      </div>
+
       <!-- 离婚按钮 -->
       <div class="secret-section" style="margin-top:24px;">
         <div class="secret-section-title" style="color:#c0392b;">⚠️ 危险区域</div>
