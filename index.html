@@ -500,18 +500,19 @@
   <button class="af-clown-btn" id="afClownBtn" onclick="afToggle()" title="开启愚人节主题">🤡</button>
 
   <!-- 未成年警告弹窗 -->
-<div id="ageWarningModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;">
-  <div style="background:#1a0a2e;border:1px solid rgba(192,132,252,0.4);border-radius:20px;padding:32px 24px;max-width:320px;width:90%;text-align:center;">
-    <div style="font-size:36px;margin-bottom:16px;">🔞</div>
-    <div style="font-size:18px;font-weight:700;color:#e9d5ff;margin-bottom:12px;">年龄确认</div>
-    <div style="font-size:14px;color:#c9aee0;line-height:1.7;margin-bottom:24px;">
-      本应用含有成人向内容，仅限<strong style="color:#f0abfc;">18岁及以上</strong>用户使用。<br><br>
-      继续使用即表示您确认已年满18周岁，并自愿承担相应责任。
+<div id="ageWarningModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(180,140,200,0.35);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:rgba(255,255,255,0.92);border:1px solid rgba(210,170,230,0.4);border-radius:20px;padding:32px 24px;max-width:320px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(160,100,200,0.15);">
+    <div style="font-size:36px;margin-bottom:12px;">🔞</div>
+    <div style="font-size:18px;font-weight:700;color:#6b21a8;margin-bottom:16px;">年龄确认</div>
+    <div style="font-size:14px;line-height:1.7;color:#5b4168;margin-bottom:24px;">
+      本应用包含成人向内容，包括亲密关系模拟、情感互动等内容。<br><br>
+      <strong style="color:#be185d;">未满18岁请立即离开。</strong><br><br>
+      继续使用即代表您确认已年满18周岁，并自愿承担相应责任。本应用不对未成年人使用承担任何责任。
     </div>
-    <button onclick="confirmAge()" style="width:100%;padding:14px;background:linear-gradient(135deg,#7c3aed,#be185d);border:none;border-radius:12px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+    <button onclick="confirmAge()" style="width:100%;padding:14px;background:linear-gradient(135deg,#a855f7,#ec4899);border:none;border-radius:12px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px;">
       我已年满18岁，继续
     </button>
-    <button onclick="denyAge()" style="width:100%;padding:12px;background:transparent;border:1px solid rgba(192,132,252,0.3);border-radius:12px;color:#9ca3af;font-size:14px;cursor:pointer;">
+    <button onclick="denyAge()" style="width:100%;padding:12px;background:transparent;border:1px solid rgba(168,85,247,0.25);border-radius:12px;color:#9ca3af;font-size:14px;cursor:pointer;">
       我未满18岁，离开
     </button>
   </div>
@@ -1524,7 +1525,7 @@ function confirmAge() {
   document.getElementById('ageWarningModal').style.display = 'none';
 }
 function denyAge() {
-  window.location.href = 'https://www.google.com';
+  window.location.href = '/underage.html';
 }
 // 页面加载后检查
 window.addEventListener('load', function() {
