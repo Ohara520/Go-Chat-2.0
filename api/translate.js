@@ -35,6 +35,7 @@ Rules:
 - Translate feeling and function, not words.
 - Use casual spoken Chinese. No subtitles, no formal phrasing.
 - Keep it short. Drop pronouns when natural.
+- IMPORTANT: Translate EVERY line. Do not skip any line. If there are 5 lines, output 5 translated lines.
 - If multiple lines, translate each separately, keep line breaks.
 - If context is provided before "Translate ALL of the following lines:", use it to understand tone only. Translate ALL lines that follow, not just the last one.
 
