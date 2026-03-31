@@ -1739,17 +1739,58 @@
 .luxury-card .product-desc { color: rgba(245,232,192,0.6) !important; }
 .luxury-card .product-price { color: #fcd34d !important; }
 
-/* 私密专区 */
+/* 私密专区 — 暧昧奢侈款 */
 .intimate-card {
-    background: linear-gradient(145deg, rgba(255,240,248,0.75), rgba(252,225,240,0.65)) !important;
-    border: 1px solid rgba(236,72,153,0.25) !important;
-    box-shadow: 0 4px 16px rgba(236,72,153,0.08) !important;
+    background: linear-gradient(145deg, rgba(30,10,20,0.88), rgba(55,15,35,0.85)) !important;
+    border: 1px solid rgba(220,80,120,0.35) !important;
+    box-shadow: 0 4px 24px rgba(180,40,80,0.18), inset 0 0 30px rgba(200,60,100,0.06) !important;
+    position: relative;
+    overflow: hidden;
 }
-.intimate-card .product-name { color: #9d174d !important; }
-.intimate-card .product-desc { color: rgba(157,23,77,0.55) !important; }
-.intimate-card .product-price { color: #be185d !important; }
+/* 顶部微光扫过效果 */
+.intimate-card::before {
+    content: '';
+    position: absolute; top: 0; left: -60%;
+    width: 40%; height: 100%;
+    background: linear-gradient(105deg, transparent, rgba(255,180,210,0.06), transparent);
+    animation: intimateShimmer 4s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes intimateShimmer {
+    0%   { left: -60%; }
+    50%  { left: 120%; }
+    100% { left: 120%; }
+}
+.intimate-card .product-emoji {
+    filter: drop-shadow(0 0 6px rgba(220,80,120,0.5));
+}
+.intimate-card .product-name {
+    color: #f0a0c0 !important;
+    letter-spacing: 0.5px;
+}
+.intimate-card .product-desc {
+    color: rgba(220,160,180,0.6) !important;
+}
+.intimate-card .product-price {
+    color: #e8829c !important;
+    font-weight: 700;
+}
 .intimate-buy-btn {
-    background: linear-gradient(135deg, rgba(236,72,153,0.75), rgba(192,132,252,0.7)) !important;
+    background: linear-gradient(135deg, rgba(180,40,80,0.85), rgba(140,30,100,0.8)) !important;
+    border: 1px solid rgba(220,80,120,0.4) !important;
+    box-shadow: 0 2px 12px rgba(180,40,80,0.25) !important;
+    color: #ffd0e0 !important;
+    letter-spacing: 0.3px;
+}
+.intimate-buy-btn:hover {
+    background: linear-gradient(135deg, rgba(210,60,100,0.9), rgba(160,40,120,0.88)) !important;
+    box-shadow: 0 4px 18px rgba(200,60,100,0.35) !important;
+}
+
+/* 私密区高亮触发（ghost-mentioned inside intimate） */
+.intimate-card.ghost-mentioned {
+    border: 1px solid rgba(240,100,150,0.6) !important;
+    box-shadow: 0 0 20px rgba(200,60,100,0.3), inset 0 0 30px rgba(200,60,100,0.08) !important;
 }
 
 /* 限时打折卡片 */
