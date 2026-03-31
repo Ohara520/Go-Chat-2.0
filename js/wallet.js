@@ -2,12 +2,13 @@
 // ===== 钱包系统 =====
 function getBalance() {
   // 迁移v2：清空旧transactions，统一发£500补偿
-  if (!localStorage.getItem('walletMigrated_v2')) {
-    localStorage.setItem('walletMigrated_v2', '1');
+  if (!localStorage.getItem('walletMigrated_v3')) {
+    localStorage.setItem('walletMigrated_v3', '1');
+    localStorage.removeItem('walletMigrated_v2');
     localStorage.removeItem('walletMigrated');
     localStorage.removeItem('transactions');
     localStorage.removeItem('wallet');
-    addTransaction({ icon: '🎁', name: '专属补偿金', amount: 500 });
+    addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
   }
   // 从transactions算余额
   const txs = getTransactions();
