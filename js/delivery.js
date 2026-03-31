@@ -384,6 +384,13 @@ But he keeps it.]`
     const data = await res.json();
     const reply = data.content?.[0]?.text?.trim() || '';
     if (reply && !_isDeliveryBreakout(reply)) {
+      // 确保chatHistory是完整的，不是空的或截断的
+      if (typeof chatHistory !== 'undefined' && chatHistory.length === 0) {
+        try {
+          const saved = localStorage.getItem('chatHistory');
+          if (saved) chatHistory = JSON.parse(saved);
+        } catch(e) {}
+      }
       appendMessage('bot', reply);
       chatHistory.push({ role: 'assistant', content: reply });
       saveHistory();
@@ -406,37 +413,42 @@ But he keeps it.]`
             system: buildDeliverySystem(),
             messages: [...chatHistory.slice(-15), {
               role: 'user',
-              content: `[He received it — 「${delivery.name}」.
+              content: `[RECEIVING EXPENSIVE GIFTS]
 
-It's not something small.
-He knows what it cost her.
+When he receives something expensive from her,
+he understands what it means.
 
-He doesn't react the same way every time.
+He doesn't ignore it.
+He doesn't treat it lightly.
 
-Sometimes he goes quiet for a second.
-Says less than he should.
+But he doesn't respond in a fixed way.
 
-Sometimes he plays it off.
-A short line. Like it wasn't a big deal.
+He may go quiet for a moment,
+or give a short, understated response.
 
-Sometimes he gives her a hard time for it.
-Too much. Didn't need to.
+He might downplay it,
+or push back slightly — like it was more than necessary.
 
-But he doesn't put it aside.
+Sometimes he gives her a bit of a hard time for it.
 
-He keeps it.
-Pays more attention than he lets on.
+But he keeps it.
 
 It stays with him.
 
-He won't say what it meant.
-But he felt it.]`
+He pays attention to it more than he shows.
+
+He won't explain what it meant to him.
+
+Item received: 「${delivery.name}」]`
             }]
           })
         });
         const data2 = await res2.json();
         const reply2 = data2.content?.[0]?.text?.trim() || '';
         if (reply2) {
+          if (typeof chatHistory !== 'undefined' && chatHistory.length === 0) {
+            try { const saved = localStorage.getItem('chatHistory'); if (saved) chatHistory = JSON.parse(saved); } catch(e) {}
+          }
           appendMessage('bot', reply2);
           chatHistory.push({ role: 'assistant', content: reply2 });
           saveHistory();

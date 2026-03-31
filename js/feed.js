@@ -338,13 +338,13 @@ ${toneHint ? `- ${toneHint}` : ''}
     const raw = data.content[0].text.replace(/```json|```/g, '').trim();
     const posts = JSON.parse(raw);
 
-    // 存进7天历史记录
+    // 存进30天历史记录
     let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
     posts.forEach(p => history.push({ date: today, post: p }));
-    // 只保留最近7天
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    history = history.filter(p => new Date(p.date) >= sevenDaysAgo);
+    // 只保留最近30天
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    history = history.filter(p => new Date(p.date) >= thirtyDaysAgo);
     localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
 
     // 同步一份简洁摘要进prompt用（只保留最近3条，省token）
