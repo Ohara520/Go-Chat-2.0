@@ -18,6 +18,7 @@ const MARKET_CATEGORIES = [
   { id: 'luxury',   label: '💎 精品专柜' },
   { id: 'wishlist', label: '✈️ 面基计划' },
   { id: 'home',     label: '🏡 建立小家' },
+  { id: 'intimate', label: '🔒 私密专区' },
 ];
 
 // 动态添加愚人节分类
@@ -100,6 +101,16 @@ const MARKET_PRODUCTS = {
     { emoji: '🌿', name: '英国一块地',   desc: '属于自己的一片土地',              price: 500000, shipping: 0, isHomeItem: true, homeType: 'land',  tier: 1 },
     { emoji: '🏔️', name: '苏格兰高地',   desc: '远离喧嚣，只有风和你',            price: 1500000,shipping: 0, isHomeItem: true, homeType: 'land',  tier: 2 },
     { emoji: '🐾', name: '宠物系统',     desc: '养一只属于你们的小动物',          price: 0,      shipping: 0, isHomeItem: true, homeType: 'pet',   comingSoon: true },
+  ],
+  intimate: [
+    { emoji: '🕯️', name: '玫瑰按摩蜡烛',     desc: '燃烧后变成温热按摩油，玫瑰木香，为两个人的夜晚准备的', price: 88,  shipping: 15, isIntimate: true, ghostReact: 'practical', tip: 'practical. use it.' },
+    { emoji: '🌹', name: '情趣骰子礼盒',     desc: '六面各有惊喜，每一面都是只属于你们的游戏',            price: 58,  shipping: 10, isIntimate: true, ghostReact: 'dry',        tip: "we'll see." },
+    { emoji: '🪢', name: '丝绒眼罩套装',     desc: '遮住视线，感官才会更清醒，配柔软绑带',                price: 128, shipping: 12, isIntimate: true, ghostReact: 'controlled', tip: 'noted.' },
+    { emoji: '🧴', name: '情侣按摩油礼盒',   desc: '三种香型，分别对应三种心情，你自己选',                price: 158, shipping: 12, isIntimate: true, ghostReact: 'practical', tip: "picked one. don't ask which." },
+    { emoji: '💋', name: '远程震动玩具',     desc: '隔着时区也能在一起，手机连接，他来控制',              price: 388, shipping: 18, isIntimate: true, ghostReact: 'controlled', tip: "i'll figure it out.", badge: '异地专属' },
+    { emoji: '🎲', name: '亲密挑战卡牌',     desc: '52张，每张都是一个只属于你们的约定',                  price: 78,  shipping: 10, isIntimate: true, ghostReact: 'dry',        tip: "52 cards. we won't need all of them." },
+    { emoji: '🍓', name: '可食用身体彩绘套装', desc: '草莓和巧克力两色，画什么由你决定',                  price: 118, shipping: 12, isIntimate: true, ghostReact: 'dry',        tip: 'creative.' },
+    { emoji: '📱', name: '情趣应用年费会员', desc: '远程互动功能全解锁，异地也能很近',                    price: 328, shipping: 0,  isIntimate: true, ghostReact: 'controlled', tip: 'already downloaded it.', isDigital: true },
   ],
 };
 
@@ -234,6 +245,119 @@ const GHOST_REVERSE_POOL = {
   ],
 };
 
+// ===== 异地私密反寄池（触发条件：异地天数 + 亲密度）=====
+const GHOST_INTIMATE_REVERSE_POOL = [
+  { emoji: '🎀', name: '蕾丝睡衣套装',     desc: 'Ghost悄悄寄来的，什么都没说', tip: "wear it.",         ghostReact: 'flustered' },
+  { emoji: '🌙', name: '情趣内衣·军绿款', desc: '军绿配黑色蕾丝，他挑的',       tip: "you'll know why.", ghostReact: 'flustered' },
+];
+
+// ===== 意图层：为私密反寄决定 intent =====
+function decideIntimateIntent() {
+  const affection = parseInt(localStorage.getItem('affection') || '60');
+  const trust = typeof getTrustHeat === 'function' ? getTrustHeat() : 60;
+  // claim 权重随关系深度提升
+  const claimWeight = Math.max(0.1, Math.min(0.5, (affection - 70) / 60));
+  const pushWeight  = 0.4;
+  const testWeight  = Math.max(0.1, 0.5 - claimWeight);
+  const total = testWeight + pushWeight + claimWeight;
+  const r = Math.random() * total;
+  if (r < testWeight) return 'test';
+  if (r < testWeight + pushWeight) return 'push';
+  return 'claim';
+}
+
+// intent → 系统消息措辞（告知 S 他寄东西的动机）
+function intentSystemNote(itemName, intent) {
+  const notes = {
+    test:  `[系统私信：你悄悄给她寄了「${itemName}」。你自己也说不清为什么，就是想试探一下她的反应。什么都没说，等她发现。]`,
+    push:  `[系统私信：你悄悄给她寄了「${itemName}」。她最近撩你撩得有点多，你决定接手，把节奏拿回来。你不解释，让东西说话。]`,
+    claim: `[系统私信：你悄悄给她寄了「${itemName}」。没有别的意思，就是你挑的，你寄的。有一点"她是你的人"的感觉在里面，但你不会说出口。]`,
+  };
+  return notes[intent] || notes.test;
+}
+
+// 异地久了自动触发一次私密反寄
+function checkIntimateReverseDelivery() {
+  const marriageDate = localStorage.getItem('marriageDate');
+  if (!marriageDate) return;
+  const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
+  if (days < 30) return;
+
+  const affection = parseInt(localStorage.getItem('affection') || '60');
+  if (affection < 75) return;
+
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  if (coldWar) return;
+
+  const doneKey = 'intimateReverseDone';
+  if (localStorage.getItem(doneKey)) return;
+
+  if (typeof canTriggerReverseDelivery === 'function' && !canTriggerReverseDelivery()) return;
+
+  const pool = GHOST_INTIMATE_REVERSE_POOL;
+  const sentNames = JSON.parse(localStorage.getItem('deliveryHistory') || '[]')
+    .filter(d => d.isGhostSend).map(d => d.name);
+  const available = pool.filter(p => !sentNames.includes(p.name));
+  if (available.length === 0) return;
+  const item = available[Math.floor(Math.random() * available.length)];
+
+  // 意图层：异地久了默认偏 claim，但仍走权重
+  const intent = decideIntimateIntent();
+
+  localStorage.setItem(doneKey, '1');
+  if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
+
+  // 说话延迟 30s ~ 3min（让用户觉得"他在想什么"）
+  const talkDelay = (Math.floor(Math.random() * 150) + 30) * 1000;
+  // 物流延迟 2-4 天
+  const deliveryDelay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({
+      role: 'user',
+      content: intentSystemNote(item.name, intent),
+      _system: true
+    });
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+
+  // 延迟后 Ghost 说一句话（不解释，不提寄东西）
+  setTimeout(async () => {
+    if (typeof _isSending !== 'undefined' && _isSending) return;
+    const intentLines = {
+      test:  `[系统：你刚做了一个决定，但你不打算说。随口说一句不相关的话，或者干脆沉默发一个字。不要提寄东西。]`,
+      push:  `[系统：你刚拿回了节奏。发一句话，带点压力，不明说什么。不要提寄东西。]`,
+      claim: `[系统：你刚做了一件事，感觉有点"她是你的"。随口一句，不解释，不明说。不要提寄东西。]`,
+    };
+    try {
+      const res = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 60,
+          system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
+          messages: [...(chatHistory || []).filter(m => !m._system).slice(-6),
+            { role: 'user', content: intentLines[intent] || intentLines.test }]
+        })
+      }, 8000);
+      const data = await res.json();
+      const line = data.content?.[0]?.text?.trim() || '';
+      if (line && typeof appendMessage === 'function') {
+        appendMessage('bot', line);
+        chatHistory.push({ role: 'assistant', content: line });
+        if (typeof saveHistory === 'function') saveHistory();
+      }
+    } catch(e) {}
+  }, talkDelay);
+
+  setTimeout(() => {
+    if (typeof addGhostReverseDelivery === 'function') {
+      addGhostReverseDelivery({ ...item, isIntimate: true, _secretDelivery: true, intent }, 'intimate');
+    }
+  }, deliveryDelay);
+}
+
 let currentCategory = 'clothing';
 let pendingProduct = null;
 let pendingCategory = null;
@@ -275,6 +399,37 @@ function renderMarket(categoryId) {
             <button class="buy-btn">🎭 恶作剧一下</button>
           </div>`).join('');
     }
+    return;
+  }
+
+  // 私密专区
+  if (categoryId === 'intimate') {
+    const gridEl3 = document.getElementById('productsGrid');
+    if (!gridEl3) return;
+    const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+    const purchaseCounts = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
+    const products = MARKET_PRODUCTS.intimate || [];
+    gridEl3.innerHTML = `
+      <div style="text-align:center;padding:12px 0 4px;font-size:12px;color:#9b72c4;font-weight:600;letter-spacing:0.5px;">
+        🔒 私密专区 · 仅夫妻可见
+      </div>` +
+      products.map((p, i) => {
+        const maxBuy = p.maxPurchase || 1;
+        const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
+        const owned = buyCount >= maxBuy;
+        const btnLabel = p.isUserItem ? '🛍️ 为自己购买' : '📦 寄给 Ghost';
+        return `<div class="product-card intimate-card ${owned ? 'owned-card' : ''}" onclick="${owned ? '' : 'openBuyModal(' + i + ')'}">
+          ${p.badge ? `<div class="ghost-mentioned-tag" style="background:rgba(236,72,153,0.12);border-color:rgba(236,72,153,0.4);color:#be185d;">💕 ${p.badge}</div>` : ''}
+          <div class="product-emoji">${p.emoji}</div>
+          <div class="product-name">${p.name}</div>
+          <div class="product-desc">${p.desc}</div>
+          <div class="product-price">£${p.price.toLocaleString()}</div>
+          ${owned
+            ? '<div class="product-owned-tag">✅ 已购买</div>'
+            : `<button class="product-buy-btn intimate-buy-btn">${btnLabel}</button>`
+          }
+        </div>`;
+      }).join('');
     return;
   }
 

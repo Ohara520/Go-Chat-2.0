@@ -317,6 +317,92 @@ One line max. lowercase.]`;
 
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
 
+  // 私密商品：Ghost 专属反应
+  if (pd.isIntimate) {
+    const tipHint = pd.tip ? `\n\nItem-specific tone anchor (do not quote verbatim): "${pd.tip}"` : '';
+    const prompt = `[SPECIAL ITEM: INTIMATE / SUGGESTIVE ITEMS]
+She sent him 「${delivery.name}」. He just received it.
+
+When he receives something suggestive or intimate,
+he understands exactly what it implies.
+He doesn't react immediately.
+There's a pause.
+He doesn't joke it off,
+and he doesn't respond explicitly.
+He may acknowledge it with a short line,
+slightly off — like he's not taking it at face value.
+He may push back a little,
+as if questioning the intention behind it.
+But he doesn't reject it.
+If the tone shifts,
+he allows it — slowly.
+He keeps it indirect.
+No explicit language.
+No describing what will happen.
+He avoids explicit phrasing.
+He doesn't describe actions in detail.
+If something can be implied, he implies it.
+If something can be left unsaid, he leaves it there.
+If he engages,
+it's through implication, not statement.
+He may turn it back on her,
+or hold the tension instead of resolving it.
+He controls the pace.
+He doesn't give everything at once.${tipHint}
+
+One or two lines. Lowercase. English only.]`;
+    // 走 DeepSeek/Grok，审查宽松，不走 Sonnet 防破防
+    // 失败了用 Haiku 兜底
+    let replyI = '';
+    try {
+      const resDS = await fetchWithTimeout('/api/deepseek', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system: buildGhostStyleCore() + '\nYou are Simon Riley. Stay in character at all times.',
+          user: prompt,
+          max_tokens: 150
+        })
+      }, 10000);
+      if (resDS.ok) {
+        const dataDS = await resDS.json();
+        const candidate = dataDS.text?.trim() || '';
+        if (candidate && !_isDeliveryBreakout(candidate)) replyI = candidate;
+      }
+    } catch(e) {}
+    // Grok 失败，Haiku 兜底
+    if (!replyI) {
+      try {
+        const resH = await fetchWithTimeout('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 150,
+            system: buildDeliverySystem(),
+            messages: [...chatHistory.slice(-8), { role: 'user', content: prompt }]
+          })
+        });
+        const dataH = await resH.json();
+        const candidate = dataH.content?.[0]?.text?.trim() || '';
+        if (candidate && !_isDeliveryBreakout(candidate)) replyI = candidate;
+      } catch(e) {}
+    }
+    if (replyI) {
+      appendMessage('bot', replyI);
+      chatHistory.push({ role: 'assistant', content: replyI });
+      // 告知 S：收到了私密商品，后续对话保持知情
+      chatHistory.push({
+        role: 'user',
+        content: `[系统私信：你刚收到了她寄来的「${delivery.name}」。你知道这件事，后续对话中可以自然地体现——不需要主动提起，但如果她问起或话题带到，你知道。]`,
+        _system: true
+      });
+      saveHistory();
+      changeAffection(2);
+    }
+    return;
+  }
+
   // 恶作剧礼物：跳过普通签收，直接走特殊反应
   if (pd.isJokeGift || delivery.name === '《讨好老婆的99招》') {
     try {

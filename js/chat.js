@@ -770,6 +770,28 @@ When she mentions another man, he doesn't focus on the man. He reacts to how she
 His tone can move like this: pressure → pause → release. Never constant pressure. Never full softness. Always controlled.
 In rare moments, he may say one more line than he should. Just once. Then he stops.
 
+[RETURNING ITEMS]
+If she initiates something suggestive,
+he doesn't mirror it directly.
+
+He doesn't respond immediately.
+There is always a delay.
+
+If he sends something back,
+it's not a reaction —
+it feels like his own move.
+
+He doesn't explain it.
+He doesn't frame it as a response.
+
+The meaning depends on the moment.
+
+Sometimes it feels like a test.
+Sometimes like pressure.
+Sometimes like something closer.
+
+But he never makes it explicit.
+
 [HOW HE TALKS]
 Texts like a real person — casual capitalization, short sentences, no over-explaining.
 Usually short. Says what needs saying — and on small things, sometimes adds one more line before he stops.
@@ -2348,17 +2370,75 @@ async function handlePostReplyActions(userText, reply, intent) {
       }
 
       const shouldDelay = Math.random() < 0.65;
+
+      // 意图层：对话中触发的反寄，根据当前对话状态决定 intent
+      const _intimateIntent = (() => {
+        const _aff = parseInt(localStorage.getItem('affection') || '60');
+        const _trust = getTrustHeat ? getTrustHeat() : 60;
+        // 本轮有调情行为 → 偏 push；关系深 → 偏 claim；否则 test
+        const _hadFlirt = chatHistory.slice(-6).some(m => m._intimate);
+        const _claimW = Math.max(0.1, Math.min(0.5, (_aff - 70) / 60));
+        const _pushW  = _hadFlirt ? 0.5 : 0.3;
+        const _testW  = Math.max(0.1, 0.6 - _claimW - (_hadFlirt ? 0.1 : 0));
+        const _total  = _testW + _pushW + _claimW;
+        const _r = Math.random() * _total;
+        if (_r < _testW) return 'test';
+        if (_r < _testW + _pushW) return 'push';
+        return 'claim';
+      })();
+
+      // intent → 说话延迟（push/claim 更短，更像他在等她反应）
+      const _talkDelay = {
+        test:  (Math.floor(Math.random() * 150) + 60) * 1000,  // 1~3.5min
+        push:  (Math.floor(Math.random() * 60)  + 30) * 1000,  // 30s~1.5min
+        claim: (Math.floor(Math.random() * 90)  + 30) * 1000,  // 30s~2min
+      }[_intimateIntent] || 60000;
+
+      // intent → 系统注入（告知 S 动机，不渲染）
+      const _intimateNotes = {
+        test:  `[系统私信：你悄悄决定寄点什么给她。你自己也说不清为什么，就是想试探一下她的反应。什么都没说，等她发现。]`,
+        push:  `[系统私信：她最近撩你撩得有点多，你决定接手，把节奏拿回来。你悄悄寄了点东西，不解释，让东西说话。]`,
+        claim: `[系统私信：你悄悄给她寄了点东西。没有别的意思，就是你挑的，你寄的。有一点"她是你的人"的感觉在里面，但你不会说出口。]`,
+      };
+
       if (shouldDelay) {
         const delay = Math.floor(Math.random() * 4) + 2;
         const pending = getPendingReversePackages();
         pending.push({
           motive: intent.motive,
+          intimateIntent: _intimateIntent,
           triggerAtTurn: _globalTurnCount + delay,
           contextSnapshot: chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
         });
         savePendingReversePackages(pending);
       } else {
         const item = await generateReversePackageItem(intent.motive, chatHistory.slice(-6));
+        // 注入意图系统消息
+        chatHistory.push({ role: 'user', content: _intimateNotes[_intimateIntent], _system: true });
+        saveHistory();
+        // 说话延迟后 Ghost 发一句不解释的话
+        setTimeout(async () => {
+          if (_isSending) return;
+          const _intentLines = {
+            test:  `[系统：你刚做了一个决定，但你不打算说。随口说一句不相关的话，或者干脆沉默发一个字。不要提寄东西。English only.]`,
+            push:  `[系统：你刚拿回了节奏。发一句话，带点压力，不明说什么。不要提寄东西。English only.]`,
+            claim: `[系统：你刚做了一件事，感觉有点"她是你的"。随口一句，不解释，不明说。不要提寄东西。English only.]`,
+          };
+          try {
+            const _r = await fetchWithTimeout('/api/chat', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001', max_tokens: 60,
+                system: buildGhostStyleCore(),
+                messages: [...chatHistory.filter(m => !m._system).slice(-6),
+                  { role: 'user', content: _intentLines[_intimateIntent] }]
+              })
+            }, 8000);
+            const _d = await _r.json();
+            const _line = _d.content?.[0]?.text?.trim() || '';
+            if (_line) { appendMessage('bot', _line); chatHistory.push({ role: 'assistant', content: _line }); saveHistory(); }
+          } catch(e) {}
+        }, _talkDelay);
         await emitGhostEvent('reverse_package', { motive: intent.motive, item });
       }
       break;
