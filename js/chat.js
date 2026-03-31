@@ -5695,6 +5695,10 @@ One or two lines. English only. lowercase.`;
     }
 
     if (Math.random() < 0.25) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
+    // 调情高亮：_intimate 预筛 + D小师确认 → 私密商城高亮
+    if (chatHistory.slice(-6).some(m => m._intimate)) {
+      setTimeout(() => { try { checkIntimateHighlight(text, reply); } catch(e) {} }, 1500);
+    }
     if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
@@ -6893,6 +6897,58 @@ function clearProductTrigger(name) {
   const reason = triggered[name]?.reason;
   if (reason) Object.keys(triggered).forEach(k => { if (triggered[k]?.reason === reason) delete triggered[k]; });
   localStorage.setItem('marketTriggered', JSON.stringify(triggered));
+}
+
+// ===== 私密商品高亮系统 =====
+function getIntimateProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+  const item = triggered[name];
+  if (!item) return null;
+  if (Date.now() - item.timestamp > 2 * 24 * 3600 * 1000) return null; // 2天冷却
+  return item.reason;
+}
+
+function clearIntimateProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+  delete triggered[name];
+  localStorage.setItem('intimateTriggered', JSON.stringify(triggered));
+}
+
+async function checkIntimateHighlight(userText, botReply) {
+  // 预筛：本轮或最近几条有 _intimate 标记才发 D 小师请求
+  const hasIntimate = chatHistory.slice(-6).some(m => m._intimate);
+  if (!hasIntimate) return;
+
+  // 冷却：24小时内只触发一次
+  const lastAt = parseInt(localStorage.getItem('intimateHighlightAt') || '0');
+  if (Date.now() - lastAt < 24 * 3600 * 1000) return;
+
+  // D 小师确认：Ghost 是否表现出明显的"想要"
+  try {
+    const raw = await fetchDeepSeek(
+      'Based on Ghost's reply in this intimate exchange, did he show clear desire or wanting — through implication, tension, or controlled restraint? Answer only JSON: {"desire": true} or {"desire": false}',
+      `Ghost replied: "${botReply.slice(0, 200)}"`,
+      30
+    );
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    if (!result.desire) return;
+  } catch(e) { return; }
+
+  localStorage.setItem('intimateHighlightAt', Date.now());
+
+  // 随机选最多3件私密商品高亮
+  const pool = (typeof MARKET_PRODUCTS !== 'undefined' && MARKET_PRODUCTS.intimate) || [];
+  const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  const available = pool.filter(p => !purchased.includes(p.name));
+  if (available.length === 0) return;
+
+  const shuffled = available.sort(() => Math.random() - 0.5).slice(0, Math.min(3, available.length));
+  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+  const now = Date.now();
+  shuffled.forEach(p => {
+    triggered[p.name] = { reason: '他很想要你', timestamp: now };
+  });
+  localStorage.setItem('intimateTriggered', JSON.stringify(triggered));
 }
 
 // ===== 建立小家道具购买反应 =====

@@ -103,7 +103,7 @@ const MARKET_PRODUCTS = {
     { emoji: '🐾', name: '宠物系统',     desc: '养一只属于你们的小动物',          price: 0,      shipping: 0, isHomeItem: true, homeType: 'pet',   comingSoon: true },
   ],
   intimate: [
-    { emoji: '🕯️', name: '玫瑰按摩蜡烛',     desc: '燃烧后变成温热按摩油，玫瑰木香，为两个人的夜晚准备的', price: 88,  shipping: 15, isIntimate: true, ghostReact: 'practical', tip: 'practical. use it.' },
+    { emoji: '🛡️', name: '超大号避孕套',       desc: '最大号，她特意挑的，他懂',                                price: 58,  shipping: 15, isIntimate: true, tip: "...noted." },
     { emoji: '🌹', name: '情趣骰子礼盒',     desc: '六面各有惊喜，每一面都是只属于你们的游戏',            price: 58,  shipping: 10, isIntimate: true, ghostReact: 'dry',        tip: "we'll see." },
     { emoji: '🪢', name: '丝绒眼罩套装',     desc: '遮住视线，感官才会更清醒，配柔软绑带',                price: 128, shipping: 12, isIntimate: true, ghostReact: 'controlled', tip: 'noted.' },
     { emoji: '🧴', name: '情侣按摩油礼盒',   desc: '三种香型，分别对应三种心情，你自己选',                price: 158, shipping: 12, isIntimate: true, ghostReact: 'practical', tip: "picked one. don't ask which." },
@@ -409,27 +409,39 @@ function renderMarket(categoryId) {
     const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
     const purchaseCounts = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
     const products = MARKET_PRODUCTS.intimate || [];
-    gridEl3.innerHTML = `
-      <div style="text-align:center;padding:12px 0 4px;font-size:12px;color:#9b72c4;font-weight:600;letter-spacing:0.5px;">
-        🔒 私密专区 · 仅夫妻可见
-      </div>` +
-      products.map((p, i) => {
-        const maxBuy = p.maxPurchase || 1;
-        const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
-        const owned = buyCount >= maxBuy;
-        const btnLabel = p.isUserItem ? '🛍️ 为自己购买' : '📦 寄给 Ghost';
-        return `<div class="product-card intimate-card ${owned ? 'owned-card' : ''}" onclick="${owned ? '' : 'openBuyModal(' + i + ')'}">
-          ${p.badge ? `<div class="ghost-mentioned-tag" style="background:rgba(236,72,153,0.12);border-color:rgba(236,72,153,0.4);color:#be185d;">💕 ${p.badge}</div>` : ''}
-          <div class="product-emoji">${p.emoji}</div>
-          <div class="product-name">${p.name}</div>
-          <div class="product-desc">${p.desc}</div>
-          <div class="product-price">£${p.price.toLocaleString()}</div>
-          ${owned
-            ? '<div class="product-owned-tag">✅ 已购买</div>'
-            : `<button class="product-buy-btn intimate-buy-btn">${btnLabel}</button>`
-          }
-        </div>`;
-      }).join('');
+    const intimateTriggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+    const now = Date.now();
+    let intimateHtml = '';
+    products.forEach((p, i) => {
+      const maxBuy = p.maxPurchase || 1;
+      const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
+      const owned = buyCount >= maxBuy;
+      const btnLabel = p.isUserItem ? '🛍️ 为自己购买' : '📦 寄给 Ghost';
+
+      // 高亮判断：intimateTriggered 里有且未过期（2天）
+      const iTrigger = intimateTriggered[p.name];
+      const isHighlighted = !owned && iTrigger && (now - iTrigger.timestamp < 2 * 24 * 3600 * 1000);
+
+      const badgeHtml = isHighlighted
+        ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(192,132,252,0.15));border:1px solid rgba(236,72,153,0.5);color:#be185d;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">💗 他很想要你</div>`
+        : p.badge
+          ? `<div class="ghost-mentioned-tag" style="background:rgba(236,72,153,0.12);border-color:rgba(236,72,153,0.4);color:#be185d;">💕 ${p.badge}</div>`
+          : '';
+
+      const actionHtml = owned
+        ? `<div class="product-owned-tag">✅ 已购买</div>`
+        : `<button class="product-buy-btn intimate-buy-btn" onclick="openBuyModal(${i})">${btnLabel}</button>`;
+
+      intimateHtml += `<div class="product-card intimate-card ${owned ? 'owned-card' : ''} ${isHighlighted ? 'ghost-mentioned' : ''}">
+        ${badgeHtml}
+        <div class="product-emoji">${p.emoji}</div>
+        <div class="product-name">${p.name}</div>
+        <div class="product-desc">${p.desc}</div>
+        <div class="product-price">£${p.price.toLocaleString()}</div>
+        ${actionHtml}
+      </div>`;
+    });
+    gridEl3.innerHTML = intimateHtml;
     return;
   }
 
@@ -589,6 +601,12 @@ function confirmPurchase() {
   }
 
   clearProductTrigger(p.name);
+  // 购买后清掉私密高亮
+  if (pendingCategory === 'intimate') {
+    const _iT = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+    delete _iT[p.name];
+    localStorage.setItem('intimateTriggered', JSON.stringify(_iT));
+  }
   closeBuyModal();
   if (isWishlist) showToast('💝 已加入心愿单！');
   else if (p.isUserItem) showToast('🛍️ 购买成功！快递正在准备中～');
