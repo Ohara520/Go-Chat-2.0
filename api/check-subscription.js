@@ -5,6 +5,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+const FREE_QUOTA = 100; // 新用户免费条数
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -18,8 +20,40 @@ export default async function handler(req, res) {
       .eq('email', email.toLowerCase().trim())
       .single();
 
+    // 没有记录 → 自动创建免费套餐
     if (error || !data) {
-      return res.status(200).json({ subscribed: false });
+      const periodEnd = new Date();
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1); // 免费额度1年有效
+      const { data: newData, error: insertError } = await supabase
+        .from('subscriptions')
+        .insert({
+          email: email.toLowerCase().trim(),
+          plan_id: 'free',
+          plan_name: '免费体验',
+          monthly_quota: FREE_QUOTA,
+          memory_limit: 10,
+          used_count: 0,
+          period_start: new Date().toISOString(),
+          period_end: periodEnd.toISOString(),
+          status: 'active',
+        })
+        .select()
+        .single();
+
+      if (insertError || !newData) {
+        return res.status(200).json({ subscribed: false });
+      }
+
+      return res.status(200).json({
+        subscribed: true,
+        plan_name: '免费体验',
+        plan_id: 'free',
+        monthly_quota: FREE_QUOTA,
+        used_count: 0,
+        remaining: FREE_QUOTA,
+        memory_limit: 10,
+        period_end: periodEnd.toISOString(),
+      });
     }
 
     // 检查是否过期
