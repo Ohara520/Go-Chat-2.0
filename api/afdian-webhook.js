@@ -15,8 +15,8 @@ const PLAN_CONFIG = {
 
 // 加油包配置
 const TOPUP_CONFIG = {
-  '9effc14425d411f19ee752540025c377': { name: '大加油包', quota: 700 },
-  '8e7858cc25d411f1ba9852540025c377': { name: '小加油包', quota: 300 },
+  '9effc14425d411f19ee752540025c377': { name: '小加油包', quota: 300 },
+  '8e7858cc25d411f1ba9852540025c377': { name: '大加油包', quota: 700 },
 };
 
 function verifySignature(token, params, sign) {

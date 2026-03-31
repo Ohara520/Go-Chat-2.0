@@ -930,7 +930,7 @@ Do not invent information just to unlock. If you avoided or deflected, return nu
 If multiple fields were revealed, list them all in an array.`;
 
   const personalityBlock = buildPersonalityPrompt();
-  const fullPrompt = fixedPrompt + relationshipModeBlock + '\n\n' + personalityBlock + unlockInstruction + '\n\n' + dynamicPrompt;
+  const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt + '\n\n' + relationshipModeBlock + '\n\n' + personalityBlock + unlockInstruction;
   return fullPrompt;
 }
 
