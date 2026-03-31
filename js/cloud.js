@@ -35,14 +35,24 @@ async function loadFromCloud() {
     const localTs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
     const cloudIsNewer = cloudTs > localTs;
 
-    // ── 1. 聊天记录：本地空时无条件恢复，否则保留更长的 ────────
+    // ── 1. 聊天记录：合并云端和本地，保留更多 ────────────────
     if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
-      // 本地空 → 无条件从云端恢复；云端更多 → 也用云端
-      if (localHistory.length === 0 || data.chat_history.length > localHistory.length) {
+      if (localHistory.length === 0) {
+        // 本地空 → 无条件从云端恢复
         localStorage.setItem('chatHistory', JSON.stringify(data.chat_history));
         localStorage.setItem('chatUpdatedAt', cloudTs);
+      } else {
+        // 合并：把云端有但本地没有的消息补进来（按内容去重）
+        const localContents = new Set(localHistory.map(m => m.role + '|' + (m.content || '').slice(0, 50)));
+        const toAdd = data.chat_history.filter(m => !localContents.has(m.role + '|' + (m.content || '').slice(0, 50)));
+        if (toAdd.length > 0) {
+          // 云端的放前面（更早），本地的放后面（更新）
+          const merged = [...toAdd, ...localHistory].slice(-300);
+          localStorage.setItem('chatHistory', JSON.stringify(merged));
+          localStorage.setItem('chatUpdatedAt', cloudTs);
+        }
       }
     }
 
@@ -288,7 +298,7 @@ async function saveToCloud() {
     const chatHistoryData = chatHistoryRaw
       ? JSON.parse(chatHistoryRaw)
           .filter(m => !m._system && !m._recalled)
-          .slice(-100)
+          .slice(-300)
           .map(m => ({ role: m.role, content: m.content, ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}) }))
       : [];
     const stateSnapshot = {
