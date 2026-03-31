@@ -101,9 +101,27 @@ window.onload = function() {
         s.style.display = 'none';
     });
 
+    // 云端数据加载（恢复聊天记录等）
+    if (typeof loadFromCloud === 'function') {
+        loadFromCloud().then(() => {
+            if (typeof refreshChatScreen === 'function') refreshChatScreen();
+        }).catch(() => {});
+    }
+
     // 直接进主页（登录检测已在index.html处理）
     openScreen('mainScreen');
 }
+
+// ===== 页面关闭前强制保存 =====
+window.addEventListener('beforeunload', () => {
+    if (typeof _saveTimer !== 'undefined' && _saveTimer) {
+        clearTimeout(_saveTimer);
+        _saveTimer = null;
+    }
+    if (typeof saveToCloud === 'function') {
+        saveToCloud().catch(() => {});
+    }
+});
 
 // ===== Toast 提示 =====
 function showToast(msg, duration = 2500) {

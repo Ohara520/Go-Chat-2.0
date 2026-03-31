@@ -248,7 +248,7 @@ function scheduleCloudSave() {
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
     saveToCloud().catch(console.error);
-  }, 3000);
+  }, 1000);
 }
 
 async function saveToCloud() {
