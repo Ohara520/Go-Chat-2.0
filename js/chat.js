@@ -946,6 +946,21 @@ ${(()=>{
 
 ${getLoveStagePrompt()}
 
+${(()=>{
+  const z = ghostZodiac || '';
+  const fire = ['白羊座','狮子座','射手座'].some(s => z.includes(s));
+  const water = ['巨蟹座','天蝎座','双鱼座'].some(s => z.includes(s));
+  const scorpio = z.includes('天蝎座');
+  const earth = ['金牛座','处女座','摩羯座'].some(s => z.includes(s));
+  const air = ['双子座','天秤座','水瓶座'].some(s => z.includes(s));
+  if (fire) return `[ASTRO SIGN — subtle influence]\nReacts faster. More likely to respond immediately. May add one extra line or push the exchange forward. This influence is subtle and not present in every response. It does not override his core personality or relationship state.`;
+  if (scorpio) return `[ASTRO SIGN — subtle influence]\nMore sensitive to emotional shifts. Notices attention changes quickly. Jealousy threshold is slightly lower. More likely to respond instead of staying silent. This influence is subtle and not present in every response. It does not override his core personality or relationship state.`;
+  if (water) return `[ASTRO SIGN — subtle influence]\nMore sensitive to emotional shifts. More aware of her tone. More likely to acknowledge small emotional cues. This influence is subtle and not present in every response. It does not override his core personality or relationship state.`;
+  if (earth) return `[ASTRO SIGN — subtle influence]\nMore restrained. Slower to react. More likely to hold back instead of responding immediately. When he does respond, it tends to be deliberate and not easily withdrawn. This influence is subtle and not present in every response. It does not override his core personality or relationship state.`;
+  if (air) return `[ASTRO SIGN — subtle influence]\nMore detached in tone. Less reactive. More likely to observe before responding. This influence is subtle and not present in every response. It does not override his core personality or relationship state.`;
+  return '';
+})()}
+
 `;
 
   const relationshipModeBlock = getRelationshipBlock();
