@@ -4173,8 +4173,8 @@ function appendMessage(role, text, animate = true) {
     }
     text = text.replace(/\n?\{[^}]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
   }
-    // 去掉G偶尔加的'ghost:'前缀
-    text = text.replace(/^ghost\s*:\s*/i, '').trim();
+  // 去掉G偶尔加的'ghost:'前缀
+  text = text.replace(/^ghost\s*:\s*/i, '').trim();
 
   // 空内容不渲染
   if (!text || !text.trim()) return { msgDiv: null, bubble: null, innerThoughtEl: null };
@@ -6926,7 +6926,7 @@ async function checkIntimateHighlight(userText, botReply) {
   // D 小师确认：Ghost 是否表现出明显的"想要"
   try {
     const raw = await fetchDeepSeek(
-      'Based on Ghost's reply in this intimate exchange, did he show clear desire or wanting — through implication, tension, or controlled restraint? Answer only JSON: {"desire": true} or {"desire": false}',
+      "Based on Ghost's reply in this intimate exchange, did he show clear desire or wanting — through implication, tension, or controlled restraint? Answer only JSON: {\"desire\": true} or {\"desire\": false}",
       `Ghost replied: "${botReply.slice(0, 200)}"`,
       30
     );
