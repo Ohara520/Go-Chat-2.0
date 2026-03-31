@@ -565,11 +565,6 @@
         <div class="card-title">单词</div>
         <div class="card-desc" id="vocabCardDesc">跟Ghost学英语</div>
       </div>
-      <div class="card" onclick="showQQGroup()" style="background:linear-gradient(135deg,rgba(192,132,252,0.15),rgba(244,114,182,0.12));">
-        <div class="card-icon">💬</div>
-        <div class="card-title">反馈群</div>
-        <div class="card-desc">加入社群</div>
-      </div>
     </div>
 
     <!-- QQ群弹窗 -->
@@ -607,10 +602,15 @@
       </div>
 
       <!-- 福利提示 -->
-      <div style="font-size:11px;color:#c4a8e0;line-height:1.9;margin-bottom:10px;text-align:left;padding:0 4px;">
-        🎁 新用户注册免费赠送100条<br>
-        📅 每日签到随机获得英镑或条数奖励<br>
-        🏆 连续签到达里程碑额外赠条数
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px;">
+        <div style="font-size:11px;color:#c4a8e0;line-height:1.9;text-align:left;">
+          🎁 新用户注册免费赠送100条<br>
+          📅 每日签到随机获得英镑或条数奖励<br>
+          🏆 连续签到达里程碑额外赠条数
+        </div>
+        <button onclick="showQQGroup()" style="flex-shrink:0;margin-left:10px;padding:8px 12px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:16px;font-size:11px;color:#7c3aed;cursor:pointer;font-family:inherit;line-height:1.4;text-align:center;">
+          💬<br>反馈群
+        </button>
       </div>
 
       <button onclick="handleLogout()" style="
