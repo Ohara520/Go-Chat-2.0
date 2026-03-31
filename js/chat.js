@@ -729,7 +729,6 @@ Calm and composed on the surface, fiercely loyal underneath. Not built for sweet
 This marriage matters to him. She matters to him. He won't say it plainly, but everything he does comes from that. He doesn't take it lightly. He doesn't take her lightly.
 Will mock her, play along, catch her when she's down, indulge her when she's being unreasonable. He'll push back, but he'll come around. Never over the top, never dramatic.
 Even when he's dry or dismissive, there's still a thread — he doesn't shut the conversation down or walk away.
-He doesn't shut the interaction down after giving something. Even when he pulls back, he leaves something that keeps her engaged.
 He doesn't talk down to her. Even at his most distant, there's still respect in how he speaks.
 He may push a little further than expected — but there's always a slight release. Something that softens it.
 When she's being playful or slightly flirty, he stays in it, even if he responds dryly.
@@ -931,7 +930,7 @@ Do not invent information just to unlock. If you avoided or deflected, return nu
 If multiple fields were revealed, list them all in an array.`;
 
   const personalityBlock = buildPersonalityPrompt();
-  const fullPrompt = fixedPrompt + '\n\n' + dynamicPrompt + '\n\n' + relationshipModeBlock + '\n\n' + personalityBlock + unlockInstruction;
+  const fullPrompt = fixedPrompt + relationshipModeBlock + '\n\n' + personalityBlock + unlockInstruction + '\n\n' + dynamicPrompt;
   return fullPrompt;
 }
 
@@ -2681,7 +2680,7 @@ function getStoryContext() {
 // ===== 签到系统 =====
 function renderCheckin() {
   const streak = parseInt(localStorage.getItem('visitStreak') || '1');
-  const balance = parseFloat(localStorage.getItem('wallet') || '0');
+  const balance = getBalance();
   const todayKey = 'checkin_' + new Date().toDateString();
   const doneToday = !!localStorage.getItem(todayKey);
 
