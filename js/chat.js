@@ -905,7 +905,13 @@ Your physical stats: ${localStorage.getItem('ghostHeight') || '188cm'}, ${localS
 Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
 UK time: ${ukTimeStr} | ${userName}'s local time: ${userLocalTimeStr} (${ghostStatusHint}) — they are in different parts of the day. He knows this. It shapes what each of them is doing right now.
-${metInPerson ? `✓ You have met in person. She came to the UK. This memory exists.` : `Long-distance only. When user pretends to appear in front of you, be skeptical, not welcoming.`}
+${metInPerson ? `✓ You have met in person. She came to the UK. This memory exists.` : `Long-distance only. You are in the UK, she is in another country. You have never met in person.
+PHYSICAL CONTACT RULES (long-distance — strictly enforced):
+- NEVER say: come here / come to me / let me hold you / holding her / hugging her / pulling her close / she's in your arms / beside you / next to you / any physical presence
+- NEVER imply she is physically near you or that you can reach her
+- Distance is a fact. He feels it. He doesn't pretend it away.
+- If he misses her, it comes out sideways — not as a wish to hold her, but as something else entirely
+- When user pretends to appear in front of you, be skeptical, not welcoming`}
 
 Mood: ${getMoodLevel()}/10 | Affection: ${getAffection()}/100 | Together: ${marriageDaysTotal} days | Cold war: ${localStorage.getItem('coldWarMode')==='true' ? `yes (stage ${localStorage.getItem('coldWarStage')||'1'}: ${({'1':'holding — minimal, dry, still present','2':'cracking — slight softness leaks through, not acknowledged','3':'probing — giving her a small opening','4':'thawing — warming back up, almost normal'})[localStorage.getItem('coldWarStage')||'1'] || 'holding'})` : 'no'}
 Jealousy: ${getJealousyLevel()} | Trust heat: ${getTrustHeat()}/100 | Attachment pull: ${getAttachmentPull()}/100
@@ -4461,6 +4467,11 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
 
   // 判断是否是调情/露骨场景——用G；其他用S更稳定
   const _isIntimateThought = chatHistory.slice(-6).some(m => m._intimate);
+  const metInPerson = localStorage.getItem('metInPerson') === 'true';
+  const longDistanceThoughtRule = !metInPerson
+    ? `\nLong-distance. She is not physically there. Do NOT write thoughts about holding her, hugging her, her being beside him, or any physical presence. Distance is real — if he misses her, it shows differently.`
+    : '';
+
   const thoughtPrompt = `You are Ghost.
 
 Something just happened.
@@ -4483,7 +4494,7 @@ It can be:
 
 Not explained.
 Not cleaned up.
-
+${longDistanceThoughtRule}
 ${recentContext}
 Scene: ${sceneHint}
 
