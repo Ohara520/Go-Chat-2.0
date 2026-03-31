@@ -4139,6 +4139,9 @@ async function initChat() {
   });
   _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
   scrollToBottom();
+
+  // 启动主动发消息计时器
+  scheduleProactiveMessage();
 }
 
 // ===== 时间分割线 =====
@@ -5991,6 +5994,92 @@ if (window.visualViewport) {
     if (container) setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
   });
 }
+
+// ===== 主动发消息系统 =====
+// 跟沉默计时不同：不是等她不说话，是他自己有什么想说
+// 每2-4小时随机检测一次，满足条件就发一条
+
+let _proactiveTimer = null;
+
+function scheduleProactiveMessage() {
+  if (_proactiveTimer) clearTimeout(_proactiveTimer);
+  // 2-4小时随机间隔
+  const delay = (2 + Math.random() * 2) * 60 * 60 * 1000;
+  _proactiveTimer = setTimeout(maybeProactiveMessage, delay);
+}
+
+async function maybeProactiveMessage() {
+  // 前置过滤
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  if (coldWar) { scheduleProactiveMessage(); return; }
+
+  // 不在聊天页面就不触发
+  const chatScreen = document.getElementById('chatScreen');
+  if (!chatScreen || !chatScreen.classList.contains('active')) {
+    scheduleProactiveMessage(); return;
+  }
+
+  // 今天已触发过2次就停
+  const todayKey = 'proactiveCount_' + new Date().toDateString();
+  const todayCount = parseInt(localStorage.getItem(todayKey) || '0');
+  if (todayCount >= 2) { scheduleProactiveMessage(); return; }
+
+  // 触发概率：base 0.3 * (trust + mood) / 2 / 100
+  const trust = getTrustHeat ? getTrustHeat() : 60;
+  const mood = getMoodLevel ? getMoodLevel() : 7;
+  const base = 0.3;
+  const triggerChance = base * ((trust + mood * 10) / 2) / 100;
+  if (Math.random() > triggerChance) { scheduleProactiveMessage(); return; }
+
+  // 最近5分钟刚发过消息，不打扰
+  const lastMsg = chatHistory.filter(m => m.role === 'assistant').slice(-1)[0];
+  if (lastMsg && lastMsg._time && Date.now() - lastMsg._time < 5 * 60 * 1000) {
+    scheduleProactiveMessage(); return;
+  }
+
+  // 触发
+  localStorage.setItem(todayKey, todayCount + 1);
+
+  const todayDetail = typeof pickTodayDetail === 'function' ? pickTodayDetail() : '';
+  const systemNote = `[PROACTIVE — something just crossed his mind. He sends one line without framing it as reaching out. No greeting. No "hey". No question to start. Just a statement, an observation, or a fragment — like he thought of something and sent it before deciding not to. Short. Self-contained. He doesn't explain why he sent it. He doesn't wait for a response. Not a check-in. Not asking how she is. Just something that happened or crossed his mind.${todayDetail ? ` Today's context: ${todayDetail}` : ''} English only, lowercase.]`;
+
+  try {
+    showTyping();
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 80,
+        ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
+        messages: [...chatHistory.filter(m => !m._system).slice(-6), {
+          role: 'user',
+          content: systemNote
+        }]
+      })
+    }, 10000);
+    const data = await res.json();
+    hideTyping();
+    let reply = (data.content?.[0]?.text || '').trim();
+    // 过滤掉系统标签
+    reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+    // 过滤掉问句开头（以 did/do/are/have/is/can/will/你/她 开头的）
+    if (!reply || /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)/i.test(reply)) {
+      scheduleProactiveMessage(); return;
+    }
+    if (reply) {
+      appendMessage('bot', reply);
+      chatHistory.push({ role: 'assistant', content: reply, _time: Date.now() });
+      saveHistory();
+      scheduleCloudSave();
+    }
+  } catch(e) {
+    hideTyping();
+  }
+
+  scheduleProactiveMessage();
+}
+
 
 // ===== 情侣空间 Tab 切换 =====
 // ===== 情侣空间+朋友圈系统已移至 js/feed.js =====
