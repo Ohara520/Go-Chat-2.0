@@ -4881,7 +4881,7 @@ async function _processMergedMessage(text) {
   // 已读延迟：只在嘴硬/撒娇/轻微吃醋场景触发，时间缩短到8-20秒
   const _lastMsg = (typeof text !== 'undefined' ? text : '') || '';
   const _delayScenes = /撒娇|哄我|抱抱|miss you|想你|hug|baby|吃醋|jealous/i.test(_lastMsg);
-  const ghostReadDelay = !coldWar && _delayScenes && mood <= 6 && Math.random() < 0.25
+  const ghostReadDelay = !coldWar && _delayScenes && mood <= 4 && Math.random() < 0.25
     ? (Math.floor(Math.random() * 12) + 8) * 1000
     : 0;
 
@@ -5508,9 +5508,9 @@ One or two lines. English only. lowercase.`;
     // 订阅用户扣减云端额度
     if (localStorage.getItem('userEmail')) consumeQuota().catch(() => {});
 
-    // 消息撤回：4%概率，发完8-12秒后撤回，重新打一条
+    // 消息撤回：4%概率，发完3-6秒后撤回，重新打一条
     if (lastBotResult && !giveMoneyMatch && Math.random() < 0.04) {
-      const recallDelay = (Math.floor(Math.random() * 5) + 8) * 1000;
+      const recallDelay = (Math.floor(Math.random() * 4) + 3) * 1000;
       _isSending = true; // 撤回期间保持锁定，防止切页面重渲染
       setTimeout(async () => {
         const { msgDiv } = lastBotResult;
