@@ -2,10 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_KEY,
+  {
+    db: { schema: 'public' },
+    global: { fetch: (url, options) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8秒超时
+      return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => clearTimeout(timeout));
+    }}
+  }
 );
 
-const FREE_QUOTA = 100; // 新用户免费条数
+const FREE_QUOTA = 100;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -23,7 +32,7 @@ export default async function handler(req, res) {
     // 没有记录 → 自动创建免费套餐
     if (error || !data) {
       const periodEnd = new Date();
-      periodEnd.setFullYear(periodEnd.getFullYear() + 1); // 免费额度1年有效
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
       const { data: newData, error: insertError } = await supabase
         .from('subscriptions')
         .insert({
@@ -41,7 +50,17 @@ export default async function handler(req, res) {
         .single();
 
       if (insertError || !newData) {
-        return res.status(200).json({ subscribed: false });
+        // 插入失败也给免费额度，不拦截用户
+        return res.status(200).json({
+          subscribed: true,
+          plan_name: '免费体验',
+          plan_id: 'free',
+          monthly_quota: FREE_QUOTA,
+          used_count: 0,
+          remaining: FREE_QUOTA,
+          memory_limit: 10,
+          period_end: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
+        });
       }
 
       return res.status(200).json({
@@ -63,7 +82,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ subscribed: false, expired: true });
     }
 
-    // 剩余条数
     const remaining = Math.max(0, data.monthly_quota - data.used_count);
 
     return res.status(200).json({
@@ -77,7 +95,17 @@ export default async function handler(req, res) {
       period_end: data.period_end,
     });
   } catch (err) {
-    console.error('Check subscription error:', err);
-    return res.status(500).json({ error: 'server error' });
+    console.error('Check subscription error:', err.message);
+    // 数据库超时时给免费额度，不拦截用户
+    return res.status(200).json({
+      subscribed: true,
+      plan_name: '免费体验',
+      plan_id: 'free',
+      monthly_quota: FREE_QUOTA,
+      used_count: 0,
+      remaining: FREE_QUOTA,
+      memory_limit: 10,
+      period_end: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
+    });
   }
 }
