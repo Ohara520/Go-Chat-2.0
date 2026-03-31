@@ -8,15 +8,15 @@ const supabase = createClient(
 
 // 套餐配置
 const PLAN_CONFIG = {
-  '6c9cd46425d211f1964152540025c377': { name: '新婚', monthly_quota: 1800, memory_limit: 10 },
-  '6e82f4a225d211f1b43e52540025c377': { name: '蜜月', monthly_quota: 2500, memory_limit: 15 },
-  '6f7c680225d211f19aca52540025c377': { name: '金婚', monthly_quota: 4500, memory_limit: 20 },
+  '6c9cd46425d211f1964152540025c377': { name: '新婚', monthly_quota: 1800, memory_limit: 15 },
+  '6e82f4a225d211f1b43e52540025c377': { name: '蜜月', monthly_quota: 2500, memory_limit: 20 },
+  '6f7c680225d211f19aca52540025c377': { name: '金婚', monthly_quota: 4500, memory_limit: 25 },
 };
 
 // 加油包配置
 const TOPUP_CONFIG = {
   '9effc14425d411f19ee752540025c377': { name: '小加油包', quota: 300 },
-  '8e7858cc25d411f1ba9852540025c377': { name: '大加油包', quota: 700 },
+  '8e7858cc25d411f1ba9852540025c377': { name: '大加油包', quota: 800 },
 };
 
 function verifySignature(token, params, sign) {
