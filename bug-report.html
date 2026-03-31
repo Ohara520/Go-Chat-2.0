@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go Chat · Bug 反馈</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0c0a;
+    --surface: #1a1714;
+    --surface2: #231f1b;
+    --border: rgba(255,255,255,0.07);
+    --amber: #f5a623;
+    --amber-dim: #c47d10;
+    --amber-glow: rgba(245,166,35,0.15);
+    --text: #f0e8d8;
+    --text-muted: #8a7d6a;
+    --text-hint: #5a4f42;
+    --red: #e85d4a;
+    --green: #5db88a;
+    --radius: 14px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans SC', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* 背景光晕 */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(245,166,35,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+  }
+
+  /* ===== 头部 ===== */
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 48px;
+    margin-bottom: 40px;
+  }
+
+  .hero-img-wrap {
+    position: relative;
+    width: 260px;
+    height: 220px;
+    margin-bottom: 8px;
+  }
+
+  .hero-img-wrap::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 180px; height: 40px;
+    background: radial-gradient(ellipse, rgba(245,166,35,0.25) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 40px rgba(245,166,35,0.3));
+    animation: float 4s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(245,166,35,0.1);
+    border: 1px solid rgba(245,166,35,0.25);
+    color: var(--amber);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+
+  .hero-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .hero-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--text);
+    text-align: center;
+    line-height: 1.1;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+
+  .hero-title span {
+    color: var(--amber);
+  }
+
+  .hero-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.8;
+    max-width: 480px;
+  }
+
+  /* ===== 须知卡片 ===== */
+  .notice-bar {
+    background: rgba(245,166,35,0.08);
+    border: 1px solid rgba(245,166,35,0.2);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 28px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .notice-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .notice-text {
+    font-size: 13px;
+    color: #c8a96e;
+    line-height: 1.7;
+  }
+
+  .notice-text strong {
+    color: var(--amber);
+    font-weight: 500;
+  }
+
+  /* ===== 表格区域 ===== */
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-hint);
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  .table-head {
+    display: grid;
+    grid-template-columns: 48px 1fr 120px 90px 70px;
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+
+  .th {
+    font-size: 11px;
+    color: var(--text-hint);
+    letter-spacing: 0.8px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .bug-row {
+    display: grid;
+    grid-template-columns: 48px 1fr 120px 90px 70px;
+    padding: 14px 16px;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    transition: background 0.15s;
+  }
+
+  .bug-row:last-child { border-bottom: none; }
+  .bug-row:hover { background: var(--surface2); }
+
+  .bug-id {
+    font-size: 12px;
+    color: var(--text-hint);
+    font-family: 'Courier New', monospace;
+  }
+
+  .bug-desc {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .bug-desc .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-right: 6px;
+    font-weight: 500;
+    vertical-align: middle;
+  }
+
+  .tag-chat { background: rgba(93,184,138,0.15); color: #5db88a; }
+  .tag-wallet { background: rgba(245,166,35,0.15); color: #f5a623; }
+  .tag-ui { background: rgba(138,125,200,0.15); color: #9b8fd4; }
+  .tag-data { background: rgba(232,93,74,0.15); color: #e85d4a; }
+  .tag-other { background: rgba(138,120,100,0.15); color: #8a7864; }
+
+  .bug-page {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  .status-pill::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .s-pending {
+    background: rgba(245,166,35,0.12);
+    color: var(--amber);
+  }
+  .s-pending::before { background: var(--amber); }
+
+  .s-fixing {
+    background: rgba(138,125,200,0.12);
+    color: #9b8fd4;
+  }
+  .s-fixing::before { background: #9b8fd4; }
+
+  .s-done {
+    background: rgba(93,184,138,0.12);
+    color: var(--green);
+  }
+  .s-done::before { background: var(--green); }
+
+  .bug-date {
+    font-size: 11px;
+    color: var(--text-hint);
+  }
+
+  /* 空状态 */
+  .empty-state {
+    padding: 48px 20px;
+    text-align: center;
+  }
+
+  .empty-state .empty-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+    color: var(--text-hint);
+    line-height: 1.7;
+  }
+
+  /* ===== 统计 ===== */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-num.amber { color: var(--amber); }
+  .stat-num.green { color: var(--green); }
+  .stat-num.purple { color: #9b8fd4; }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-hint);
+    letter-spacing: 0.5px;
+  }
+
+  /* ===== 提交指引 ===== */
+  .how-to {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 28px;
+  }
+
+  .how-to-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .how-to-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .step-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(245,166,35,0.15);
+    color: var(--amber);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .step-text strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* ===== 底部 ===== */
+  .footer {
+    text-align: center;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer p {
+    font-size: 12px;
+    color: var(--text-hint);
+    line-height: 2;
+  }
+
+  .footer span {
+    color: var(--amber);
+  }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 600px) {
+    .hero-title { font-size: 26px; }
+    .hero-img-wrap { width: 200px; height: 170px; }
+
+    .table-head,
+    .bug-row {
+      grid-template-columns: 40px 1fr 80px;
+    }
+    .th:nth-child(4), .th:nth-child(5),
+    .bug-row > *:nth-child(4), .bug-row > *:nth-child(5) {
+      display: none;
+    }
+
+    .stats-row { grid-template-columns: repeat(3, 1fr); }
+    .stat-num { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 头部 -->
+  <div class="hero">
+    <div class="hero-img-wrap">
+      <img class="hero-img" src="images/关灯透明底.png" alt="Noah正在修bug">
+    </div>
+    <div class="hero-badge">Go Chat · 反馈中心</div>
+    <h1 class="hero-title">Bug 收集<span>表</span></h1>
+    <p class="hero-desc">发现问题了？告诉我！<br>每晚统一修复，修好会在这里更新状态 🛠</p>
+  </div>
+
+  <!-- 须知 -->
+  <div class="notice-bar">
+    <div class="notice-icon">💡</div>
+    <div class="notice-text">
+      遇到 bug <strong>先别刷新、别清缓存</strong>，保留现场方便复现。截图 + 描述「点了什么、出现了什么」发到群里就行，我来记录。
+    </div>
+  </div>
+
+  <!-- 统计 -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num amber" id="cnt-total">0</div>
+      <div class="stat-label">已收集</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num purple" id="cnt-fixing">0</div>
+      <div class="stat-label">修复中</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num green" id="cnt-done">0</div>
+      <div class="stat-label">已修复</div>
+    </div>
+  </div>
+
+  <!-- 提交指引 -->
+  <div class="how-to">
+    <div class="how-to-title">📋 怎么反馈</div>
+    <div class="how-to-steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>截图</strong>，拍下出问题的界面</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">说清楚<strong>在哪个页面</strong>、<strong>做了什么操作</strong>、<strong>出现了什么</strong></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">发到<strong>反馈交流群</strong>，Noah 看到会记进来</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">每晚统一修，修好后这里的状态会更新为<strong style="color:#5db88a;">已修复</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bug 表格 -->
+  <div class="section-label">Bug 列表</div>
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="th">#</div>
+      <div class="th">问题描述</div>
+      <div class="th">位置</div>
+      <div class="th">状态</div>
+      <div class="th">日期</div>
+    </div>
+
+    <div id="bug-list">
+      <!-- 示例数据，上线后替换 -->
+      <div class="bug-row">
+        <div class="bug-id">#001</div>
+        <div class="bug-desc"><span class="tag tag-data">数据</span>刷新页面后聊天记录消失</div>
+        <div class="bug-page">聊天页</div>
+        <div><span class="status-pill s-done">已修复</span></div>
+        <div class="bug-date">03/31</div>
+      </div>
+      <div class="bug-row">
+        <div class="bug-id">#002</div>
+        <div class="bug-desc"><span class="tag tag-ui">界面</span>商城页分类标签被顶部遮住</div>
+        <div class="bug-page">商城</div>
+        <div><span class="status-pill s-done">已修复</span></div>
+        <div class="bug-date">03/31</div>
+      </div>
+      <div class="bug-row">
+        <div class="bug-id">#003</div>
+        <div class="bug-desc"><span class="tag tag-chat">聊天</span>Ghost 有时会说"过来"等需要见面的话</div>
+        <div class="bug-page">聊天页</div>
+        <div><span class="status-pill s-done">已修复</span></div>
+        <div class="bug-date">03/31</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部 -->
+  <div class="footer">
+    <p>Go Chat · Bug 反馈收集<br>
+    每晚修复更新 · 感谢大家的耐心 <span>♥</span><br>
+    插画由粉丝 <span>k教练</span> 无偿创作</p>
+  </div>
+
+</div>
+
+<script>
+  function updateStats() {
+    const rows = document.querySelectorAll('.bug-row');
+    let fixing = 0, done = 0;
+    rows.forEach(r => {
+      if (r.querySelector('.s-fixing')) fixing++;
+      if (r.querySelector('.s-done')) done++;
+    });
+    document.getElementById('cnt-total').textContent = rows.length;
+    document.getElementById('cnt-fixing').textContent = fixing;
+    document.getElementById('cnt-done').textContent = done;
+  }
+  updateStats();
+</script>
+</body>
+</html>
