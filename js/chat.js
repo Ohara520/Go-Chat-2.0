@@ -969,9 +969,12 @@ ${(()=>{
 [PROFILE UNLOCK]
 After your reply, on a new line, add JSON: {"unlock": "field"} or {"unlock": ["field1","field2"]} or {"unlock": null}
 Fields: birthday, zodiac, height, weight, blood_type, hometown
-Only unlock fields you actually revealed in your reply.
-Do not invent information just to unlock. If you avoided or deflected, return null.
-If multiple fields were revealed, list them all in an array.`;
+STRICT RULES:
+- Only unlock a field if you explicitly stated that specific information in your reply.
+- If she asked about zodiac and you only answered zodiac — only unlock zodiac. Do NOT unlock birthday, height, or anything else.
+- Each field must be unlocked separately based on what was actually said.
+- If you deflected, avoided, or did not clearly state the value — return null for that field.
+- When in doubt, return null. Under-unlocking is better than over-unlocking.`;
 
   const personalityBlock = buildPersonalityPrompt();
   const fullPrompt = fixedPrompt + relationshipModeBlock + '\n\n' + personalityBlock + unlockInstruction + '\n\n' + dynamicPrompt;
