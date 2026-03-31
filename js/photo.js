@@ -42,6 +42,32 @@ async function uploadToStorage(base64, bucket, fileName) {
   } catch(e) { return null; }
 }
 
+// ===== 把头像URL写入Supabase user_data表 =====
+async function saveAvatarUrlToProfile(url) {
+  try {
+    const sb = typeof getSbClient === 'function' ? getSbClient() : null;
+    const userId = typeof getSbUserId === 'function' ? getSbUserId() : null;
+    if (!sb || !userId) return;
+
+    const { data: row } = await sb
+      .from('user_data')
+      .select('profile')
+      .eq('user_id', userId)
+      .single();
+
+    const profile = row?.profile || {};
+    profile.ghostAvatarUrl = url;
+
+    await sb
+      .from('user_data')
+      .upsert({ user_id: userId, profile }, { onConflict: 'user_id' });
+
+    console.log('[avatar] URL已写入数据库:', url);
+  } catch(e) {
+    console.warn('[avatar] 写库失败:', e);
+  }
+}
+
 // ===== 更新Ghost头像 =====
 function updateGhostAvatar(url) {
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
@@ -50,14 +76,39 @@ function updateGhostAvatar(url) {
   if (!url.startsWith('data:')) {
     localStorage.setItem('ghostAvatarUrl', url);
     if (typeof touchLocalState === 'function') touchLocalState();
+
+    // ✅ 同步写入Supabase数据库，换设备也不丢
+    saveAvatarUrlToProfile(url);
   }
 }
 
-// ===== 恢复Ghost头像 =====
-function restoreGhostAvatar() {
-  const url = localStorage.getItem('ghostAvatarUrl');
-  if (!url) return;
-  document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = url; });
+// ===== 恢复Ghost头像（优先从数据库读，保证多设备同步）=====
+async function restoreGhostAvatar() {
+  // 先用localStorage快速显示（避免白屏）
+  const cached = localStorage.getItem('ghostAvatarUrl');
+  if (cached) {
+    document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = cached; });
+  }
+
+  // 再从Supabase拉最新（换设备/清缓存也能恢复）
+  try {
+    const sb = typeof getSbClient === 'function' ? getSbClient() : null;
+    const userId = typeof getSbUserId === 'function' ? getSbUserId() : null;
+    if (!sb || !userId) return;
+
+    const { data: row } = await sb
+      .from('user_data')
+      .select('profile')
+      .eq('user_id', userId)
+      .single();
+
+    const url = row?.profile?.ghostAvatarUrl;
+    if (url) {
+      localStorage.setItem('ghostAvatarUrl', url);
+      document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = url; });
+      console.log('[avatar] 从数据库恢复头像:', url);
+    }
+  } catch(e) {}
 }
 
 // ===== 图片预览 =====
@@ -140,7 +191,7 @@ async function handlePhotoUpload(fileDataList) {
 英文回复，1-2句话，不要太礼貌，不要用"cute"这种通用词。]`
       : `[场景：她发来了图片。你能清楚看到图片内容。直接回应你看到的东西，具体说出细节——颜色、物体、场景、表情或氛围。Ghost式反应，1-2句，不要说"看不清"或"我看到了一张图"这种废话。]`;
 
-    // 5. 发给H看图回复
+    // 5. 发给模型看图回复
     if (typeof showTyping === 'function') showTyping();
 
     const _sys = typeof buildSystemPrompt === 'function' ? buildSystemPrompt() : '';
@@ -156,7 +207,7 @@ async function handlePhotoUpload(fileDataList) {
       type: 'image',
       source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
     }));
-    console.log('[photo] 发给S的图片数量:', imageContents.length, '第一张base64长度:', base64List[0]?.length);
+    console.log('[photo] 发给模型的图片数量:', imageContents.length, '第一张base64长度:', base64List[0]?.length);
 
     const lastUserText = cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.';
     const msgsWithPhoto = [
@@ -169,7 +220,7 @@ async function handlePhotoUpload(fileDataList) {
 
     let reply = '';
 
-    // S直接看图回复
+    // 主模型直接看图回复
     try {
       const sRes = await fetchWithTimeout('/api/chat', {
         method: 'POST',
@@ -195,7 +246,7 @@ async function handlePhotoUpload(fileDataList) {
       }
     } catch(e) {}
 
-    // S失败或破防，走Grok兜底（支持识图）
+    // 主模型失败或破防，走Grok兜底（支持识图）
     const _photoBreakout = reply && /I'm Claude|I cannot|I need to stop|I'm not able/i.test(reply);
     if (!reply || _photoBreakout) {
       try {
@@ -272,15 +323,14 @@ async function handlePhotoUpload(fileDataList) {
         const ghostIdx = base64List.length > 1 ? 1 : 0;
         const ghostB64 = base64List[ghostIdx];
 
-        // 先用base64临时显示
+        // 先用base64临时显示（即时反馈）
         updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
         sessionStorage.removeItem('avatarRequestPending'); // 换上了，清除pending
 
-        // 异步上传Storage，完成后更新为正式URL
+        // 异步上传Storage，完成后更新为正式URL并写入数据库
         uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
           if (url) {
-            updateGhostAvatar(url);
-            localStorage.setItem('ghostAvatarUrl', url);
+            updateGhostAvatar(url); // 这里会自动调用saveAvatarUrlToProfile
           }
         });
       }
@@ -288,7 +338,6 @@ async function handlePhotoUpload(fileDataList) {
 
     // 8. 异步上传所有图片到Storage，完成后更新历史记录和气泡
     const photoUrls = new Array(base64List.length).fill(null);
-    const photoMsgIdx = chatHistory.length - (reply ? 2 : 1); // 找到刚存的图片消息
     const uploadPromises = base64List.map((b64, i) =>
       uploadToStorage(b64, PHOTO_BUCKET, `photo_${Date.now()}_${i}.jpg`).then(url => {
         if (url) {
@@ -335,9 +384,13 @@ async function checkPendingAvatarChoice(userText) {
 
   _pendingAvatarChoice = null;
   const ghostB64 = base64List[chosenIdx] || base64List[0];
+
+  // 先临时显示
   updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
+
+  // 异步上传并写库
   uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-    if (url) updateGhostAvatar(url);
+    if (url) updateGhostAvatar(url); // 自动调用saveAvatarUrlToProfile
   });
 
   if (typeof showTyping === 'function') showTyping();
@@ -405,7 +458,7 @@ async function checkAvatarReplace(userText) {
     const ghostB64 = base64List[0];
     updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
     uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-      if (url) updateGhostAvatar(url);
+      if (url) updateGhostAvatar(url); // 自动调用saveAvatarUrlToProfile
     });
     reply = "changed.";
     sessionStorage.removeItem('avatarRequestPending');
