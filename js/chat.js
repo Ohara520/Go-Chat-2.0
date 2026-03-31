@@ -6904,7 +6904,7 @@ function getIntimateProductTrigger(name) {
   const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
   const item = triggered[name];
   if (!item) return null;
-  if (Date.now() - item.timestamp > 2 * 24 * 3600 * 1000) return null; // 2天冷却
+  if (Date.now() - item.timestamp > 5 * 24 * 3600 * 1000) return null; // 5天冷却
   return item.reason;
 }
 
@@ -6919,9 +6919,9 @@ async function checkIntimateHighlight(userText, botReply) {
   const hasIntimate = chatHistory.slice(-6).some(m => m._intimate);
   if (!hasIntimate) return;
 
-  // 冷却：24小时内只触发一次
+  // 冷却：5天内只触发一次
   const lastAt = parseInt(localStorage.getItem('intimateHighlightAt') || '0');
-  if (Date.now() - lastAt < 24 * 3600 * 1000) return;
+  if (Date.now() - lastAt < 5 * 24 * 3600 * 1000) return;
 
   // D 小师确认：Ghost 是否表现出明显的"想要"
   try {
@@ -6942,7 +6942,7 @@ async function checkIntimateHighlight(userText, botReply) {
   const available = pool.filter(p => !purchased.includes(p.name));
   if (available.length === 0) return;
 
-  const shuffled = available.sort(() => Math.random() - 0.5).slice(0, Math.min(3, available.length));
+  const shuffled = available.sort(() => Math.random() - 0.5).slice(0, 1); // 每次只亮1件
   const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
   const now = Date.now();
   shuffled.forEach(p => {
