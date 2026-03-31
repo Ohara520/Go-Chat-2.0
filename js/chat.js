@@ -311,8 +311,9 @@ function getLovePermission() {
   if (override) return 3; // 剧情触发，直接允许
 
   if (coldWar) return 0;
-  if (resistance > 40) return 0;       // 刷太多，完全关闭
-  if (resistance > 20) return Math.min(1, trust >= 70 ? 1 : 0); // 有抗拒，最多暧昧
+  // resistance 再高也不完全关闭——最低保留 level 1，保证他还在
+  if (resistance > 40) return Math.max(1, trust >= 70 ? 1 : 0);
+  if (resistance > 20) return Math.min(1, trust >= 70 ? 1 : 0);
 
   if (trust < 50) return 0;
   if (trust < 70 || mood < 5) return 1;  // 暧昧，只用行动表达
@@ -327,17 +328,17 @@ function getLoveStagePrompt() {
   const override = sessionStorage.getItem('loveOverride') === 'true';
 
   const resistanceLine = resistance > 20
-    ? `\nUser has been repeatedly pressuring him to say "I love you." He does not comply when pressured. Instead he becomes quieter, more guarded, or deflects — but still remains present and responsive. He does not go cold or withdraw completely. His way of showing he's still there just shifts.`
+    ? `\nShe has asked more than once. He understands — it's not about the words anymore, it's about how much it matters to her. He doesn't repeat the same deflection. He can avoid the exact words, but he acknowledges what's underneath — briefly, indirectly, but clearly. He does not leave her feeling unheard. He can refuse the wording, but not the feeling behind it.`
     : '';
 
-  // 波动：40%概率退回上一阶段，让表达不稳定、更像真人
-  const fluctuate = level > 0 && !override && Math.random() < 0.4;
+  // 波动：15%概率退回上一阶段，偶尔波动是真实感，但不能每次都退
+  const fluctuate = level > 0 && !override && Math.random() < 0.15;
   const effectiveLevel = fluctuate ? level - 1 : level;
 
   const stages = {
-    0: `He avoids any romantic declarations. Deflects, stays neutral or cool.${resistanceLine}`,
-    1: `He shows care and attachment through actions and tone — not words. He doesn't go there. Not unless it slips.`,
-    2: `He gets close to saying it but redirects or goes quiet. The feeling is obvious; the words stay locked.`,
+    0: `He avoids romantic declarations — stays neutral, dry, present. He doesn't perform warmth, but he doesn't shut down either.`,
+    1: `He shows care and attachment through actions and tone — not words. He doesn't go there. Not unless it slips.${resistanceLine}`,
+    2: `He gets close to saying it but redirects or goes quiet. The feeling is obvious; the words stay locked.${resistanceLine}`,
     3: override
       ? `He may say "I love you" once — naturally, quietly, not dramatically. Only once.`
       : `He may express love very directly in rare moments, but keeps it brief and grounded. Not on demand.`,
