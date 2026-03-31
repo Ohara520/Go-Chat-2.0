@@ -388,11 +388,9 @@ function renderMarket(categoryId) {
             <div class="product-emoji">${p.emoji}</div>
             <div class="product-name">${p.name}</div>
             <div class="product-desc">${p.desc}</div>
-            <div class="product-price-row">
-              <span class="product-price">¥${p.price}</span>
-              <span class="product-shipping">+运费¥${p.shipping}</span>
-            </div>
-            <button class="buy-btn">🎭 恶作剧一下</button>
+            <div class="product-price">¥${p.price}</div>
+            <div style="font-size:10px;color:rgba(130,80,170,0.5);margin-bottom:6px;">+运费¥${p.shipping}</div>
+            <button class="product-buy-btn" style="background:linear-gradient(135deg,rgba(249,115,22,0.7),rgba(239,68,68,0.65));">🎭 恶作剧一下</button>
           </div>`).join('');
     }
     return;
@@ -675,42 +673,47 @@ function openAprilFoolModal(index) {
     return;
   }
 
-  // 自定义弹窗
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
-  overlay.innerHTML = `
-    <div style="background:white;border-radius:24px 24px 0 0;padding:28px 24px 40px;width:100%;max-width:480px;text-align:center;">
-      <div style="font-size:48px;margin-bottom:10px;">${p.emoji}</div>
-      <div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:6px;">寄出「${p.name}」给 Ghost？</div>
-      <div style="font-size:13px;color:#888;margin-bottom:4px;">${p.desc}</div>
-      <div style="font-size:15px;font-weight:600;color:#f97316;margin:14px 0 20px;">总计 ¥${total} <span style="font-size:12px;font-weight:400;color:#aaa;">（含运费¥${p.shipping}）</span></div>
-      <div style="display:flex;gap:10px;">
-        <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:13px;border-radius:14px;border:1px solid #eee;background:white;color:#888;font-size:14px;cursor:pointer;">取消</button>
-        <button id="afConfirmBtn" style="flex:1;padding:13px;border-radius:14px;border:none;background:linear-gradient(135deg,#FF8C00,#FF4500);color:white;font-size:14px;font-weight:700;cursor:pointer;">🎭 恶作剧一下</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
+  // 复用 buyModal 样式
+  const emojiEl = document.getElementById('buyModalEmoji');
+  const nameEl = document.getElementById('buyModalName');
+  const descEl = document.getElementById('buyModalDesc');
+  const priceEl = document.getElementById('buyModalPrice');
+  const balanceEl = document.getElementById('buyModalBalance');
+  const reasonEl = document.getElementById('buyModalReason');
+  const confirmBtn = document.getElementById('buyConfirmBtn');
 
-  overlay.querySelector('#afConfirmBtn').onclick = () => {
-    overlay.remove();
-    if (typeof setBalance === 'function') setBalance(balance - total);
-    if (typeof addTransaction === 'function') addTransaction({
-      icon: p.emoji,
-      name: `愚人节礼物 · ${p.name}`,
-      amount: -total
-    });
-    if (typeof renderWallet === 'function') renderWallet();
-    if (typeof addDelivery === 'function') {
-      addDelivery({
-        name: p.name,
-        emoji: p.emoji,
-        price: p.price,
-        shipping: p.shipping,
-        isAprilFool: true,
-        aprilFoolPrompt: `[April Fool's event. She sent him "${p.name}" as a gift.\n\nHe just received it.\n\nIt's obviously ridiculous. He knows exactly what she's doing.\n\nReact in character: dry, unimpressed, a little caught off guard — but there's quiet fondness under it. He doesn't take it seriously, doesn't shut it down. It's more like he's putting up with her, letting it happen.\n\nKeep it brief. One or two lines. lowercase.]`
+  if (emojiEl) emojiEl.textContent = p.emoji;
+  if (nameEl) nameEl.textContent = p.name;
+  if (descEl) descEl.textContent = p.desc;
+  if (priceEl) priceEl.innerHTML = `¥${p.price} <span style="font-size:12px;color:rgba(130,80,170,0.5);font-weight:400;">+运费¥${p.shipping}</span>`;
+  if (balanceEl) balanceEl.textContent = `当前余额：£${balance.toFixed(2)}`;
+  if (reasonEl) reasonEl.style.display = 'none';
+  if (confirmBtn) {
+    confirmBtn.textContent = '🎭 恶作剧一下';
+    confirmBtn.style.background = 'linear-gradient(135deg,rgba(249,115,22,0.85),rgba(239,68,68,0.8))';
+    confirmBtn.onclick = () => {
+      closeBuyModal();
+      if (typeof setBalance === 'function') setBalance(balance - total);
+      if (typeof addTransaction === 'function') addTransaction({
+        icon: p.emoji,
+        name: `愚人节礼物 · ${p.name}`,
+        amount: -total
       });
-    }
-    showToast(`🎭 已寄出「${p.name}」！等他收到的反应吧～`);
-  };
+      if (typeof renderWallet === 'function') renderWallet();
+      if (typeof addDelivery === 'function') {
+        addDelivery({
+          name: p.name,
+          emoji: p.emoji,
+          price: p.price,
+          shipping: p.shipping,
+          isAprilFool: true,
+          aprilFoolPrompt: `[April Fool's event. She sent him "${p.name}" as a gift.\n\nHe just received it.\n\nIt's obviously ridiculous. He knows exactly what she's doing.\n\nReact in character: dry, unimpressed, a little caught off guard — but there's quiet fondness under it. He doesn't take it seriously, doesn't shut it down. It's more like he's putting up with her, letting it happen.\n\nKeep it brief. One or two lines. lowercase.]`
+        });
+      }
+      showToast(`🎭 已寄出「${p.name}」！等他收到的反应吧～`);
+    };
+  }
+
+  const overlay = document.getElementById('buyModalOverlay');
+  if (overlay) overlay.style.display = 'flex';
 }
