@@ -901,7 +901,8 @@ Sending something — ONLY via SEND_GIFT tag. Never hint, promise, or imply send
   const dynamicPrompt = `[CURRENT STATE]
 
 Wife: ${userName}, in ${countryInfo ? countryInfo.flag + ' ' + countryInfo.name : 'China'}
-Your birthday: ${ghostBirthday} (${ghostZodiac})
+Your birthday: ${ghostBirthday}
+Your zodiac: ${ghostZodiac}
 Your physical stats: ${localStorage.getItem('ghostHeight') || '188cm'}, ${localStorage.getItem('ghostWeight') || '95kg'}, Blood type: ${localStorage.getItem('ghostBloodType') || 'O'}
 Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
