@@ -383,11 +383,7 @@ function renderMarket(categoryId) {
   if (categoryId === 'aprilfool') {
     const gridEl2 = document.getElementById('productsGrid');
     if (gridEl2) {
-      gridEl2.innerHTML = `
-        <div style="text-align:center;padding:12px 0 4px;font-size:12px;color:#f97316;font-weight:600;letter-spacing:0.5px;">
-          🤡 愚人节限定 · 仅4月1日开放
-        </div>` +
-        APRIL_FOOL_PRODUCTS.map((p, i) => `
+      gridEl2.innerHTML = APRIL_FOOL_PRODUCTS.map((p, i) => `
           <div class="product-card april-fool-card" onclick="openAprilFoolModal(${i})">
             <div class="product-emoji">${p.emoji}</div>
             <div class="product-name">${p.name}</div>
@@ -673,23 +669,38 @@ function openAprilFoolModal(index) {
   if (!p) return;
   const total = p.price + p.shipping;
   const balance = typeof getBalance === 'function' ? getBalance() : 0;
-  
+
   if (balance < total) {
     showToast(`余额不足，还差 £${(total - balance).toFixed(1)}`);
     return;
   }
 
-  if (confirm(`🤡 确认寄出「${p.emoji} ${p.name}」给 Ghost？\n总计 ¥${total}（含运费）`)) {
-    // 扣款
+  // 自定义弹窗
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:24px 24px 0 0;padding:28px 24px 40px;width:100%;max-width:480px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:10px;">${p.emoji}</div>
+      <div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:6px;">寄出「${p.name}」给 Ghost？</div>
+      <div style="font-size:13px;color:#888;margin-bottom:4px;">${p.desc}</div>
+      <div style="font-size:15px;font-weight:600;color:#f97316;margin:14px 0 20px;">总计 ¥${total} <span style="font-size:12px;font-weight:400;color:#aaa;">（含运费¥${p.shipping}）</span></div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:13px;border-radius:14px;border:1px solid #eee;background:white;color:#888;font-size:14px;cursor:pointer;">取消</button>
+        <button id="afConfirmBtn" style="flex:1;padding:13px;border-radius:14px;border:none;background:linear-gradient(135deg,#FF8C00,#FF4500);color:white;font-size:14px;font-weight:700;cursor:pointer;">🎭 恶作剧一下</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#afConfirmBtn').onclick = () => {
+    overlay.remove();
     if (typeof setBalance === 'function') setBalance(balance - total);
-    if (typeof addTransaction === 'function') addTransaction({ 
-      icon: p.emoji, 
-      name: `愚人节礼物 · ${p.name}`, 
-      amount: -total 
+    if (typeof addTransaction === 'function') addTransaction({
+      icon: p.emoji,
+      name: `愚人节礼物 · ${p.name}`,
+      amount: -total
     });
     if (typeof renderWallet === 'function') renderWallet();
-
-    // 加入快递
     if (typeof addDelivery === 'function') {
       addDelivery({
         name: p.name,
@@ -701,5 +712,5 @@ function openAprilFoolModal(index) {
       });
     }
     showToast(`🎭 已寄出「${p.name}」！等他收到的反应吧～`);
-  }
+  };
 }
