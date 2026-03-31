@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Go Chat · Bug 反馈</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -14,13 +15,11 @@
     --surface2: #231f1b;
     --border: rgba(255,255,255,0.07);
     --amber: #f5a623;
-    --amber-dim: #c47d10;
-    --amber-glow: rgba(245,166,35,0.15);
     --text: #f0e8d8;
     --text-muted: #8a7d6a;
     --text-hint: #5a4f42;
-    --red: #e85d4a;
     --green: #5db88a;
+    --purple: #9b8fd4;
     --radius: 14px;
   }
 
@@ -34,15 +33,12 @@
     overflow-x: hidden;
   }
 
-  /* 背景光晕 */
   body::before {
     content: '';
     position: fixed;
-    top: -20%;
-    left: 50%;
+    top: -20%; left: 50%;
     transform: translateX(-50%);
-    width: 800px;
-    height: 600px;
+    width: 800px; height: 600px;
     background: radial-gradient(ellipse, rgba(245,166,35,0.06) 0%, transparent 70%);
     pointer-events: none;
     z-index: 0;
@@ -56,19 +52,17 @@
     padding: 0 20px 80px;
   }
 
-  /* ===== 头部 ===== */
   .hero {
     display: flex;
     flex-direction: column;
     align-items: center;
     padding-top: 48px;
-    margin-bottom: 40px;
+    margin-bottom: 36px;
   }
 
   .hero-img-wrap {
     position: relative;
-    width: 260px;
-    height: 220px;
+    width: 240px; height: 200px;
     margin-bottom: 8px;
   }
 
@@ -77,21 +71,20 @@
     position: absolute;
     bottom: 0; left: 50%;
     transform: translateX(-50%);
-    width: 180px; height: 40px;
-    background: radial-gradient(ellipse, rgba(245,166,35,0.25) 0%, transparent 70%);
+    width: 160px; height: 36px;
+    background: radial-gradient(ellipse, rgba(245,166,35,0.22) 0%, transparent 70%);
     border-radius: 50%;
   }
 
   .hero-img {
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     object-fit: contain;
     filter: drop-shadow(0 8px 40px rgba(245,166,35,0.3));
     animation: float 4s ease-in-out infinite;
   }
 
   @keyframes float {
-    0%, 100% { transform: translateY(0px); }
+    0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-8px); }
   }
 
@@ -131,191 +124,108 @@
     color: var(--text);
     text-align: center;
     line-height: 1.1;
-    margin-bottom: 12px;
-    letter-spacing: -0.5px;
+    margin-bottom: 10px;
   }
 
-  .hero-title span {
-    color: var(--amber);
-  }
+  .hero-title span { color: var(--amber); }
 
   .hero-desc {
     font-size: 14px;
     color: var(--text-muted);
     text-align: center;
     line-height: 1.8;
-    max-width: 480px;
   }
 
-  /* ===== 须知卡片 ===== */
-  .notice-bar {
-    background: rgba(245,166,35,0.08);
-    border: 1px solid rgba(245,166,35,0.2);
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    margin-bottom: 28px;
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .notice-icon {
-    font-size: 18px;
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-
-  .notice-text {
-    font-size: 13px;
-    color: #c8a96e;
-    line-height: 1.7;
-  }
-
-  .notice-text strong {
-    color: var(--amber);
-    font-weight: 500;
-  }
-
-  /* ===== 表格区域 ===== */
-  .section-label {
-    font-size: 11px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text-hint);
-    font-weight: 500;
-    margin-bottom: 14px;
-  }
-
-  .table-wrap {
+  .form-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    overflow: hidden;
+    padding: 24px;
     margin-bottom: 28px;
   }
 
-  .table-head {
-    display: grid;
-    grid-template-columns: 48px 1fr 120px 90px 70px;
-    padding: 10px 16px;
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-    gap: 12px;
-  }
-
-  .th {
-    font-size: 11px;
-    color: var(--text-hint);
-    letter-spacing: 0.8px;
+  .form-title {
+    font-size: 14px;
     font-weight: 500;
-    text-transform: uppercase;
-  }
-
-  .bug-row {
-    display: grid;
-    grid-template-columns: 48px 1fr 120px 90px 70px;
-    padding: 14px 16px;
-    gap: 12px;
-    border-bottom: 1px solid var(--border);
-    align-items: center;
-    transition: background 0.15s;
-  }
-
-  .bug-row:last-child { border-bottom: none; }
-  .bug-row:hover { background: var(--surface2); }
-
-  .bug-id {
-    font-size: 12px;
-    color: var(--text-hint);
-    font-family: 'Courier New', monospace;
-  }
-
-  .bug-desc {
-    font-size: 13px;
     color: var(--text);
-    line-height: 1.5;
+    margin-bottom: 18px;
   }
 
-  .bug-desc .tag {
-    display: inline-block;
-    font-size: 10px;
-    padding: 2px 7px;
-    border-radius: 4px;
-    margin-right: 6px;
-    font-weight: 500;
-    vertical-align: middle;
-  }
+  .form-row { margin-bottom: 14px; }
 
-  .tag-chat { background: rgba(93,184,138,0.15); color: #5db88a; }
-  .tag-wallet { background: rgba(245,166,35,0.15); color: #f5a623; }
-  .tag-ui { background: rgba(138,125,200,0.15); color: #9b8fd4; }
-  .tag-data { background: rgba(232,93,74,0.15); color: #e85d4a; }
-  .tag-other { background: rgba(138,120,100,0.15); color: #8a7864; }
-
-  .bug-page {
+  .form-label {
     font-size: 12px;
     color: var(--text-muted);
+    margin-bottom: 6px;
+    display: block;
   }
 
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 11px;
-    font-weight: 500;
-    padding: 3px 10px;
-    border-radius: 20px;
-  }
+  .form-label span { color: var(--amber); margin-left: 2px; }
 
-  .status-pill::before {
-    content: '';
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .s-pending {
-    background: rgba(245,166,35,0.12);
-    color: var(--amber);
-  }
-  .s-pending::before { background: var(--amber); }
-
-  .s-fixing {
-    background: rgba(138,125,200,0.12);
-    color: #9b8fd4;
-  }
-  .s-fixing::before { background: #9b8fd4; }
-
-  .s-done {
-    background: rgba(93,184,138,0.12);
-    color: var(--green);
-  }
-  .s-done::before { background: var(--green); }
-
-  .bug-date {
-    font-size: 11px;
-    color: var(--text-hint);
-  }
-
-  /* 空状态 */
-  .empty-state {
-    padding: 48px 20px;
-    text-align: center;
-  }
-
-  .empty-state .empty-icon {
-    font-size: 36px;
-    margin-bottom: 12px;
-    opacity: 0.4;
-  }
-
-  .empty-state p {
+  textarea, input[type="text"], select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Noto Sans SC', sans-serif;
     font-size: 13px;
-    color: var(--text-hint);
-    line-height: 1.7;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
   }
 
-  /* ===== 统计 ===== */
+  textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+  textarea:focus, input:focus, select:focus { border-color: rgba(245,166,35,0.4); }
+  textarea::placeholder, input::placeholder { color: var(--text-hint); }
+  select option { background: #231f1b; }
+
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--amber);
+    border: none;
+    border-radius: 10px;
+    color: #1a1200;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    margin-top: 4px;
+  }
+
+  .submit-btn:hover { opacity: 0.9; }
+  .submit-btn:active { transform: scale(0.98); }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .submit-hint {
+    font-size: 11px;
+    color: var(--text-hint);
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 30px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #2a2420;
+    border: 1px solid rgba(93,184,138,0.3);
+    color: var(--green);
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 20px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 999;
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
   .stats-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -335,175 +245,174 @@
     font-family: 'Syne', sans-serif;
     font-size: 28px;
     font-weight: 800;
-    color: var(--text);
     line-height: 1;
     margin-bottom: 4px;
   }
 
   .stat-num.amber { color: var(--amber); }
   .stat-num.green { color: var(--green); }
-  .stat-num.purple { color: #9b8fd4; }
+  .stat-num.purple { color: var(--purple); }
+  .stat-label { font-size: 11px; color: var(--text-hint); }
 
-  .stat-label {
+  .section-label {
     font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
     color: var(--text-hint);
-    letter-spacing: 0.5px;
+    font-weight: 500;
+    margin-bottom: 14px;
   }
 
-  /* ===== 提交指引 ===== */
-  .how-to {
+  .table-wrap {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
+    overflow: hidden;
     margin-bottom: 28px;
   }
 
-  .how-to-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .how-to-steps {
-    display: flex;
-    flex-direction: column;
+  .table-head {
+    display: grid;
+    grid-template-columns: 48px 1fr 100px 90px 60px;
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
     gap: 10px;
   }
 
-  .step {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .step-num {
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: rgba(245,166,35,0.15);
-    color: var(--amber);
+  .th {
     font-size: 11px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-
-  .step-text {
-    font-size: 13px;
-    color: var(--text-muted);
-    line-height: 1.6;
-  }
-
-  .step-text strong {
-    color: var(--text);
+    color: var(--text-hint);
+    letter-spacing: 0.8px;
     font-weight: 500;
+    text-transform: uppercase;
   }
 
-  /* ===== 底部 ===== */
+  .bug-row {
+    display: grid;
+    grid-template-columns: 48px 1fr 100px 90px 60px;
+    padding: 14px 16px;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    transition: background 0.15s;
+  }
+
+  .bug-row:last-child { border-bottom: none; }
+  .bug-row:hover { background: var(--surface2); }
+
+  .bug-id { font-size: 12px; color: var(--text-hint); font-family: 'Courier New', monospace; }
+  .bug-desc { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .bug-sub { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+  .bug-location { font-size: 12px; color: var(--text-muted); }
+  .bug-date { font-size: 11px; color: var(--text-hint); }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .status-pill::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .s-pending { background: rgba(245,166,35,0.12); color: var(--amber); }
+  .s-pending::before { background: var(--amber); }
+  .s-fixing { background: rgba(155,143,212,0.12); color: var(--purple); }
+  .s-fixing::before { background: var(--purple); }
+  .s-done { background: rgba(93,184,138,0.12); color: var(--green); }
+  .s-done::before { background: var(--green); }
+
+  .loading-row {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-hint);
+    font-size: 13px;
+  }
+
   .footer {
     text-align: center;
     padding-top: 32px;
     border-top: 1px solid var(--border);
   }
 
-  .footer p {
-    font-size: 12px;
-    color: var(--text-hint);
-    line-height: 2;
-  }
+  .footer p { font-size: 12px; color: var(--text-hint); line-height: 2; }
+  .footer span { color: var(--amber); }
 
-  .footer span {
-    color: var(--amber);
-  }
-
-  /* ===== 响应式 ===== */
   @media (max-width: 600px) {
-    .hero-title { font-size: 26px; }
+    .hero-title { font-size: 28px; }
     .hero-img-wrap { width: 200px; height: 170px; }
-
-    .table-head,
-    .bug-row {
-      grid-template-columns: 40px 1fr 80px;
-    }
-    .th:nth-child(4), .th:nth-child(5),
-    .bug-row > *:nth-child(4), .bug-row > *:nth-child(5) {
-      display: none;
-    }
-
-    .stats-row { grid-template-columns: repeat(3, 1fr); }
-    .stat-num { font-size: 22px; }
+    .table-head, .bug-row { grid-template-columns: 40px 1fr 80px; }
+    .th:nth-child(3), .th:nth-child(5),
+    .bug-row > *:nth-child(3), .bug-row > *:nth-child(5) { display: none; }
   }
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- 头部 -->
   <div class="hero">
     <div class="hero-img-wrap">
       <img class="hero-img" src="images/关灯透明底.png" alt="Noah正在修bug">
     </div>
     <div class="hero-badge">Go Chat · 反馈中心</div>
     <h1 class="hero-title">Bug 收集<span>表</span></h1>
-    <p class="hero-desc">发现问题了？告诉我！<br>每晚统一修复，修好会在这里更新状态 🛠</p>
+    <p class="hero-desc">发现问题？直接填进来！<br>每晚统一修复，修好会更新状态 🛠</p>
   </div>
 
-  <!-- 须知 -->
-  <div class="notice-bar">
-    <div class="notice-icon">💡</div>
-    <div class="notice-text">
-      遇到 bug <strong>先别刷新、别清缓存</strong>，保留现场方便复现。截图 + 描述「点了什么、出现了什么」发到群里就行，我来记录。
+  <div class="form-card">
+    <div class="form-title">🐛 提交新 Bug</div>
+    <div class="form-row">
+      <label class="form-label">问题描述 <span>*</span></label>
+      <textarea id="input-desc" placeholder="说清楚发生了什么，比如「点了转账按钮之后页面空白了」"></textarea>
     </div>
+    <div class="form-row">
+      <label class="form-label">发生在哪里 <span>*</span></label>
+      <select id="input-location">
+        <option value="">选择页面</option>
+        <option value="聊天页">聊天页</option>
+        <option value="商城">商城</option>
+        <option value="钱包">钱包</option>
+        <option value="纪念页">纪念页</option>
+        <option value="情侣空间">情侣空间</option>
+        <option value="打工页">打工页</option>
+        <option value="秘密页">秘密页</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">联系方式（选填，方便我追问）</label>
+      <input type="text" id="input-contact" placeholder="QQ / 微信 / 群昵称 都行">
+    </div>
+    <button class="submit-btn" onclick="submitBug()">提交反馈</button>
+    <div class="submit-hint">提交后我会看到，每晚统一处理</div>
   </div>
 
-  <!-- 统计 -->
   <div class="stats-row">
     <div class="stat-card">
-      <div class="stat-num amber" id="cnt-total">0</div>
+      <div class="stat-num amber" id="cnt-total">—</div>
       <div class="stat-label">已收集</div>
     </div>
     <div class="stat-card">
-      <div class="stat-num purple" id="cnt-fixing">0</div>
+      <div class="stat-num purple" id="cnt-fixing">—</div>
       <div class="stat-label">修复中</div>
     </div>
     <div class="stat-card">
-      <div class="stat-num green" id="cnt-done">0</div>
+      <div class="stat-num green" id="cnt-done">—</div>
       <div class="stat-label">已修复</div>
     </div>
   </div>
 
-  <!-- 提交指引 -->
-  <div class="how-to">
-    <div class="how-to-title">📋 怎么反馈</div>
-    <div class="how-to-steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-text"><strong>截图</strong>，拍下出问题的界面</div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-text">说清楚<strong>在哪个页面</strong>、<strong>做了什么操作</strong>、<strong>出现了什么</strong></div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-text">发到<strong>反馈交流群</strong>，Noah 看到会记进来</div>
-      </div>
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-text">每晚统一修，修好后这里的状态会更新为<strong style="color:#5db88a;">已修复</strong></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bug 表格 -->
-  <div class="section-label">Bug 列表</div>
+  <div class="section-label">所有反馈</div>
   <div class="table-wrap">
     <div class="table-head">
       <div class="th">#</div>
@@ -512,34 +421,11 @@
       <div class="th">状态</div>
       <div class="th">日期</div>
     </div>
-
     <div id="bug-list">
-      <!-- 示例数据，上线后替换 -->
-      <div class="bug-row">
-        <div class="bug-id">#001</div>
-        <div class="bug-desc"><span class="tag tag-data">数据</span>刷新页面后聊天记录消失</div>
-        <div class="bug-page">聊天页</div>
-        <div><span class="status-pill s-done">已修复</span></div>
-        <div class="bug-date">03/31</div>
-      </div>
-      <div class="bug-row">
-        <div class="bug-id">#002</div>
-        <div class="bug-desc"><span class="tag tag-ui">界面</span>商城页分类标签被顶部遮住</div>
-        <div class="bug-page">商城</div>
-        <div><span class="status-pill s-done">已修复</span></div>
-        <div class="bug-date">03/31</div>
-      </div>
-      <div class="bug-row">
-        <div class="bug-id">#003</div>
-        <div class="bug-desc"><span class="tag tag-chat">聊天</span>Ghost 有时会说"过来"等需要见面的话</div>
-        <div class="bug-page">聊天页</div>
-        <div><span class="status-pill s-done">已修复</span></div>
-        <div class="bug-date">03/31</div>
-      </div>
+      <div class="loading-row">加载中…</div>
     </div>
   </div>
 
-  <!-- 底部 -->
   <div class="footer">
     <p>Go Chat · Bug 反馈收集<br>
     每晚修复更新 · 感谢大家的耐心 <span>♥</span><br>
@@ -548,19 +434,110 @@
 
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
-  function updateStats() {
-    const rows = document.querySelectorAll('.bug-row');
-    let fixing = 0, done = 0;
-    rows.forEach(r => {
-      if (r.querySelector('.s-fixing')) fixing++;
-      if (r.querySelector('.s-done')) done++;
-    });
-    document.getElementById('cnt-total').textContent = rows.length;
-    document.getElementById('cnt-fixing').textContent = fixing;
-    document.getElementById('cnt-done').textContent = done;
+const SUPABASE_URL = 'https://siahkenfoofkjrgevgma.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = isError ? 'rgba(232,93,74,0.3)' : 'rgba(93,184,138,0.3)';
+  t.style.color = isError ? '#e85d4a' : '#5db88a';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function submitBug() {
+  const desc = document.getElementById('input-desc').value.trim();
+  const location = document.getElementById('input-location').value;
+  const contact = document.getElementById('input-contact').value.trim();
+
+  if (!desc) { showToast('请描述一下问题', true); return; }
+  if (!location) { showToast('请选择发生的页面', true); return; }
+
+  const btn = document.querySelector('.submit-btn');
+  btn.disabled = true;
+  btn.textContent = '提交中…';
+
+  const { error } = await sb.from('bug_reports').insert({
+    description: desc,
+    location: location,
+    contact: contact || null,
+    status: 'pending'
+  });
+
+  btn.disabled = false;
+  btn.textContent = '提交反馈';
+
+  if (error) { showToast('提交失败，请稍后再试', true); return; }
+
+  document.getElementById('input-desc').value = '';
+  document.getElementById('input-location').value = '';
+  document.getElementById('input-contact').value = '';
+  showToast('✓ 已提交，我会看到的！');
+  loadBugs();
+}
+
+const STATUS_MAP = {
+  pending: { label: '待处理', cls: 's-pending' },
+  fixing:  { label: '修复中', cls: 's-fixing' },
+  done:    { label: '已修复', cls: 's-done' },
+};
+
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadBugs() {
+  const { data, error } = await sb
+    .from('bug_reports')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error || !data) {
+    document.getElementById('bug-list').innerHTML = '<div class="loading-row">加载失败，刷新试试</div>';
+    return;
   }
-  updateStats();
+
+  const total = data.length;
+  const fixing = data.filter(r => r.status === 'fixing').length;
+  const done = data.filter(r => r.status === 'done').length;
+
+  document.getElementById('cnt-total').textContent = total;
+  document.getElementById('cnt-fixing').textContent = fixing;
+  document.getElementById('cnt-done').textContent = done;
+
+  if (total === 0) {
+    document.getElementById('bug-list').innerHTML = '<div class="loading-row">暂无反馈，太棒了 🎉</div>';
+    return;
+  }
+
+  document.getElementById('bug-list').innerHTML = data.map((r, i) => {
+    const s = STATUS_MAP[r.status] || STATUS_MAP.pending;
+    return `
+      <div class="bug-row">
+        <div class="bug-id">#${String(total - i).padStart(3,'0')}</div>
+        <div class="bug-desc">
+          ${escHtml(r.description)}
+          ${r.contact ? `<div class="bug-sub">by ${escHtml(r.contact)}</div>` : ''}
+        </div>
+        <div class="bug-location">${escHtml(r.location || '')}</div>
+        <div><span class="status-pill ${s.cls}">${s.label}</span></div>
+        <div class="bug-date">${formatDate(r.created_at)}</div>
+      </div>`;
+  }).join('');
+}
+
+loadBugs();
 </script>
 </body>
 </html>
