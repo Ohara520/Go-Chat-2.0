@@ -62,7 +62,7 @@
 
   .hero-img-wrap {
     position: relative;
-    width: 240px; height: 200px;
+    width: 280px; height: 240px;
     margin-bottom: 8px;
   }
 
@@ -117,7 +117,7 @@
     50% { opacity: 0.3; }
   }
 
-  .hero-title {
+  .hero-title { overflow: visible;
     font-family: 'Syne', sans-serif;
     font-size: 36px;
     font-weight: 800;
@@ -349,7 +349,7 @@
   .footer span { color: var(--amber); }
 
   @media (max-width: 600px) {
-    .hero-title { font-size: 28px; }
+    .hero-title { overflow: visible; font-size: 28px; }
     .hero-img-wrap { width: 200px; height: 170px; }
     .table-head, .bug-row { grid-template-columns: 40px 1fr 80px; }
     .th:nth-child(3), .th:nth-child(5),
@@ -362,7 +362,7 @@
 
   <div class="hero">
     <div class="hero-img-wrap">
-      <img class="hero-img" src="images/guandeng.png" alt="Noah正在修bug">
+      <img class="hero-img" src="images/关灯透明底.png" alt="Noah正在修bug">
     </div>
     <div class="hero-badge">Go Chat · 反馈中心</div>
     <h1 class="hero-title">Bug 收集<span>表</span></h1>
