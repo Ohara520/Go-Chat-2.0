@@ -3881,7 +3881,11 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
       appendMessage('bot', noteText);
     }
   }
+  const delay = noteText ? 800 : 0;
   setTimeout(() => {
+    // 重新获取container，防止DOM更新导致引用失效
+    const c = document.getElementById('messagesContainer');
+    if (!c) return;
     // Ghost转出 → 左边灰色卡片
     const divOut = document.createElement('div');
     divOut.className = 'message bot';
@@ -3898,9 +3902,12 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
         <div class="transfer-status ${isRefund ? 'refund-status' : ''}">${isRefund ? '退款中' : '转账中'}</div>
         <div class="transfer-time">${timeStr}</div>
       </div></div>`;
-    container.appendChild(divOut);
+    c.appendChild(divOut);
+    c.scrollTop = c.scrollHeight;
     // 用户收到 → 右边粉色卡片（延迟1秒）
     setTimeout(() => {
+      const c2 = document.getElementById('messagesContainer');
+      if (!c2) return;
       const divIn = document.createElement('div');
       divIn.className = 'message user';
       divIn.innerHTML = `<div class="transfer-card user-transfer-card">
@@ -3916,11 +3923,10 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
           <div class="transfer-status">${isRefund ? '已退款' : '已到账'}</div>
           <div class="transfer-time">${timeStr}</div>
         </div></div>`;
-      container.appendChild(divIn);
-      container.scrollTop = container.scrollHeight;
+      c2.appendChild(divIn);
+      c2.scrollTop = c2.scrollHeight;
     }, 1000);
-    container.scrollTop = container.scrollHeight;
-  }, noteText ? 800 : 0);
+  }, delay);
 }
 let chatHistory = [];
 let _isSending = false; // 防止切页面时重新渲染吞掉正在等待的bot回复
