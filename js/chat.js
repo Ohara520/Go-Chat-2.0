@@ -3550,7 +3550,7 @@ async function ghostSendInitMessage(offlineHours) {
     hideTyping();
     let reply = data.content?.[0]?.text?.trim() || '';
     if (reply) {
-      reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+      reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
       appendMessage('bot', reply);
       chatHistory.push({ role: 'assistant', content: reply });
       saveHistory();
@@ -3728,7 +3728,7 @@ async function sendSticker(id) {
     hideTyping();
     let reply = data.content?.[0]?.text?.trim() || '';
     if (!reply) throw new Error('EMPTY_REPLY');
-    reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
 
     // Ghost偶尔也发表情包
     appendMessage('bot', reply);
@@ -3835,7 +3835,7 @@ function confirmTransfer() {
     let reply = data.content?.[0]?.text || '...';
     updateToRead();
     const shouldRefund = reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8));
-    reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START)\n?/gi, '').replace(/\s{2,}/g, ' ').trim();
+    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '').replace(/\s{2,}/g, ' ').trim();
     if (shouldRefund) {
       // 退款：加回余额，更新卡片状态，显示退款卡片
       setBalance(getBalance() + amount);
@@ -4081,7 +4081,7 @@ async function initChat() {
   container.innerHTML = '';
   chatHistory.forEach(msg => {
     if (msg.role === 'user') {
-      if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') || /\b(REFUND|KEEP)\b/.test(msg.content)) {
+      if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') || /\b(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z]))\b/.test(msg.content)) {
         if (msg._userTransfer) {
           const container = document.getElementById('messagesContainer');
           if (container) showUserTransferCard(container, msg._userTransfer.amount);
@@ -4213,7 +4213,7 @@ function appendMessage(role, text, animate = true) {
 
   // 自动清理未处理的系统tag，防止显示在聊天里
   if (role === 'bot' || role === 'assistant') {
-    text = text.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+    text = text.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
     // 解析并删除unlock tag
     // 宽松匹配unlock tag，支持单个或数组格式
     const _validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
@@ -4261,7 +4261,7 @@ function appendMessage(role, text, animate = true) {
   bubble.className = 'message-bubble';
 
   // 渲染前清理系统标记和多余括号
-  text = text.replace(/\n?(REFUND|KEEP)\n?/gi, '').trim();
+  text = text.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z]))\n?/g, '').trim();
   // 过滤 --- 开头的旁白行（系统提示渗漏）
   text = text.split('\n').filter(line => !line.trim().startsWith('---')).join('\n').trim();
   // 过滤第三人称旁白行——以"他"开头描述Ghost自己状态的句子
@@ -5058,7 +5058,8 @@ async function _processMergedMessage(text) {
     }
 
     const _hasChinese = /[\u4e00-\u9fff]/.test(text);
-    const langHint = _hasChinese ? '[LANGUAGE: Reply in English only. Do NOT mix Chinese words into English sentences. Do NOT add Chinese translation unless using the 收 format on a new line.]' : '';
+    // 无论用户发中文还是英文，始终强制 Ghost 用英文回复
+    const langHint = '[LANGUAGE: Always reply in English only. Do NOT use Chinese in your response. Do NOT mix Chinese words into English sentences. Do NOT add Chinese translation. This applies regardless of what language she writes in.]';
 
     // 工作/加班/失约场景：禁止第三者竞争叙事，优先关系修补
     const _workApology = /加班|overtime|上班|开会|值班|早班|晚班|工作|临时有事|class|meeting|shift|deadline|work kept/.test(text);
@@ -5080,7 +5081,7 @@ async function _processMergedMessage(text) {
       }
     }
 
-    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, _hasChinese ? langHint : ''].filter(Boolean).join('\n');
+    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, langHint].filter(Boolean).join('\n');
 
     // ===== 情趣话题检测：直接走Gemini，不走Claude =====
     const INTIMATE_PATTERNS = [
@@ -6104,7 +6105,7 @@ async function maybeProactiveMessage() {
     hideTyping();
     let reply = (data.content?.[0]?.text || '').trim();
     // 过滤掉系统标签
-    reply = reply.replace(/\n?(REFUND|KEEP|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/gi, '').trim();
+    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
     // 过滤掉问句开头（以 did/do/are/have/is/can/will/你/她 开头的）
     if (!reply || /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)/i.test(reply)) {
       scheduleProactiveMessage(); return;

@@ -236,9 +236,14 @@ async function loadFromCloud() {
       }
     }
 
-    console.log('云端数据已加载');
+    console.log('[cloud] 数据已加载');
+    // 如果上次有未同步的本地数据，加载完立刻重新保存
+    if (localStorage.getItem('cloudSavePending') === '1') {
+      localStorage.removeItem('cloudSavePending');
+      setTimeout(() => saveToCloud().catch(console.error), 3000);
+    }
   } catch(e) {
-    console.log('云端加载失败，使用本地数据', e);
+    console.log('[cloud] 加载失败，使用本地数据', e);
   }
 }
 // 保存数据到云端（防抖，3秒内无新变化才存，保证最后一次也能存上）
@@ -253,10 +258,11 @@ function touchLocalState() {
 
 function scheduleCloudSave() {
   if (_saveTimer) clearTimeout(_saveTimer);
+  // 防抖改为10秒，大幅减少 Supabase 并发写入压力
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
     saveToCloud().catch(console.error);
-  }, 1000);
+  }, 10000);
 }
 
 async function saveToCloud() {
@@ -362,10 +368,31 @@ async function saveToCloud() {
     const walletVal = parseFloat(localStorage.getItem('wallet') || '0');
     if (walletVal > 0) upsertData.balance = walletVal;
 
-    await sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' });
-    localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
+    // 重试一次，防止偶发网络问题导致数据丢失
+    let saveOk = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { error: upsertErr } = await sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' });
+        if (!upsertErr) { saveOk = true; break; }
+        console.warn('[cloud] 保存失败第', attempt+1, '次:', upsertErr.message);
+        if (attempt === 0) await new Promise(r => setTimeout(r, 2000));
+      } catch(retryErr) {
+        console.warn('[cloud] 保存异常第', attempt+1, '次:', retryErr.message);
+        if (attempt === 0) await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+    if (saveOk) {
+      localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
+      localStorage.setItem('localUpdatedAt', Date.now().toString());
+      console.log('[cloud] 保存成功');
+    } else {
+      console.error('[cloud] 保存最终失败，数据暂存本地');
+      // 标记本地有未同步数据，下次进入时重试
+      localStorage.setItem('cloudSavePending', '1');
+    }
   } catch(e) {
-    console.log('云端保存失败', e);
+    console.error('[cloud] 保存异常:', e);
+    localStorage.setItem('cloudSavePending', '1');
   }
 }
 
