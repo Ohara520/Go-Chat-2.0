@@ -10,14 +10,23 @@ let _pendingAvatarChoice = null;
 function compressImageToBase64(dataUrl, maxWidth = 800, quality = 0.82) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let w = img.width, h = img.height;
-      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const compressed = canvas.toDataURL('image/jpeg', quality);
-      resolve(compressed.split(',')[1]);
+    img.onload = async () => {
+      try {
+        // 等待图片完全解码，防止canvas画出全黑（手机拍照/某些格式常见）
+        if (img.decode) await img.decode();
+        const canvas = document.createElement('canvas');
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        // 白色背景，防止PNG透明区域变黑
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed.split(',')[1]);
+      } catch(e) { reject(e); }
     };
     img.onerror = reject;
     img.src = dataUrl;
@@ -243,7 +252,7 @@ async function handlePhotoUpload(fileDataList) {
             ...cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了')).slice(0, -1),
             {
               role: 'user',
-              content: [...imageContents, { type: 'text', text: recentText.slice(-100) || '.' }]
+              content: [...imageContents, { type: 'text', text: cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || '.' }]
             }
           ]
         })
@@ -266,7 +275,7 @@ async function handlePhotoUpload(fileDataList) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             system: core + '\n' + photoHint,
-            user: recentText.slice(-100) || 'she sent a photo.',
+            user: cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'she sent a photo.',
             image_base64: base64List[0],
             max_tokens: 200
           })
