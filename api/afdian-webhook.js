@@ -78,6 +78,20 @@ export default async function handler(req, res) {
       const planId = order.plan_id;
       const itemId = order.sku_detail?.[0]?.sku_id || '';
 
+      // ⚠️ 订单去重：同一个out_trade_no只处理一次，防止爱发电重试导致重复充值
+      const tradeNo = order.out_trade_no;
+      if (tradeNo) {
+        const { data: existingOrder } = await supabase
+          .from('subscriptions')
+          .select('afdian_order_id')
+          .eq('afdian_order_id', tradeNo)
+          .maybeSingle();
+        if (existingOrder) {
+          console.log('[webhook] 订单已处理过，跳过:', tradeNo);
+          continue;
+        }
+      }
+
       // ⚠️ 加油包优先判断——从所有可能的字段里匹配
       // 防止加油包的plan_id撞上订阅配置，导致误充大额条数
       const topupKey = TOPUP_CONFIG[planId] ? planId
@@ -102,6 +116,7 @@ export default async function handler(req, res) {
           await supabase.from('subscriptions')
             .update({
               monthly_quota: existing.monthly_quota + topup.quota,
+              afdian_order_id: order.out_trade_no,
               updated_at: new Date().toISOString(),
             })
             .eq('email', email.toLowerCase().trim());
