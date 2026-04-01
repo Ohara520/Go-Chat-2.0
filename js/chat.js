@@ -4949,7 +4949,7 @@ async function _processMergedMessage(text) {
 
     // S用过滤历史（调情内容替换成占位符，30条），防止破防
     const cleanHistory = chatHistory
-      .filter(m => !m._system && !m._recalled)
+      .filter(m => (!m._system || m._imageDesc) && !m._recalled)
       .slice(-30)
       .map(m => ({ role: m.role, content: m._intimate ? "[ they were close for a moment. ]" : m.content }));
 

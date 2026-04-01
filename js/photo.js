@@ -109,6 +109,16 @@ async function restoreGhostAvatar() {
       console.log('[avatar] 从数据库恢复头像:', url);
     }
   } catch(e) {}
+
+  // 2秒后再执行一次，防止被loadFromCloud覆盖
+  setTimeout(() => {
+    const url = localStorage.getItem('ghostAvatarUrl');
+    if (url && !url.startsWith('data:')) {
+      document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+        if (el.src !== url) el.src = url;
+      });
+    }
+  }, 2000);
 }
 
 // ===== 图片预览 =====
@@ -303,7 +313,7 @@ async function handlePhotoUpload(fileDataList) {
           const descData = await descRes.json();
           const desc = descData.content?.[0]?.text?.trim() || '';
           if (desc) {
-            chatHistory.push({ role: 'user', content: `[图片内容：${desc}]`, _system: true });
+            chatHistory.push({ role: 'user', content: `[图片内容：${desc}]`, _system: true, _imageDesc: true });
           }
         }
       } catch(e) {}

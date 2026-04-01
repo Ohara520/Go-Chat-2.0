@@ -366,7 +366,10 @@ function initMarket() {
   const el = document.getElementById('marketBalanceDisplay');
   if (el) el.textContent = '£' + getBalance().toFixed(2);
   renderDeliveryTracker();
-  renderMarket('clothing');
+  // 如果当前分类不在可用列表里（比如愚人节过了），重置到服装
+  const validCats = getMarketCategories().map(c => c.id);
+  if (!validCats.includes(currentCategory)) currentCategory = 'clothing';
+  renderMarket(currentCategory);
   // 检查快递进度
   checkDeliveryUpdates();
 }
