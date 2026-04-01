@@ -5035,7 +5035,8 @@ async function _processMergedMessage(text) {
     }
 
     const _hasChinese = /[\u4e00-\u9fff]/.test(text);
-    const langHint = _hasChinese ? '[LANGUAGE: Reply in English only. Do NOT mix Chinese words into English sentences. Do NOT add Chinese translation unless using the 收 format on a new line.]' : '';
+    // 无论用户发中文还是英文，始终强制 Ghost 用英文回复
+    const langHint = '[LANGUAGE: Always reply in English only. Do NOT use Chinese in your response. Do NOT mix Chinese words into English sentences. Do NOT add Chinese translation. This applies regardless of what language she writes in.]';
 
     // 工作/加班/失约场景：禁止第三者竞争叙事，优先关系修补
     const _workApology = /加班|overtime|上班|开会|值班|早班|晚班|工作|临时有事|class|meeting|shift|deadline|work kept/.test(text);
@@ -5057,7 +5058,7 @@ async function _processMergedMessage(text) {
       }
     }
 
-    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, _hasChinese ? langHint : ''].filter(Boolean).join('\n');
+    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, langHint].filter(Boolean).join('\n');
 
     // ===== 情趣话题检测：直接走Gemini，不走Claude =====
     const INTIMATE_PATTERNS = [
