@@ -398,16 +398,9 @@ But he keeps it.]`
     const data = await res.json();
     const reply = data.content?.[0]?.text?.trim() || '';
     if (reply && !_isDeliveryBreakout(reply)) {
-      // 确保chatHistory是完整的，不是空的或截断的
-      if (typeof chatHistory !== 'undefined' && chatHistory.length === 0) {
-        try {
-          const saved = localStorage.getItem('chatHistory');
-          if (saved) chatHistory = JSON.parse(saved);
-        } catch(e) {}
-      }
       appendMessage('bot', reply);
-      chatHistory.push({ role: 'assistant', content: reply });
-      saveHistory();
+      if (typeof chatHistory !== 'undefined') chatHistory.push({ role: 'assistant', content: reply });
+      if (typeof saveHistory === 'function') saveHistory();
     }
 
     // 好感度
@@ -460,12 +453,9 @@ Item received: 「${delivery.name}」]`
         const data2 = await res2.json();
         const reply2 = data2.content?.[0]?.text?.trim() || '';
         if (reply2) {
-          if (typeof chatHistory !== 'undefined' && chatHistory.length === 0) {
-            try { const saved = localStorage.getItem('chatHistory'); if (saved) chatHistory = JSON.parse(saved); } catch(e) {}
-          }
           appendMessage('bot', reply2);
-          chatHistory.push({ role: 'assistant', content: reply2 });
-          saveHistory();
+          if (typeof chatHistory !== 'undefined') chatHistory.push({ role: 'assistant', content: reply2 });
+          if (typeof saveHistory === 'function') saveHistory();
           // 好感度
           changeAffection(pd.price > 3000 ? 5 : 3);
           // 精品专柜：Ghost真正签收后才入事件池发朋友圈
