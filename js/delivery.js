@@ -211,6 +211,9 @@ function checkDeliveryUpdates() {
           if (!history.find(h => h.id === d.id)) {
             history.unshift(d);
             localStorage.setItem('deliveryHistory', JSON.stringify(history));
+            // 签收是重要事件，立刻强制存云端，不等防抖，防止数据丢失
+            if (typeof touchLocalState === 'function') touchLocalState();
+            if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
           }
           if (d.isGhostSend) {
             showMysteryPackage(d);
