@@ -19,8 +19,9 @@ const TOPUP_CONFIG = {
   '8e7858cc25d411f1ba9852540025c377': { name: '大加油包', quota: 1000 },
 };
 
-function verifySignature(token, params, sign) {
-  const str = token + params;
+function verifySignature(token, params, ts, sign) {
+  // 爱发电签名：md5(token + params + ts)
+  const str = token + params + ts;
   const hash = crypto.createHash('md5').update(str).digest('hex');
   return hash === sign;
 }
@@ -28,30 +29,51 @@ function verifySignature(token, params, sign) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
+  // 打印完整请求体，方便排查
+  console.log('[webhook] 收到请求, body:', JSON.stringify(req.body).slice(0, 500));
+
   try {
     const { ec, em, data } = req.body;
 
+    console.log('[webhook] ec:', ec, 'em:', em);
+
     if (ec !== 200) {
+      console.warn('[webhook] ec非200，忽略:', ec);
       return res.status(200).json({ ec: 200, em: 'ok' });
     }
 
     const token = process.env.AFDIAN_TOKEN;
+    if (!token) {
+      console.error('[webhook] AFDIAN_TOKEN 未设置！');
+    }
 
-    // 验证签名
+    // 验证签名（两种方式都试）
     const paramsStr = JSON.stringify(data);
-    if (!verifySignature(token, paramsStr, req.body.sign || '')) {
-      // 签名验证失败也继续处理，爱发电有时签名方式不同
-      console.warn('签名验证失败，继续处理');
+    const ts = req.body.ts || '';
+    const signOk1 = verifySignature(token, paramsStr, ts, req.body.sign || '');
+    const signOk2 = verifySignature(token, paramsStr, '', req.body.sign || '');
+    if (!signOk1 && !signOk2) {
+      console.warn('[webhook] 签名验证失败，继续处理');
+    } else {
+      console.log('[webhook] 签名验证通过');
     }
 
     const orders = data?.order ? [data.order] : (data?.orders || []);
+    console.log('[webhook] 订单数量:', orders.length);
 
     for (const order of orders) {
-      const email = order.remark || order.user_id; // 用户填写的邮箱在备注里
-      if (!email || !email.includes('@')) {
-        console.warn('订单没有有效邮箱:', order.out_trade_no);
+      console.log('[webhook] 处理订单:', order.out_trade_no, 'remark:', order.remark, 'plan_id:', order.plan_id);
+
+      // 从备注取邮箱，做更宽松的提取（支持带空格/换行的备注）
+      const rawRemark = (order.remark || '').trim();
+      const emailMatch = rawRemark.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+      const email = emailMatch ? emailMatch[0] : null;
+
+      if (!email) {
+        console.warn('[webhook] 订单没有有效邮箱, remark:', rawRemark, 'order_id:', order.out_trade_no);
         continue;
       }
+      console.log('[webhook] 邮箱:', email);
 
       const planId = order.plan_id;
       const itemId = order.sku_detail?.[0]?.sku_id || '';
