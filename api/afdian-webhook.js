@@ -20,7 +20,6 @@ const TOPUP_CONFIG = {
 };
 
 function verifySignature(token, params, ts, sign) {
-  // 爱发电签名：md5(token + params + ts)
   const str = token + params + ts;
   const hash = crypto.createHash('md5').update(str).digest('hex');
   return hash === sign;
@@ -29,7 +28,6 @@ function verifySignature(token, params, ts, sign) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  // 打印完整请求体，方便排查
   console.log('[webhook] 收到请求, body:', JSON.stringify(req.body).slice(0, 500));
 
   try {
@@ -47,7 +45,6 @@ export default async function handler(req, res) {
       console.error('[webhook] AFDIAN_TOKEN 未设置！');
     }
 
-    // 验证签名（两种方式都试）
     const paramsStr = JSON.stringify(data);
     const ts = req.body.ts || '';
     const signOk1 = verifySignature(token, paramsStr, ts, req.body.sign || '');
@@ -62,15 +59,43 @@ export default async function handler(req, res) {
     console.log('[webhook] 订单数量:', orders.length);
 
     for (const order of orders) {
-      console.log('[webhook] 处理订单:', order.out_trade_no, 'remark:', order.remark, 'plan_id:', order.plan_id);
+      console.log('[webhook] 处理订单:', order.out_trade_no, 'plan_id:', order.plan_id);
+      console.log('[webhook] 完整订单字段:', JSON.stringify(order));
 
-      // 从备注取邮箱，做更宽松的提取（支持带空格/换行的备注）
-      const rawRemark = (order.remark || '').trim();
-      const emailMatch = rawRemark.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+      // =============================
+      // 【修复1】去重：查独立的 afdian_orders 表
+      // 原来存在 subscriptions.afdian_order_id，会被新订单覆盖，导致旧订单去重失效
+      // =============================
+      const tradeNo = order.out_trade_no;
+      if (tradeNo) {
+        const { data: existingOrder } = await supabase
+          .from('afdian_orders')
+          .select('out_trade_no')
+          .eq('out_trade_no', tradeNo)
+          .maybeSingle();
+
+        if (existingOrder) {
+          console.log('[webhook] 订单已处理过，跳过:', tradeNo);
+          continue;
+        }
+      }
+
+      // =============================
+      // 【修复2】多字段提取邮箱，防止 remark 为空时丢单
+      // =============================
+      const remarkSources = [
+        order.remark,
+        order.user_remark,
+        order.buyer_message,
+      ].filter(Boolean).join(' ');
+
+      console.log('[webhook] remark来源:', remarkSources);
+
+      const emailMatch = remarkSources.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
       const email = emailMatch ? emailMatch[0] : null;
 
       if (!email) {
-        console.warn('[webhook] 订单没有有效邮箱, remark:', rawRemark, 'order_id:', order.out_trade_no);
+        console.warn('[webhook] 订单没有有效邮箱, remarkSources:', remarkSources, 'order_id:', order.out_trade_no);
         continue;
       }
       console.log('[webhook] 邮箱:', email);
@@ -78,22 +103,6 @@ export default async function handler(req, res) {
       const planId = order.plan_id;
       const itemId = order.sku_detail?.[0]?.sku_id || '';
 
-      // ⚠️ 订单去重：同一个out_trade_no只处理一次，防止爱发电重试导致重复充值
-      const tradeNo = order.out_trade_no;
-      if (tradeNo) {
-        const { data: existingOrder } = await supabase
-          .from('subscriptions')
-          .select('afdian_order_id')
-          .eq('afdian_order_id', tradeNo)
-          .maybeSingle();
-        if (existingOrder) {
-          console.log('[webhook] 订单已处理过，跳过:', tradeNo);
-          continue;
-        }
-      }
-
-      // ⚠️ 加油包优先判断——从所有可能的字段里匹配
-      // 防止加油包的plan_id撞上订阅配置，导致误充大额条数
       const topupKey = TOPUP_CONFIG[planId] ? planId
         : TOPUP_CONFIG[itemId] ? itemId
         : TOPUP_CONFIG[order.item_id] ? order.item_id
@@ -112,17 +121,14 @@ export default async function handler(req, res) {
           .single();
 
         if (existing) {
-          // 有订阅，在现有额度基础上加
           await supabase.from('subscriptions')
             .update({
               monthly_quota: existing.monthly_quota + topup.quota,
-              afdian_order_id: order.out_trade_no,
               updated_at: new Date().toISOString(),
             })
             .eq('email', email.toLowerCase().trim());
           console.log('[webhook] 加油包充值成功:', email, '+', topup.quota, '条，当前总额度:', existing.monthly_quota + topup.quota);
         } else {
-          // 没有订阅，新建临时记录
           const periodEnd = new Date();
           periodEnd.setMonth(periodEnd.getMonth() + 1);
           await supabase.from('subscriptions').insert({
@@ -135,7 +141,6 @@ export default async function handler(req, res) {
             period_start: new Date().toISOString(),
             period_end: periodEnd.toISOString(),
             status: 'active',
-            afdian_order_id: order.out_trade_no,
           });
           console.log('[webhook] 加油包新建记录:', email, topup.quota, '条');
         }
@@ -153,24 +158,35 @@ export default async function handler(req, res) {
           plan_name: plan.name,
           monthly_quota: plan.monthly_quota,
           memory_limit: plan.memory_limit,
-          used_count: 0, // 续费重置用量
+          used_count: 0,
           period_start: now.toISOString(),
           period_end: periodEnd.toISOString(),
           status: 'active',
-          afdian_order_id: order.out_trade_no,
           updated_at: now.toISOString(),
         }, { onConflict: 'email' });
         console.log('[webhook] 订阅开通/续费成功:', email, plan.name, plan.monthly_quota, '条');
 
       } else {
-        // 未知plan_id，记录日志但不做任何操作，防止误充
         console.warn('[webhook] 未知plan_id，跳过处理:', planId, 'order:', order.out_trade_no);
+      }
+
+      // =============================
+      // 【修复1续】订单处理完成后，记录到独立的去重表
+      // =============================
+      if (tradeNo) {
+        await supabase.from('afdian_orders').insert({
+          out_trade_no: tradeNo,
+          email: email ? email.toLowerCase().trim() : null,
+          plan_id: planId || null,
+          processed_at: new Date().toISOString(),
+        });
+        console.log('[webhook] 已记录订单到去重表:', tradeNo);
       }
     }
 
     return res.status(200).json({ ec: 200, em: 'ok' });
   } catch (err) {
     console.error('Webhook error:', err);
-    return res.status(200).json({ ec: 200, em: 'ok' }); // 爱发电要求必须返回200
+    return res.status(200).json({ ec: 200, em: 'ok' });
   }
 }
