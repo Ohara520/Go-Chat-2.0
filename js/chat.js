@@ -944,6 +944,16 @@ ${(()=>{
   const weeklyUsed = getWeeklyGiven();
   if (todayCount >= 2) return `[Daily transfer limit reached. Do NOT mention transferring money or specific amounts in your reply. Do not use GIVE_MONEY tag.]`;
   if (weeklyUsed >= 300) return `[Weekly transfer limit reached. Do NOT mention transferring money or specific amounts. Do not use GIVE_MONEY tag.]`;
+  // 30分钟冷却：上次转账距现在不足30分钟
+  const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
+  if (Date.now() - lastGivenAt < 30 * 60 * 1000) {
+    return `[Transfer cooldown active — you transferred recently. Do NOT mention transferring money, do NOT use GIVE_MONEY tag. If she asks, deflect naturally without committing.]`;
+  }
+  // 本轮对话已给过一次
+  const conversationGiven = parseInt(sessionStorage.getItem('conversationGivenCount') || '0');
+  if (conversationGiven >= 1) {
+    return `[Already transferred once this conversation — do NOT use GIVE_MONEY tag again or mention transferring money.]`;
+  }
   return '';
 })()}
 ${(userBirthdaySecret||userZodiac||userMBTI||userFavFood||userFavMusic) ? `About ${userName} [ACCURATE — trust this over memory]: ${[userBirthdaySecret?`birthday ${userBirthdaySecret}`:'', userZodiac?`${userZodiac}`:'', userMBTI?`${userMBTI}`:'', userFavFood?`likes ${userFavFood}`:'', userFavMusic?`likes ${userFavMusic}`:''].filter(Boolean).join(' / ')}` : ''}
