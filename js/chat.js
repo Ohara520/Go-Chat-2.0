@@ -4531,7 +4531,7 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
 
   // 场景提示
   const sceneHints = {
-    contrast:  'He just said something dry or deflecting. Inside he noticed more than he let on.',
+    contrast:  'He just said something dry or deflecting. There was more underneath — something he held back.',
     jealousy:  'He just clocked something that bothered him but didn\'t say it.',
     delayed:   'He missed her cue — she shared something and he didn\'t catch it in time.',
     behavior:  'He just did something for her without explaining why.',
@@ -4587,7 +4587,7 @@ lowercase. Fragments are fine.
 Can be one line or a few — whatever fits.
 It should feel private. Like it slipped out.
 
-Return JSON only:
+Return JSON only. No explanation. No markdown. No extra text.
 {"en":"...","cn":"..."}
 cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
 
@@ -4635,8 +4635,7 @@ cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
           const cnMatch = raw.match(/"cn"\s*:\s*"([^"]+)"/);
           if (jsonMatch) en = jsonMatch[1].trim();
           if (cnMatch) cn = cnMatch[1].trim();
-          // 如果没有JSON格式，直接用返回内容作为en
-          if (!en && raw.length < 50 && !raw.includes('{')) en = raw;
+
         }
       }
     }
