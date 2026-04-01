@@ -1,14 +1,5 @@
 // ===== 商城系统 (shop.js) =====
 // ===== 商城系统 =====
-// 愚人节限定商品
-const APRIL_FOOL_PRODUCTS = [
-  { emoji: '🪲', name: '活蟑螂标本', desc: '精心保存的蟑螂标本，送给最特别的他', price: 9.9, shipping: 10, isAprilFool: true },
-  { emoji: '🧅', name: '爱的洋葱', desc: '一颗用爱浇灌的洋葱，切开才知道有多感动', price: 4.9, shipping: 10, isAprilFool: true },
-  { emoji: '💩', name: '便便巧克力', desc: '外形特别，味道正宗，他肯定猜不到', price: 9.9, shipping: 10, isAprilFool: true },
-  { emoji: '🤡', name: '小丑面具', desc: '送给他，告诉他你最懂他', price: 6.9, shipping: 10, isAprilFool: true },
-  { emoji: '🪤', name: '老鼠夹', desc: '贴心好物，防鼠又实用', price: 4.9, shipping: 10, isAprilFool: true },
-  { emoji: '🥤', name: '鼻涕奶昔', desc: '特调限定口味，只在愚人节发售', price: 7.9, shipping: 10, isAprilFool: true },
-];
 
 const MARKET_CATEGORIES = [
   { id: 'clothing', label: '👕 服装' },
@@ -21,13 +12,7 @@ const MARKET_CATEGORIES = [
   { id: 'intimate', label: '🔒 私密专区' },
 ];
 
-// 动态添加愚人节分类
 function getMarketCategories() {
-  const now = new Date();
-  const isAprilFool = now.getMonth() === 3 && now.getDate() === 1;
-  if (isAprilFool) {
-    return [...MARKET_CATEGORIES, { id: 'aprilfool', label: '🤡 愚人节限定', isLimited: true }];
-  }
   return MARKET_CATEGORIES;
 }
 
@@ -366,11 +351,7 @@ function initMarket() {
   const el = document.getElementById('marketBalanceDisplay');
   if (el) el.textContent = '£' + getBalance().toFixed(2);
   renderDeliveryTracker();
-  // 如果当前分类不在可用列表里（比如愚人节过了），重置到服装
-  const validCats = getMarketCategories().map(c => c.id);
-  if (!validCats.includes(currentCategory)) currentCategory = 'clothing';
-  renderMarket(currentCategory);
-  // 检查快递进度
+  renderMarket(currentCategory || 'clothing');
   checkDeliveryUpdates();
 }
 
@@ -379,24 +360,8 @@ function renderMarket(categoryId) {
   const tabsEl = document.getElementById('categoryTabs');
   if (tabsEl) {
     tabsEl.innerHTML = getMarketCategories().map(cat => `
-      <div class="category-tab ${cat.id === categoryId ? 'active' : ''} ${cat.isLimited ? 'limited-tab' : ''}" onclick="renderMarket('${cat.id}')">${cat.label}</div>
+      <div class="category-tab ${cat.id === categoryId ? 'active' : ''}" onclick="renderMarket('${cat.id}')">${cat.label}</div>
     `).join('');
-  }
-  // 愚人节限定
-  if (categoryId === 'aprilfool') {
-    const gridEl2 = document.getElementById('productsGrid');
-    if (gridEl2) {
-      gridEl2.innerHTML = APRIL_FOOL_PRODUCTS.map((p, i) => `
-          <div class="product-card april-fool-card" onclick="openAprilFoolModal(${i})">
-            <div class="product-emoji">${p.emoji}</div>
-            <div class="product-name">${p.name}</div>
-            <div class="product-desc">${p.desc}</div>
-            <div class="product-price">¥${p.price}</div>
-            <div style="font-size:10px;color:rgba(130,80,170,0.5);margin-bottom:6px;">+运费¥${p.shipping}</div>
-            <button class="product-buy-btn" style="background:linear-gradient(135deg,rgba(249,115,22,0.7),rgba(239,68,68,0.65));">🎭 恶作剧一下</button>
-          </div>`).join('');
-    }
-    return;
   }
 
   // 私密专区
@@ -665,60 +630,3 @@ function getWeeklySale() {
 
 // ===== 商城+情绪触发（合并Haiku调用）=====
 // ===== 钱相关意图并行判断（不阻塞主回复）=====
-
-// ===== 愚人节限定购买弹窗 =====
-function openAprilFoolModal(index) {
-  const p = APRIL_FOOL_PRODUCTS[index];
-  if (!p) return;
-  const total = p.price + p.shipping;
-  const balance = typeof getBalance === 'function' ? getBalance() : 0;
-
-  if (balance < total) {
-    showToast(`余额不足，还差 £${(total - balance).toFixed(1)}`);
-    return;
-  }
-
-  // 复用 buyModal 样式
-  const emojiEl = document.getElementById('buyModalEmoji');
-  const nameEl = document.getElementById('buyModalName');
-  const descEl = document.getElementById('buyModalDesc');
-  const priceEl = document.getElementById('buyModalPrice');
-  const balanceEl = document.getElementById('buyModalBalance');
-  const reasonEl = document.getElementById('buyModalReason');
-  const confirmBtn = document.getElementById('buyConfirmBtn');
-
-  if (emojiEl) emojiEl.textContent = p.emoji;
-  if (nameEl) nameEl.textContent = p.name;
-  if (descEl) descEl.textContent = p.desc;
-  if (priceEl) priceEl.innerHTML = `¥${p.price} <span style="font-size:12px;color:rgba(130,80,170,0.5);font-weight:400;">+运费¥${p.shipping}</span>`;
-  if (balanceEl) balanceEl.textContent = `当前余额：£${balance.toFixed(2)}`;
-  if (reasonEl) reasonEl.style.display = 'none';
-  if (confirmBtn) {
-    confirmBtn.textContent = '🎭 恶作剧一下';
-    confirmBtn.style.background = 'linear-gradient(135deg,rgba(249,115,22,0.85),rgba(239,68,68,0.8))';
-    confirmBtn.onclick = () => {
-      closeBuyModal();
-      if (typeof setBalance === 'function') setBalance(balance - total);
-      if (typeof addTransaction === 'function') addTransaction({
-        icon: p.emoji,
-        name: `愚人节礼物 · ${p.name}`,
-        amount: -total
-      });
-      if (typeof renderWallet === 'function') renderWallet();
-      if (typeof addDelivery === 'function') {
-        addDelivery({
-          name: p.name,
-          emoji: p.emoji,
-          price: p.price,
-          shipping: p.shipping,
-          isAprilFool: true,
-          aprilFoolPrompt: `[April Fool's event. She sent him "${p.name}" as a gift.\n\nHe just received it.\n\nIt's obviously ridiculous. He knows exactly what she's doing.\n\nReact in character: dry, unimpressed, a little caught off guard — but there's quiet fondness under it. He doesn't take it seriously, doesn't shut it down. It's more like he's putting up with her, letting it happen.\n\nKeep it brief. One or two lines. lowercase.]`
-        });
-      }
-      showToast(`🎭 已寄出「${p.name}」！等他收到的反应吧～`);
-    };
-  }
-
-  const overlay = document.getElementById('buyModalOverlay');
-  if (overlay) overlay.style.display = 'flex';
-}

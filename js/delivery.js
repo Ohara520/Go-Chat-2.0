@@ -36,16 +36,13 @@ const DELIVERY_STAGES_GHOST = [
 
 function addDelivery(product, isGhostSend, isLuxury) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const totalMs = product.isAprilFool
-    ? 3 * 3600 * 1000  // 愚人节礼物3小时到
-    : isGhostSend
-    ? (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000  // Ghost反寄1-2天
-    : (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000; // 用户寄2-3天
+  const totalMs = isGhostSend
+    ? (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000
+    : (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
   const stages = isGhostSend ? DELIVERY_STAGES_GHOST : DELIVERY_STAGES_USER;
   const now = Date.now();
   const interval = totalMs / stages.length;
 
-  // 遗失逻辑（只有用户寄的，10%概率，头等舱不遗失）
   const canLost = !isGhostSend && !product.noLost;
   const isLost = canLost && Math.random() < 0.10;
   const lostAtStage = isLost ? Math.floor(Math.random() * 3) + 1 : -1;
@@ -74,8 +71,6 @@ function addDelivery(product, isGhostSend, isLuxury) {
       emoji: product.emoji,
       isFromHome: product.isFromHome || false,
       festival: product.festival || '',
-      isAprilFool: product.isAprilFool || false,
-      aprilFoolPrompt: product.aprilFoolPrompt || null,
     }
   };
 
@@ -241,76 +236,6 @@ async function onGhostReceived(delivery) {
   const container = document.getElementById('messagesContainer');
   if (!container) return;
   const pd = delivery.productData;
-
-  // 愚人节限定：用特殊prompt，按收到数量递进
-  if (pd.isAprilFool && pd.aprilFoolPrompt) {
-    try {
-      // 读取今天收到的愚人节礼物数量
-      const today = new Date().toDateString();
-      const afKey = 'aprilFoolReceivedCount_' + today;
-      const afCount = parseInt(localStorage.getItem(afKey) || '0') + 1;
-      localStorage.setItem(afKey, afCount);
-
-      // 根据数量选不同的反应层次
-      let afPrompt;
-      if (afCount === 1) {
-        afPrompt = `[April Fool's event. She sent him "${pd.name}" as a gift.
-
-He just received it. First one.
-
-It's obviously ridiculous. He's caught off guard — didn't expect this.
-
-React: dry, a little confused, but there's quiet fondness. He doesn't know what she's playing at yet.
-
-Keep it brief. One or two lines. lowercase.]`;
-      } else if (afCount === 2) {
-        afPrompt = `[April Fool's event. She sent him "${pd.name}". This is the second ridiculous thing today.
-
-He's starting to understand what she's doing.
-
-React: dry, slightly exasperated, but still putting up with it. A hint of "really? again?"
-
-Keep it brief. One or two lines. lowercase.]`;
-      } else if (afCount === 3) {
-        afPrompt = `[April Fool's event. She sent him "${pd.name}". Third one today.
-
-He's done being surprised. Now he's just shaking his head.
-
-React: flat, unimpressed, maybe a single line of complaint. Still accepted it though.
-
-Keep it brief. One line. lowercase.]`;
-      } else {
-        afPrompt = `[April Fool's event. She sent him "${pd.name}". This is the ${afCount}th ridiculous thing today.
-
-He's completely numb at this point. No reaction left.
-
-React: one flat line. Maybe just acknowledges it without any feeling. Or says nothing meaningful. 
-He's given up being surprised.
-
-One line max. lowercase.]`;
-      }
-
-      const res = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 100,
-          ...(() => { const _sys = buildSystemPrompt(); return { system: _sys, systemParts: buildSystemPromptParts(_sys) }; })(),
-          messages: [...chatHistory.slice(-10), { role: 'user', content: afPrompt }]
-        })
-      });
-      const data = await res.json();
-      const reply = data.content?.[0]?.text?.trim() || '';
-      if (reply) {
-        appendMessage('bot', reply);
-        chatHistory.push({ role: 'assistant', content: reply });
-        saveHistory();
-        if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
-      }
-    } catch(e) {}
-    return;
-  }
 
   // 正常签收逻辑
   const fee = pd.shipping || 15;
