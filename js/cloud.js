@@ -297,7 +297,7 @@ async function saveToCloud() {
       meetType: localStorage.getItem('meetType') || '',
       botNickname: localStorage.getItem('botNickname') || '',
       marriageType: localStorage.getItem('marriageType') || 'established',
-      ghostAvatarUrl: localStorage.getItem('ghostAvatarUrl') || '',
+      ghostAvatarUrl: (() => { const u = localStorage.getItem('ghostAvatarUrl') || ''; return u.startsWith('data:') ? '' : u; })(),
       ghostHeight: localStorage.getItem('ghostHeight') || '',
       ghostWeight: localStorage.getItem('ghostWeight') || '',
       ghostBloodType: localStorage.getItem('ghostBloodType') || '',
