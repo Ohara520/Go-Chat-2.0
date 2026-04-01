@@ -91,7 +91,15 @@ async function loadFromCloud() {
       if (p.coldWarMode != null && cloudIsNewer) localStorage.setItem('coldWarMode', String(p.coldWarMode));
       // 婚姻模式和Ghost档案
       setIfMissing('marriageType', p.marriageType);
-      setIfMissing('ghostAvatarUrl', p.ghostAvatarUrl);
+      // Ghost头像URL：云端有值就用云端（换设备必须恢复），本地有值且云端没有就保留本地
+      if (p.ghostAvatarUrl) {
+        // 云端有头像URL，无论新旧都写入（保证换头像后刷新能恢复）
+        localStorage.setItem('ghostAvatarUrl', p.ghostAvatarUrl);
+        // 同时更新页面上的头像元素
+        document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+          el.src = p.ghostAvatarUrl + '?t=' + Date.now();
+        });
+      }
       setIfMissing('ghostHeight', p.ghostHeight);
       setIfMissing('ghostWeight', p.ghostWeight);
       setIfMissing('ghostBloodType', p.ghostBloodType);
