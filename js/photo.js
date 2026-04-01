@@ -184,7 +184,7 @@ async function handlePhotoUpload(fileDataList) {
     // 检测情头上下文：只看最近3条消息，避免误触发
     const _avatarKeyword = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头|情侣头像|头像.*换|换.*头像/i;
     const recentFew = typeof chatHistory !== 'undefined'
-      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-3).map(m => m.content || '').join(' ')
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6).map(m => m.content || '').join(' ')
       : '';
     const isAvatarContext = _avatarKeyword.test(recentFew) || sessionStorage.getItem('avatarRequestPending') === '1';
     // 用户提过换情头，记录pending状态
@@ -283,8 +283,7 @@ async function handlePhotoUpload(fileDataList) {
 
     if (typeof hideTyping === 'function') hideTyping();
 
-    // 如果不是头像上下文，发完图就清掉pending，防止后续图片误触发
-    if (!isAvatarContext) sessionStorage.removeItem('avatarRequestPending');
+    // 注意：avatarRequestPending 只在换头像成功后清除，不在这里清
 
     // 6. 显示回复
     if (typeof appendMessage === 'function') appendMessage('bot', reply);
@@ -334,7 +333,11 @@ async function handlePhotoUpload(fileDataList) {
         const ghostB64 = base64List[ghostIdx];
 
         // 先用base64临时显示（即时反馈）
-        updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
+        const _avatarDataUrl = `data:image/jpeg;base64,${ghostB64}`;
+        updateGhostAvatar(_avatarDataUrl);
+        // 先存 base64 到 localStorage 作为兜底，防止 Storage 上传失败后刷新消失
+        localStorage.setItem('ghostAvatarUrl', _avatarDataUrl);
+        if (typeof touchLocalState === 'function') touchLocalState();
         sessionStorage.removeItem('avatarRequestPending'); // 换上了，清除pending
 
         // 异步上传Storage，完成后更新为正式URL并写入数据库
