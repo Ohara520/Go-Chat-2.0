@@ -78,9 +78,55 @@ export default async function handler(req, res) {
       const planId = order.plan_id;
       const itemId = order.sku_detail?.[0]?.sku_id || '';
 
-      // 判断是订阅还是加油包
-      if (PLAN_CONFIG[planId]) {
-        // 订阅方案
+      // ⚠️ 加油包优先判断——从所有可能的字段里匹配
+      // 防止加油包的plan_id撞上订阅配置，导致误充大额条数
+      const topupKey = TOPUP_CONFIG[planId] ? planId
+        : TOPUP_CONFIG[itemId] ? itemId
+        : TOPUP_CONFIG[order.item_id] ? order.item_id
+        : null;
+
+      console.log('[webhook] topupKey:', topupKey, 'planId:', planId);
+
+      if (topupKey) {
+        // ===== 加油包 =====
+        const topup = TOPUP_CONFIG[topupKey];
+
+        const { data: existing } = await supabase
+          .from('subscriptions')
+          .select('monthly_quota, used_count')
+          .eq('email', email.toLowerCase().trim())
+          .single();
+
+        if (existing) {
+          // 有订阅，在现有额度基础上加
+          await supabase.from('subscriptions')
+            .update({
+              monthly_quota: existing.monthly_quota + topup.quota,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('email', email.toLowerCase().trim());
+          console.log('[webhook] 加油包充值成功:', email, '+', topup.quota, '条，当前总额度:', existing.monthly_quota + topup.quota);
+        } else {
+          // 没有订阅，新建临时记录
+          const periodEnd = new Date();
+          periodEnd.setMonth(periodEnd.getMonth() + 1);
+          await supabase.from('subscriptions').insert({
+            email: email.toLowerCase().trim(),
+            plan_id: 'topup',
+            plan_name: '加油包',
+            monthly_quota: topup.quota,
+            memory_limit: 10,
+            used_count: 0,
+            period_start: new Date().toISOString(),
+            period_end: periodEnd.toISOString(),
+            status: 'active',
+            afdian_order_id: order.out_trade_no,
+          });
+          console.log('[webhook] 加油包新建记录:', email, topup.quota, '条');
+        }
+
+      } else if (PLAN_CONFIG[planId]) {
+        // ===== 订阅方案 =====
         const plan = PLAN_CONFIG[planId];
         const now = new Date();
         const periodEnd = new Date(now);
@@ -99,44 +145,11 @@ export default async function handler(req, res) {
           afdian_order_id: order.out_trade_no,
           updated_at: now.toISOString(),
         }, { onConflict: 'email' });
+        console.log('[webhook] 订阅开通/续费成功:', email, plan.name, plan.monthly_quota, '条');
 
-      } else if (TOPUP_CONFIG[order.item_id] || TOPUP_CONFIG[itemId]) {
-        // 加油包
-        const topup = TOPUP_CONFIG[order.item_id] || TOPUP_CONFIG[itemId];
-        if (!topup) continue;
-
-        // 给用户增加额度（在现有基础上加）
-        const { data: existing } = await supabase
-          .from('subscriptions')
-          .select('monthly_quota, used_count')
-          .eq('email', email.toLowerCase().trim())
-          .single();
-
-        if (existing) {
-          // 有订阅，增加月额度
-          await supabase.from('subscriptions')
-            .update({
-              monthly_quota: existing.monthly_quota + topup.quota,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('email', email.toLowerCase().trim());
-        } else {
-          // 没有订阅也能买加油包，给一个临时记录
-          const periodEnd = new Date();
-          periodEnd.setMonth(periodEnd.getMonth() + 1);
-          await supabase.from('subscriptions').insert({
-            email: email.toLowerCase().trim(),
-            plan_id: 'topup',
-            plan_name: '加油包',
-            monthly_quota: topup.quota,
-            memory_limit: 10,
-            used_count: 0,
-            period_start: new Date().toISOString(),
-            period_end: periodEnd.toISOString(),
-            status: 'active',
-            afdian_order_id: order.out_trade_no,
-          });
-        }
+      } else {
+        // 未知plan_id，记录日志但不做任何操作，防止误充
+        console.warn('[webhook] 未知plan_id，跳过处理:', planId, 'order:', order.out_trade_no);
       }
     }
 
