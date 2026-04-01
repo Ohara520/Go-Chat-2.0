@@ -554,11 +554,13 @@ function openBuyModal(idx) {
     btn.disabled = false;
     btn.textContent = btnLabel;
   }
-  document.getElementById('buyModalOverlay').classList.add('show');
+  const overlay2 = document.getElementById('buyModalOverlay');
+  if (overlay2) overlay2.style.display = 'flex';
 }
 
 function closeBuyModal() {
-  document.getElementById('buyModalOverlay').classList.remove('show');
+  const overlay = document.getElementById('buyModalOverlay');
+  if (overlay) overlay.style.display = 'none';
   pendingProduct = null;
 }
 
