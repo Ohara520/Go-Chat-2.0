@@ -64,8 +64,14 @@ async function loadFromCloud() {
       // 静态资料：本地没有才写（换设备恢复）
       setIfMissing('userName', p.userName);
       setIfMissing('marriageDate', p.marriageDate);
-      setIfMissing('ghostBirthday', p.ghostBirthday);
-      setIfMissing('ghostZodiac', p.ghostZodiac);
+      // Ghost生日：云端有值就用云端的，保证多设备一致
+      if (p.ghostBirthday) {
+        localStorage.setItem('ghostBirthday', p.ghostBirthday);
+        localStorage.setItem('ghostZodiac', p.ghostZodiac || localStorage.getItem('ghostZodiac') || '');
+      } else {
+        setIfMissing('ghostBirthday', p.ghostBirthday);
+        setIfMissing('ghostZodiac', p.ghostZodiac);
+      }
       setIfMissing('meetType', p.meetType);
       setIfMissing('botNickname', p.botNickname);
       // 用户设置：云端更新才覆盖

@@ -519,6 +519,8 @@ function ensureGhostBirthday() {
   const pick = GHOST_BIRTHDAY_POOL[Math.floor(Math.random() * GHOST_BIRTHDAY_POOL.length)];
   localStorage.setItem('ghostBirthday', pick.date);
   localStorage.setItem('ghostZodiac', pick.zodiac);
+  // 立刻存云端，防止换设备时重新随机
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 // ===== 性格倾向系统 =====
@@ -1143,11 +1145,12 @@ function importUserData() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      if (!data.version || !data.chatHistory) {
+      // 只要有version字段就认为是合法的记忆文件，chatHistory不是必须的
+      if (!data.version) {
         showToast('❌ 文件格式不对，请选择正确的记忆文件');
         return;
       }
-      // 恢复聊天记录
+      // 恢复聊天记录（有才恢复）
       if (data.chatHistory?.length > 0) {
         localStorage.setItem('chatHistory', JSON.stringify(data.chatHistory));
       }
@@ -3481,12 +3484,12 @@ function applyMoneyEffect(amount, options = {}) {
     ? amount
     : Math.min(amount, 300 - weeklyUsed);
 
-  setBalance(getBalance() + actualAmount);
+  // 先记录交易，再更新UI，确保顺序正确
+  addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
   addWeeklyGiven(actualAmount);
   incrementTodayGivenCount();
   localStorage.setItem('lastGivenAt', Date.now());
-  sessionStorage.setItem('conversationGivenCount', String(conversationGiven + 1)); // 本轮计数
-  addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
+  sessionStorage.setItem('conversationGivenCount', String(conversationGiven + 1));
   renderWallet();
   if (options.affection !== false) changeAffection(1);
   // 转账后立刻存云端，防止关页面丢数据
@@ -6631,7 +6634,15 @@ function loadSecretScreen() {
   };
   Object.entries(fields).forEach(([id, key]) => {
     const el = document.getElementById(id);
-    if (el) el.value = localStorage.getItem(key) || '';
+    if (el) {
+      el.value = localStorage.getItem(key) || '';
+      // 失焦时自动保存，防止退出页面丢数据
+      el.onblur = () => saveSecret(key, el.value);
+      // 输入时也实时保存（生日除外，等失焦后验证格式）
+      if (key !== 'userBirthday') {
+        el.oninput = () => { if (el.value.trim()) saveSecret(key, el.value); };
+      }
+    }
   });
 
   // 相遇方式
