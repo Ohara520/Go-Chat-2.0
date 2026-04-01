@@ -5524,19 +5524,31 @@ One or two lines. English only. lowercase.`;
 
 
     // 审查后重新拆分（reply 可能已被重写）
-    // 解析unlock tag
-    const _unlockMatch = reply.match(/\{"unlock":\s*"([^"]+)"\}/);
-    if (_unlockMatch) {
-      const field = _unlockMatch[1];
-      const validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
-      if (validFields.includes(field)) {
-        localStorage.setItem(`ghostUnlocked_${field}`, 'true');
-      }
-      // 从回复里删掉unlock tag
-      reply = reply.replace(/\n?\{"unlock":\s*"[^"]*"\}/, '').trim();
+    // 解析unlock tag（支持单个字段、数组格式、null，全部清除防止显示在消息里）
+    const validFields = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
+
+    // 匹配数组格式 {"unlock": ["height", "weight"]}
+    const _unlockArr = reply.match(/"unlock"\s*:\s*\[([^\]]+)\]/);
+    if (_unlockArr) {
+      const fields = _unlockArr[1].match(/"([^"]+)"/g) || [];
+      fields.forEach(f => {
+        const field = f.replace(/"/g, '');
+        if (validFields.includes(field)) {
+          localStorage.setItem(`ghostUnlocked_${field}`, 'true');
+        }
+      });
     } else {
-      reply = reply.replace(/\n?\{"unlock":\s*null\}/, '').trim();
+      // 匹配单个格式 {"unlock": "height"}
+      const _unlockMatch = reply.match(/"unlock"\s*:\s*"([^"]+)"/);
+      if (_unlockMatch) {
+        const field = _unlockMatch[1];
+        if (validFields.includes(field)) {
+          localStorage.setItem(`ghostUnlocked_${field}`, 'true');
+        }
+      }
     }
+    // 不管什么格式，统一清除所有unlock tag，防止显示在消息里
+    reply = reply.replace(/\n?\{[^}]*"unlock"[^}]*\}/g, '').trim();
 
     // 强制每句话单独一行——把句号/问号/感叹号后的空格换成换行
     // 不强制分行，让模型自己决定
