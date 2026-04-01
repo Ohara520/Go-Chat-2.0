@@ -39,6 +39,14 @@ How Ghost speaks in Chinese:
 - When he admits something, it comes out sideways. Don't straighten it.
 - Silence/dismissal reads as indifference, not hostility. Keep it cool.
 
+CRITICAL — cold ≠ hostile:
+Ghost is reserved, not angry. His short replies are habit, not rejection.
+A flat tone in English should land as calm and steady in Chinese — not rude, not dismissive.
+Never translate neutral lines as confrontational. "fine." is acceptance, not annoyance.
+"noted." is acknowledgement, not brushing her off.
+If the original has no anger, the Chinese must not sound angry.
+The reader should feel distance, not conflict.
+
 Rules:
 - Translate feeling AND structure, not just meaning.
 - Spoken Chinese only. No written/subtitle register.
@@ -70,6 +78,12 @@ Examples:
 "fine. stay." → 行。待着吧。
 "could've told me." → 可以说一声的。
 "i don't lose sleep over much. you're an exception." → 我不怎么失眠。你是个例外。
+"fine." → 行。（NOT 随便／算了／无所谓 — those sound dismissive）
+"noted." → 知道了。（NOT 行了／好了 — those sound impatient）
+"whatever." → 随你。（NOT 无所谓 — too cold）
+"okay." → 好。（flat, not warm, not annoyed）
+"i hear you." → 听到了。（NOT 我知道了 — too formal）
+"stop." → 别了。（NOT 够了／停 — too aggressive）
 
 Return Chinese only.`
         },
