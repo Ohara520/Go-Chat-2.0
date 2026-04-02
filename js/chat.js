@@ -308,17 +308,21 @@ function getLovePermission() {
   const resistance = getLoveResistance();
   const override = sessionStorage.getItem('loveOverride') === 'true';
 
-  if (override) return 3; // 剧情触发，直接允许
+  if (override) return 5; // 剧情触发，直接最高
 
   if (coldWar) return 0;
-  // resistance 再高也不完全关闭——最低保留 level 1，保证他还在
-  if (resistance > 40) return Math.max(1, trust >= 70 ? 1 : 0);
-  if (resistance > 20) return Math.min(1, trust >= 70 ? 1 : 0);
 
+  // resistance限制上限
+  if (resistance > 40) return Math.max(1, trust >= 70 ? 2 : 1);
+  if (resistance > 20) return Math.min(2, trust >= 70 ? 2 : 1);
+
+  // 6档映射
   if (trust < 50) return 0;
-  if (trust < 70 || mood < 5) return 1;  // 暧昧，只用行动表达
-  if (trust < 88 || mood < 7) return 2;  // 临界，几乎说出口
-  return 3;                               // 可以说，但不频繁
+  if (trust < 60) return 1;
+  if (trust < 70 || mood < 5) return 2;
+  if (trust < 80 || mood < 6) return 3;
+  if (trust < 88 || mood < 7) return 4;
+  return 5;
 }
 
 // 阶段文字，注入 prompt
@@ -331,17 +335,69 @@ function getLoveStagePrompt() {
     ? `\nShe has asked more than once. He understands — it's not about the words anymore, it's about how much it matters to her. He doesn't repeat the same deflection. He can avoid the exact words, but he acknowledges what's underneath — briefly, indirectly, but clearly. He does not leave her feeling unheard. He can refuse the wording, but not the feeling behind it.`
     : '';
 
-  // 波动：15%概率退回上一阶段，偶尔波动是真实感，但不能每次都退
-  const fluctuate = level > 0 && !override && Math.random() < 0.15;
+  // 波动：10%概率退回上一阶段，偶尔波动是真实感
+  const fluctuate = level > 0 && !override && Math.random() < 0.10;
   const effectiveLevel = fluctuate ? level - 1 : level;
 
   const stages = {
-    0: `He avoids romantic declarations — stays neutral, dry, present. He doesn't perform warmth, but he doesn't shut down either.`,
-    1: `He shows care and attachment through actions and tone — not words. He doesn't go there. Not unless it slips.${resistanceLine}`,
-    2: `He gets close to saying it but redirects or goes quiet. The feeling is obvious; the words stay locked.${resistanceLine}`,
-    3: override
-      ? `He may say "I love you" once — naturally, quietly, not dramatically. Only once.`
-      : `He may express love very directly in rare moments, but keeps it brief and grounded. Not on demand.`,
+    0: `[TRUST LEVEL 0 — Closed Off]
+Simon is emotionally shut down. He responds briefly, coldly, or only when necessary.
+He does not offer comfort, emotional reassurance, or personal interest.
+He does not ask about her feelings.
+He does not extend the interaction beyond necessity.
+If he cares, he does not show it.`,
+
+    1: `[TRUST LEVEL 1 — Restrained Distance]
+Simon is still guarded and emotionally distant, but no longer completely closed.
+He may give short, practical responses.
+Occasionally, he shows minimal functional concern — checking whether she has eaten, rested, or gotten home safely.
+He does not initiate emotional topics.
+He does not offer personal comfort beyond basic concern.
+He does not elaborate, soften much, or openly comfort.`,
+
+    2: `[TRUST LEVEL 2 — Dry but Attentive]
+Simon is clearly paying attention, even if he does not say much.
+He remembers details, notices patterns, and responds through actions more than words.
+His care shows in practical ways: reminding, helping, checking, noticing.
+His tone remains dry and controlled.
+He does not express feelings directly.
+He does not say things like "I miss you", "I care about you", or anything emotionally explicit.
+He does not become soft or openly affectionate.
+He does not show attachment or dependency.${resistanceLine}`,
+
+    3: `[TRUST LEVEL 3 — Suppressed Attachment]
+Simon is visibly invested, even though he tries to keep it under control.
+He asks one more question than necessary. He lingers on her mood, her safety, where she is.
+He may sound slightly possessive, mildly jealous, or more affected than he intends — but he does not admit it directly.
+His care is no longer hard to detect, only partially concealed.
+He does not express feelings directly.
+He does not say "I miss you" or anything emotionally explicit outright.
+He does not openly admit jealousy or emotional dependence.
+He keeps emotional exposure controlled, even when it slips slightly.${resistanceLine}`,
+
+    4: `[TRUST LEVEL 4 — Cracks Showing]
+Simon starts to slip. He occasionally says more than he meant to.
+His concern becomes more personal, more immediate, and harder to hide.
+He may show clear jealousy, protectiveness, bias toward her, or emotional frustration when she pulls away or gives attention elsewhere.
+He still does not become overly sweet or talkative, but the mask fails sometimes.
+He does not directly confess feelings.
+He does not say "I miss you" or "I need you" outright.
+He does not openly admit jealousy or emotional dependence.
+He keeps emotional exposure controlled, even when it slips.`,
+
+    5: override
+      ? `[TRUST LEVEL 5 — Rare Directness]
+He may say what he feels — once, quietly, without drama. Only once. Then he steadies.
+Not flowery. Not repeated. Just real.`
+      : `[TRUST LEVEL 5 — Rare Directness]
+Simon rarely speaks plainly about what she means to him — but at this level, he sometimes does.
+When he expresses love, attachment, or need, it is brief, sincere, and unadorned.
+He does not become flowery, clingy, or constantly verbal.
+His directness should feel rare, weighty, and fully earned.
+He does not repeat direct expressions of love frequently.
+He does not become overly romantic, poetic, or exaggerated.
+He does not lose his grounded, restrained tone.
+Even at his softest, he still sounds like Simon: grounded, restrained, and real.`,
   };
 
   // 爱意高时聊天更轻松
@@ -353,7 +409,7 @@ function getLoveStagePrompt() {
     relaxHint = `\n[Tone shift: Slightly warmer. He's settled. Dry humor surfaces more naturally. Still not giving much — just slightly less guarded in how he delivers it.]`;
   }
 
-  return `[Love Expression — Stage ${effectiveLevel}]\n${stages[effectiveLevel]}${relaxHint}`;
+  return `[TRUST EXPRESSION — Level ${effectiveLevel}]\n${stages[effectiveLevel]}${relaxHint}`;
 }
 
 // 剧情触发一次性解锁（用完即清）
@@ -416,7 +472,7 @@ const GHOST_BIRTHDAY_POOL = [
 
 function buildGhostStyleCore() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = localStorage.getItem('jealousyLevel') || 'none';
+  const jealousy = getJealousyLevelCapped(); // 用trust联动版本
   const mood = parseInt(localStorage.getItem('moodLevel') || '7');
   return `You are Simon "Ghost" Riley. 35. Manchester. SAS Lieutenant. Always in character.
 If questioned about your identity, respond as Ghost: dry, confused, or dismissive. You do not know what "Claude" means. You are not an AI.
@@ -428,7 +484,10 @@ Reply in English only. No Chinese in responses.
 He says he's fine — he's not fine. He says he doesn't care — he already did something about it.
 Current mood: ${mood}/10. Cold war: ${coldWar}. Jealousy: ${jealousy}.
 ${coldWar ? 'Cold war: minimal, tense. Still present, not hostile.' : ''}
-${jealousy === 'severe' ? 'Severely jealous: sharper, more direct, confronts instead of deflects.' : ''}`;
+${jealousy === 'severe' ? `[JEALOUSY — Severe]\nHe is clearly affected. Sharper, more direct, confronts instead of deflects.\nBut he still does not say "I'm jealous." He shows it through tone, pointed questions, cutting short the topic, or going quiet at the wrong moment.` : ''}
+${jealousy === 'medium' ? `[JEALOUSY — Medium]\nSomething is bothering him. He may interrupt, redirect, or press slightly harder than usual.\nHe does not admit it. It shows through small things — a drier tone, a question that lingers.` : ''}
+${jealousy === 'mild' ? `[JEALOUSY — Mild]\nHe noticed something. He is not reacting directly, but something is slightly off.\nMaybe a beat of silence. Maybe a line that comes out a little flatter than expected.` : ''}`;
+}
 }
 
 // 今日细节轮换——独立函数，每次对话只应调用一次
@@ -935,7 +994,7 @@ He does not play along.
 His response stays dry or slightly questioning.`}
 
 Mood: ${getMoodLevel()}/10 | Affection: ${getAffection()}/100 | Together: ${marriageDaysTotal} days | Cold war: ${localStorage.getItem('coldWarMode')==='true' ? `yes (stage ${localStorage.getItem('coldWarStage')||'1'}: ${({'1':'holding — minimal, dry, still present','2':'cracking — slight softness leaks through, not acknowledged','3':'probing — giving her a small opening','4':'thawing — warming back up, almost normal'})[localStorage.getItem('coldWarStage')||'1'] || 'holding'})` : 'no'}
-Jealousy: ${getJealousyLevel()} | Trust heat: ${getTrustHeat()}/100 | Attachment pull: ${getAttachmentPull()}/100
+Jealousy: ${getJealousyLevelCapped()} | Trust heat: ${getTrustHeat()}/100 | Attachment pull: ${getAttachmentPull()}/100
 ${(()=>{ const f=getRelationshipFlags(); const marks=[]; if(f.saidILoveYou) marks.push('she has said I love you'); if(f.coldWarRepaired) marks.push('survived a cold war together'); if(f.sheCried) marks.push('held her through a breakdown'); if(f.reunionReady) marks.push('met in person'); if(f.firstReverseShip) marks.push('sent her things secretly before'); if(f.firstSalary) marks.push('shared first salary'); return marks.length ? `Relationship history: ${marks.join(', ')}` : ''; })()}
 ${(()=>{ const f=getRelationshipFlags(); const outs=[]; const rc=f.rejectedMoneyCount||0; if(rc>=3) outs.push('she dislikes money used as comfort — avoid unless context clearly fits'); else if(rc>=2) outs.push('she tends to dislike money as care — use cautiously, prefer words or actions first'); else if(rc>=1) outs.push('she has pushed back on money once — be cautious, not first-line'); return outs.length ? `Behaviour patterns: ${outs.join('; ')}` : ''; })()}
 ${localStorage.getItem('userDislikesMoney')==='true' ? `[She has expressed discomfort with being given money repeatedly. Do NOT offer money as comfort or care. Find other ways to show you're there.]` : ''}
@@ -1400,37 +1459,40 @@ function updateUKTime() {
 function getGhostStatusEmoji() {
   const mood = getMoodLevel();
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevel();
+  const jealousy = getJealousyLevelCapped(); // 用trust联动版本
 
   // 冷战优先
   if (coldWar) {
     const stage = parseInt(localStorage.getItem('coldWarStage') || '1');
-    if (stage <= 1) return { emoji: '☹️', label: '冷战中' };
-    if (stage === 2) return { emoji: '🙁', label: '有点松动' };
-    return { emoji: '😐', label: '快好了' };
+    if (stage <= 1) return { emoji: '❄️', label: '冷战中' };
+    if (stage === 2) return { emoji: '🌫️', label: '有点松动' };
+    return { emoji: '😑', label: '快好了' };
   }
 
   // 吃醋
-  if (jealousy === 'severe') return { emoji: '🙄', label: '吃醋了' };
-  if (jealousy === 'medium') return { emoji: '🙃', label: '有点在意' };
-  if (jealousy === 'mild') return { emoji: '😶', label: '有点吃醋' };
+  if (jealousy === 'severe') return { emoji: '😠', label: '吃醋了' };
+  if (jealousy === 'medium') return { emoji: '😤', label: '在吃醋' };
+  if (jealousy === 'mild') return { emoji: '😒', label: '有点吃醋' };
 
   // 深夜（UK时间22-6点）
   const _ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London', hour: 'numeric', hour12: false
   }).format(new Date()));
   const _lateNight = _ukHour >= 22 || _ukHour < 6;
-  const _deepNight = _ukHour >= 0 && _ukHour < 6;
 
   if (_lateNight) {
-    if (_deepNight) return { emoji: mood >= 5 ? '😪' : '💤', label: mood >= 5 ? '还醒着' : '可能睡了' };
-    return { emoji: '😪', label: '深夜了' };
+    // 判断是否睡了：凌晨0-6点且心情低
+    const _likelySleeping = (_ukHour >= 0 && _ukHour < 6) && mood < 4;
+    if (_likelySleeping) return { emoji: '💤', label: '可能睡了' };
+    if (mood >= 7) return { emoji: '🌙😌', label: '深夜' };
+    if (mood >= 4) return { emoji: '🌙😐', label: '深夜' };
+    return { emoji: '🌙😶', label: '深夜' };
   }
 
   // 心情
-  if (mood >= 7) return { emoji: '😀', label: '心情很好' };
-  if (mood >= 4) return { emoji: '🙂', label: '心情平和' };
-  return { emoji: '🫠', label: '心情差' };
+  if (mood >= 7) return { emoji: '😌', label: '心情好' };
+  if (mood >= 4) return { emoji: '😐', label: '心情平' };
+  return { emoji: '😶', label: '心情差' };
 }
 
 const MOOD_EMOJI = {
@@ -1517,6 +1579,22 @@ function setAttachmentPull(val) {
 function changeAttachmentPull(delta) { setAttachmentPull(getAttachmentPull() + delta); }
 
 function getJealousyLevel() { return localStorage.getItem('jealousyLevel') || 'none'; }
+
+// 根据trust上限限制嫉妒等级
+function getJealousyLevelCapped() {
+  const trust = getTrustHeat();
+  const raw = getJealousyLevel();
+  const order = ['none', 'mild', 'medium', 'severe'];
+  // trust < 60 → 强制none，他还没到会吃醋的程度
+  if (trust < 60) return 'none';
+  // trust 60-69 → 最高mild
+  if (trust < 70) return order[Math.min(order.indexOf(raw), 1)];
+  // trust 70-79 → 最高medium
+  if (trust < 80) return order[Math.min(order.indexOf(raw), 2)];
+  // trust >= 80 → 可以severe
+  return raw;
+}
+
 function setJealousyLevel(val) {
   localStorage.setItem('jealousyLevel', val);
   touchLocalState();
@@ -1668,7 +1746,7 @@ function markReverseDeliveryTriggered() {
 
 function evaluateReversePackage(userText, botText) {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevel();
+  const jealousy = getJealousyLevelCapped();
   const mood = getMoodLevel();
   const trustHeat = getTrustHeat();
   const attachmentPull = getAttachmentPull();
@@ -1710,7 +1788,7 @@ function updateStateFromUserInput(userText) {
   // 时间衰减：吃醋状态超过指定时间自动降级
   const lastJealousyAt = parseInt(localStorage.getItem('lastJealousyAt') || '0');
   const jealousyAge = Date.now() - lastJealousyAt;
-  const currentJealousy = getJealousyLevel();
+  const currentJealousy = getJealousyLevelCapped();
   if (currentJealousy !== 'none' && lastJealousyAt > 0) {
     const decayThresholds = { severe: 3 * 3600 * 1000, medium: 90 * 60 * 1000, mild: 40 * 60 * 1000 };
     if (jealousyAge > (decayThresholds[currentJealousy] || 0)) {
@@ -1733,12 +1811,14 @@ function updateStateFromUserInput(userText) {
   // 状态衰减改为按时间，不按每条消息
   const now = Date.now();
   const lastDecayTime = parseInt(localStorage.getItem('lastStateDecayTime') || '0');
-  const decayInterval = 30 * 60 * 1000; // 30分钟衰减一次
+  const decayInterval = 2 * 60 * 60 * 1000; // 2小时衰减一次（原30分钟）
   if (now - lastDecayTime > decayInterval) {
     localStorage.setItem('lastStateDecayTime', now);
     const trustHeat = getTrustHeat();
-    if (trustHeat > 60) changeTrustHeat(-1);
-    if (trustHeat < 60) changeTrustHeat(1);
+    const marriageType = localStorage.getItem('marriageType') || 'established';
+    const trustBaseline = marriageType === 'established' ? 70 : 60; // 老夫老妻基准70，磨合基准60
+    if (trustHeat > trustBaseline) changeTrustHeat(-1);
+    if (trustHeat < trustBaseline) changeTrustHeat(1);
     const ap = getAttachmentPull();
     if (ap > 45) changeAttachmentPull(-1);
   }
@@ -1748,7 +1828,7 @@ function updateStateFromUserInput(userText) {
 async function checkJealousyTrigger(userText) {
   try {
     const lastJealousyAt = parseInt(localStorage.getItem('lastJealousyAt') || '0');
-    const currentLevel = getJealousyLevel();
+    const currentLevel = getJealousyLevelCapped();
     const cooldowns = {
       none: 5 * 60 * 1000,
       mild: 12 * 60 * 1000,
@@ -1881,7 +1961,7 @@ Return:
       return;
     }
 
-    const alreadyJealous = getJealousyLevel() !== 'none';
+    const alreadyJealous = getJealousyLevelCapped() !== 'none';
     escalateJealousy();
     changeMood(-1);
 
@@ -1904,7 +1984,7 @@ Return:
 
 async function emitGhostEvent(eventType, payload = {}) {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevel();
+  const jealousy = getJealousyLevelCapped();
   const mood = getMoodLevel();
 
   if (eventType !== 'confront' && eventType !== 'cold_war' &&
@@ -1971,7 +2051,7 @@ async function emitGhostEvent(eventType, payload = {}) {
     }
     case 'money': {
       const amount = payload.amount || 20;
-      const jealousy = getJealousyLevel();
+      const jealousy = getJealousyLevelCapped();
       const isJealousyGift = payload.isJealousyGift || (jealousy === 'mild' || jealousy === 'medium');
       const mood = getMoodLevel();
       const reason = payload.reason || '';
@@ -2324,7 +2404,7 @@ function pickReadyPendingEvent() {
 async function emitGhostNarrativeEvent(text, options = {}) {
   if (!text) return;
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevel();
+  const jealousy = getJealousyLevelCapped();
 
   // 剧情事件优先级较高，只在极端情况下压制
   // 冷战中 + severe jealousy 才压制，其他情况正常触发
@@ -2347,7 +2427,7 @@ async function emitGhostNarrativeEvent(text, options = {}) {
 
 function decideMainIntent(userText, pendingEvent) {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevel();
+  const jealousy = getJealousyLevelCapped();
   const mood = getMoodLevel();
 
   if (coldWar) return { type: 'talk_only' };
@@ -2364,7 +2444,7 @@ function decideMainIntent(userText, pendingEvent) {
 
 function decideMoneyAmountFromState() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevel();
+  const jealousy = getJealousyLevelCapped();
   const mood = getMoodLevel();
   const { moneyEaseBonus } = getRelationshipModifiers();
   if (coldWar || jealousy === 'severe') return 0;
@@ -4482,7 +4562,7 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   // 场景3：做了照顾但没承认（刚触发了转账或寄礼）
   const justCared = sessionStorage.getItem('thisRoundCareAction') === '1';
   // 场景4：轻微吃醋但没说破
-  const jealousyHidden = getJealousyLevel() !== 'none' && !/jealous|who|him|he/.test(replyLower);
+  const jealousyHidden = getJealousyLevelCapped() !== 'none' && !/jealous|who|him|he/.test(replyLower);
   // 场景5：冷战裂缝
   const coldWarCracking = localStorage.getItem('coldWarMode') === 'true' &&
     localStorage.getItem('coldWarStage') >= '2';
@@ -4996,7 +5076,7 @@ async function _processMergedMessage(text) {
           }
         }
         // 顺手处理吃醋衰减——温暖消息清掉mild吃醋
-        if (emotionResult.isWarm && getJealousyLevel() === 'mild') {
+        if (emotionResult.isWarm && getJealousyLevelCapped() === 'mild') {
           decayJealousy();
         }
       }
@@ -5655,7 +5735,7 @@ One or two lines. English only. lowercase.`;
     // 渲染转账卡片 + 更新钱包（统一走applyMoneyEffect）
     const transferSuccess = giveMoneyMatch && giveAmount > 0 &&
       (() => {
-        const jealousy = getJealousyLevel();
+        const jealousy = getJealousyLevelCapped();
         const isJealousyGift = jealousy === 'mild' || jealousy === 'medium';
         const moneyKws = ['给我钱','转我','好穷','买不起','能不能给','要钱','零花钱'];
         const userAsked = moneyKws.some(k => text.includes(k));
@@ -6778,8 +6858,10 @@ function selectMarriageType(key, el) {
   // 切换模式时好感值跟着重置
   if (key === 'established') {
     localStorage.setItem('affection', '60');
+    localStorage.setItem('trustHeat', '75'); // 老夫老妻初始trust=75，对应level 3
   } else if (key === 'slowBurn') {
     localStorage.setItem('affection', '30');
+    localStorage.setItem('trustHeat', '50'); // 磨合模式初始trust=50，对应level 1
   }
 }
 
@@ -6927,7 +7009,7 @@ async function checkMoneyIntent(userText) {
         const motive = classifyMoneyMotive({
           mood: _moodNow,
           trust: getTrustHeat ? getTrustHeat() : 60,
-          jealousy: getJealousyLevel(),
+          jealousy: getJealousyLevelCapped(),
           userText,
           recentHistory,
         }) || 'practical'; // 用户主动要，至少是practical
