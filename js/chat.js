@@ -1161,11 +1161,14 @@ function initProfile() {
 
 // ===== 数据导出导入 =====
 function exportUserData() {
+  // 过滤掉系统注入条目，只保留真实对话
+  const rawHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+  const cleanHistory = rawHistory.filter(m => !m._system && !m._recalled && !m._intimate);
+
   const data = {
     version: '2.0',
     exportedAt: new Date().toISOString(),
-    chatHistory: JSON.parse(localStorage.getItem('chatHistory') || '[]'),
-    longTermMemory: localStorage.getItem('longTermMemory') || '',
+    chatHistory: cleanHistory,
     profile: {
       userName: localStorage.getItem('userName') || '',
       userBirthday: localStorage.getItem('userBirthday') || '',
@@ -1198,10 +1201,10 @@ function exportUserData() {
     relationship: {
       affection: localStorage.getItem('affection') || '60',
       moodLevel: localStorage.getItem('moodLevel') || '7',
-      simonPersonality: localStorage.getItem('simonPersonality') || '',
       relationshipFlags: localStorage.getItem('relationshipFlags') || '{}',
       metInPerson: localStorage.getItem('metInPerson') || 'false',
     }
+    // 注意：longTermMemory 和 simonPersonality 不导出，属于系统内部数据
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
