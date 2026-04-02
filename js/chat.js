@@ -6172,13 +6172,30 @@ function scheduleSilenceCheck(index) {
 
 // ===== 键盘弹出/收起时防止空白区域残留 =====
 if (window.visualViewport) {
+  let _lastVH = window.visualViewport.height;
   window.visualViewport.addEventListener('resize', () => {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
-    // interactive-widget=resizes-content 已处理键盘空白问题
-    // 这里只做滚底，防止输入框被遮
+
+    const vh = window.visualViewport.height;
+    const chatContainer = chatScreen.querySelector('.chat-container');
+    const inputArea = chatScreen.querySelector('.input-area');
+
+    // 部分安卓不支持interactive-widget，手动设置高度
+    if (chatContainer) {
+      chatContainer.style.height = vh + 'px';
+    }
+
+    // 滚到底部，防止输入框被遮
     const container = document.getElementById('messagesContainer');
-    if (container) setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+    if (container) {
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+        // 确保输入框可见
+        if (inputArea) inputArea.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      }, 50);
+    }
+    _lastVH = vh;
   });
 }
 

@@ -7,6 +7,7 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    position: relative;
 }
 
 /* ===== 聊天 Header ===== */
@@ -216,6 +217,7 @@
     flex-direction: column;
     gap: 12px;
     background: rgba(245, 235, 255, 0.3);
+    overscroll-behavior: contain;
 }
 
 .message {
