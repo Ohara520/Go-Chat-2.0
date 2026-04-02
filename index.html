@@ -1561,12 +1561,21 @@ function showQQGroup() {
 (function() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('admin') === '12138666') {
+    // 维护弹窗bypass
     document.addEventListener('DOMContentLoaded', function() {
       const m = document.getElementById('maintenanceModal');
       if (m) m.style.display = 'none';
-      const adminBtn = document.getElementById('adminWalletTest');
-      if (adminBtn) adminBtn.style.display = 'block';
     });
+    // 钱包测试按钮——用轮询确保元素存在后显示
+    const showAdminBtn = () => {
+      const adminBtn = document.getElementById('adminWalletTest');
+      if (adminBtn) {
+        adminBtn.style.display = 'block';
+      } else {
+        setTimeout(showAdminBtn, 500);
+      }
+    };
+    setTimeout(showAdminBtn, 500);
   }
 })();
 
