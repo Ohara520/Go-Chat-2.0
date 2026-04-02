@@ -177,57 +177,5 @@ document.addEventListener('keydown', e => {
   if (loginVisible) handleLogin(); else handleRegister();
 });
 </script>
-<!-- ===== 维护弹窗 ===== -->
-<script>
-(function() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('admin') === '12138666') {
-    document.addEventListener('DOMContentLoaded', function() {
-      const m = document.getElementById('maintenanceModal');
-      if (m) m.style.display = 'none';
-    });
-  }
-})();
-</script>
-<div id="maintenanceModal" style="
-  display: flex;
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(6px);
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-">
-  <div style="
-    background: linear-gradient(160deg, #ede0f7 0%, #f5d6ed 50%, #fce4ec 100%);
-    border-radius: 24px;
-    padding: 36px 28px;
-    max-width: 360px;
-    width: 100%;
-    text-align: center;
-    box-shadow: 0 16px 48px rgba(107,63,160,0.25);
-    position: relative;
-  ">
-    <div style="font-size: 48px; margin-bottom: 16px;">🔧</div>
-    <div style="font-size: 20px; font-weight: 700; color: #6b3fa0; margin-bottom: 10px;">系统维护中</div>
-    <div style="font-size: 14px; color: #7a5a9a; line-height: 1.8; margin-bottom: 20px;">
-      西蒙正在升级中，暂时无法陪伴💙<br>
-      维护完成后将第一时间通知大家~<br><br>
-      <span style="
-        display: inline-block;
-        background: rgba(176,122,208,0.15);
-        border: 1px solid rgba(176,122,208,0.3);
-        border-radius: 12px;
-        padding: 10px 20px;
-        font-size: 14px;
-        color: #6b3fa0;
-        font-weight: 600;
-      ">🎁 恢复后每位用户将获得 £100 补偿</span>
-    </div>
-    <div style="font-size: 12px; color: #b09ac8;">感谢大家的耐心等待 🙏</div>
-  </div>
-</div>
 </body>
 </html>
