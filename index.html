@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="color-scheme" content="light only">
 <title>Go Chat</title>
 <link rel="stylesheet" href="css/base.css">
@@ -517,7 +517,7 @@
         <div class="card-title">聊天</div>
         <div class="card-desc">与Ghost聊天</div>
       </div>
-      <div class="card" id="calendarCard" onclick="openScreen('calendarScreen')">
+      <div class="card" id="calendarCard" onclick="openScreen('calendarScreen');setTimeout(()=>{if(typeof initCalendar==='function')initCalendar();},80);">
         <div class="card-icon" id="calendarCardIcon">📅</div>
         <div class="card-title">纪念</div>
         <div class="card-desc" id="calendarCardDesc">点点滴滴</div>
