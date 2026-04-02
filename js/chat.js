@@ -5236,9 +5236,8 @@ async function _processMergedMessage(text) {
         const _isImageShare = /看看这张|看这张|这张图|这个图|这照片|看看这|rate this|what do you think|look at this/i.test(text);
         const _marriageMode = localStorage.getItem('marriageType') || 'established';
         const _affection = parseInt(localStorage.getItem('affection') || '60');
-        const _modeHint = _marriageMode === 'slowBurn' || _affection < 60
-          ? `\nThey're still finding their footing. He's more guarded here — the closeness is there but he pulls back faster. He won't go as far.`
-          : `\nThey know each other well. The ease is already there. He doesn't need to hold back as much — it comes naturally.`;
+        // 磨合模式好感≥60时，按老夫老妻处理（和getRelationshipBlock一致）
+        const _isEstablished = _marriageMode === 'established' || (_marriageMode === 'slowBurn' && _affection >= 60);
 
         const _intimateBaseEstablished = `
 They are married.
