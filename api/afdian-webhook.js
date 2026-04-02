@@ -152,11 +152,21 @@ export default async function handler(req, res) {
         const periodEnd = new Date(now);
         periodEnd.setMonth(periodEnd.getMonth() + 1);
 
+        // 查询现有剩余条数，叠加而不是覆盖
+        const { data: existing } = await supabase
+          .from('subscriptions')
+          .select('monthly_quota, used_count')
+          .eq('email', email.toLowerCase().trim())
+          .maybeSingle();
+
+        const currentRemaining = existing ? Math.max(0, existing.monthly_quota - existing.used_count) : 0;
+        const newQuota = currentRemaining + plan.monthly_quota;
+
         await supabase.from('subscriptions').upsert({
           email: email.toLowerCase().trim(),
           plan_id: planId,
           plan_name: plan.name,
-          monthly_quota: plan.monthly_quota,
+          monthly_quota: newQuota,
           memory_limit: plan.memory_limit,
           used_count: 0,
           period_start: now.toISOString(),
@@ -164,7 +174,7 @@ export default async function handler(req, res) {
           status: 'active',
           updated_at: now.toISOString(),
         }, { onConflict: 'email' });
-        console.log('[webhook] 订阅开通/续费成功:', email, plan.name, plan.monthly_quota, '条');
+        console.log('[webhook] 订阅开通/续费成功:', email, plan.name, '原剩余:', currentRemaining, '+新套餐:', plan.monthly_quota, '=总额度:', newQuota, '条');
 
       } else {
         console.warn('[webhook] 未知plan_id，跳过处理:', planId, 'order:', order.out_trade_no);
