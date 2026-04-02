@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     }
 
     const response = await client.chat.completions.create({
-      model: 'grok-4-1-fast-non-reasoning',
+      model: 'grok-4.1-fast-non-reasoning',
       max_tokens,
       messages: [
         { role: 'system', content: system },
