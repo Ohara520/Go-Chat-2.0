@@ -5197,7 +5197,7 @@ One or two lines. English only. lowercase.`;
         // 直接走Grok，不走Moonshot
         let geminiReply = '';
         try {
-          const grokRes = await fetchWithTimeout('/api/deepseek', {
+          const grokRes = await fetchWithTimeout('/api/venice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -5214,7 +5214,7 @@ One or two lines. English only. lowercase.`;
         // G调情回复用宽松检测，只过滤明显破防
         const _intimateBreakout = (txt) => {
           const l = txt.toLowerCase();
-          return ["i'm claude", "i am claude", "made by anthropic", "i can't roleplay", "i cannot roleplay", "as an ai", "i'm an ai"].some(p => l.includes(p));
+          return ["i'm claude", "i am claude", "made by anthropic", "i can't roleplay", "i cannot roleplay", "as an ai", "i'm an ai", "i'm kiro", "i am kiro", "kiro", "development work", "coding questions", "infrastructure", "not the right tool", "i need to step back"].some(p => l.includes(p));
         };
         if (geminiReply && geminiReply.trim() && !_intimateBreakout(geminiReply)) {
           hideTyping();
@@ -5246,7 +5246,7 @@ One or two lines. English only. lowercase.`;
           } catch(e2) {}
           // Moonshot失败，走DeepSeek兜底
           try {
-            const dsRes = await fetchWithTimeout('/api/deepseek', {
+            const dsRes = await fetchWithTimeout('/api/venice', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -5274,7 +5274,7 @@ One or two lines. English only. lowercase.`;
       } catch(e) {
         // Moonshot网络失败，走DeepSeek兜底
         try {
-          const dsRes2 = await fetchWithTimeout('/api/deepseek', {
+          const dsRes2 = await fetchWithTimeout('/api/venice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

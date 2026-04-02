@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     }
 
     const response = await client.chat.completions.create({
-      model: 'venice/uncensored:free',
+      model: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
       max_tokens,
       messages: [
         { role: 'system', content: system },
