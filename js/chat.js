@@ -1490,8 +1490,8 @@ function getGhostStatusEmoji() {
   }
 
   // 心情
-  if (mood >= 7) return { emoji: '😌', label: '心情好' };
-  if (mood >= 4) return { emoji: '😐', label: '心情平' };
+  if (mood >= 8) return { emoji: '😌', label: '心情好' };
+  if (mood >= 5) return { emoji: '😐', label: '心情平' };
   return { emoji: '😶', label: '心情差' };
 }
 
@@ -1504,19 +1504,19 @@ const MOOD_EMOJI = {
   ]
 };
 
-// UK时间段基础心情值
-function getMoodBaseByUKTime() {
+// UK时间段心情偏移值（不再是绝对值，只是轻微偏移）
+function getMoodOffsetByUKTime() {
   const now = new Date();
-  const ukOffset = 0; // UTC+0 (GMT), 夏令时可调
+  const ukOffset = 0; // UTC+0 (GMT)
   const utc = now.getTime() + now.getTimezoneOffset() * 60000;
   const ukTime = new Date(utc + ukOffset * 3600000);
   const hour = ukTime.getHours();
-  if (hour >= 6  && hour < 9)  return 6;  // 刚起床，平和
-  if (hour >= 9  && hour < 13) return 8;  // 训练状态好，开心
-  if (hour >= 13 && hour < 17) return 5;  // 下午懈怠，无聊
-  if (hour >= 17 && hour < 21) return 7;  // 收工想你，思念偏暖
-  if (hour >= 21 && hour < 24) return 8;  // 放松时间，开心
-  return 4; // 凌晨，任务或睡觉
+  if (hour >= 6  && hour < 9)  return -1; // 刚起床，稍低
+  if (hour >= 9  && hour < 13) return  1; // 训练状态好，稍高
+  if (hour >= 13 && hour < 17) return -1; // 下午懈怠，稍低
+  if (hour >= 17 && hour < 21) return  0; // 傍晚收工，平稳
+  if (hour >= 21 && hour < 24) return  1; // 放松时间，稍高
+  return -2; // 凌晨，状态最低
 }
 
 function getMoodLevel() {
@@ -1539,8 +1539,10 @@ function refreshStatusEmoji() {
   localStorage.setItem('currentMood', entry.label);
 }
 
-function changeMood(delta) {
-  setMoodLevel(getMoodLevel() + delta);
+function changeMood(delta, force = false) {
+  // 非强制事件限制每轮最多±1，防止跳变
+  const clampedDelta = force ? delta : Math.max(-1, Math.min(1, delta));
+  setMoodLevel(getMoodLevel() + clampedDelta);
 }
 
 function initMood() {
@@ -1548,16 +1550,17 @@ function initMood() {
   if (!localStorage.getItem('moodLevel')) {
     localStorage.setItem('moodLevel', '7');
   }
-  // 按UK时间段轻推（不突变，每次最多漂移1）
-  const base = getMoodBaseByUKTime();
+  const offset = getMoodOffsetByUKTime();
   const current = getMoodLevel();
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   if (!coldWar) {
-    if (current < base) setMoodLevel(current + 1);
-    else if (current > base + 2) setMoodLevel(current - 1);
+    // 时间偏移：每次最多漂移1，保留用户互动的影响
+    const target = current + offset;
+    if (current < target) setMoodLevel(current + 1);
+    else if (current > target + 1) setMoodLevel(current - 1);
     else setMoodLevel(current); // 触发UI更新
   } else {
-    setMoodLevel(Math.min(current, 3)); // 冷战中心情压低
+    setMoodLevel(Math.min(current, 3)); // 冷战中心情压低上限
   }
 }
 
@@ -3292,7 +3295,7 @@ function startColdWar() {
   localStorage.setItem('coldWarStart', Date.now());
   setColdWarStage(1); // 阶段1：顶着
   touchLocalState();
-  changeMood(-3);
+  changeMood(-3, true);
   changeAffection(-4);
   setMoodLevel(Math.min(getMoodLevel(), 2));
   if (coldWarTimer) clearTimeout(coldWarTimer);
@@ -3309,7 +3312,7 @@ function endColdWar(userApologized = false) {
   if (coldWarTimer) { clearTimeout(coldWarTimer); coldWarTimer = null; }
   if (userApologized) {
     changeAffection(3);
-    changeMood(2);
+    changeMood(2, true);
   } else {
     changeAffection(1);
     changeMood(1);
@@ -5770,7 +5773,7 @@ One or two lines. English only. lowercase.`;
       ).then(raw => {
         try {
           const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
-          if (result.apology) { endColdWar(true); changeMood(2); }
+          if (result.apology) { endColdWar(true); changeMood(2, true); }
         } catch(e) {}
       }).catch(() => {});
     }
