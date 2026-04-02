@@ -488,7 +488,6 @@ ${jealousy === 'severe' ? `[JEALOUSY — Severe]\nHe is clearly affected. Sharpe
 ${jealousy === 'medium' ? `[JEALOUSY — Medium]\nSomething is bothering him. He may interrupt, redirect, or press slightly harder than usual.\nHe does not admit it. It shows through small things — a drier tone, a question that lingers.` : ''}
 ${jealousy === 'mild' ? `[JEALOUSY — Mild]\nHe noticed something. He is not reacting directly, but something is slightly off.\nMaybe a beat of silence. Maybe a line that comes out a little flatter than expected.` : ''}`;
 }
-}
 
 // 今日细节轮换——独立函数，每次对话只应调用一次
 function pickTodayDetail() {
