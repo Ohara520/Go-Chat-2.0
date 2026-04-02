@@ -4393,8 +4393,13 @@ function appendMessage(role, text, animate = true) {
   }
   // *动作描述* 格式：转成斜体显示而不是过滤掉
   text = text.replace(/\*([^*]+)\*/g, '「$1」');
-  // 清掉模型输出的方括号（翻译格式残留）
-  text = text.replace(/\[([^\]]*)\]/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  // 删除模型输出里的 [指令] 和 【指令】 整块（tone hint / 系统指令泄漏防护）
+  // 直接删整块，不保留括号内文字，防止指令文字残留在对话里
+  if (role === 'bot') {
+    text = text.replace(/【[^】]{0,400}】/g, '').trim();
+    text = text.replace(/\[[^\]]{0,400}\]/g, '').trim();
+  }
+  text = text.replace(/\s{2,}/g, ' ').trim();
 
   // bot消息渲染：自动分离英文和中文（兼容Ghost偶尔还是输出双语的情况）
   if (role === 'bot' && text.trim().length > 3) {
@@ -6171,62 +6176,55 @@ function scheduleSilenceCheck(index) {
 }
 
 // ===== 键盘弹出/收起时防止空白区域残留 =====
-const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-// iOS 滚动位置锁定：防止 iOS 在键盘弹出时自动滚动整个页面导致布局跳动
-if (_isIOS) {
-  window.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: true });
-}
-
 if (window.visualViewport) {
+  let _lastVH = window.visualViewport.height;
   window.visualViewport.addEventListener('resize', () => {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
 
-    const vv = window.visualViewport;
+    const vh = window.visualViewport.height;
+    const chatContainer = chatScreen.querySelector('.chat-container');
 
-    // 旧版 iOS（< 15.4）不支持 dvh，手动把整个容器压缩到可视区高度
-    if (_isIOS) {
-      const appContainer = document.querySelector('.container');
-      if (appContainer) appContainer.style.height = vv.height + 'px';
+    // 部分安卓不支持interactive-widget，手动设置高度
+    if (chatContainer) {
+      chatContainer.style.height = vh + 'px';
     }
 
-    // chat-container 同步调整（安卓兜底）
-    const chatContainer = chatScreen.querySelector('.chat-container');
-    if (chatContainer) chatContainer.style.height = vv.height + 'px';
-
-    // 滚到最新消息
-    const msgs = document.getElementById('messagesContainer');
-    if (msgs) setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 60);
+    // 滚到底部，防止输入框被遮
+    const container = document.getElementById('messagesContainer');
+    if (container) {
+      setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+    }
+    _lastVH = vh;
   });
 }
 
-// ===== iOS 键盘专项处理 =====
+// ===== iOS键盘专项处理 =====
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 if (_isIOS) {
   document.addEventListener('focusin', (e) => {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
     if (e.target.id !== 'chatInput') return;
-    // 等键盘完全弹出后滚到底，绝对不用 scrollIntoView（会导致整页跳）
+    // iOS键盘弹出后滚到底
     setTimeout(() => {
-      const msgs = document.getElementById('messagesContainer');
-      if (msgs) msgs.scrollTop = msgs.scrollHeight;
-    }, 400);
+      const container = document.getElementById('messagesContainer');
+      if (container) container.scrollTop = container.scrollHeight;
+      e.target.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    }, 350);
   });
 
   document.addEventListener('focusout', (e) => {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
     if (e.target.id !== 'chatInput') return;
-    // 键盘收起，把高度都还原
+    // iOS键盘收起后恢复布局
     setTimeout(() => {
-      const appContainer = document.querySelector('.container');
-      if (appContainer) appContainer.style.height = '';
       const chatContainer = chatScreen.querySelector('.chat-container');
       if (chatContainer) chatContainer.style.height = '';
-      const msgs = document.getElementById('messagesContainer');
-      if (msgs) msgs.scrollTop = msgs.scrollHeight;
-    }, 150);
+      const container = document.getElementById('messagesContainer');
+      if (container) container.scrollTop = container.scrollHeight;
+    }, 100);
   });
 }
 
