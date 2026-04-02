@@ -935,6 +935,13 @@
         </div>
       </div>
 
+      <!-- 管理员测试按钮（只有admin模式可见） -->
+      <div id="adminWalletTest" style="display:none;margin:12px 0;text-align:center;">
+        <button onclick="adminAddMoney(100)" style="background:linear-gradient(135deg,#b07ad0,#d4709a);color:white;border:none;border-radius:12px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;margin:4px;">+£100 测试</button>
+        <button onclick="adminAddMoney(500)" style="background:linear-gradient(135deg,#7a5a9a,#b07ad0);color:white;border:none;border-radius:12px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;margin:4px;">+£500 测试</button>
+        <button onclick="adminClearWallet()" style="background:#e05a8a;color:white;border:none;border-radius:12px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;margin:4px;">清空钱包</button>
+      </div>
+
       <!-- 交易记录 -->
       <div class="transaction-section">
         <div class="transaction-header">📋 交易记录</div>
@@ -1557,9 +1564,29 @@ function showQQGroup() {
     document.addEventListener('DOMContentLoaded', function() {
       const m = document.getElementById('maintenanceModal');
       if (m) m.style.display = 'none';
+      const adminBtn = document.getElementById('adminWalletTest');
+      if (adminBtn) adminBtn.style.display = 'block';
     });
   }
 })();
+
+function adminAddMoney(amount) {
+  if (typeof addTransaction === 'function') {
+    addTransaction({ icon: '🔧', name: '管理员测试充值', amount: amount });
+    if (typeof renderWallet === 'function') renderWallet();
+    alert('已添加 £' + amount + '，当前余额：£' + (typeof getBalance === 'function' ? getBalance() : '?'));
+  } else {
+    alert('钱包系统未加载！');
+  }
+}
+
+function adminClearWallet() {
+  if (confirm('确认清空钱包？')) {
+    localStorage.removeItem('transactions');
+    if (typeof renderWallet === 'function') renderWallet();
+    alert('钱包已清空！');
+  }
+}
 </script>
 <div id="maintenanceModal" style="
   display: flex;
