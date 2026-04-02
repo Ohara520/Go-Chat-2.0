@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: 'https://api.yunjintao.com/v1',
 });
 
 // Ghost调情专用人设——精简、直接、锁死核心性格
@@ -39,16 +39,12 @@ export default async function handler(req, res) {
     const fullSystem = GHOST_INTIMATE_CORE + (safeSystem ? '\n\n' + safeSystem : '');
 
     const response = await client.chat.completions.create({
-      model: 'nothingiisreal/mn-celeste-12b',
+      model: 'grok-4.1',
       max_tokens,
       messages: [
         { role: 'system', content: fullSystem },
         { role: 'user', content: user },
       ],
-      headers: {
-        'HTTP-Referer': 'https://gochat.vercel.app',
-        'X-Title': 'Go Chat',
-      }
     });
 
     const text = response.choices?.[0]?.message?.content?.trim() || '';
