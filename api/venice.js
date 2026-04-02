@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const fullSystem = GHOST_INTIMATE_CORE + (safeSystem ? '\n\n' + safeSystem : '');
 
     const response = await client.chat.completions.create({
-      model: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+      model: 'nothingiisreal/mn-celeste-12b',
       max_tokens,
       messages: [
         { role: 'system', content: fullSystem },
