@@ -1000,17 +1000,17 @@ ${localStorage.getItem('userDislikesMoney')==='true' ? `[She has expressed disco
 ${(()=>{
   const todayCount = getTodayGivenCount();
   const weeklyUsed = getWeeklyGiven();
-  if (todayCount >= 2) return `[Daily transfer limit reached. Do NOT mention transferring money or specific amounts in your reply. Do not use GIVE_MONEY tag.]`;
-  if (weeklyUsed >= 300) return `[Weekly transfer limit reached. Do NOT mention transferring money or specific amounts. Do not use GIVE_MONEY tag.]`;
-  // 30分钟冷却：上次转账距现在不足30分钟
+  if (todayCount >= 3) return `[Daily transfer limit reached. You MUST NOT mention transferring money, sending money, or any specific amounts. Do NOT use GIVE_MONEY tag under any circumstances. Do not hint at it either.]`;
+  if (weeklyUsed >= 500) return `[Weekly transfer limit reached. You MUST NOT mention transferring money, sending money, or any specific amounts. Do NOT use GIVE_MONEY tag under any circumstances.]`;
+  // 15分钟冷却
   const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
-  if (Date.now() - lastGivenAt < 30 * 60 * 1000) {
-    return `[Transfer cooldown active — you transferred recently. Do NOT mention transferring money, do NOT use GIVE_MONEY tag. If she asks, deflect naturally without committing.]`;
+  if (Date.now() - lastGivenAt < 15 * 60 * 1000) {
+    return `[Transfer cooldown active — you transferred very recently. You MUST NOT mention transferring money or use GIVE_MONEY tag. Do not hint at it. If she asks about money, deflect naturally.]`;
   }
   // 本轮对话已给过一次
   const conversationGiven = parseInt(sessionStorage.getItem('conversationGivenCount') || '0');
   if (conversationGiven >= 1) {
-    return `[Already transferred once this conversation — do NOT use GIVE_MONEY tag again or mention transferring money.]`;
+    return `[Already transferred once this conversation — do NOT use GIVE_MONEY tag again or mention transferring money under any circumstances.]`;
   }
   return '';
 })()}
@@ -3556,15 +3556,15 @@ function applyMoneyEffect(amount, options = {}) {
   // 0. 用户长期表达不喜欢被钱哄 → Ghost主动给时跳过（用户主动要除外）
   if (!userRequested && localStorage.getItem('userDislikesMoney') === 'true') return false;
 
-  // 1. 每日次数：用户主动要最多5次，Ghost主动给最多2次
+  // 1. 每日次数：用户主动要最多5次，Ghost主动给最多3次
   const todayCount = getTodayGivenCount();
-  const dailyLimit = userRequested ? 5 : 2;
+  const dailyLimit = userRequested ? 5 : 3;
   if (todayCount >= dailyLimit) return false;
 
-  // 2. 两次之间冷却：用户主动要不受冷却限制
+  // 2. 两次之间冷却：15分钟，用户主动要不受冷却限制
   if (!userRequested && !options.bypassCooldown) {
     const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
-    const transferCooldown = 30 * 60 * 1000;
+    const transferCooldown = 15 * 60 * 1000;
     if (Date.now() - lastGivenAt < transferCooldown) return false;
   }
 
@@ -3584,11 +3584,11 @@ function applyMoneyEffect(amount, options = {}) {
   // 每周上限检查——吃醋/和好情绪性转账可绕过
   const weeklyUsed = getWeeklyGiven();
   if (!options.bypassWeeklyLimit) {
-    if (weeklyUsed >= 300) return false;
+    if (weeklyUsed >= 500) return false;
   }
   const actualAmount = options.bypassWeeklyLimit
     ? amount
-    : Math.min(amount, 300 - weeklyUsed);
+    : Math.min(amount, 500 - weeklyUsed);
 
   // 先记录交易，再更新UI，确保顺序正确
   addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
@@ -4081,6 +4081,15 @@ let lastMessageTime = null;
 async function initChat() {
   // 好感度初始化（首次）
   if (!localStorage.getItem('affection')) setAffection(60);
+
+  // ===== 维护补偿：每个用户只发一次£100 =====
+  if (!localStorage.getItem('maintenanceCompensation_20260402')) {
+    localStorage.setItem('maintenanceCompensation_20260402', '1');
+    if (typeof addTransaction === 'function') {
+      addTransaction({ icon: '🎁', name: '维护补偿', amount: 100 });
+      if (typeof renderWallet === 'function') renderWallet();
+    }
+  }
 
   // 副作用初始化——统一在这里做，buildSystemPrompt 只读不写
   ensureGhostBirthday();
@@ -5762,11 +5771,15 @@ One or two lines. English only. lowercase.`;
           userRequested: userAsked, // 用户主动要，限制宽松
         });
         if (!applied) {
-          const dailyLimit = userAsked ? 5 : 2;
+          const dailyLimit = userAsked ? 5 : 3;
           const limitMsg = getTodayGivenCount() >= dailyLimit
             ? '[系统：今日零花钱次数已达上限，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]'
-            : '[系统：本周零花钱已达上限£300，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]';
+            : '[系统：本周零花钱已达上限，本次转账未执行，你没有成功转钱。用你自己的方式拒绝，不解释系统原因，符合你当下的心情和性格就行。]';
           chatHistory.push({ role: 'user', content: limitMsg, _system: true });
+          // 假账过滤：把回复里提到转钱/具体金额的部分删掉，防止用户以为转了
+          reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop|throw)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
+          reply = reply.replace(/£\d+[^.!?\n]*(send|transfer|give|wire|on its way|coming your way)[^.!?\n]*/gi, '').trim();
+          reply = reply || '.';
           return false;
         }
         // 用实际到账金额覆盖，防止被周上限截断后不一致
