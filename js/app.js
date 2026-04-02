@@ -105,6 +105,14 @@ window.onload = function() {
     if (typeof loadFromCloud === 'function') {
         loadFromCloud().then(() => {
             if (typeof refreshChatScreen === 'function') refreshChatScreen();
+            // 云端加载完成后，刷新当前已打开的页面数据
+            const activeScreen = document.querySelector('.screen.active');
+            if (activeScreen) {
+                const id = activeScreen.id;
+                if (id === 'secretScreen'      && typeof loadSecretScreen  === 'function') loadSecretScreen();
+                if (id === 'profileScreen'     && typeof initProfile       === 'function') initProfile();
+                if (id === 'walletScreen'      && typeof renderWallet      === 'function') renderWallet();
+            }
         }).catch(() => {});
     }
 
