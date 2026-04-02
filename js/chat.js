@@ -6171,42 +6171,40 @@ function scheduleSilenceCheck(index) {
 }
 
 // ===== 键盘弹出/收起时防止空白区域残留 =====
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 if (window.visualViewport) {
-  let _lastVH = window.visualViewport.height;
   window.visualViewport.addEventListener('resize', () => {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
 
-    const vh = window.visualViewport.height;
+    const vv = window.visualViewport;
     const chatContainer = chatScreen.querySelector('.chat-container');
 
-    // 部分安卓不支持interactive-widget，手动设置高度
+    // 用 visualViewport 高度撑满可视区（iOS/安卓通用）
     if (chatContainer) {
-      chatContainer.style.height = vh + 'px';
+      chatContainer.style.height = vv.height + 'px';
     }
 
     // 滚到底部，防止输入框被遮
     const container = document.getElementById('messagesContainer');
     if (container) {
-      setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+      setTimeout(() => { container.scrollTop = container.scrollHeight; }, 60);
     }
-    _lastVH = vh;
   });
 }
 
 // ===== iOS键盘专项处理 =====
-const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 if (_isIOS) {
   document.addEventListener('focusin', (e) => {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
     if (e.target.id !== 'chatInput') return;
-    // iOS键盘弹出后滚到底
+    // 等键盘完全弹出后只滚消息列表，不用 scrollIntoView（会导致整页跳）
     setTimeout(() => {
       const container = document.getElementById('messagesContainer');
       if (container) container.scrollTop = container.scrollHeight;
-      e.target.scrollIntoView({ block: 'end', behavior: 'smooth' });
-    }, 350);
+    }, 400);
   });
 
   document.addEventListener('focusout', (e) => {
@@ -6219,7 +6217,7 @@ if (_isIOS) {
       if (chatContainer) chatContainer.style.height = '';
       const container = document.getElementById('messagesContainer');
       if (container) container.scrollTop = container.scrollHeight;
-    }, 100);
+    }, 150);
   });
 }
 
