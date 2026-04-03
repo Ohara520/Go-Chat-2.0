@@ -7527,23 +7527,7 @@ async function checkMoneyIntent(userText) {
 
   try {
     const raw = await fetchDeepSeek(
-      '判断用户这句话的钱相关意图和理由类型。只返回JSON，不要其他文字。
-
-intent可选值：
-- "request"：用户在要钱/希望对方给钱
-- "refuse"：用户在拒绝收钱/说不要钱
-- "complain"：用户在抱怨对方老给钱/用钱哄人
-- "hint"：用户暗示经济压力或想要某样东西，但没直接要钱
-- "none"：和钱无关或只是提到钱这个词
-
-reason_type可选值（仅当intent为request或hint时填写）：
-- "reunion"：用户想要钱是为了买机票/来找对方/见面/去对方所在城市/异地相见
-- "care"：真实生活困难，如没吃饭、生病、手机坏了、交不起费、朋友还没还钱等
-- "flirty"：撒娇式要钱，如买奶茶、买零食、打赏、随手给我点
-- "testing"：试探性要钱，如"你给不给我钱""看看你会不会给"
-- "neutral"：其他/无法判断
-
-格式：{"intent":"none","reason_type":"neutral"}',
+      `判断用户这句话的钱相关意图和理由类型。只返回JSON，不要其他文字。\n\nintent可选值：\n- "request"：用户在要钱/希望对方给钱\n- "refuse"：用户在拒绝收钱/说不要钱\n- "complain"：用户在抱怨对方老给钱/用钱哄人\n- "hint"：用户暗示经济压力或想要某样东西，但没直接要钱\n- "none"：和钱无关或只是提到钱这个词\n\nreason_type可选值（仅当intent为request或hint时填写）：\n- "reunion"：用户想要钱是为了买机票/来找对方/见面/去对方所在城市/异地相见\n- "care"：真实生活困难，如没吃饭、生病、手机坏了、交不起费、朋友还没还钱等\n- "flirty"：撒娇式要钱，如买奶茶、买零食、打赏、随手给我点\n- "testing"：试探性要钱，如"你给不给我钱""看看你会不会给"\n- "neutral"：其他/无法判断\n\n格式：{"intent":"none","reason_type":"neutral"}`,
       `用户说：${userText}`,
       80
     );
@@ -7623,8 +7607,7 @@ reason_type可选值（仅当intent为request或hint时填写）：
           const amount = decideMoneyAmountFromState();
           if (amount > 0) {
             const recentCtx = recentHistory
-              .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('
-');
+              .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('\n');
             // 延迟触发，让 Ghost 先回复，再悄悄转——不说破，就行动
             // 标记本轮 hint 已准备给钱，防止用户在窗口期开口要钱时重复触发
             sessionStorage.setItem('hintMoneyPending', '1');
