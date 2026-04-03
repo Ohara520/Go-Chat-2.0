@@ -2624,6 +2624,17 @@ function parseAssistantTags(reply) {
   let coldWarStart = false;
   let sendGift = null;
 
+  // ===== 清理模型泄漏的内部指令 =====
+  // 1. 删除 [方括号] 和 【方括号】 里的所有内容（系统指令、tone hint等）
+  cleanedReply = cleanedReply.replace(/\[(?!\d)[^\]]{3,}\]/g, '').trim();
+  cleanedReply = cleanedReply.replace(/【[^】]{3,}】/g, '').trim();
+  // 2. 删除行首的 "- Tease/Note/Hint/Scene/Context..." 这类指令行
+  cleanedReply = cleanedReply.replace(/\n?-\s+(Tease|Note|Hint|Scene|Context|Tone|Keep|Stay|Let|Make|Don't|Do not|Remember|This)[^\n]*/gi, '').trim();
+  // 3. 删除括号包着的英文指令（如 (tease her lightly)）
+  cleanedReply = cleanedReply.replace(/\([A-Z][^)]{5,}\)/g, '').trim();
+  // 4. 清理多余空行
+  cleanedReply = cleanedReply.replace(/\n{3,}/g, '\n').trim();
+
   const moneyMatch = cleanedReply.match(/GIVE_MONEY:(\d+):?([^\n]*)/i);
   if (moneyMatch) {
     giveMoney = {
