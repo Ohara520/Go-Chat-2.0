@@ -1559,13 +1559,12 @@ function toggleThought() {
     // 检查队列里有没有下一条
     if (_thoughtQueue.length > 0) {
       const next = _thoughtQueue.shift();
-      const thoughtTextEl = document.getElementById('thoughtText');
-      if (thoughtTextEl) {
-        thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${next.en}</div><div style="font-size:11px;opacity:0.6">${next.zh}</div>`;
-      }
+      // 队列里有下一条心声：300ms后重新亮起按钮提示用户
       setTimeout(() => {
-        bubble.classList.add('show');
-        // 不自动消失，用户手动关闭
+        if (btn) {
+          btn.dataset.hasThought = '1';
+          btn.classList.add('thought-btn-pulse');
+        }
       }, 300);
     } else {
       if (btn) { btn.classList.remove('thought-btn-pulse'); btn.dataset.hasThought = '0'; }
@@ -4930,51 +4929,82 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
     (Date.now() - parseInt(sessionStorage.getItem('jealousyReferentAt') || '0')) < 30 * 60 * 1000;
   if (_rivalryInner.test(replyText) && !_hasReferentNow) return;
 
-  // ── 裂缝检测：只在有情绪反差的时候触发 ──────────────────
+  // ── 心声触发场景检测 ──────────────────────────────────────
   const replyLower = replyText.toLowerCase();
   const lastUserMsg = (chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '').toLowerCase();
 
-  // 场景1：嘴硬——回复很短/很冷，但上下文有情绪
-  const isStubborn = replyLower.length < 60 && /yeah|right|fine|okay|whatever|noted|sure/.test(replyLower);
-  // 场景2：没接住情绪——用户在分享，Ghost转移了话题或只说了事实
-  const userSharing = /难过|委屈|开心|好累|爱你|想你|sad|excited|happy|tired|missed/.test(lastUserMsg);
-  const ghostDeflected = replyLower.length < 80 && !/(you|her|she|feel|okay|alright|here)/.test(replyLower);
+  // 场景1：嘴硬——回复很短/很冷，表面干但背后有情绪
+  const isStubborn = replyLower.length < 80 && /yeah|right|fine|okay|whatever|noted|sure|got it|copy/.test(replyLower);
+
+  // 场景2：没接住情绪——用户在分享，Ghost没有完全接住
+  const userSharing = /难过|委屈|开心|好累|爱你|想你|害怕|不安|sad|excited|happy|tired|missed|scared|worried|nervous/.test(lastUserMsg);
+  const ghostDeflected = replyLower.length < 100 && !/(feel|okay|alright|here|know|understand|got you)/.test(replyLower);
   const missedCue = userSharing && ghostDeflected;
-  // 场景3：做了照顾但没承认（刚触发了转账或寄礼）
+
+  // 场景3：做了照顾但没承认（转账/寄礼）
   const justCared = sessionStorage.getItem('thisRoundCareAction') === '1';
-  // 场景4：轻微吃醋但没说破
+
+  // 场景4：吃醋但没说破
   const jealousyHidden = getJealousyLevelCapped() !== 'none' && !/jealous|who|him|he/.test(replyLower);
+
   // 场景5：冷战裂缝
   const coldWarCracking = localStorage.getItem('coldWarMode') === 'true' &&
     localStorage.getItem('coldWarStage') >= '2';
 
-  // 冷却：每5条消息才能触发一次
-  const lastAt = parseInt(localStorage.getItem('lastInnerThoughtAt') || '0');
+  // 场景6：隐藏的关心——他说了一句关心的话但很克制，背后比说出口的多
+  const hiddenCare = /careful|eat|sleep|rest|tired|cold|warm|safe|okay\?|alright\?|you good|how are you/.test(replyLower)
+    && replyLower.length < 60;
+
+  // 场景7：他注意到了细节——用户说了什么，Ghost的回复里有一个细节呼应
+  const noticedDetail = replyLower.length < 80
+    && lastUserMsg.length > 20
+    && chatHistory.filter(m => m.role === 'user' && !m._system).length > 3;
+
+  // 场景8：他想多说但没说——回复很短，但上下文明明有更多可以说的
+  const heldBack = replyLower.length < 50
+    && lastUserMsg.length > 30
+    && !isStubborn;
+
+  // 冷却：每3条消息才能触发一次，超过10条强制触发
   const msgCountKey = 'innerThoughtMsgCount';
   const msgCount = parseInt(localStorage.getItem(msgCountKey) || '0') + 1;
   localStorage.setItem(msgCountKey, msgCount);
-  if (msgCount - parseInt(localStorage.getItem('lastInnerThoughtMsgCount') || '0') < 5) {
-    if (!justCared && !coldWarCracking) return; // 特殊场景不受条数限制
+  const lastTriggeredCount = parseInt(localStorage.getItem('lastInnerThoughtMsgCount') || '0');
+  const gapSinceLastTrigger = msgCount - lastTriggeredCount;
+  const forceTrigger = gapSinceLastTrigger >= 15;
+  if (gapSinceLastTrigger < 5) {
+    if (!justCared && !coldWarCracking) return;
   }
 
-  const hasCrack = isStubborn || missedCue || justCared || jealousyHidden || coldWarCracking;
+  // 氛围感知：看最近几条对话的整体氛围，影响触发概率
+  const _recentCtx = chatHistory
+    .filter(m => !m._system && !m._recalled)
+    .slice(-6)
+    .map(m => m.content.toLowerCase()).join(' ');
+  const _warmAtmosphere = /love|miss|想你|爱你|好想|抱|亲|喜欢|care|here for you|with you/.test(_recentCtx);
+  const _intimateRecent = chatHistory.slice(-6).some(m => m._intimate);
+  const _atmosphereBoost = (_warmAtmosphere || _intimateRecent) ? 0.15 : 0; // 温柔氛围额外+15%概率
 
   // 确定心声类型和触发概率
   let thoughtType = 'contrast';
   let triggerChance = 0;
 
-  if (justCared) { thoughtType = 'behavior'; triggerChance = 0.85; }
+  if (justCared)        { thoughtType = 'behavior';  triggerChance = 0.90; }
   else if (coldWarCracking) { thoughtType = 'crack'; triggerChance = 0.85; }
-  else if (jealousyHidden) { thoughtType = 'jealousy'; triggerChance = 0.80; }
-  else if (isStubborn) { thoughtType = 'contrast'; triggerChance = 0.75; }
-  else if (missedCue) { thoughtType = 'delayed'; triggerChance = 0.75; }
+  else if (jealousyHidden)  { thoughtType = 'jealousy'; triggerChance = 0.80; }
+  else if (missedCue)       { thoughtType = 'delayed';  triggerChance = 0.75; }
+  else if (isStubborn)      { thoughtType = 'contrast'; triggerChance = 0.75; }
+  else if (hiddenCare)      { thoughtType = 'behavior'; triggerChance = 0.70; }
+  else if (heldBack)        { thoughtType = 'contrast'; triggerChance = 0.60; }
+  else if (noticedDetail)   { thoughtType = 'contrast'; triggerChance = 0.45; }
   else {
-    // 日常随机触发——没有特定场景，就是他随手的一个念头
+    // 日常随机——他随时可能有一个没说出口的念头
     thoughtType = 'contrast';
-    triggerChance = 0.20;
+    triggerChance = 0.25;
   }
 
-  if (Math.random() > triggerChance) return;
+  const finalChance = Math.min(0.95, triggerChance + _atmosphereBoost);
+  if (!forceTrigger && Math.random() > finalChance) return;
 
   // 记录触发时的消息计数
   localStorage.setItem('lastInnerThoughtMsgCount', msgCount);
