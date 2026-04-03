@@ -174,6 +174,16 @@ async function loadFromCloud() {
     } else if (data.chat_history && data.chat_history.length > 0) {
       // 有聊天记录说明是老用户，直接标记为已迁移，防止清空
       localStorage.setItem('walletMigrated_v3', '1');
+    } else {
+      // 新用户：云端没有记录
+      // 先标记已迁移，再手动给初始礼金，防止 getBalance() 重复触发清空+给钱
+      if (!localStorage.getItem('walletMigrated_v3')) {
+        localStorage.setItem('walletMigrated_v3', '1');
+        // 给初始礼金（跟 wallet.js 里迁移代码一致）
+        if (typeof addTransaction === 'function') {
+          addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
+        }
+      }
     }
 
     // ── 5. 余额：本地没有才从云端恢复，有就保留本地 ──────────
