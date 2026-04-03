@@ -3344,7 +3344,8 @@ function doCheckin() {
   renderCheckin();
   initCalendar();
   launchCheckinFlowers();
-  scheduleCloudSave();
+  // 签到是重要操作，立刻存云端，不走防抖，防止切页面后记录丢失
+  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
 }
 
 function showCheckinResult(msg, streak) {
