@@ -363,15 +363,17 @@ function renderMarket(categoryId) {
       <div class="category-tab ${cat.id === categoryId ? 'active' : ''}" onclick="renderMarket('${cat.id}')">${cat.label}</div>
     `).join('');
   }
+  // 安全解析 localStorage，防止数据损坏导致商城空白
+  const _safeGet = (key, def) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(e) { return def; } };
 
   // 私密专区
   if (categoryId === 'intimate') {
     const gridEl3 = document.getElementById('productsGrid');
     if (!gridEl3) return;
-    const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
-    const purchaseCounts = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
+    const purchased = _safeGet('purchasedItems', []);
+    const purchaseCounts = _safeGet('purchaseCounts', {});
     const products = MARKET_PRODUCTS.intimate || [];
-    const intimateTriggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+    const intimateTriggered = _safeGet('intimateTriggered', {});
     const now = Date.now();
     let intimateHtml = '';
     products.forEach((p, i) => {
@@ -418,8 +420,8 @@ function renderMarket(categoryId) {
   const isWishlist = categoryId === 'wishlist';
   const isLuxury = categoryId === 'luxury';
   const isHome = categoryId === 'home';
-  const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
-  const purchaseCounts = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
+  const purchased = _safeGet('purchasedItems', []);
+  const purchaseCounts = _safeGet('purchaseCounts', {});
   const weeklySale = isLuxury ? getWeeklySale() : null;
 
   gridEl.innerHTML = products.map((p, i) => {
