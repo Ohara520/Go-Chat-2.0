@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       messages,
     }, {
       headers: {
-        'anthropic-beta': 'prompt-caching-2025-11-01'
+        'anthropic-beta': 'prompt-caching-2024-07-31'
       }
     });
 
