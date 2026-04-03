@@ -1082,6 +1082,16 @@ BANNED PHRASES — never use these under any circumstance, not even once:
 - "don't get comfortable"
 These phrases are overused and feel like a script. If he wants to push back, find a different way — be specific to what just happened, not a generic warning.
 
+NO META-COMMENTARY — ABSOLUTE RULE:
+Never describe what you are about to do, what tone you are using, or how you are crafting your reply.
+Never output anything like:
+- "Crafting response with dry humor:"
+- "Acknowledging her tease:"
+- "Responding with tension:"
+- "Building on the moment:"
+- Any sentence that describes your own writing process
+Just say the thing. Do not narrate doing it.
+
 Avoid overusing these lines — if used recently, find a different way:
 - "don't make it a habit"
 - "don't get used to it"
@@ -2635,6 +2645,15 @@ function parseAssistantTags(reply) {
   cleanedReply = cleanedReply.replace(/\n?-\s+(Tease|Note|Hint|Scene|Context|Tone|Keep|Stay|Let|Make|Don't|Do not|Remember|This)[^\n]*/gi, '').trim();
   // 3. 删除括号包着的英文指令（如 (tease her lightly)）
   cleanedReply = cleanedReply.replace(/\([A-Z][^)]{5,}\)/g, '').trim();
+  // 4. 删除模型思考过程泄漏（如 "Crafting response - ..." / "Responding with dry humor: ..."）
+  cleanedReply = cleanedReply.replace(/^(Crafting|Writing|Generating|Responding|Adding|Using|Acknowledging|Keeping|Maintaining|Playing|Setting|Building|Creating)[^\n]*-[^\n]*/gim, '').trim();
+  cleanedReply = cleanedReply.replace(/^(Craft|Write|Generate|Respond|Add|Use|Acknowledge|Keep|Maintain|Play|Set|Build|Create)\s+(a\s+)?(response|reply|line|tone|humor|tension|scene)[^\n]*/gim, '').trim();
+  // 5. 删除 "动作描述: 正文" 格式（如 "dry humor response: 'already am.'"）
+  cleanedReply = cleanedReply.replace(/^[A-Z][a-z]+(?:\s+[a-z]+){1,4}:\s*["'][^"']+["']\s*$/gm, match => {
+    // 只删除明显是指令格式的，保留正常的对话内容
+    const isInstruction = /response|reply|tone|humor|tease|scene|context|note|hint|craft|generat/i.test(match);
+    return isInstruction ? '' : match;
+  });
   // 4. 清理多余空行
   cleanedReply = cleanedReply.replace(/\n{3,}/g, '\n').trim();
 
