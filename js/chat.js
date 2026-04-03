@@ -3306,7 +3306,7 @@ function doCheckin() {
     const current = parseInt(localStorage.getItem(key) || '0');
     localStorage.setItem(key, Math.max(0, current - msgCount).toString());
     // 云端条数（已登录用户）——减少 used_count
-    const _email = localStorage.getItem('userEmail') || '';
+    const _email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
     if (_email) {
       fetch('/api/checkin-bonus', {
         method: 'POST',
@@ -3326,7 +3326,7 @@ function doCheckin() {
     const current = parseInt(localStorage.getItem(key) || '0');
     localStorage.setItem(key, Math.max(0, current - milestoneBonus).toString());
     // 云端同步里程碑奖励
-    const _emailM = localStorage.getItem('userEmail') || '';
+    const _emailM = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
     if (_emailM) {
       fetch('/api/checkin-bonus', {
         method: 'POST',
@@ -4108,7 +4108,7 @@ async function sendSticker(id) {
   if (!meta) return;
 
   // 条数检查：用完了不触发Ghost回复
-  const email = localStorage.getItem('userEmail') || '';
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (email) {
     const sub = await getSubscription();
     if (!sub || sub.remaining <= 0) {
@@ -4263,7 +4263,7 @@ function confirmTransfer() {
     return;
   }
   // 条数检查放在确认时，不拦截打开，让用户知道为什么不行
-  const _email = localStorage.getItem('userEmail') || '';
+  const _email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (_email) {
     // 订阅用户：检查云端额度
     const _remaining = _subCache ? _subCache.remaining : 1;
@@ -4328,7 +4328,7 @@ function confirmTransfer() {
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '').replace(/\s{2,}/g, ' ').trim();
     // 转账回复成功，扣一条额度
     incrementTodayCount();
-    if (localStorage.getItem('userEmail')) consumeQuota().catch(() => {});
+    if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
 
     if (shouldRefund) {
       // 退款：加回余额，更新卡片状态，显示退款卡片
@@ -5266,7 +5266,7 @@ let _subCacheTime = 0;
 async function getSubscription() {
   const now = Date.now();
   if (_subCache && now - _subCacheTime < 5 * 60 * 1000) return _subCache;
-  const email = localStorage.getItem('userEmail') || '';
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (!email) return null;
   try {
     const res = await fetch('/api/check-subscription', {
@@ -5282,7 +5282,7 @@ async function getSubscription() {
 }
 
 async function consumeQuota() {
-  const email = localStorage.getItem('userEmail') || '';
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (!email) return true;
   try {
     const res = await fetch('/api/increment-usage', {
@@ -5365,7 +5365,7 @@ async function sendMessage() {
 
 async function _processMergedMessage(text) {
   // 条数限制检查
-  const email = localStorage.getItem('userEmail') || '';
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (email) {
     const sub = await getSubscription();
     if (!sub) {
@@ -6420,7 +6420,7 @@ One or two lines. English only. lowercase.`;
     // 成功拿到回复才计条数
     incrementTodayCount();
     // 订阅用户扣减云端额度
-    if (localStorage.getItem('userEmail')) consumeQuota().catch(() => {});
+    if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
 
     // 消息撤回：4%概率，发完3-6秒后撤回，重新打一条
     if (lastBotResult && !giveMoneyMatch && Math.random() < 0.04) {
