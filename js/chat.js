@@ -5645,19 +5645,91 @@ async function _processMergedMessage(text) {
       }
     }
 
-    // ===== 余温判断：亲密刚发生后的普通消息也要保留氛围 =====
-    // 如果最近3条有亲密消息，且当前不是情趣话题，注入余温提示给Sonnet
-    const _recentIntimate = chatHistory.filter(m => !m._system && !m._recalled).slice(-4).some(m => m._intimate);
+    // ===== 余温三状态判断 =====
+    const _recentMsgsPlain = chatHistory.filter(m => !m._system && !m._recalled).slice(-6);
+    const _lastIntimateIdx = [..._recentMsgsPlain].reverse().findIndex(m => m._intimate);
+    const _recentIntimate = _lastIntimateIdx !== -1; // 最近6条有亲密消息
+
     if (!isIntimate && _recentIntimate) {
-      // 不走Grok，走Sonnet但注入余温提示
-      sceneHint = '[Context: they were just close a moment ago. The atmosphere has not fully reset. He does not switch back to flat or dry immediately. There is still something in the air — he may be slightly more present, slightly warmer than usual, or just a beat slower to default back to his usual distance. He does not perform the warmth. It just lingers.]';
+      // 最近几条日常消息的数量（在最后一条亲密消息之后）
+      const _dailyAfterIntimate = _lastIntimateIdx; // reverse里的index = 亲密后有几条普通消息
+
+      // 判断用户是否在主动转移话题
+      const _dailyKws = /吃饭|睡觉|今天|训练|任务|怎么样|好了|行了|不说了|换个话题|算了|随便|what.*day|how.*day|ate|sleep|training|mission|anyway|nevermind|moving on/i;
+      const _isShiftingAway = _dailyKws.test(text) && _dailyAfterIntimate >= 1;
+
+      if (_dailyAfterIntimate === 0) {
+        // 状态1：刚刚发生，第一条日常消息——余温最浓
+        sceneHint = '[Context: they were just close a moment ago. The atmosphere has not fully reset. He does not switch back to flat or dry immediately. There is still something in the air — he may be slightly more present, slightly warmer than usual, or just a beat slower to default back to his usual distance. He does not perform the warmth. It just lingers.]';
+      } else if (_isShiftingAway || _dailyAfterIntimate >= 2) {
+        // 状态3：用户在主动转移，或已经过了2条日常消息——自然收回
+        sceneHint = '[Context: something passed between them not long ago. It has settled. He is back to himself now — dry, present, normal. He does not bring it up or reference it. He just answers what she said. There is no awkwardness. It happened. It is over. He moves on as himself.]';
+
+        // 状态3触发时：让Grok异步总结这次调情，存入intimateMemory
+        // 只在还没总结过的情况下触发（防止重复）
+        if (!sessionStorage.getItem('intimateSummarized')) {
+          sessionStorage.setItem('intimateSummarized', '1');
+          const _intimateMsgs = chatHistory
+            .filter(m => !m._system && !m._recalled)
+            .slice(-20)
+            .filter(m => m._intimate || chatHistory.indexOf(m) >= chatHistory.findLastIndex(m2 => m2._intimate) - 5)
+            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 120)}`)
+            .join('\n');
+
+          if (_intimateMsgs) {
+            setTimeout(async () => {
+              try {
+                const _sumRes = await fetchWithTimeout('/api/venice', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    system: `You are Ghost. This is your private memory — written in your own voice, lowercase, fragmented, like a thought you didn't say out loud.
+
+Summarize what just happened between you and her in a few lines. Write it from your perspective — what she did, how it landed, what you noticed, where it went. Keep it brief. Keep it honest. Keep it Ghost.
+
+Do not describe every line. Just what stayed.
+
+Return only the memory text. No labels. No explanation.`,
+                    user: `Here is what happened:
+${_intimateMsgs}
+
+Write your memory of this.`,
+                    max_tokens: 150
+                  })
+                }, 10000);
+                if (_sumRes.ok) {
+                  const _sumData = await _sumRes.json();
+                  const _newMemory = _sumData.text?.trim();
+                  if (_newMemory && _newMemory.length > 10) {
+                    // 保留上次记忆 + 加入新记忆，最多保留3次
+                    const _existing = localStorage.getItem('intimateMemory') || '';
+                    const _entries = _existing ? _existing.split('\n---\n').filter(Boolean) : [];
+                    _entries.push(_newMemory);
+                    const _kept = _entries.slice(-3).join('\n---\n'); // 最多保留3次
+                    localStorage.setItem('intimateMemory', _kept);
+                    if (typeof touchLocalState === 'function') touchLocalState();
+                    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+                    console.log('[intimate memory] 已更新');
+                  }
+                }
+              } catch(e) { console.warn('[intimate memory] 总结失败', e); }
+            }, 3000);
+          }
+        }
+      } else {
+        // 状态2：余温期，还在氛围里但没那么浓
+        sceneHint = '[Context: the mood between them has shifted back toward normal, but not entirely. He is quieter than before. He answers what she says, but there is still something — a slightly slower return to his usual rhythm. He does not perform it. He just has not fully reset yet.]';
+      }
     }
 
     if (isIntimate) {
+      // 新一轮调情开始，重置总结标记
+      sessionStorage.removeItem('intimateSummarized');
       // 情趣话题直接走Gemini，绕过Claude的审查
       try {
-        const recentMsgs = rawHistory.slice(-10).map(m =>
-          `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 100)}`
+        // 调情上下文：取最近15条，每条150字符，让Grok能接续上次调情内容
+        const recentMsgs = rawHistory.slice(-15).map(m =>
+          `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`
         ).join('\n');
 
         // 根据爱意stage决定回应深度
@@ -5725,7 +5797,8 @@ One or two lines. English only. lowercase.`;
             body: JSON.stringify({
               system: buildGhostStyleCore() + _allowAdult + _intimatePrompt,
               user: recentMsgs + '\nHer: ' + text,
-              max_tokens: 200
+              max_tokens: 200,
+              intimateMemory: localStorage.getItem('intimateMemory') || ''
             })
           }, 12000);
           if (grokRes.ok) {

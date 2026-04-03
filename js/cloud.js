@@ -97,6 +97,17 @@ async function loadFromCloud() {
       // 位置信息：换设备也要恢复
       setIfNewerOrMissing('currentLocation', p.currentLocation);
       setIfNewerOrMissing('currentLocationReason', p.currentLocationReason);
+      // 调情记忆：换设备恢复，有新的就合并
+      if (p.intimateMemory) {
+        const _local = localStorage.getItem('intimateMemory') || '';
+        if (!_local) {
+          localStorage.setItem('intimateMemory', p.intimateMemory);
+        } else if (cloudIsNewer && p.intimateMemory !== _local) {
+          const _all = [...(p.intimateMemory.split('\n---\n')), ...(_local.split('\n---\n'))];
+          const _deduped = [...new Set(_all)].filter(Boolean).slice(-3);
+          localStorage.setItem('intimateMemory', _deduped.join('\n---\n'));
+        }
+      }
       // 头像：有就用云端（换设备必须恢复）
       if (p.userAvatarBase64 && !localStorage.getItem('userAvatarBase64')) {
         localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
@@ -391,6 +402,7 @@ async function saveToCloud() {
       lastSalaryMonth: localStorage.getItem('lastSalaryMonth') || '',
       currentLocation: localStorage.getItem('currentLocation') || '',
       currentLocationReason: localStorage.getItem('currentLocationReason') || '',
+      intimateMemory: localStorage.getItem('intimateMemory') || '',
       walletMigrated_v3: localStorage.getItem('walletMigrated_v3') || '',
       // 签到记录：存最近60天的签到key + 本月里程碑计数
       checkinKeys: (() => {
