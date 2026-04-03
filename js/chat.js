@@ -5104,9 +5104,9 @@ One line. Lowercase. Private. Like it slipped out.`;
       if (btn) {
         btn.style.opacity = '1';
         // ready=1才触发pulse，防止空心声气泡闪烁
-        if (en && cn) {
+        if (en) {
           if (btn.dataset.hasThought === '1') {
-            _thoughtQueue.push({ en, zh: cn, el: innerThoughtEl });
+            _thoughtQueue.push({ en, el: innerThoughtEl });
           } else {
             btn.classList.add('thought-btn-pulse');
             btn.dataset.hasThought = '1';
@@ -5115,7 +5115,7 @@ One line. Lowercase. Private. Like it slipped out.`;
               const bubble = document.getElementById('thoughtBubble');
               const thoughtTextEl = document.getElementById('thoughtText');
               if (bubble && thoughtTextEl && !bubble.classList.contains('show')) {
-                thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${en}</div><div style="font-size:11px;opacity:0.6">${cn}</div>`;
+                thoughtTextEl.innerHTML = `<div style="font-style:italic">${en}</div>`;
                 bubble.classList.add('show');
                 if (thoughtTimer) clearTimeout(thoughtTimer);
                 // 不自动消失，等用户关闭
