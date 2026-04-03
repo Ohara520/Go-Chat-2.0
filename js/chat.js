@@ -6583,6 +6583,8 @@ One or two lines. English only. lowercase.`;
     _currentAbortController = null; // 请求完成，清除controller
     chatHistory.push({ role: 'assistant', content: reply, ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {}) });
     saveHistory();
+    // 主流程也立刻存云端聊天记录，防止卡顿后丢消息
+    if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
 
     // 副作用全部用try-catch包住，失败静默处理，不影响主流程
     consumeLoveOverride(); // 一次性爱意解锁用完即清
