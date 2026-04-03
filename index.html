@@ -1464,8 +1464,7 @@ async function loadSubscribeCard() {
     if (!planEl) return;
     if (data.subscribed) {
       planEl.textContent = `💎 ${data.plan_name}`;
-      // 免费体验不显示到期日期，只显示剩余条数
-      if (data.plan_id === 'free') {
+      if (data.plan_id === 'free' || data.plan_id === 'trial') {
         remEl.textContent = `剩余 ${data.remaining} 条`;
       } else {
         const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
@@ -1513,6 +1512,8 @@ function openSubscribePage() {
 
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(loadSubscribeCard, 1000);
+  // 每3分钟刷新一次条数显示
+  setInterval(loadSubscribeCard, 3 * 60 * 1000);
   // 恢复Ghost情头
   setTimeout(() => {
     if (typeof restoreGhostAvatar === 'function') restoreGhostAvatar();
