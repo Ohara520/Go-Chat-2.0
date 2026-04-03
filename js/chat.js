@@ -6166,7 +6166,22 @@ One or two lines. English only. lowercase.`;
     const _ghostHometown = (localStorage.getItem('ghostHometown') || 'manchester').toLowerCase();
 
     const _autoUnlock = [];
-    if (_ghostBirthday && _autoCheckReply.includes(_ghostBirthday.replace('月','').replace('日','')) && !localStorage.getItem('ghostUnlocked_birthday'))
+    // 生日检测：支持中文格式（3月12日）和英文格式（March 12 / march 12）
+    const _birthdayMatch = (() => {
+      if (!_ghostBirthday) return false;
+      // 中文格式：直接包含
+      if (_autoCheckReply.includes(_ghostBirthday)) return true;
+      // 英文格式：从中文月日转换后匹配
+      const _monthMap = {'1':'january','2':'february','3':'march','4':'april','5':'may','6':'june','7':'july','8':'august','9':'september','10':'october','11':'november','12':'december'};
+      const _bdMatch = _ghostBirthday.match(/(\d+)月(\d+)日/);
+      if (_bdMatch) {
+        const _enMonth = _monthMap[_bdMatch[1]] || '';
+        const _enDay = _bdMatch[2];
+        if (_enMonth && _autoCheckReply.includes(_enMonth) && _autoCheckReply.includes(_enDay)) return true;
+      }
+      return false;
+    })();
+    if (_birthdayMatch && !localStorage.getItem('ghostUnlocked_birthday'))
       _autoUnlock.push('birthday');
     if ((_ghostZodiac && _autoCheckReply.includes(_ghostZodiac)) || (_ghostZodiacEn && _autoCheckReply.includes(_ghostZodiacEn)))
       if (!localStorage.getItem('ghostUnlocked_zodiac')) _autoUnlock.push('zodiac');
