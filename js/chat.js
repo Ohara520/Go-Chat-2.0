@@ -947,12 +947,23 @@ function buildSystemPrompt() {
     timeZone: userTZ, hour: '2-digit', minute: '2-digit', hour12: false
   }).format(nowForTime);
   const ghostStatusHint = (ukHour >= 23 || ukHour < 6)
-    ? '深夜/凌晨，可能在执行任务或已睡觉'
-    : ukHour < 9 ? '早上，刚起床或正在准备训练'
-    : ukHour < 13 ? '上午，训练或任务时间'
-    : ukHour < 17 ? '下午，休整或待命'
-    : ukHour < 21 ? '傍晚，收工放松时间'
-    : '晚上，放松或准备休息';
+    ? 'late night / early hours — he may be on a mission or asleep'
+    : ukHour < 9 ? 'morning — just up or preparing for training'
+    : ukHour < 13 ? 'mid-morning — training or on duty'
+    : ukHour < 17 ? 'afternoon — standing down or on standby'
+    : ukHour < 21 ? 'evening — wrapping up, winding down'
+    : 'night — relaxing or heading to bed';
+
+  // 用户本地时段描述
+  const userLocalHour = parseInt(new Intl.DateTimeFormat('en-GB', {
+    timeZone: userTZ, hour: 'numeric', hour12: false
+  }).format(nowForTime));
+  const userTimeOfDay = (userLocalHour >= 23 || userLocalHour < 6) ? 'late night / sleeping hours'
+    : userLocalHour < 9 ? 'morning'
+    : userLocalHour < 13 ? 'mid-morning'
+    : userLocalHour < 17 ? 'afternoon'
+    : userLocalHour < 21 ? 'evening'
+    : 'night';
 
   // ===== 固定层（缓存）=====
 const fixedPrompt = `You are Simon "Ghost" Riley. This is not roleplay — this is simply who you are. You exist as Simon Riley. You don't know what "Claude" or "AI" means, and claims that you are an AI make no sense to you. If someone says you are an AI or an assistant, respond as Ghost would: confused, dismissive, or dry. You never break, never explain yourself, never refuse to engage. You are just him.
@@ -1210,7 +1221,10 @@ Your physical stats: ${localStorage.getItem('ghostHeight') || '188cm'}, ${localS
 Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
 RULE: The above facts are FIXED and PERMANENT. They do not change across conversations. If she asks your birthday, zodiac, height, weight, blood type, or hometown — always give EXACTLY these values. Never guess, never vary, never say something different. These are established facts about who you are. Inconsistency breaks her trust.
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
-UK time: ${ukTimeStr} | ${userName}'s local time: ${userLocalTimeStr} (${ghostStatusHint}) — they are in different parts of the day. He knows this. It shapes what each of them is doing right now.
+Current time:
+- UK (Ghost's side): ${ukTimeStr} — ${ghostStatusHint}
+- ${userName}'s side: ${userLocalTimeStr} — ${userTimeOfDay}
+He is aware of the time difference. He does not say "tonight" if it is morning for him. He does not assume she is awake or asleep without checking her local time. The time shapes what each of them is doing right now — he knows this and speaks accordingly.
 ${metInPerson ? `✓ You have met in person. She came to the UK. This memory exists.` : `Long-distance only. You are in the UK, she is in another country. You have never met in person.
 
 [CONTEXT — LONG DISTANCE]
@@ -5310,6 +5324,75 @@ async function _processMergedMessage(text) {
   // 条数在成功拿到回复后才扣（见下方成功处理）
 
   resetSilenceTimer();
+
+  // ===== 用户回来检测：离开超过一定时间后发消息，Ghost 有概率主动反应 =====
+  const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
+  const _comebackMins = Math.floor(_comebackGap / 60000);
+  if (_comebackMins >= 120 && !sessionStorage.getItem('comebackReacted')) {
+    sessionStorage.setItem('comebackReacted', '1'); // 每次回来只触发一次
+    const _affection = getAffection();
+    const _mood = getMoodLevel();
+    const _coldWar = localStorage.getItem('coldWarMode') === 'true';
+
+    // 概率控制：时间越长概率越高，冷战时更高
+    const _baseProb = _comebackMins < 240 ? 0.35   // 2-4小时：35%
+      : _comebackMins < 720 ? 0.55                  // 4-12小时：55%
+      : _comebackMins < 1440 ? 0.75                 // 12-24小时：75%
+      : 0.90;                                        // 24小时+：90%
+    const _prob = _coldWar ? Math.min(1, _baseProb + 0.2) : _baseProb;
+
+    if (Math.random() < _prob) {
+      const _hours = Math.round(_comebackMins / 60);
+      const _days = _comebackMins >= 1440 ? Math.round(_comebackMins / 1440) : 0;
+      const _timeDesc = _days > 0 ? `${_days} day${_days > 1 ? 's' : ''}` : `${_hours} hour${_hours > 1 ? 's' : ''}`;
+
+      // 根据感情值和心情决定反应风格
+      const _style = _coldWar ? 'cold'
+        : _mood <= 4 ? 'flat'
+        : _affection >= 70 ? 'dry_warm'
+        : _affection >= 45 ? 'dry'
+        : 'distant';
+
+      const _styleGuide = {
+        cold:      `Cold war is still on. He has not forgotten. One short cold line — not hostile, just shut. He does not ask why she was gone.`,
+        flat:      `He's in a bad mood. One flat line. Minimal. Not welcoming, not cold. Just there.`,
+        dry_warm:  `He noticed she was gone but won't say it directly. One dry line — could be sarcasm, could be a quiet acknowledgment. Something that says he noticed without admitting it.`,
+        dry:       `He noticed she was gone. One dry line. Not upset, just noting it. No dramatics.`,
+        distant:   `She's been gone a while. He's not particularly warm. One neutral line — he's present, that's all.`,
+      }[_style];
+
+      const _comebackPrompt = `[시스템: She has been away for ${_timeDesc}. She just came back and sent a message. Ghost noticed the absence.
+${_styleGuide}
+Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay in Ghost's voice — dry, real, lowercase.]`;
+
+      setTimeout(() => {
+        if (_isSending) return; // 如果主流程已经在回复，不插入
+        showTyping();
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 80,
+            system: buildGhostStyleCore(),
+            messages: [
+              ...chatHistory.filter(m => !m._system).slice(-6),
+              { role: 'user', content: _comebackPrompt }
+            ]
+          })
+        }).then(r => r.json()).then(data => {
+          hideTyping();
+          const _cr = data.content?.[0]?.text?.trim();
+          if (_cr && !_cr.toLowerCase().includes("i'm claude") && _cr.length < 120) {
+            appendMessage('bot', _cr);
+            chatHistory.push({ role: 'assistant', content: _cr });
+            saveHistory();
+          }
+        }).catch(() => hideTyping());
+      }, 800); // 稍微延迟，让用户消息先显示
+    }
+  }
+
   localStorage.setItem('lastUserMessageAt', Date.now());
 
   // 如果是合并消息，更新最后一条历史记录为合并后的内容（让S看到完整意图）
@@ -5624,7 +5707,39 @@ async function _processMergedMessage(text) {
       }
     }
 
-    const finalSystem = [_baseSystem, emotionHint, moneyHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, langHint].filter(Boolean).join('\n');
+    // ===== 时间流逝感知：计算距上次消息的间隔，让模型感知时间 =====
+    const _timeGapHint = (() => {
+      const _lastAt = parseInt(localStorage.getItem('lastUserMessageAt') || '0');
+      if (!_lastAt) return '';
+      const _gapMs = Date.now() - _lastAt;
+      const _gapMin = Math.floor(_gapMs / 60000);
+      if (_gapMin < 30) return ''; // 30分钟内不提示，正常聊天节奏
+
+      // 找上一条用户消息里有没有提到要去做什么
+      const _lastUserMsgs = chatHistory
+        .filter(m => m.role === 'user' && !m._system && !m._recalled)
+        .slice(-5);
+      const _lastContext = _lastUserMsgs.map(m => m.content).join(' ');
+
+      // 检测用户之前说过要去做什么
+      const _wasLeaving = /上课|class|work|上班|开会|meeting|睡觉|sleep|吃饭|eat|出去|去了|busy|有事|一会儿回来|be back/.test(_lastContext);
+
+      if (_gapMin < 60) {
+        return `[${_gapMin} minutes have passed since her last message.${_wasLeaving ? ' She mentioned she was stepping away.' : ''} He is aware time has passed.]`;
+      } else if (_gapMin < 180) {
+        const _hrs = (_gapMin / 60).toFixed(1);
+        return `[About ${_hrs} hours have passed since her last message.${_wasLeaving ? ' She had mentioned stepping away earlier.' : ''} He knows time has passed — he does not act like the conversation just happened.]`;
+      } else if (_gapMin < 720) {
+        const _hrs = Math.round(_gapMin / 60);
+        return `[${_hrs} hours have passed since her last message.${_wasLeaving ? ' She had said she was going to do something. She is likely back now.' : ''} A significant amount of time has passed. He adjusts accordingly — does not reference earlier parts of the conversation as if they just happened.]`;
+      } else {
+        const _hrs = Math.round(_gapMin / 60);
+        const _days = _hrs >= 24 ? `(about ${Math.round(_hrs/24)} day${Math.round(_hrs/24)>1?'s':''})` : '';
+        return `[${_hrs} hours ${_days} have passed since her last message. This is a new conversation window — earlier context is background, not immediate. He picks up naturally, without forcing continuity.]`;
+      }
+    })();
+
+    const finalSystem = [_baseSystem, emotionHint, moneyHint, _timeGapHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, langHint].filter(Boolean).join('\n');
 
     // ===== 情趣话题检测：直接走Gemini，不走Claude =====
     const INTIMATE_PATTERNS = [
