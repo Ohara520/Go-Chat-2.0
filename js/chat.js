@@ -4338,7 +4338,7 @@ function confirmTransfer() {
     addTransaction({ icon: '↩️', name: '退款（网络错误）', amount: amount });
     renderWallet();
     updateUserTransferCard(cardId, false);
-    appendMessage('bot', '...\n[网络不太好，等一下。]');
+    appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
   });
 }
 
@@ -6219,10 +6219,18 @@ One or two lines. English only. lowercase.`;
           reply = (retryReply && !isBreakout(retryReply)) ? retryReply : '...';
         }
       } catch(e) {
-        reply = '...'; // 都失败了Ghost就沉默
+        reply = '___NETWORK_ERROR___'; // 都失败了，显示网络提示
       }
     }
     updateToRead();
+
+    // 网络/模型失败兜底：显示友好提示而不是沉默的 ...
+    if (reply === '___NETWORK_ERROR___' || reply === '...') {
+      hideTyping();
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+      _isSending = false;
+      return;
+    }
 
     // ===== Step 4: 解析模型tag =====
     const { cleanedReply, giveMoney: parsedMoney, coldWarStart, sendGift } = parseAssistantTags(reply);
@@ -6648,11 +6656,12 @@ One or two lines. English only. lowercase.`;
     const isApiError = err?.message?.startsWith('API_ERROR_');
     const isEmptyReply = err?.message === 'EMPTY_REPLY';
     if (isTimeout || isNetwork) {
-      appendMessage('bot', "...\n[信号不太好，再发一次。]");
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
     } else if (isApiError || isEmptyReply) {
-      appendMessage('bot', "...\n[稍等一下，再试试。]");
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+    } else {
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
     }
-    // 其他未知错误静默处理
   }
 }
 
