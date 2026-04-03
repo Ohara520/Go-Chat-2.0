@@ -434,6 +434,10 @@
       padding: 8px 12px;
       border-radius: 12px;
       transition: background 0.15s;
+      background: none;
+      border: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .plus-action-btn:active { background: rgba(168,85,247,0.08); }
     .plus-action-icon { font-size: 26px; }
@@ -665,18 +669,18 @@
 
       <div class="plus-panel" id="plusPanel" style="display:none">
         <div class="plus-panel-actions">
-          <div class="plus-action-btn" onclick="closePlusPanel(); openTransfer();">
+          <button class="plus-action-btn" onclick="closePlusPanel(); openTransfer();" type="button">
             <div class="plus-action-icon">💸</div>
             <div class="plus-action-label">转账</div>
-          </div>
-          <div class="plus-action-btn" onclick="toggleStickerFromPlus()">
+          </button>
+          <button class="plus-action-btn" onclick="toggleStickerFromPlus();" type="button">
             <div class="plus-action-icon">🖼️</div>
             <div class="plus-action-label">表情包</div>
-          </div>
-          <div class="plus-action-btn" onclick="closePlusPanel(); triggerPhotoUpload();">
+          </button>
+          <button class="plus-action-btn" onclick="closePlusPanel(); triggerPhotoUpload();" type="button">
             <div class="plus-action-icon">📷</div>
             <div class="plus-action-label">发图片</div>
-          </div>
+          </button>
         </div>
         <!-- 表情包子面板 -->
         <div class="sticker-sub-panel" id="stickerSubPanel" style="display:none">
@@ -1467,9 +1471,13 @@ async function loadSubscribeCard() {
     const card = document.getElementById('subscribeCard');
     if (!planEl) return;
     if (data.subscribed) {
-      const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
       planEl.textContent = `💎 ${data.plan_name}`;
-      remEl.textContent = `剩余 ${data.remaining} 条 · ${endDate}到期`;
+      if (data.plan_id === 'free' || data.plan_id === 'trial') {
+        remEl.textContent = `剩余 ${data.remaining} 条`;
+      } else {
+        const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+        remEl.textContent = `剩余 ${data.remaining} 条 · ${endDate}到期`;
+      }
       card.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(236,72,153,0.12) 100%)';
     }
   } catch(e) {}
@@ -1512,6 +1520,7 @@ function openSubscribePage() {
 
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(loadSubscribeCard, 1000);
+  setInterval(loadSubscribeCard, 3 * 60 * 1000);
   // 恢复Ghost情头
   setTimeout(() => {
     if (typeof restoreGhostAvatar === 'function') restoreGhostAvatar();
