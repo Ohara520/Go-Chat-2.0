@@ -89,8 +89,28 @@ async function loadFromCloud() {
       setIfNewerOrMissing('userFavColor', p.userFavColor);
       setIfNewerOrMissing('userBio', p.userBio);
       setIfNewerOrMissing('metInPerson', p.metInPerson != null ? String(p.metInPerson) : null);
-      setIfNewerOrMissing('visitStreak', p.visitStreak);
-      setIfNewerOrMissing('vocabStreak', p.vocabStreak);
+      // visitStreak 取较大值，防止换设备后连续天数倒退
+      if (p.visitStreak) {
+        const _localStreak = parseInt(localStorage.getItem('visitStreak') || '0');
+        const _cloudStreak = parseInt(p.visitStreak || '0');
+        if (_cloudStreak > _localStreak) {
+          localStorage.setItem('visitStreak', String(_cloudStreak));
+        }
+      }
+      // vocabStreak + vocabLastDay 必须一起恢复，否则连续天数算不准
+      if (p.vocabStreak) {
+        const _localVS = parseInt(localStorage.getItem('vocabStreak') || '0');
+        const _cloudVS = parseInt(p.vocabStreak || '0');
+        if (_cloudVS > _localVS) {
+          localStorage.setItem('vocabStreak', String(_cloudVS));
+          // 同时恢复 lastDay，否则下次学习时找不到昨天记录会重置
+          if (p.vocabLastDay && !localStorage.getItem('vocabLastDay')) {
+            localStorage.setItem('vocabLastDay', p.vocabLastDay);
+          }
+        }
+      } else if (p.vocabLastDay && !localStorage.getItem('vocabLastDay')) {
+        localStorage.setItem('vocabLastDay', p.vocabLastDay);
+      }
       setIfNewerOrMissing('vocabLastDay', p.vocabLastDay);
       setIfNewerOrMissing('lastSalaryAmount', p.lastSalaryAmount);
       setIfNewerOrMissing('lastSalaryMonth', p.lastSalaryMonth);
