@@ -434,10 +434,6 @@
       padding: 8px 12px;
       border-radius: 12px;
       transition: background 0.15s;
-      background: none;
-      border: none;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
     }
     .plus-action-btn:active { background: rgba(168,85,247,0.08); }
     .plus-action-icon { font-size: 26px; }
@@ -669,18 +665,18 @@
 
       <div class="plus-panel" id="plusPanel" style="display:none">
         <div class="plus-panel-actions">
-          <button class="plus-action-btn" onclick="closePlusPanel(); openTransfer();" type="button">
+          <div class="plus-action-btn" onclick="closePlusPanel(); openTransfer();">
             <div class="plus-action-icon">💸</div>
             <div class="plus-action-label">转账</div>
-          </button>
-          <button class="plus-action-btn" onclick="toggleStickerFromPlus();" type="button">
+          </div>
+          <div class="plus-action-btn" onclick="toggleStickerFromPlus()">
             <div class="plus-action-icon">🖼️</div>
             <div class="plus-action-label">表情包</div>
-          </button>
-          <button class="plus-action-btn" onclick="closePlusPanel(); triggerPhotoUpload();" type="button">
+          </div>
+          <div class="plus-action-btn" onclick="closePlusPanel(); triggerPhotoUpload();">
             <div class="plus-action-icon">📷</div>
             <div class="plus-action-label">发图片</div>
-          </button>
+          </div>
         </div>
         <!-- 表情包子面板 -->
         <div class="sticker-sub-panel" id="stickerSubPanel" style="display:none">
@@ -1445,6 +1441,10 @@ async function handleDivorce() {
 
 async function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
+  // 退出前强制存一次云端，防止最新几条消息丢失
+  try {
+    if (typeof saveToCloud === 'function') await saveToCloud();
+  } catch(e) {}
   await sbClient.auth.signOut();
   localStorage.removeItem('sb_user_id');
   localStorage.removeItem('sb_user_email');
