@@ -5042,7 +5042,8 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
   let en = '', cn = '';
 
   // 判断是否是调情/露骨场景——用G；其他用S更稳定
-  const _isIntimateThought = chatHistory.slice(-6).some(m => m._intimate);
+  // 发图片时不走 Grok 生成心声，防止 Kirk 破防
+  const _isIntimateThought = !isRecentPhoto && chatHistory.slice(-6).some(m => m._intimate);
   const metInPerson = localStorage.getItem('metInPerson') === 'true';
   const longDistanceThoughtRule = !metInPerson
     ? `\nLong-distance. She is not physically there. Do NOT write thoughts about holding her, hugging her, her being beside him, or any physical presence. Distance is real — if he misses her, it shows differently.`
@@ -5095,7 +5096,11 @@ One line. Lowercase. Private. Like it slipped out.`;
           const grokThoughtData = await grokThoughtRes.json();
           const rawG = grokThoughtData.text?.trim() || '';
           const matchG = rawG.match(/"en"\s*:\s*"([^"]+)"/);
-          if (matchG) { en = matchG[1].trim(); }
+          if (matchG) {
+            const _thoughtKirkCheck = matchG[1].toLowerCase();
+            const _isKirk = ["kirk", "kiro", "ai assistant", "i'm an ai", "development work", "coding questions", "step out of character", "can't roleplay"].some(p => _thoughtKirkCheck.includes(p));
+            if (!_isKirk) en = matchG[1].trim();
+          }
         }
       } catch(e) {}
       // Grok失败走Haiku兜底
@@ -5809,6 +5814,7 @@ Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay i
     // 图片检测必须在调情检测之前定义
     const lastPhotoMsg = chatHistory.filter(m => m.role === 'user' && m._photoBase64 && !m._system).slice(-1)[0];
     const isRecentPhoto = lastPhotoMsg && chatHistory.indexOf(lastPhotoMsg) >= chatHistory.length - 4;
+    // 有图片时强制关闭调情相关路径，防止 Grok 被调用后破防说 Kirk
 
     const INTIMATE_PATTERNS = [
       /亲亲|抱抱|贴贴|摸摸|蹭蹭|咬|舔|亲一下|抱一下/,
