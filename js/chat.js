@@ -1569,7 +1569,7 @@ function toggleThought() {
   const _savedThought = (() => { try { return JSON.parse(localStorage.getItem('lastInnerThought') || 'null'); } catch(e) { return null; } })();
   if (_savedThought && _savedThought.en) {
     if (thoughtTextEl) {
-      thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${_savedThought.en}</div><div style="font-size:11px;opacity:0.6">${_savedThought.cn || ''}</div>`;
+      thoughtTextEl.innerHTML = `<div style="font-style:italic">${_savedThought.en}</div>`;
     }
     bubble.classList.add('show');
     // 停止闪烁——用户已经看到了
@@ -1578,9 +1578,8 @@ function toggleThought() {
     thoughtTimer = setTimeout(() => bubble.classList.remove('show'), 5000);
   } else if (itEl && itEl.dataset.ready === '1') {
     const enEl = itEl.querySelector('.it-en');
-    const zhEl = itEl.querySelector('.it-zh');
     if (thoughtTextEl && enEl) {
-      thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${enEl.textContent}</div><div style="font-size:11px;opacity:0.6">${zhEl ? zhEl.textContent : ''}</div>`;
+      thoughtTextEl.innerHTML = `<div style="font-style:italic">${enEl.textContent}</div>`;
     }
     bubble.classList.add('show');
     if (thoughtTimer) clearTimeout(thoughtTimer);
@@ -1592,9 +1591,8 @@ function toggleThought() {
     const waitTimer = setTimeout(() => {
       if (itEl.dataset.ready === '1') {
         const enEl = itEl.querySelector('.it-en');
-        const zhEl = itEl.querySelector('.it-zh');
         if (thoughtTextEl && enEl) {
-          thoughtTextEl.innerHTML = `<div style="font-style:italic;margin-bottom:3px">${enEl.textContent}</div><div style="font-size:11px;opacity:0.6">${zhEl ? zhEl.textContent : ''}</div>`;
+          thoughtTextEl.innerHTML = `<div style="font-style:italic">${enEl.textContent}</div>`;
         }
       } else {
         if (thoughtTextEl) thoughtTextEl.textContent = '他现在没想太多。';
@@ -4759,34 +4757,7 @@ function appendMessage(role, text, animate = true) {
     enLine.style.whiteSpace = 'pre-line';
     bubble.appendChild(enLine);
 
-    // 翻译按钮
-    const translateBtn = document.createElement('button');
-    translateBtn.className = 'translate-btn';
-    translateBtn.textContent = '译';
-    translateBtn.title = '显示中文翻译';
-    const zhLine = document.createElement('div');
-    zhLine.className = 'bubble-zh bubble-zh-hidden';
-    zhLine.textContent = existingZh; // Ghost自带中文直接放进去，没有就留空
-
-    translateBtn.onclick = async function(e) {
-      e.stopPropagation();
-      if (zhLine.classList.contains('bubble-zh-hidden')) {
-        zhLine.classList.remove('bubble-zh-hidden');
-        translateBtn.textContent = '收';
-        translateBtn.classList.add('active');
-        // 没有现成中文才调用翻译
-        if (!zhLine.textContent) {
-          zhLine.textContent = '…';
-          await translateWithGemini(enText, zhLine, '');
-        }
-      } else {
-        zhLine.classList.add('bubble-zh-hidden');
-        translateBtn.textContent = '译';
-        translateBtn.classList.remove('active');
-      }
-    };
-    bubble.appendChild(translateBtn);
-    bubble.appendChild(zhLine);
+    // 译按钮已移除
   } else {
     bubble.textContent = text;
   }
@@ -5013,8 +4984,8 @@ Can be one line or a few — whatever fits.
 It should feel private. Like it slipped out.
 
 Return JSON only. No explanation. No markdown. No extra text.
-{"en":"...","cn":"..."}
-cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
+{"en":"..."}
+One line. Lowercase. Private. Like it slipped out.`;
 
   try {
     if (_isIntimateThought) {
@@ -5028,15 +4999,15 @@ cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
         if (grokThoughtRes.ok) {
           const grokThoughtData = await grokThoughtRes.json();
           const rawG = grokThoughtData.text?.trim() || '';
-          const matchG = rawG.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
-          if (matchG) { en = matchG[1].trim(); cn = matchG[2].trim(); }
+          const matchG = rawG.match(/"en"\s*:\s*"([^"]+)"/);
+          if (matchG) { en = matchG[1].trim(); }
         }
       } catch(e) {}
       // Grok失败走Haiku兜底
       if (!en) {
         const raw = await fetchDeepSeek(thoughtPrompt, '', 80);
-        const jsonMatch = raw.match(/\{"en"\s*:\s*"([^"]+)"\s*,\s*"cn"\s*:\s*"([^"]+)"\}/);
-        if (jsonMatch) { en = jsonMatch[1].trim(); cn = jsonMatch[2].trim(); }
+        const jsonMatch = raw.match(/"en"\s*:\s*"([^"]+)"/);
+        if (jsonMatch) { en = jsonMatch[1].trim(); }
       }
     } else {
       // 普通场景用S，更稳定更有人设
@@ -5059,7 +5030,7 @@ cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
           const jsonMatch = raw.match(/"en"\s*:\s*"([^"]+)"/);
           const cnMatch = raw.match(/"cn"\s*:\s*"([^"]+)"/);
           if (jsonMatch) en = jsonMatch[1].trim();
-          if (cnMatch) cn = cnMatch[1].trim();
+          // cn 已移除，只保留英文心声
 
         }
       }
@@ -5070,24 +5041,23 @@ cn in spoken Chinese, same feeling. Keep it natural, not too long.`;
   if (!en) {
     console.warn('[心声] G未返回内容，使用fallback, thoughtType:', thoughtType);
     const fallbacks = {
-      contrast:  { en: "noticed.", cn: "注意到了" },
-      jealousy:  { en: "didn't like that.", cn: "不太行" },
-      delayed:   { en: "missed it.", cn: "没接住" },
-      behavior:  { en: "just easier this way.", cn: "这样简单点" },
-      crack:     { en: "maybe.", cn: "也许吧" },
+      contrast:  'noticed.',
+      jealousy:  "didn't like that.",
+      delayed:   'missed it.',
+      behavior:  'just easier this way.',
+      crack:     'maybe.',
     };
-    const fb = fallbacks[thoughtType] || fallbacks.contrast;
-    en = fb.en; cn = fb.cn;
+    en = fallbacks[thoughtType] || fallbacks.contrast;
   }
 
   try {
     const textEl = innerThoughtEl.querySelector('.inner-thought-text');
     if (textEl && innerThoughtEl) {
-      textEl.innerHTML = `<div class="it-en">${en}</div><div class="it-zh">${cn}</div>`;
+      textEl.innerHTML = `<div class="it-en">${en}</div>`;
       innerThoughtEl.dataset.ready = '1';
       localStorage.setItem('lastInnerThoughtAt', Date.now());
       // 存到localStorage，按钮点击时直接读，不依赖DOM
-      localStorage.setItem('lastInnerThought', JSON.stringify({ en, cn }));
+      localStorage.setItem('lastInnerThought', JSON.stringify({ en }));
       const btn = document.getElementById('thoughtBtn');
       if (btn) {
         btn.style.opacity = '1';
