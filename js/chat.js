@@ -5806,6 +5806,10 @@ Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay i
     const finalSystem = [_baseSystem, emotionHint, moneyHint, _timeGapHint, sceneHint || '[React directly to what she just said. Take it at face value.]', responseMode, workHint, avatarHint, langHint].filter(Boolean).join('\n');
 
     // ===== 情趣话题检测：直接走Gemini，不走Claude =====
+    // 图片检测必须在调情检测之前定义
+    const lastPhotoMsg = chatHistory.filter(m => m.role === 'user' && m._photoBase64 && !m._system).slice(-1)[0];
+    const isRecentPhoto = lastPhotoMsg && chatHistory.indexOf(lastPhotoMsg) >= chatHistory.length - 4;
+
     const INTIMATE_PATTERNS = [
       /亲亲|抱抱|贴贴|摸摸|蹭蹭|咬|舔|亲一下|抱一下/,
       /kiss|hug|cuddle|touch me|hold me|bite|lick/i,
@@ -6095,8 +6099,6 @@ One or two lines. English only. lowercase.`;
     }
 
     // 检查上一条用户消息是否是图片——如果是，把图片带进这条消息
-    const lastPhotoMsg = chatHistory.filter(m => m.role === 'user' && m._photoBase64 && !m._system).slice(-1)[0];
-    const isRecentPhoto = lastPhotoMsg && chatHistory.indexOf(lastPhotoMsg) >= chatHistory.length - 4;
 
     // 图片消息直接走Sonnet主模型——能看图、人设最稳、不会破防成Kirk
     if (isRecentPhoto && lastPhotoMsg._photoBase64.length > 0) {
