@@ -96,16 +96,7 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('Check subscription error:', err.message);
-    // 数据库超时时给免费额度，不拦截用户
-    return res.status(200).json({
-      subscribed: true,
-      plan_name: '免费体验',
-      plan_id: 'free',
-      monthly_quota: FREE_QUOTA,
-      used_count: 0,
-      remaining: FREE_QUOTA,
-      memory_limit: 10,
-      period_end: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-    });
+    // 数据库超时：返回503让前端继续用缓存，不重置条数
+    return res.status(503).json({ error: 'timeout', message: 'use cached subscription data' });
   }
 }

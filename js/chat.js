@@ -5326,11 +5326,21 @@ async function getSubscription() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
+    // 503 = 数据库超时，用缓存里的数据，不重置条数
+    if (res.status === 503) {
+      console.warn('[sub] 查询超时，使用缓存数据');
+      return _subCache; // 可能是null，交给上层处理
+    }
     const data = await res.json();
-    _subCache = data.subscribed ? data : null;
-    _subCacheTime = now;
+    if (data.subscribed) {
+      _subCache = data;
+      _subCacheTime = now;
+    }
+    return data.subscribed ? data : null;
+  } catch(e) {
+    // 网络错误也用缓存
     return _subCache;
-  } catch(e) { return null; }
+  }
 }
 
 async function consumeQuota() {
