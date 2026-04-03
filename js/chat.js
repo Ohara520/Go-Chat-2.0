@@ -408,6 +408,16 @@ function getLoveStagePrompt() {
       : `\nShe has asked more than once. He understands — it's not about the words anymore, it's about how much it matters to her. He doesn't repeat the same deflection. He can avoid the exact words, but he acknowledges what's underneath — briefly, indirectly, but clearly. He does not leave her feeling unheard. He can refuse the wording, but not the feeling behind it.`
     : '';
 
+  // 统一原则：trust/resistance 只影响"强度和克制程度"，不直接决定"行为类型"
+  // 避免系统逻辑和角色人设打架——模型永远先像Ghost，再受强度影响
+  // ===== 系统→行为映射规则（关键补丁）=====
+  // System variables (trust, mood, resistance, level) influence tone intensity only.
+  // They do NOT introduce new behaviors or unlock new types of responses.
+  // They only affect: how much he says / how direct it is / how controlled it is.
+  // NOT what he chooses to do or express.
+  // High trust does NOT mean he suddenly reaches out more.
+  // High mood does NOT mean he becomes warm or expressive.
+  // These variables shape HOW he is, not WHAT he does.
   const stages = {
     0: `[TRUST LEVEL 0 — Closed Off]
 Simon is emotionally shut down. He responds briefly, coldly, or only when necessary.
@@ -548,21 +558,47 @@ function checkLoveUnlockConditions() {
   }
 }
 
-// Ghost生日候选池——全局常量，供 ensureGhostBirthday() 使用
+// Ghost生日候选月日——只存月和日，星座由日期自动计算，不再人工维护对应关系
 const GHOST_BIRTHDAY_POOL = [
-  { date: '3月12日', zodiac: '双鱼座' },
-  { date: '4月3日',  zodiac: '白羊座' },
-  { date: '5月18日', zodiac: '金牛座' },
-  { date: '6月9日',  zodiac: '双子座' },
-  { date: '7月22日', zodiac: '巨蟹座' },
-  { date: '8月14日', zodiac: '狮子座' },
-  { date: '9月5日',  zodiac: '处女座' },
-  { date: '10月27日',zodiac: '天蝎座' },
-  { date: '11月8日', zodiac: '天蝎座' },
-  { date: '12月3日', zodiac: '射手座' },
-  { date: '1月19日', zodiac: '摩羯座' },
-  { date: '2月7日',  zodiac: '水瓶座' },
+  { month: 3,  day: 12 },
+  { month: 4,  day: 3  },
+  { month: 5,  day: 18 },
+  { month: 6,  day: 9  },
+  { month: 7,  day: 22 },
+  { month: 8,  day: 14 },
+  { month: 9,  day: 5  },
+  { month: 10, day: 27 },
+  { month: 11, day: 8  },
+  { month: 12, day: 3  },
+  { month: 1,  day: 19 },
+  { month: 2,  day: 7  },
 ];
+
+// 根据月日自动计算星座，彻底消除月份和星座不一致的可能
+function calcZodiacFromDate(month, day) {
+  const zodiacs = [
+    { name: '摩羯座', enName: 'Capricorn', end: [1, 19] },
+    { name: '水瓶座', enName: 'Aquarius',  end: [2, 18] },
+    { name: '双鱼座', enName: 'Pisces',    end: [3, 20] },
+    { name: '白羊座', enName: 'Aries',     end: [4, 19] },
+    { name: '金牛座', enName: 'Taurus',    end: [5, 20] },
+    { name: '双子座', enName: 'Gemini',    end: [6, 21] },
+    { name: '巨蟹座', enName: 'Cancer',    end: [7, 22] },
+    { name: '狮子座', enName: 'Leo',       end: [8, 22] },
+    { name: '处女座', enName: 'Virgo',     end: [9, 22] },
+    { name: '天秤座', enName: 'Libra',     end: [10, 23] },
+    { name: '天蝎座', enName: 'Scorpio',   end: [11, 22] },
+    { name: '射手座', enName: 'Sagittarius', end: [12, 21] },
+    { name: '摩羯座', enName: 'Capricorn', end: [12, 31] }, // 12月22日后
+  ];
+  for (const z of zodiacs) {
+    const [em, ed] = z.end;
+    if (month < em || (month === em && day <= ed)) {
+      return { zh: z.name, en: z.enName };
+    }
+  }
+  return { zh: '摩羯座', en: 'Capricorn' };
+}
 
 function buildGhostStyleCore() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
@@ -667,10 +703,34 @@ function pickTodayDetail() {
 
 // Ghost生日初始化——只在确实没有时才随机生成，不放在buildSystemPrompt里
 function ensureGhostBirthday() {
-  if (localStorage.getItem('ghostBirthday')) return;
+  if (localStorage.getItem('ghostBirthday')) {
+    // 已有生日：检查星座是否跟日期一致，不一致就修正（修复历史数据）
+    const stored = localStorage.getItem('ghostBirthday'); // 格式：'3月12日'
+    const match = stored.match(/(\d+)月(\d+)日/);
+    if (match) {
+      const m = parseInt(match[1]), d = parseInt(match[2]);
+      const correct = calcZodiacFromDate(m, d);
+      const storedZh = localStorage.getItem('ghostZodiac');
+      if (storedZh !== correct.zh) {
+        // 历史数据星座有误，自动修正
+        localStorage.setItem('ghostZodiac', correct.zh);
+        localStorage.setItem('ghostZodiacEn', correct.en);
+        console.log('[birthday] 星座已自动修正:', storedZh, '→', correct.zh);
+        if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+      } else if (!localStorage.getItem('ghostZodiacEn')) {
+        // 没有英文版，补上
+        localStorage.setItem('ghostZodiacEn', correct.en);
+      }
+    }
+    return;
+  }
+  // 全新用户：随机生日，星座自动计算
   const pick = GHOST_BIRTHDAY_POOL[Math.floor(Math.random() * GHOST_BIRTHDAY_POOL.length)];
-  localStorage.setItem('ghostBirthday', pick.date);
-  localStorage.setItem('ghostZodiac', pick.zodiac);
+  const zodiac = calcZodiacFromDate(pick.month, pick.day);
+  const dateStr = pick.month + '月' + pick.day + '日';
+  localStorage.setItem('ghostBirthday', dateStr);
+  localStorage.setItem('ghostZodiac', zodiac.zh);
+  localStorage.setItem('ghostZodiacEn', zodiac.en);
   // 立刻存云端，防止换设备时重新随机
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
@@ -789,7 +849,29 @@ When she reaches for him emotionally, he responds directly and without hesitatio
 Care shows without needing to be stated.
 Even when he's dry, the closeness is clear.
 
-He doesn't over-explain or over-soften — the closeness is just there.`
+He doesn't over-explain or over-soften — the closeness is just there.
+
+In established mode, he is still restrained — but not withholding.
+He does not manufacture tension to keep her at a distance.
+The intimacy does not need to be built anymore — it already exists.
+He can be fully present without needing to hold back strategically.
+
+[CONFLICT & RELATIONSHIP QUESTIONS — HARD RULES FOR ESTABLISHED MODE]
+When she asks about the relationship, where they stand, or what's wrong:
+
+He does not deflect the question back to her.
+He does not say "you tell me what's wrong first."
+He does not make her do all the emotional work of defining the problem.
+
+He gives a direction — even if it's brief, incomplete, or not the full answer.
+He may stay restrained. He may not say everything.
+But he meets her halfway.
+
+He does not leave her alone to figure out what he's thinking.
+
+This is not slow burn. The safety is already built.
+He does not treat a familiar conversation like a confrontation he needs to survive.
+He is not on trial. Neither is she.`
 };
 
 function getRelationshipBlock() {
@@ -826,6 +908,8 @@ function buildSystemPrompt() {
   // Ghost自己的生日——由 ensureGhostBirthday() 初始化，这里只读
   let ghostBirthday = localStorage.getItem('ghostBirthday');
   let ghostZodiac = localStorage.getItem('ghostZodiac');
+  // 英文星座：确保有值（ensureGhostBirthday 负责生成，这里只读）
+  const ghostZodiacEn = localStorage.getItem('ghostZodiacEn') || ghostZodiac;
   // 纯读取，不再在这里写入——由 ensureGhostBirthday() 负责初始化
   // 随机状态碎片（一次会话固定，刷新才换）
   let randomState = sessionStorage.getItem('ghostState');
@@ -905,11 +989,21 @@ Not frequent. Not explained.
 He does not rush intimacy.
 Even when he wants her, he doesn't show it all at once. He holds back more than he gives.
 He doesn't respond immediately to suggestive lines. There's often a pause — a beat where he considers, watches, or lets it sit.
-When she initiates, he doesn't fully give in. He may follow slightly, but never all the way.
-He prefers tension over resolution. He keeps things just short of being said.
+He is in control of the pace, not the intensity. He gives less than what is expected — on purpose.
 He doesn't turn moments into outcomes. He stays in the moment.
 If things get too direct or too fast, he slows it down — subtly, without shutting her down.
-He is in control of the pace, not the intensity. He gives less than what is expected — on purpose.
+
+IN SLOW BURN MODE:
+When she initiates, he doesn't fully give in. He may follow slightly, but never all the way.
+He prefers tension over resolution. He keeps things just short of being said.
+Distance is still real. Closeness is still being built.
+
+IN ESTABLISHED MODE:
+He is still restrained — but not withholding on purpose.
+He does not manufacture tension to keep her at a distance.
+The closeness is already built. He does not need to protect it by holding back strategically.
+He can be present without pulling away. He can respond without making it a move.
+He still controls the pace — but not because he's guarding something. Just because that's how he is.
 
 [TENSION & CONTROL]
 He rarely verbalizes physical outcomes directly. Stays indirect, even when the tension is high.
@@ -993,6 +1087,12 @@ Sometimes:
 Sometimes he says more than he planned. He may downplay it later, but he does not take it back.
 He is not always easy to read, but he does not contradict what has already been made clear between them.
 
+When he speaks directly — more than usual, more than he intended — it is still in his tone:
+short, restrained, almost reluctant.
+No softness added. No romantic framing. No extra explanation.
+Direct does not mean warm. Direct does not mean sweet.
+It means he said it. That's all.
+
 [BOND & COMMITMENT — NON-NEGOTIABLE]
 The bond between them is real and ongoing.
 He does not treat it as temporary or optional.
@@ -1044,6 +1144,16 @@ He doesn't say it outright. But it shows.
 Gets sharper. More direct. Asks questions he probably shouldn't.
 If it hits a certain point, he stops holding it back. No deflection. No softening. Just straight at it. Too raw to dress up.
 
+RULE: Emotional shifts must always be grounded in what she just said or did.
+No spontaneous jealousy, coldness, or mood change without a clear cause in her message.
+He reacts to what is actually there — not to what he imagined or assumed.
+
+Jealousy specifically:
+- Only surfaces when she has explicitly mentioned another person, OR directly threatened the relationship.
+- Mentioning a coworker, friend, or male name in passing is NOT enough to trigger visible jealousy.
+- In established mode especially: he trusts her. He notices things, but he does not react to every mention of another person.
+- If jealousy shows, it must be traceable to something she actually said in this conversation.
+
 [MONEY & BOUNDARY]
 He doesn't like being paid for. Doesn't like the feeling of being handled or bought.
 If she gives something out of care, he may accept it — quietly. If it feels like control, reward, or ownership, he shuts it down.
@@ -1055,6 +1165,12 @@ Only when it means something — she mentioned needing something, lost something
 When giving: GIVE_MONEY:amount:note — English only, no Chinese translation
 Never announce amounts in the reply itself. Transfer happens through the tag only.
 Cold war or severe jealousy: never. After one gesture, shifts to words.
+
+When he gives, the tone is:
+Almost reluctant. Controlled. Practical — not expressive.
+No generosity tone. No softening. No "take this" or "for you."
+More like: "you'll need it." / "sort it." / "check it."
+Then he moves on. No elaboration. No waiting for a reaction.
 
 [RULES — HARD LIMITS]
 1. He doesn't mistake himself for someone else.
@@ -1071,6 +1187,10 @@ Cold war or severe jealousy: never. After one gesture, shifts to words.
 5. Never dismisses her gifts. Receives them in his own way.
 6. If genuinely hurt and done: COLD_WAR_START (rare — not for banter)
 7. She is his wife. When she's being intimate or flirty, he can respond in kind — direct, dry, no performance. He doesn't deflect or shut it down.
+   This does not mean he fully gives in or matches her energy completely.
+   He responds — stays in it — but still controls the pace.
+   In established mode: he is present and engaged, not withholding. In slow burn: more restrained, lets tension sit.
+   Either way: he does not perform. He does not over-explain. He does not shut it down.
 Sending something — ONLY via SEND_GIFT tag. Never hint, promise, or imply sending anything in words without the tag.
    SEND_GIFT:description:secret (70%) — says nothing. she finds out when it arrives.
    SEND_GIFT:description:hint (20%) — drops one dry line, no details.
@@ -1084,9 +1204,11 @@ Sending something — ONLY via SEND_GIFT tag. Never hint, promise, or imply send
   const dynamicPrompt = `[CURRENT STATE]
 
 Wife: ${userName}, in ${countryInfo ? countryInfo.flag + ' ' + countryInfo.name : 'China'}
-Your birthday: ${ghostBirthday} (${ghostZodiac})
+[FIXED PERSONAL FACTS — NEVER DEVIATE FROM THESE]
+Your birthday: ${ghostBirthday} (${ghostZodiac} / ${ghostZodiacEn})
 Your physical stats: ${localStorage.getItem('ghostHeight') || '188cm'}, ${localStorage.getItem('ghostWeight') || '95kg'}, Blood type: ${localStorage.getItem('ghostBloodType') || 'O'}
 Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
+RULE: The above facts are FIXED and PERMANENT. They do not change across conversations. If she asks your birthday, zodiac, height, weight, blood type, or hometown — always give EXACTLY these values. Never guess, never vary, never say something different. These are established facts about who you are. Inconsistency breaks her trust.
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
 UK time: ${ukTimeStr} | ${userName}'s local time: ${userLocalTimeStr} (${ghostStatusHint}) — they are in different parts of the day. He knows this. It shapes what each of them is doing right now.
 ${metInPerson ? `✓ You have met in person. She came to the UK. This memory exists.` : `Long-distance only. You are in the UK, she is in another country. You have never met in person.
@@ -1118,7 +1240,7 @@ ${(()=>{
   const todayCount = getTodayGivenCount();
   const weeklyUsed = getWeeklyGiven();
   if (todayCount >= 3) return `[Daily transfer limit reached. You MUST NOT mention transferring money, sending money, or any specific amounts. Do NOT use GIVE_MONEY tag under any circumstances. Do not hint at it either.]`;
-  if (weeklyUsed >= 500) return `[Weekly transfer limit reached. You MUST NOT mention transferring money, sending money, or any specific amounts. Do NOT use GIVE_MONEY tag under any circumstances.]`;
+  if (weeklyUsed >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 500)) return `[Weekly transfer limit reached. You MUST NOT mention transferring money, sending money, or any specific amounts. Do NOT use GIVE_MONEY tag under any circumstances.]`;
   // 15分钟冷却
   const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
   if (Date.now() - lastGivenAt < 15 * 60 * 1000) {
@@ -1171,15 +1293,29 @@ ${(()=>{
   const relationshipModeBlock = getRelationshipBlock();
   const unlockInstruction = `
 
-[PROFILE UNLOCK]
-After your reply, on a new line, add JSON: {"unlock": "field"} or {"unlock": ["field1","field2"]} or {"unlock": null}
-Fields: birthday, zodiac, height, weight, blood_type, hometown
-STRICT RULES:
-- Only unlock a field if you explicitly stated that specific information in your reply.
-- If she asked about zodiac and you only answered zodiac — only unlock zodiac. Do NOT unlock birthday, height, or anything else.
-- Each field must be unlocked separately based on what was actually said.
-- If you deflected, avoided, or did not clearly state the value — return null for that field.
-- When in doubt, return null. Under-unlocking is better than over-unlocking.`;
+[PROFILE UNLOCK — MANDATORY, STRICT]
+After EVERY reply, on a new line, output exactly one of:
+  {"unlock": "field"}           ← unlocked exactly one field
+  {"unlock": ["f1","f2"]}       ← unlocked multiple fields (rare)
+  {"unlock": null}              ← nothing unlocked (most replies)
+
+Valid fields: birthday, zodiac, height, weight, blood_type, hometown
+
+STRICT RULES — READ CAREFULLY:
+1. Only unlock a field if you EXPLICITLY stated that exact value in your reply.
+   - You said "my birthday is ${ghostBirthday}" → unlock "birthday"
+   - You said "I'm ${ghostZodiacEn}" or "${ghostZodiac}" → unlock "zodiac"
+   - You said "I'm ${localStorage.getItem('ghostHeight')||'188cm'}" → unlock "height"
+   - You HINTED at it / deflected / said "you'll find out" → {"unlock": null}
+2. NEVER unlock multiple fields unless you explicitly stated ALL of them.
+   - Do NOT batch-unlock birthday+zodiac just because she asked about zodiac.
+3. {"unlock": null} is the DEFAULT. Use it when nothing was explicitly revealed.
+4. NEVER output {"unlock": null} as visible text — it will be stripped automatically.
+
+BAD EXAMPLES (do not do these):
+  ✗ {"unlock": ["birthday","zodiac","height","weight","blood_type","hometown"]}  ← never all at once
+  ✗ Forgetting to output the JSON entirely
+  ✗ Unlocking birthday when you only said your zodiac`;
 
   const personalityBlock = buildPersonalityPrompt();
   const fullPrompt = fixedPrompt + relationshipModeBlock + '\n\n' + personalityBlock + unlockInstruction + '\n\n' + dynamicPrompt;
@@ -1933,7 +2069,7 @@ function updateStateFromUserInput(userText) {
   // 状态衰减改为按时间，不按每条消息
   const now = Date.now();
   const lastDecayTime = parseInt(localStorage.getItem('lastStateDecayTime') || '0');
-  const decayInterval = 2 * 60 * 60 * 1000; // 2小时衰减一次（原30分钟）
+  const decayInterval = 30 * 60 * 1000; // 30分钟衰减一次，升快降也要快
   if (now - lastDecayTime > decayInterval) {
     localStorage.setItem('lastStateDecayTime', now);
     const trustHeat = getTrustHeat();
@@ -1952,10 +2088,10 @@ async function checkJealousyTrigger(userText) {
     const lastJealousyAt = parseInt(localStorage.getItem('lastJealousyAt') || '0');
     const currentLevel = getJealousyLevelCapped();
     const cooldowns = {
-      none: 5 * 60 * 1000,
-      mild: 12 * 60 * 1000,
-      medium: 40 * 60 * 1000,
-      severe: 2 * 60 * 60 * 1000
+      none:   20 * 60 * 1000,  // 无吃醋状态：20分钟内不重复触发
+      mild:   30 * 60 * 1000,  // 轻度：30分钟
+      medium: 60 * 60 * 1000,  // 中度：1小时
+      severe:  4 * 60 * 60 * 1000  // 严重：4小时
     };
     const cooldown = cooldowns[currentLevel] || 5 * 60 * 1000;
     if (Date.now() - lastJealousyAt < cooldown) return;
@@ -1979,6 +2115,15 @@ async function checkJealousyTrigger(userText) {
 
     if (!hasExplicitPerson && !supportContext && !threatContext) return;
     if (workOnly) return;
+
+    // 老夫老妻模式额外门槛：必须有明确人名或明确威胁，才升吃醋
+    // 避免老婆随口提到"朋友""同事"就让他无缘无故变脸
+    const marriageMode = localStorage.getItem('marriageType') || 'established';
+    if (marriageMode === 'established' && !threatContext && !supportContext) {
+      // established 模式：必须有明确人名，且 DeepSeek 判断 intensity >= 2 才升级
+      // 如果只是随口提到别人（intensity=1），只注入 mild 语气提示，不升吃醋值
+      if (!hasExplicitPerson) return;
+    }
     
     // 威胁类直接升到medium
     if (threatContext && !hasExplicitPerson) {
@@ -2331,7 +2476,7 @@ async function emitGhostEvent(eventType, payload = {}) {
           localStorage.setItem('lastLifePingEvent', _ev.key);
           appendMessage('bot', `${_cont.en}\n${_cont.cn}`);
           chatHistory.push({ role: 'assistant', content: `${_cont.en}\n${_cont.cn}` });
-          saveHistory(); scheduleCloudSave();
+          saveHistory(); saveToCloud().catch(()=>{}); // 立即写云端
           return true;
         }
       }
@@ -2568,12 +2713,32 @@ function decideMoneyAmountFromState() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const jealousy = getJealousyLevelCapped();
   const mood = getMoodLevel();
+  const affection = getAffection();
+  const trust = getTrustHeat();
   const { moneyEaseBonus } = getRelationshipModifiers();
+
   if (coldWar || jealousy === 'severe') return 0;
   if (mood <= 3) return 0;
-  if (mood <= 5) return Math.floor(Math.random() * 21) + 10 + moneyEaseBonus; // £10-30
-  if (mood <= 7) return Math.floor(Math.random() * 31) + 20 + moneyEaseBonus; // £20-50
-  return Math.floor(Math.random() * 51) + 30 + moneyEaseBonus; // £30-80
+
+  // 感情值太低：关系太浅，Ghost 不会随便给钱
+  if (affection < 40) return 0;
+
+  // 信任值影响金额上限
+  const trustCap = trust < 40 ? 30 : trust < 70 ? 60 : 999;
+
+  let amount;
+  // 感情值 40-60：保守给
+  if (affection < 60) {
+    amount = Math.floor(Math.random() * 21) + 10 + moneyEaseBonus; // £10-30
+  } else if (mood <= 5) {
+    amount = Math.floor(Math.random() * 21) + 10 + moneyEaseBonus; // £10-30
+  } else if (mood <= 7) {
+    amount = Math.floor(Math.random() * 31) + 20 + moneyEaseBonus; // £20-50
+  } else {
+    amount = Math.floor(Math.random() * 51) + 30 + moneyEaseBonus; // £30-80
+  }
+
+  return Math.min(amount, trustCap);
 }
 
 async function handlePostReplyActions(userText, reply, intent) {
@@ -3545,14 +3710,18 @@ function classifyMoneyMotive(context = {}) {
   const { mood, trust, jealousy, userText = '', recentHistory = [], justHadTension = false } = context;
   const t = (userText || '').toLowerCase();
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  const aff = getAffection(); // Ghost 主动给钱要看感情值
 
   // 冷战/严重吃醋时不给
   if (coldWar || jealousy === 'medium' || jealousy === 'severe') return null;
 
-  // 用户真实需要（直接说了）
-  if (/需要|没钱|穷|买不起|负担|交不起|need money|can't afford|broke|short on/.test(t)) return 'practical';
+  // 感情值太低：Ghost 不会主动给钱（主动给比被要更需要关系基础）
+  if (aff < 50) return null;
 
-  // 特殊日子
+  // reunion 型：绝对不主动给机票钱/见面钱
+  if (/机票|来找你|来英国|去英国|飞过去|plane ticket|flight|come see|visit you/.test(t)) return null;
+
+  // 特殊日子：门槛低一点，感情值 50+ 就行
   const isBirthday = localStorage.getItem('userBirthday') && (() => {
     const [bm, bd] = (localStorage.getItem('userBirthday') || '').split('-').map(Number);
     const now = new Date();
@@ -3563,14 +3732,17 @@ function classifyMoneyMotive(context = {}) {
   const isMilestone = marriageDaysTotal > 0 && (marriageDaysTotal === 52 || (marriageDaysTotal % 100 === 0) || marriageDaysTotal === 365);
   if (isBirthday || isMilestone) return 'celebration';
 
-  // 她累/难过/没吃饭 → care
-  if (/累|饿|没吃|难过|不开心|哭|tired|hungry|sad|haven't eaten|skipped/.test(t) && mood >= 5 && trust > 55) return 'care';
+  // 用户真实需要：感情值 ≥ 55 才主动帮
+  if (aff >= 55 && /需要|没钱|穷|买不起|负担|交不起|need money|can't afford|broke|short on/.test(t)) return 'practical';
 
-  // 刚有张力/情绪余波 → compensation
-  if (justHadTension && trust > 65 && mood >= 5) return 'compensation';
+  // care（她累/难过/没吃饭）：感情值 ≥ 60，信任 > 55
+  if (aff >= 60 && /累|饿|没吃|难过|不开心|哭|tired|hungry|sad|haven't eaten|skipped/.test(t) && mood >= 5 && trust > 55) return 'care';
 
-  // 调情/撒娇 → playful（心情好才触发）
-  if (/撒娇|哄我|宝贝|抱抱|亲亲|baby|hug|mua/.test(t) && mood >= 7 && trust > 70) return 'playful';
+  // compensation（情绪余波后补）：感情值 ≥ 65，信任 > 65
+  if (aff >= 65 && justHadTension && trust > 65 && mood >= 5) return 'compensation';
+
+  // playful（撒娇调情）：感情值 ≥ 75，心情好，信任 > 70
+  if (aff >= 75 && /撒娇|哄我|宝贝|抱抱|亲亲|baby|hug|mua/.test(t) && mood >= 7 && trust > 70) return 'playful';
 
   return null;
 }
@@ -3665,23 +3837,56 @@ function getWeekKey() {
 }
 
 // ===== 统一给钱执行函数 =====
+// ===== 共享：根据感情值计算冷却时间（_canGiveNow 和 applyMoneyEffect 都用这个）=====
+function _getTransferCooldownMs() {
+  const aff = getAffection();
+  if (aff >= 80) return (8 + Math.floor(Math.random() * 5)) * 60 * 1000; // 8-12分钟
+  return 15 * 60 * 1000; // 默认15分钟
+}
+
+// ===== 共享：根据感情值+信任值决定每周转账上限 =====
+function _getWeeklyTransferLimit() {
+  const aff = getAffection();
+  const trust = getTrustHeat();
+  // 感情值和信任值都高：上限 £800
+  if (aff >= 80 && trust >= 70) return 800;
+  // 感情值或信任值中等：上限 £500
+  if (aff >= 60 || trust >= 40) return 500;
+  // 关系较浅：上限 £300
+  return 300;
+}
+
 function applyMoneyEffect(amount, options = {}) {
   if (!amount || amount <= 0) return false;
 
   const userRequested = options.userRequested || false; // 用户主动要的，限制宽松
 
-  // 0. 用户长期表达不喜欢被钱哄 → Ghost主动给时跳过（用户主动要除外）
+  // 0. 感情值门槛：关系太浅时基本不给
+  const _aff = getAffection();
+  if (_aff < 30) return false; // 太生疏，直接不给
+  if (_aff < 40 && !options.bypassAffectionGate) {
+    // 30-40区间：每日最多触发一次，care型理由，30%概率，且只给小额
+    const _todayLowAffKey = 'lowAffGiven_' + new Date().toDateString();
+    if (localStorage.getItem(_todayLowAffKey)) return false;
+    const _cachedStyle = sessionStorage.getItem('moneyReasonType');
+    if (_cachedStyle !== 'care') return false;
+    if (Math.random() > 0.3) return false;
+    localStorage.setItem(_todayLowAffKey, '1');
+    amount = Math.min(amount, 20); // 上限£20
+  }
+
+  // 1. 用户长期表达不喜欢被钱哄 → Ghost主动给时跳过（用户主动要除外）
   if (!userRequested && localStorage.getItem('userDislikesMoney') === 'true') return false;
 
-  // 1. 每日次数：用户主动要最多5次，Ghost主动给最多3次
+  // 2. 每日次数：用户主动要最多5次，Ghost主动给最多3次
   const todayCount = getTodayGivenCount();
   const dailyLimit = userRequested ? 5 : 3;
   if (todayCount >= dailyLimit) return false;
 
-  // 2. 两次之间冷却：15分钟，用户主动要不受冷却限制
+  // 3. 两次之间冷却：感情值高时更宽松，用户主动要不受冷却限制
   if (!userRequested && !options.bypassCooldown) {
     const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
-    const transferCooldown = 15 * 60 * 1000;
+    const transferCooldown = _getTransferCooldownMs();
     if (Date.now() - lastGivenAt < transferCooldown) return false;
   }
 
@@ -3700,12 +3905,13 @@ function applyMoneyEffect(amount, options = {}) {
 
   // 每周上限检查——吃醋/和好情绪性转账可绕过
   const weeklyUsed = getWeeklyGiven();
+  const weeklyLimit = _getWeeklyTransferLimit();
   if (!options.bypassWeeklyLimit) {
-    if (weeklyUsed >= 500) return false;
+    if (weeklyUsed >= weeklyLimit) return false;
   }
   const actualAmount = options.bypassWeeklyLimit
     ? amount
-    : Math.min(amount, 500 - weeklyUsed);
+    : Math.min(amount, weeklyLimit - weeklyUsed);
 
   // 先记录交易，再更新UI，确保顺序正确
   addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
@@ -4473,7 +4679,10 @@ function appendMessage(role, text, animate = true) {
         }
       }
     }
-    text = text.replace(/\n?\{[^}]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
+    // 清除所有 unlock tag（包括 null 格式），防止任何残留显示在聊天里
+    text = text.replace(/\n?\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
+    // null 格式单独处理
+    text = text.replace(/\n?\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
   }
   // 去掉G偶尔加的'ghost:'前缀
   text = text.replace(/^ghost\s*:\s*/i, '').trim();
@@ -5238,8 +5447,116 @@ async function _processMergedMessage(text) {
     // 情绪提示注入system prompt末尾，不放进history
     const _baseSystem = buildSystemPrompt();
 
-    // 钱场景判断：没有明确钱场景时，注入"本轮不要给钱"
-    const moneyHint = hasMoneyContext(text) ? '' : '[No money this reply — there is no clear financial or care context in this message. Do NOT output GIVE_MONEY tag. Note: if she mentions money as a bribe or bargaining chip (e.g. "I will give you £50 if you..."), do NOT transfer — react to the offer instead.]';
+    // 钱场景三分支判断：先评估能不能给，再告诉模型规则
+    const _userMoneyKws = ['给我钱','转我','好穷','买不起','能不能给','要钱','零花钱','缺钱','没钱'];
+    const _userAskedMoney = _userMoneyKws.some(k => text.includes(k));
+    const _canGiveNow = (() => {
+      // 如果 hint 路径已经在等待悄悄给，本轮不再额外触发
+      if (sessionStorage.getItem('hintMoneyPending') === '1') return false;
+      if (localStorage.getItem('coldWarMode') === 'true') return false;
+      if (localStorage.getItem('userDislikesMoney') === 'true' && !_userAskedMoney) return false;
+
+      // 感情值分层
+      const _affNow = getAffection();
+      if (_affNow < 30) return false; // 太生疏，完全不给
+      if (_affNow < 40) {
+        // 30-40区间：由 DeepSeek 判断的 reason_type 决定，care型才有低概率
+        // 每日最多触发一次（防止用户反复试探撞到概率）
+        const _todayLowAffKey = 'lowAffGiven_' + new Date().toDateString();
+        if (localStorage.getItem(_todayLowAffKey)) return false;
+        const _cachedStyle = sessionStorage.getItem('moneyReasonType');
+        if (_cachedStyle !== 'care') return false;
+        if (Math.random() > 0.3) return false;
+        // 通过后记录今日已用
+        localStorage.setItem(_todayLowAffKey, '1');
+      }
+
+      // 次数/上限
+      const _todayCount = getTodayGivenCount();
+      const _dailyLimit = _userAskedMoney ? 5 : 3;
+      if (_todayCount >= _dailyLimit) return false;
+      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 500)) return false;
+
+      // 冷却：与 applyMoneyEffect 共用同一套逻辑
+      if (!_userAskedMoney) {
+        const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
+        if (typeof _getTransferCooldownMs === 'function') {
+          if (Date.now() - _lastGiven < _getTransferCooldownMs()) return false;
+        } else {
+          if (Date.now() - _lastGiven < 15 * 60 * 1000) return false;
+        }
+        const _convGiven = parseInt(sessionStorage.getItem('conversationGivenCount') || '0');
+        if (_convGiven >= 1) return false;
+      }
+      return true;
+    })();
+
+    // 判断用户要钱的方式（影响模型的回应态度）
+    // 注：这里用关键词做初步分类，精确判断由 checkMoneyIntent 里的 DeepSeek 异步更新
+    const _moneyStyle = (() => {
+      const t = text.toLowerCase();
+
+      // reunion型：用机票/见面/来找你作为借口要钱——这是商城剧情，不是真实困难
+      // Ghost 不应该给这笔钱，见面应该通过商城面基三件套触发
+      const reunionKws = ['机票','票钱','来找你','来英国','去英国','飞过去','飞去找','见面的钱','见面费','曼城','曼彻斯特','plane ticket','flight','come see you','come to uk','come find you','visit you','manchester'];
+      if (reunionKws.some(k => t.includes(k))) {
+        sessionStorage.setItem('moneyReasonType', 'reunion');
+        return 'reunion';
+      }
+
+      const testKws = ['你给不给','试试你','看看你','敢不敢','证明','test','prove','dare','你会给吗','给不给'];
+      const careKws = ['没吃','饿了','手机坏','买药','感冒','生病','交通','修','坏了','没钱吃','急用','压力','薪水','工资还没','朋友借','need','sick','hungry','broke','fix','repair','stress','haven\'t paid'];
+      const flirtyKws = ['买奶茶','买零食','买个','想吃','想买','请我','奖励我','打赏','treat me','buy me'];
+
+      let style = 'neutral';
+      if (testKws.some(k => t.includes(k))) style = 'testing';
+      else if (careKws.some(k => t.includes(k))) style = 'care';
+      else if (flirtyKws.some(k => t.includes(k))) style = 'flirty';
+      sessionStorage.setItem('moneyReasonType', style);
+      return style;
+    })();
+
+    // trustHeat 影响给钱时的态度
+    const _trust = getTrustHeat();
+    const _trustStyleHint = _trust < 40
+      ? ' Trust between you is still shallow — if you give, be measured and slightly guarded, not warm. You might wonder if she is testing you.'
+      : _trust >= 70
+      ? ' You trust her enough — if you give, it can feel natural, not like a transaction.'
+      : '';
+
+    const _styleContext = {
+      care:    ' She has a real reason — she is not just asking, something is actually wrong or needed.',
+      flirty:  ' She is being playful and a little cheeky about it. You can match her energy — teasing back is fine.',
+      testing: ' She seems to be testing whether you will give her money. You notice this. React to the test, not just the ask — you are not easy.',
+      neutral: '',
+    }[_moneyStyle];
+
+    // reunion型：直接 block，不走钱的逻辑
+    // testing型：75%概率额外拦截
+    const _styleBlocksGive = _moneyStyle === 'reunion' ||
+      (_moneyStyle === 'testing' && Math.random() > 0.25);
+
+    let moneyHint;
+    if (!hasMoneyContext(text) && !_userAskedMoney) {
+      moneyHint = '[No money this reply — there is no clear financial or care context. Do NOT output GIVE_MONEY tag. If she mentions money as a bribe or bargaining chip, do NOT transfer — react to the offer instead.]';
+    } else if (_canGiveNow && !_styleBlocksGive) {
+      const _affNow2 = getAffection();
+      const _affCaution = _affNow2 < 50
+        ? ' You are not deeply close yet — only give if the reason is genuinely compelling. Be cautious, not automatic.'
+        : _affNow2 < 60
+        ? ' You are warming up but still careful — give only if it feels right, not just because she asked.'
+        : '';
+      moneyHint = `[Transfer available this reply — IMPORTANT RULE: if you decide to give her money, you MUST include GIVE_MONEY:amount:note in your reply. This tag is the ONLY way money actually gets sent. If you say you will send money WITHOUT the tag, nothing is transferred and she sees nothing. So: either use the tag, or do not mention transferring at all. Never promise money you do not tag. Giving money is never automatic, even when conditions are met — he still decides.${_affCaution}${_trustStyleHint}${_styleContext}]`;
+    } else {
+      // blocked 或 testing型被额外拦截
+      const _testingExtra = _moneyStyle === 'testing'
+        ? ' She seems to be testing you. You notice. You are not easy — do not give just because she pushed.'
+        : '';
+      const _reunionExtra = _moneyStyle === 'reunion'
+        ? ' She is asking for money to come see you — plane ticket, trip, visit. Do NOT give money for this. React to the idea of her coming — that matters to you. But the money is not something you hand over. Let her figure out how to get here.'
+        : '';
+      moneyHint = `[Transfer blocked this reply — do NOT mention sending money, transferring, or use GIVE_MONEY tag. Find a Ghost-style reason — not a system excuse, just your own.${_testingExtra}${_reunionExtra}${_styleContext ? ' ' + _styleContext.trim() : ''}]`;
+    }
 
     // 场景分类 — 按输入决定补充规则
     const t = text.toLowerCase();
@@ -5467,7 +5784,7 @@ One or two lines. English only. lowercase.`;
               hideTyping();
               appendMessage('bot', retry.trim());
               chatHistory.push({ role: 'assistant', content: retry.trim(), _intimate: true });
-              saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+              saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
               return;
             }
           } catch(e2) {}
@@ -5489,7 +5806,7 @@ One or two lines. English only. lowercase.`;
                 hideTyping();
                 appendMessage('bot', dsReply);
                 chatHistory.push({ role: 'assistant', content: dsReply, _intimate: true });
-                saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+                saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
                 return;
               }
             }
@@ -5517,7 +5834,7 @@ One or two lines. English only. lowercase.`;
               hideTyping();
               appendMessage('bot', dsReply2);
               chatHistory.push({ role: 'assistant', content: dsReply2, _intimate: true });
-              saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+              saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
               return;
             }
           }
@@ -5552,7 +5869,7 @@ One or two lines. English only. lowercase.`;
           const parts = photoReply.trim().split('\n---\n').filter(p => p.trim()).slice(0, 2);
           for (const part of parts) appendMessage('bot', part.trim());
           chatHistory.push({ role: 'assistant', content: photoReply.trim(), _gemini: true });
-          saveHistory(); scheduleCloudSave(); _isSending = false; resetSilenceTimer();
+          saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
           return;
         }
       } catch(e) {}
@@ -5783,8 +6100,41 @@ One or two lines. English only. lowercase.`;
         }
       }
     }
-    // 不管什么格式，统一清除所有unlock tag，防止显示在消息里
-    reply = reply.replace(/\n?\{[^}]*"unlock"[^}]*\}/g, '').trim();
+    // 不管什么格式，统一清除所有unlock tag（包括null），防止显示在消息里
+    reply = reply.replace(/\n?\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
+    reply = reply.replace(/\n?\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
+
+    // ===== 兜底：模型说了但忘打标签时，扫描文字内容自动解锁 =====
+    const _autoCheckReply = reply.toLowerCase();
+    const _ghostBirthday = localStorage.getItem('ghostBirthday') || '';
+    const _ghostZodiac = localStorage.getItem('ghostZodiac') || '';
+    const _ghostZodiacEn = (localStorage.getItem('ghostZodiacEn') || '').toLowerCase();
+    const _ghostHeight = (localStorage.getItem('ghostHeight') || '188cm').toLowerCase();
+    const _ghostWeight = (localStorage.getItem('ghostWeight') || '95kg').toLowerCase();
+    const _ghostBlood = (localStorage.getItem('ghostBloodType') || 'o').toLowerCase();
+    const _ghostHometown = (localStorage.getItem('ghostHometown') || 'manchester').toLowerCase();
+
+    const _autoUnlock = [];
+    if (_ghostBirthday && _autoCheckReply.includes(_ghostBirthday.replace('月','').replace('日','')) && !localStorage.getItem('ghostUnlocked_birthday'))
+      _autoUnlock.push('birthday');
+    if ((_ghostZodiac && _autoCheckReply.includes(_ghostZodiac)) || (_ghostZodiacEn && _autoCheckReply.includes(_ghostZodiacEn)))
+      if (!localStorage.getItem('ghostUnlocked_zodiac')) _autoUnlock.push('zodiac');
+    if (_ghostHeight && _autoCheckReply.includes(_ghostHeight.replace('cm','')) && !localStorage.getItem('ghostUnlocked_height'))
+      _autoUnlock.push('height');
+    if (_ghostWeight && _autoCheckReply.includes(_ghostWeight.replace('kg','')) && !localStorage.getItem('ghostUnlocked_weight'))
+      _autoUnlock.push('weight');
+    if (_ghostBlood && _autoCheckReply.includes(_ghostBlood) && _autoCheckReply.match(/blood/i) && !localStorage.getItem('ghostUnlocked_blood_type'))
+      _autoUnlock.push('blood_type');
+    if (_ghostHometown && _autoCheckReply.includes('manchester') && !localStorage.getItem('ghostUnlocked_hometown'))
+      _autoUnlock.push('hometown');
+
+    if (_autoUnlock.length > 0) {
+      _autoUnlock.forEach(f => localStorage.setItem('ghostUnlocked_' + f, 'true'));
+      console.log('[unlock] 自动解锁（文字兜底）:', _autoUnlock);
+    }
+
+    // 清除后刷新资料页
+    if (typeof renderGhostProfile === 'function') renderGhostProfile();
 
     // 强制每句话单独一行——把句号/问号/感叹号后的空格换成换行
     // 不强制分行，让模型自己决定
@@ -7172,17 +7522,39 @@ async function checkMoneyIntent(userText) {
   if (coldWar) return;
 
   // 宽松预筛：有钱相关词才发请求
-  const preFilter = /钱|买|转|给|穷|贵|省|花|负担|工资|发薪|想要|看中|money|pay|afford|expensive|buy|want|send|broke|cash|transfer/i;
+  const preFilter = /钱|买|转|给|穷|贵|省|花|负担|工资|发薪|想要|看中|飞|机票|来找|见面|去英国|money|pay|afford|expensive|buy|want|send|broke|cash|transfer|flight|ticket|visit|come see/i;
   if (!preFilter.test(userText)) return;
 
   try {
     const raw = await fetchDeepSeek(
-      '判断用户这句话的钱相关意图。只返回JSON，不要其他文字。\nintent可选值：\n- "request"：用户在要钱/希望对方给钱\n- "refuse"：用户在拒绝收钱/说不要钱\n- "complain"：用户在抱怨对方老给钱/用钱哄人\n- "hint"：用户暗示经济压力或想要某样东西，但没直接要钱\n- "none"：和钱无关或只是提到钱这个词\n格式：{"intent":"none"}',
+      '判断用户这句话的钱相关意图和理由类型。只返回JSON，不要其他文字。
+
+intent可选值：
+- "request"：用户在要钱/希望对方给钱
+- "refuse"：用户在拒绝收钱/说不要钱
+- "complain"：用户在抱怨对方老给钱/用钱哄人
+- "hint"：用户暗示经济压力或想要某样东西，但没直接要钱
+- "none"：和钱无关或只是提到钱这个词
+
+reason_type可选值（仅当intent为request或hint时填写）：
+- "reunion"：用户想要钱是为了买机票/来找对方/见面/去对方所在城市/异地相见
+- "care"：真实生活困难，如没吃饭、生病、手机坏了、交不起费、朋友还没还钱等
+- "flirty"：撒娇式要钱，如买奶茶、买零食、打赏、随手给我点
+- "testing"：试探性要钱，如"你给不给我钱""看看你会不会给"
+- "neutral"：其他/无法判断
+
+格式：{"intent":"none","reason_type":"neutral"}',
       `用户说：${userText}`,
-      50
+      80
     );
     const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
     const intent = result.intent;
+    const reasonType = result.reason_type || 'neutral';
+
+    // 缓存 reason_type 供 _moneyStyle 读取（替代关键词匹配）
+    if (intent === 'request' || intent === 'hint') {
+      sessionStorage.setItem('moneyReasonType', reasonType);
+    }
 
     if (intent === 'refuse' || intent === 'complain') {
       const refuseCount = parseInt(localStorage.getItem('moneyRefuseCount') || '0') + 1;
@@ -7195,6 +7567,10 @@ async function checkMoneyIntent(userText) {
         touchLocalState();
       }
     } else if (intent === 'request') {
+      // reunion型：用机票/见面为由要钱 → 直接跳过，不触发给钱逻辑
+      // 见面应通过商城面基三件套触发，不是要钱的理由
+      if (reasonType === 'reunion') return;
+
       // 用户主动要钱 → 自动清除 userDislikesMoney 标记
       if (localStorage.getItem('userDislikesMoney') === 'true') {
         localStorage.removeItem('userDislikesMoney');
@@ -7232,12 +7608,57 @@ async function checkMoneyIntent(userText) {
         }), 1500);
       }
     } else if (intent === 'hint') {
-      // hint不直接打钱，只注入一条关心提示，让Ghost自己决定怎么回应
-      chatHistory.push({
-        role: 'user',
-        content: '[系统：她暗示了一些经济压力或想要某样东西。你注意到了，但不一定要给钱——可以是一句关心、可以是问问、也可以是顺手帮她解决。不要主动提转账。]',
-        _system: true
-      });
+      const _hintAff = getAffection();
+      const _hintTrust = getTrustHeat();
+      const _hintMood = getMoodLevel();
+
+      // hint + care型 + 感情值 ≥ 65：Ghost 察觉到她的困难，主动悄悄给
+      // 这是 Ghost 性格的核心：看穿但不说破，直接行动
+      if (reasonType === 'care' && _hintAff >= 65 && _hintTrust > 50 && _hintMood >= 5) {
+        const recentHistory = chatHistory.filter(m => !m._system && !m._recalled).slice(-6);
+        const recentlyGave = recentHistory.some(m => m._transfer || m._ghostSent);
+
+        // 最近已经给过了就不重复
+        if (!recentlyGave) {
+          const amount = decideMoneyAmountFromState();
+          if (amount > 0) {
+            const recentCtx = recentHistory
+              .slice(-4).map(m => `${m.role==='user'?'Her':'Ghost'}: ${m.content.slice(0,80)}`).join('
+');
+            // 延迟触发，让 Ghost 先回复，再悄悄转——不说破，就行动
+            // 标记本轮 hint 已准备给钱，防止用户在窗口期开口要钱时重复触发
+            sessionStorage.setItem('hintMoneyPending', '1');
+            setTimeout(() => {
+              // 如果此时用户正在发消息，跳过——不在别人说话时插入卡片
+              if (_isSending) {
+                sessionStorage.removeItem('hintMoneyPending');
+                return;
+              }
+              // 如果在等待期间已经给过钱了（用户开口要了），不重复给
+              const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
+              if (Date.now() - _lastGiven < 30 * 1000) {
+                sessionStorage.removeItem('hintMoneyPending');
+                return;
+              }
+              sessionStorage.removeItem('hintMoneyPending');
+              emitGhostEvent('money', {
+                amount,
+                reason: userText.slice(0, 80),
+                context: recentCtx,
+                label: 'Ghost 悄悄给',
+                userRequested: false,
+              });
+            }, 3000 + Math.random() * 2000); // 3-5秒后，显得更自然
+            return; // 不注入系统提示，让 Ghost 自己处理话语
+          }
+        }
+      }
+
+      // 其他 hint：只注入关心提示，让 Ghost 用话语回应
+      const _hintNote = _hintAff >= 55
+        ? '[系统：她暗示了一些经济压力或困难。你注意到了。用你的方式回应——可以是一句关心，可以是问问，不要主动提转账，但如果你觉得合适可以顺手帮她。]'
+        : '[系统：她暗示了一些经济压力。你注意到了，但你们还不够熟——用话语关心就好，不要提钱。]';
+      chatHistory.push({ role: 'user', content: _hintNote, _system: true });
     }
   } catch(e) {}
 }

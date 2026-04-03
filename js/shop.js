@@ -600,6 +600,8 @@ function confirmPurchase() {
   }
 
   renderMarket(currentCategory);
+  // 购买是重要操作，立即写云端，不走防抖
+  if (typeof saveToCloud === 'function') saveToCloud().catch(()=>{});
 }
 
 // ===== 每周折扣 =====

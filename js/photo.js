@@ -120,12 +120,34 @@ async function restoreGhostAvatar() {
   } catch(e) {}
 
   // 2秒后再执行一次，防止被loadFromCloud覆盖
-  setTimeout(() => {
+  setTimeout(async () => {
     const url = localStorage.getItem('ghostAvatarUrl');
+
     if (url && !url.startsWith('data:')) {
+      // 有正式URL：确保DOM显示正确
       document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-        if (el.src !== url) el.src = url;
+        if (el.src !== url) el.src = url + '?t=' + Date.now();
       });
+    } else {
+      // 没有正式URL：检查是否有base64备份，有的话重试上传
+      const b64 = localStorage.getItem('ghostAvatarBase64');
+      if (b64) {
+        console.log('[avatar] 检测到未上传的base64备份，重试上传...');
+        // 先把base64显示出来
+        const dataUrl = `data:image/jpeg;base64,${b64}`;
+        document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = dataUrl; });
+        // 重试上传
+        try {
+          const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
+          if (retryUrl) {
+            updateGhostAvatar(retryUrl); // 更新DOM + localStorage + 写数据库
+            localStorage.removeItem('ghostAvatarBase64'); // 上传成功，清除备份
+            console.log('[avatar] 重试上传成功:', retryUrl);
+          }
+        } catch(e) {
+          console.warn('[avatar] 重试上传失败，继续用base64显示');
+        }
+      }
     }
   }, 2000);
 }
@@ -344,8 +366,11 @@ async function handlePhotoUpload(fileDataList) {
         // 先用base64临时显示（即时反馈）
         const _avatarDataUrl = `data:image/jpeg;base64,${ghostB64}`;
         updateGhostAvatar(_avatarDataUrl);
-        // 先存 base64 到 localStorage 作为兜底，防止 Storage 上传失败后刷新消失
+        // 存 base64 到两个 key：
+        // ghostAvatarUrl → 当前使用的头像（可能被正式URL覆盖）
+        // ghostAvatarBase64 → 永久备份，用于上传失败时重试恢复
         localStorage.setItem('ghostAvatarUrl', _avatarDataUrl);
+        localStorage.setItem('ghostAvatarBase64', ghostB64); // 纯base64，不带前缀
         if (typeof touchLocalState === 'function') touchLocalState();
         sessionStorage.removeItem('avatarRequestPending'); // 换上了，清除pending
 
@@ -353,7 +378,9 @@ async function handlePhotoUpload(fileDataList) {
         uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
           if (url) {
             updateGhostAvatar(url); // 这里会自动调用saveAvatarUrlToProfile
+            localStorage.removeItem('ghostAvatarBase64'); // 上传成功，清除base64备份
           }
+          // 上传失败：base64备份保留，restoreGhostAvatar 下次会重试
         });
       }
     }

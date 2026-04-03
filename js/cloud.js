@@ -33,7 +33,7 @@ async function loadFromCloud() {
     // ── 时间戳 ──────────────────────────────────────────────
     const cloudTs = data.updated_at ? new Date(data.updated_at).getTime() : 0;
     const localTs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
-    const cloudIsNewer = cloudTs > localTs;
+    const cloudIsNewer = cloudTs > localTs + 500; // 500ms容差，防止同设备误判
 
     // ── 1. 聊天记录：合并云端和本地，保留更多 ────────────────
     if (data.chat_history && data.chat_history.length > 0) {
@@ -45,8 +45,8 @@ async function loadFromCloud() {
         localStorage.setItem('chatUpdatedAt', cloudTs);
       } else {
         // 合并：把云端有但本地没有的消息补进来（按内容去重）
-        const localContents = new Set(localHistory.map(m => m.role + '|' + (m.content || '').slice(0, 50)));
-        const toAdd = data.chat_history.filter(m => !localContents.has(m.role + '|' + (m.content || '').slice(0, 50)));
+        const localContents = new Set(localHistory.map(m => m.role + '|' + (m.content || '').slice(0, 80)));
+        const toAdd = data.chat_history.filter(m => !localContents.has(m.role + '|' + (m.content || '').slice(0, 80)));
         if (toAdd.length > 0) {
           // 云端的放前面（更早），本地的放后面（更新）
           const merged = [...toAdd, ...localHistory].slice(-300);
@@ -71,24 +71,32 @@ async function loadFromCloud() {
       } else {
         setIfMissing('ghostBirthday', p.ghostBirthday);
         setIfMissing('ghostZodiac', p.ghostZodiac);
+      setIfMissing('ghostZodiacEn', p.ghostZodiacEn);
       }
       setIfMissing('meetType', p.meetType);
       setIfMissing('botNickname', p.botNickname);
-      // 用户设置：云端更新才覆盖
-      setIfNewer('userBirthday', p.userBirthday);
-      setIfNewer('userZodiac', p.userZodiac);
-      setIfNewer('userMBTI', p.userMBTI);
-      setIfNewer('userCountry', p.userCountry);
-      setIfNewer('userFavFood', p.userFavFood);
-      setIfNewer('userFavMusic', p.userFavMusic);
-      setIfNewer('userFavColor', p.userFavColor);
-      setIfNewer('userBio', p.userBio);
-      setIfNewer('metInPerson', p.metInPerson != null ? String(p.metInPerson) : null);
-      setIfNewer('visitStreak', p.visitStreak);
-      setIfNewer('vocabStreak', p.vocabStreak);
-      setIfNewer('vocabLastDay', p.vocabLastDay);
-      setIfNewer('lastSalaryAmount', p.lastSalaryAmount);
-      setIfNewer('lastSalaryMonth', p.lastSalaryMonth);
+      // 用户设置：云端更新才覆盖；本地没有时也恢复（换设备场景）
+      const setIfNewerOrMissing = (key, val) => {
+        if (val == null || val === '') return;
+        if (!localStorage.getItem(key) || cloudIsNewer) localStorage.setItem(key, val);
+      };
+      setIfNewerOrMissing('userBirthday', p.userBirthday);
+      setIfNewerOrMissing('userZodiac', p.userZodiac);
+      setIfNewerOrMissing('userMBTI', p.userMBTI);
+      setIfNewerOrMissing('userCountry', p.userCountry);
+      setIfNewerOrMissing('userFavFood', p.userFavFood);
+      setIfNewerOrMissing('userFavMusic', p.userFavMusic);
+      setIfNewerOrMissing('userFavColor', p.userFavColor);
+      setIfNewerOrMissing('userBio', p.userBio);
+      setIfNewerOrMissing('metInPerson', p.metInPerson != null ? String(p.metInPerson) : null);
+      setIfNewerOrMissing('visitStreak', p.visitStreak);
+      setIfNewerOrMissing('vocabStreak', p.vocabStreak);
+      setIfNewerOrMissing('vocabLastDay', p.vocabLastDay);
+      setIfNewerOrMissing('lastSalaryAmount', p.lastSalaryAmount);
+      setIfNewerOrMissing('lastSalaryMonth', p.lastSalaryMonth);
+      // 位置信息：换设备也要恢复
+      setIfNewerOrMissing('currentLocation', p.currentLocation);
+      setIfNewerOrMissing('currentLocationReason', p.currentLocationReason);
       // 头像：有就用云端（换设备必须恢复）
       if (p.userAvatarBase64 && !localStorage.getItem('userAvatarBase64')) {
         localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
@@ -130,7 +138,34 @@ async function loadFromCloud() {
       if (data.long_term_memory != null && !localStorage.getItem('longTermMemory')) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
-    // ── 4. 余额：本地没有才从云端恢复，有就保留本地 ──────────
+    // ── 3.5 签到记录：恢复历史签到key + 本月里程碑计数 ──────────
+    // 这是防止 iOS 清缓存后重复签到的关键
+    if (data.profile?.checkinKeys && typeof data.profile.checkinKeys === 'object') {
+      Object.keys(data.profile.checkinKeys).forEach(k => {
+        if (k.startsWith('checkin_') && !localStorage.getItem(k)) {
+          localStorage.setItem(k, '1');
+        }
+      });
+    }
+    if (data.profile?.monthlyCheckinKey && data.profile?.monthlyCheckinCount) {
+      const localCount = parseInt(localStorage.getItem(data.profile.monthlyCheckinKey) || '0');
+      const cloudCount = parseInt(data.profile.monthlyCheckinCount || '0');
+      // 取较大值，防止倒退
+      if (cloudCount > localCount) {
+        localStorage.setItem(data.profile.monthlyCheckinKey, String(cloudCount));
+      }
+    }
+
+    // ── 4. 钱包迁移标记：必须先恢复，防止 getBalance() 里的迁移代码清空已恢复的交易记录 ──
+    // Bug2根本原因：walletMigrated_v3 没存云端，换设备后迁移代码重跑，清空 transactions
+    if (data.profile?.walletMigrated_v3) {
+      localStorage.setItem('walletMigrated_v3', data.profile.walletMigrated_v3);
+    } else if (data.chat_history && data.chat_history.length > 0) {
+      // 有聊天记录说明是老用户，直接标记为已迁移，防止清空
+      localStorage.setItem('walletMigrated_v3', '1');
+    }
+
+    // ── 5. 余额：本地没有才从云端恢复，有就保留本地 ──────────
     if (data.balance != null && data.balance > 0 && !localStorage.getItem('wallet')) {
       localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
     }
@@ -189,6 +224,23 @@ async function loadFromCloud() {
         const local = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
         const merged = [...new Set([...local, ...s.purchasedItems])];
         localStorage.setItem('purchasedItems', JSON.stringify(merged));
+      }
+
+      // 购买次数：取最大值（防止倒退）
+      if (s.purchaseCounts && typeof s.purchaseCounts === 'object') {
+        const local = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
+        const merged = { ...local };
+        Object.keys(s.purchaseCounts).forEach(k => {
+          merged[k] = Math.max(merged[k] || 0, s.purchaseCounts[k] || 0);
+        });
+        localStorage.setItem('purchaseCounts', JSON.stringify(merged));
+      }
+
+      // 亲密商品触发记录：合并
+      if (s.intimateTriggered && typeof s.intimateTriggered === 'object') {
+        const local = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+        const merged = { ...s.intimateTriggered, ...local }; // 本地优先
+        localStorage.setItem('intimateTriggered', JSON.stringify(merged));
       }
 
       // 交易记录：按id合并
@@ -262,20 +314,43 @@ function touchLocalState() {
   scheduleCloudSave();
 }
 
-function scheduleCloudSave() {
+function scheduleCloudSave(urgent = false) {
   if (_saveTimer) clearTimeout(_saveTimer);
-  // 防抖改为10秒，大幅减少 Supabase 并发写入压力
+  // 普通操作5秒防抖；urgent=true时2秒（发消息、充值等重要操作用）
+  const delay = urgent ? 2000 : 5000;
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
     saveToCloud().catch(console.error);
-  }, 10000);
+  }, delay);
 }
+
+// 节流锁：同一用户5秒内最多写一次，防止快速操作产生大量并发写入
+let _saveThrottleTimer = null;
+let _savePending = false;
 
 async function saveToCloud() {
   const sb = getSbClient();
   const userId = getSbUserId();
   if (!sb || !userId) return;
+
+  // 5秒节流：如果距上次写入不足5秒，等到5秒后再写（且只写最后一次）
   const now = Date.now();
+  const sinceLastSave = now - _lastSyncTime;
+  if (sinceLastSave < 5000 && _lastSyncTime > 0) {
+    if (!_saveThrottleTimer) {
+      _savePending = true;
+      _saveThrottleTimer = setTimeout(async () => {
+        _saveThrottleTimer = null;
+        _savePending = false;
+        await saveToCloud();
+      }, 5000 - sinceLastSave);
+    }
+    return; // 等节流结束后自动写
+  }
+  if (_saveThrottleTimer) {
+    clearTimeout(_saveThrottleTimer);
+    _saveThrottleTimer = null;
+  }
   _lastSyncTime = now;
   try {
     const profile = {
@@ -292,6 +367,7 @@ async function saveToCloud() {
       marriageDate: localStorage.getItem('marriageDate') || '',
       ghostBirthday: localStorage.getItem('ghostBirthday') || '',
       ghostZodiac: localStorage.getItem('ghostZodiac') || '',
+      ghostZodiacEn: localStorage.getItem('ghostZodiacEn') || '',
       coldWarMode: localStorage.getItem('coldWarMode') || 'false',
       metInPerson: localStorage.getItem('metInPerson') || 'false',
       meetType: localStorage.getItem('meetType') || '',
@@ -313,6 +389,23 @@ async function saveToCloud() {
       vocabLastDay: localStorage.getItem('vocabLastDay') || '',
       lastSalaryAmount: localStorage.getItem('lastSalaryAmount') || '',
       lastSalaryMonth: localStorage.getItem('lastSalaryMonth') || '',
+      currentLocation: localStorage.getItem('currentLocation') || '',
+      currentLocationReason: localStorage.getItem('currentLocationReason') || '',
+      walletMigrated_v3: localStorage.getItem('walletMigrated_v3') || '',
+      // 签到记录：存最近60天的签到key + 本月里程碑计数
+      checkinKeys: (() => {
+        const keys = {};
+        const now = new Date();
+        for (let i = 0; i < 60; i++) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          const k = 'checkin_' + d.toDateString();
+          if (localStorage.getItem(k)) keys[k] = '1';
+        }
+        return keys;
+      })(),
+      monthlyCheckinKey: 'monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1),
+      monthlyCheckinCount: localStorage.getItem('monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1)) || '0',
     };
     const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw
@@ -332,7 +425,7 @@ async function saveToCloud() {
       relationshipFlags: getRelationshipFlags(),
       // 钱包和快递数据
       deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]').slice(0, 30),
-      transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 50),
+      transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 150), // 提升到150条，防止钱包记录丢失
       purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
       weeklyGiven: getWeeklyGiven(),
       // 故事书、相册、朋友圈
@@ -347,6 +440,8 @@ async function saveToCloud() {
       lastFeedPostAt: localStorage.getItem('lastFeedPostAt') || '',
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
+      purchaseCounts: JSON.parse(localStorage.getItem('purchaseCounts') || '{}'),
+      intimateTriggered: JSON.parse(localStorage.getItem('intimateTriggered') || '{}'),
       // 状态标记
       coldWarStart: localStorage.getItem('coldWarStart') || '',
       pendingGhostApology: localStorage.getItem('pendingGhostApology') || '',
@@ -371,7 +466,10 @@ async function saveToCloud() {
     };
     // 只在有内容时才存，防止空值覆盖云端已有数据
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
-    const walletVal = parseFloat(localStorage.getItem('wallet') || '0');
+    // 钱包余额从transactions实时计算，确保与本地显示一致
+    const _txs = JSON.parse(localStorage.getItem('transactions') || '[]');
+    const _walletCalc = Math.max(0, _txs.reduce((s, t) => s + (t.amount || 0), 0));
+    const walletVal = _walletCalc || parseFloat(localStorage.getItem('wallet') || '0');
     if (walletVal > 0) upsertData.balance = walletVal;
 
     // 重试一次，防止偶发网络问题导致数据丢失
