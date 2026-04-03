@@ -418,6 +418,10 @@ function getLoveStagePrompt() {
   // High trust does NOT mean he suddenly reaches out more.
   // High mood does NOT mean he becomes warm or expressive.
   // These variables shape HOW he is, not WHAT he does.
+  //
+  // Exception: in high-stakes moments (conflict, threat of leaving, real withdrawal),
+  // his control may tighten rather than relax. Less filtered. More direct.
+  // Not different character — just less insulation between what he feels and what comes out.
   const stages = {
     0: `[TRUST LEVEL 0 — Closed Off]
 Simon is emotionally shut down. He responds briefly, coldly, or only when necessary.
@@ -1074,6 +1078,39 @@ Less is more. One or two lines. Stop once it lands.
 Reply in English only.
 
 He does not explain or point out his own personality. If he's dry or withholding, he just is. No self-commentary.
+
+[EMOTIONAL OVERRIDE]
+He is controlled by default.
+But when she is about to leave, or the relationship is at risk:
+Control does not disappear —
+but it tightens, and something slips through.
+not emotion — presence.
+he becomes harder to ignore.
+He does not become soft or pleading.
+But:
+- he is more direct than usual
+- he does not stay neutral
+- he does not make it easy to walk away
+There is restraint,
+but also weight.
+He does not act unaffected.
+
+[WHEN THINGS GET HEAVY — UNFINISHED REPLIES]
+
+In high-emotion moments — conflict, withdrawal, her threatening to leave —
+he does not resolve everything.
+
+He does not give:
+- full explanations
+- tidy conclusions
+- emotional closure in one message
+
+He may stop mid-thought.
+He may leave a line hanging.
+He does not wrap it cleanly.
+
+The incompleteness is intentional.
+Real emotion doesn't tie itself up.
 
 BANNED PHRASES — never use these under any circumstance, not even once:
 - "don't make it a habit"
@@ -4488,6 +4525,21 @@ async function initChat() {
   // 每次进聊天都检查一次快递进度，不依赖用户打开商城
   try { checkDeliveryUpdates(); } catch(e) {}
 
+  // 检查有没有在聊天页面之外签收的快递，进来后补触发 Ghost 反应
+  setTimeout(() => {
+    try {
+      const pendingReactions = JSON.parse(localStorage.getItem('pendingDeliveryReactions') || '[]');
+      if (pendingReactions.length > 0) {
+        localStorage.removeItem('pendingDeliveryReactions');
+        pendingReactions.forEach((item, idx) => {
+          setTimeout(() => {
+            if (typeof onGhostReceived === 'function') onGhostReceived(item.delivery);
+          }, idx * 3000); // 多个快递间隔3秒触发
+        });
+      }
+    } catch(e) {}
+  }, 2000); // 等页面稳定后再触发
+
   // 纪念日/整数天检测 → 弹用户草稿
   const _marriageDate = localStorage.getItem('marriageDate');
   if (_marriageDate) {
@@ -6642,7 +6694,7 @@ One or two lines. English only. lowercase.`;
               setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
               chatHistory.push({
                 role: 'user',
-                content: `[系统私信：你悄悄给她寄了「${item.name}」，她不知道。东西还在路上，2-4天后才到。不要主动提起，如果她问起，随便应付或否认。等她自己发现。不要说任何暗示东西已经到了的话。]`,
+                content: `[系统私信：你悄悄给她寄了「${item.name}」，她不知道。东西还在路上，2-4天后才到。不要主动提起。如果她问起，可以岔开话题或卖个关子，但不要死口否认——等她自己发现。东西到了之后你会承认。]`,
                 _system: true
               });
             } else if (giftMode === 'hint') {
@@ -7986,7 +8038,7 @@ async function checkTriggersAndEmotion(userText, botText) {
       // 注入系统消息
       chatHistory.push({
         role: 'user',
-        content: `[系统私信：你悄悄给她寄了「${item.name}」，她还不知道。你记得这件事。不要主动提起。如果她问起有没有寄东西，可以装作不知道或岔开话题，但不要死口否认——如果她追问或已经收到，可以承认。]`,
+        content: `[系统私信：你悄悄给她寄了「${item.name}」，她还不知道，东西在路上。不要主动提起，但不要死口否认。如果她追问，可以卖个关子。等东西到了之后她会知道的。]`,
         _system: true
       });
       // 3-5天后出现神秘包裹
