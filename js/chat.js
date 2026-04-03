@@ -4192,11 +4192,6 @@ function appendGhostSticker(id) {
 }
 
 function openTransfer() {
-  // 条数上限检查
-  if (getTodayCount() >= DAILY_LIMIT) {
-    showToast('今天的消息条数已用完，明天再来哦 💌');
-    return;
-  }
   const balance = getBalance();
   const balEl = document.getElementById('transferBalance');
   if (balEl) balEl.textContent = '£' + Math.floor(balance);
@@ -4219,6 +4214,24 @@ function confirmTransfer() {
     document.getElementById('transferAmount').placeholder = '余额不足';
     document.getElementById('transferAmount').value = '';
     return;
+  }
+  // 条数检查放在确认时，不拦截打开，让用户知道为什么不行
+  const _email = localStorage.getItem('userEmail') || '';
+  if (_email) {
+    // 订阅用户：检查云端额度
+    const _remaining = _subCache ? _subCache.remaining : 1;
+    if (_remaining <= 0) {
+      showToast('今天的消息条数已用完，明天再来哦 💌');
+      closeTransfer();
+      return;
+    }
+  } else {
+    // 未登录用户：检查本地条数
+    if (getTodayCount() >= DAILY_LIMIT) {
+      showToast('今天的消息条数已用完，明天再来哦 💌');
+      closeTransfer();
+      return;
+    }
   }
   closeTransfer();
 
@@ -4266,6 +4279,10 @@ function confirmTransfer() {
     updateToRead();
     const shouldRefund = reply.includes('REFUND') || (!reply.includes('KEEP') && (coldWar || Math.random() < 0.8));
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '').replace(/\s{2,}/g, ' ').trim();
+    // 转账回复成功，扣一条额度
+    incrementTodayCount();
+    if (localStorage.getItem('userEmail')) consumeQuota().catch(() => {});
+
     if (shouldRefund) {
       // 退款：加回余额，更新卡片状态，显示退款卡片
       setBalance(getBalance() + amount);
