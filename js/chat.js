@@ -2625,9 +2625,12 @@ function parseAssistantTags(reply) {
   let sendGift = null;
 
   // ===== 清理模型泄漏的内部指令 =====
-  // 1. 删除 [方括号] 和 【方括号】 里的所有内容（系统指令、tone hint等）
-  cleanedReply = cleanedReply.replace(/\[(?!\d)[^\]]{3,}\]/g, '').trim();
-  cleanedReply = cleanedReply.replace(/【[^】]{3,}】/g, '').trim();
+  // 1. 删除各种括号里的指令/动作描写
+  cleanedReply = cleanedReply.replace(/\[(?!\d)[^\]]{3,}\]/g, '').trim();   // [方括号]
+  cleanedReply = cleanedReply.replace(/【[^】]{3,}】/g, '').trim();              // 【方括号】
+  cleanedReply = cleanedReply.replace(/「[^」]{2,}」/g, '').trim();              // 「日式括号」
+  cleanedReply = cleanedReply.replace(/\*[^*]{2,}\*/g, '').trim();             // *星号动作*
+  cleanedReply = cleanedReply.replace(/~[^~]{2,}~/g, '').trim();                // ~波浪线~
   // 2. 删除行首的 "- Tease/Note/Hint/Scene/Context..." 这类指令行
   cleanedReply = cleanedReply.replace(/\n?-\s+(Tease|Note|Hint|Scene|Context|Tone|Keep|Stay|Let|Make|Don't|Do not|Remember|This)[^\n]*/gi, '').trim();
   // 3. 删除括号包着的英文指令（如 (tease her lightly)）
@@ -5978,7 +5981,7 @@ One or two lines. English only. lowercase.`;
               hideTyping();
               appendMessage('bot', retry.trim());
               chatHistory.push({ role: 'assistant', content: retry.trim(), _intimate: true });
-              saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
+              saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer(); if (typeof saveChatHistoryNow === "function") saveChatHistoryNow().catch(()=>{});
               return;
             }
           } catch(e2) {}
@@ -6000,7 +6003,7 @@ One or two lines. English only. lowercase.`;
                 hideTyping();
                 appendMessage('bot', dsReply);
                 chatHistory.push({ role: 'assistant', content: dsReply, _intimate: true });
-                saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
+                saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer(); if (typeof saveChatHistoryNow === "function") saveChatHistoryNow().catch(()=>{});
                 return;
               }
             }
@@ -6028,7 +6031,7 @@ One or two lines. English only. lowercase.`;
               hideTyping();
               appendMessage('bot', dsReply2);
               chatHistory.push({ role: 'assistant', content: dsReply2, _intimate: true });
-              saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
+              saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer(); if (typeof saveChatHistoryNow === "function") saveChatHistoryNow().catch(()=>{});
               return;
             }
           }
@@ -6063,7 +6066,7 @@ One or two lines. English only. lowercase.`;
           const parts = photoReply.trim().split('\n---\n').filter(p => p.trim()).slice(0, 2);
           for (const part of parts) appendMessage('bot', part.trim());
           chatHistory.push({ role: 'assistant', content: photoReply.trim(), _gemini: true });
-          saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer();
+          saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer(); if (typeof saveChatHistoryNow === "function") saveChatHistoryNow().catch(()=>{});
           return;
         }
       } catch(e) {}

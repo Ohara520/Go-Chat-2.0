@@ -349,6 +349,26 @@ function scheduleCloudSave(urgent = false) {
 let _saveThrottleTimer = null;
 let _savePending = false;
 
+// 聊天记录单独写入，绕过节流——每条消息成功后立刻调用
+async function saveChatHistoryNow() {
+  const sb = getSbClient();
+  const userId = getSbUserId();
+  if (!sb || !userId) return;
+  try {
+    const chatHistoryRaw = localStorage.getItem('chatHistory');
+    if (!chatHistoryRaw) return;
+    const chatHistoryData = JSON.parse(chatHistoryRaw).slice(-300);
+    if (chatHistoryData.length === 0) return;
+    await sb.from('user_data').upsert({
+      user_id: userId,
+      chat_history: chatHistoryData,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+  } catch(e) {
+    console.warn('[cloud] 聊天记录快速保存失败:', e);
+  }
+}
+
 async function saveToCloud() {
   const sb = getSbClient();
   const userId = getSbUserId();
