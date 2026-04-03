@@ -5785,10 +5785,12 @@ Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay i
       /intimate|seduce|turn.*on|turned.*on|naughty/i,
       /🍆|🍑|💦|😏|👅|🫦|🥵/,
     ];
-    let isIntimate = INTIMATE_PATTERNS.some(p => p.test(text));
+    // 有图片时跳过调情检测——图片走Sonnet主流程，不走Grok
+    // 原因：Grok不支持接收图片，误判调情后Grok看不到图会破防说"Kirk"
+    let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 正则没命中，用H做语义判断——捕捉灰色地带的调情
-    if (!isIntimate) {
+    // 正则没命中，用H做语义判断——捕捉灰色地带的调情（有图片时跳过）
+    if (!isIntimate && !isRecentPhoto) {
       try {
         const flirtCheck = await fetchWithTimeout('/api/chat', {
           method: 'POST',
@@ -5975,7 +5977,7 @@ One or two lines. English only. lowercase.`;
         // G调情回复用宽松检测，只过滤明显破防
         const _intimateBreakout = (txt) => {
           const l = txt.toLowerCase();
-          return ["i'm claude", "i am claude", "made by anthropic", "i can't roleplay", "i cannot roleplay", "as an ai", "i'm an ai", "i'm kiro", "i am kiro", "kiro", "development work", "coding questions", "infrastructure", "not the right tool", "i need to step back"].some(p => l.includes(p));
+          return ["i'm claude", "i am claude", "made by anthropic", "i can't roleplay", "i cannot roleplay", "as an ai", "i'm an ai", "i'm kiro", "i am kiro", "kiro", "i'm kirk", "i am kirk", "kirk", "ai assistant", "development work", "coding questions", "infrastructure", "not the right tool", "i need to step back", "i'm an ai assistant", "how can i help you today"].some(p => l.includes(p));
         };
         if (geminiReply && geminiReply.trim() && !_intimateBreakout(geminiReply)) {
           hideTyping();
@@ -6066,32 +6068,10 @@ One or two lines. English only. lowercase.`;
     const lastPhotoMsg = chatHistory.filter(m => m.role === 'user' && m._photoBase64 && !m._system).slice(-1)[0];
     const isRecentPhoto = lastPhotoMsg && chatHistory.indexOf(lastPhotoMsg) >= chatHistory.length - 4;
 
-    // 图片消息直接走Gemini，反应更自然，不容易破防
+    // 图片消息直接走Sonnet主模型——能看图、人设最稳、不会破防成Kirk
     if (isRecentPhoto && lastPhotoMsg._photoBase64.length > 0) {
-      try {
-        const recentMsgs = cleanHistory.slice(-10).map(m =>
-          `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 100)}`
-        ).join('\n');
-        const photoReply = await fetchDeepSeek(
-          buildGhostStyleCore() + `\nShe just sent you an image. You can see it. React as Ghost — whatever comes naturally: a dry comment, a point about what's in it, calling her out for sending it, or just your honest first reaction. No detours, no neutral descriptions. Say what you actually think. Sharp, real, one or two lines. Lowercase. English only.`,
-          recentMsgs + '\nHer: ' + (text || '[sent an image]'),
-          150
-        );
-        const _photoBreakout = (txt) => {
-          const l = txt.toLowerCase();
-          return ["i'm claude", "i am claude", "made by anthropic", "as an ai", "i'm an ai"].some(p => l.includes(p));
-        };
-        if (photoReply && photoReply.trim() && !_photoBreakout(photoReply)) {
-          hideTyping();
-          const parts = photoReply.trim().split('\n---\n').filter(p => p.trim()).slice(0, 2);
-          for (const part of parts) appendMessage('bot', part.trim());
-          chatHistory.push({ role: 'assistant', content: photoReply.trim(), _gemini: true });
-          saveHistory(); saveToCloud().catch(()=>{}); _isSending = false; resetSilenceTimer(); if (typeof saveChatHistoryNow === "function") saveChatHistoryNow().catch(()=>{});
-          return;
-        }
-      } catch(e) {}
-      // Gemini失败，加场景hint让Claude直接反应
-      sceneHint = '[She just sent you an image. React to it directly — do NOT describe what you see. Say what you think of her for sending it. One line.]';
+      // 不单独处理，直接让Sonnet主流程带图片处理，加场景提示
+      sceneHint = '[She just sent you an image. React to it directly — whatever comes naturally: a dry comment, a point about what you see, calling her out, or just your honest first reaction. Do NOT describe what you see in detail. Say what you think. Sharp, real, one or two lines.]';
     }
     let messagesForRequest = cleanHistory;
     if (isRecentPhoto && lastPhotoMsg._photoBase64.length > 0) {
