@@ -4677,10 +4677,10 @@ function appendMessage(role, text, animate = true) {
         }
       }
     }
-    // 清除所有 unlock tag（包括 null 格式），防止任何残留显示在聊天里
-    text = text.replace(/\n?\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
-    // null 格式单独处理
-    text = text.replace(/\n?\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
+    // 清除所有 unlock tag（包括 null 格式，包括夹在中间的）
+    text = text.replace(/\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
+    text = text.replace(/\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
+    text = text.replace(/\n{2,}/g, '\n').trim(); // 清理多余空行
   }
   // 去掉G偶尔加的'ghost:'前缀
   text = text.replace(/^ghost\s*:\s*/i, '').trim();
@@ -6151,9 +6151,10 @@ One or two lines. English only. lowercase.`;
         }
       }
     }
-    // 不管什么格式，统一清除所有unlock tag（包括null），防止显示在消息里
-    reply = reply.replace(/\n?\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
-    reply = reply.replace(/\n?\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
+    // 不管什么格式，统一清除所有unlock tag（包括null，包括夹在中间的）
+    reply = reply.replace(/\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
+    reply = reply.replace(/\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
+    reply = reply.replace(/\n{2,}/g, '\n').trim();
 
     // ===== 兜底：模型说了但忘打标签时，扫描文字内容自动解锁 =====
     const _autoCheckReply = reply.toLowerCase();
