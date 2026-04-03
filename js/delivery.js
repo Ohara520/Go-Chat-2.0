@@ -218,6 +218,17 @@ function checkDeliveryUpdates() {
           if (d.isGhostSend) {
             showMysteryPackage(d);
           } else {
+            // 签收时立刻注入系统记忆，确保 Ghost 知道，不管用户在不在聊天页面
+            // 这样用户立刻去问，Ghost 也不会否认
+            if (typeof chatHistory !== 'undefined') {
+              const _pd = d.productData || {};
+              chatHistory.push({
+                role: 'user',
+                content: `[系统记忆：她寄给你的「${d.name}」刚刚签收。你收到了。如果她问起，直接承认收到了，可以自然提到感受。不要否认或装不知道。]`,
+                _system: true
+              });
+              if (typeof saveHistory === 'function') saveHistory();
+            }
             onGhostReceived(d);
           }
         }
@@ -237,7 +248,13 @@ function checkDeliveryUpdates() {
 
 async function onGhostReceived(delivery) {
   const container = document.getElementById('messagesContainer');
-  if (!container) return;
+  // 如果不在聊天页面，把快递事件存起来，下次进聊天页面时触发
+  if (!container) {
+    const pending = JSON.parse(localStorage.getItem('pendingDeliveryReactions') || '[]');
+    pending.push({ delivery, savedAt: Date.now() });
+    localStorage.setItem('pendingDeliveryReactions', JSON.stringify(pending));
+    return;
+  }
   const pd = delivery.productData;
 
   // 正常签收逻辑
@@ -400,6 +417,16 @@ But he keeps it.]`
     if (reply && !_isDeliveryBreakout(reply)) {
       appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') chatHistory.push({ role: 'assistant', content: reply });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+
+    // 签收后注入系统记忆——让 Ghost 记住收到了，下次被问不会否认
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({
+        role: 'user',
+        content: `[系统记忆：她寄给你的「${delivery.name}」已经签收。你收到了，你知道这件事。如果她问起，直接承认，不要否认或装不知道。]`,
+        _system: true
+      });
       if (typeof saveHistory === 'function') saveHistory();
     }
 
