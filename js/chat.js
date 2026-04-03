@@ -5645,6 +5645,14 @@ async function _processMergedMessage(text) {
       }
     }
 
+    // ===== 余温判断：亲密刚发生后的普通消息也要保留氛围 =====
+    // 如果最近3条有亲密消息，且当前不是情趣话题，注入余温提示给Sonnet
+    const _recentIntimate = chatHistory.filter(m => !m._system && !m._recalled).slice(-4).some(m => m._intimate);
+    if (!isIntimate && _recentIntimate) {
+      // 不走Grok，走Sonnet但注入余温提示
+      sceneHint = '[Context: they were just close a moment ago. The atmosphere has not fully reset. He does not switch back to flat or dry immediately. There is still something in the air — he may be slightly more present, slightly warmer than usual, or just a beat slower to default back to his usual distance. He does not perform the warmth. It just lingers.]';
+    }
+
     if (isIntimate) {
       // 情趣话题直接走Gemini，绕过Claude的审查
       try {
