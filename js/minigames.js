@@ -513,11 +513,15 @@ function collectMessage(button) {
   showToast('已收藏 ⭐');
 }
 
-function deleteCollection(el, index) {
+function deleteCollection(el, index, currentPage = 0) {
   const collections = JSON.parse(localStorage.getItem('collections') || '[]');
   collections.splice(index, 1);
   localStorage.setItem('collections', JSON.stringify(collections));
-  renderCollectionScreen();
+  // 删除后留在当前页，如果当前页已空则退回上一页
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(collections.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages - 1);
+  renderCollectionScreen(safePage);
 }
 
 function renderCollectionScreen(page = 0) {
@@ -536,7 +540,7 @@ function renderCollectionScreen(page = 0) {
 
   const itemsHtml = pageItems.map((item, i) => `
     <div class="collection-item" style="position:relative;background:rgba(255,255,255,0.7);border-radius:14px;padding:12px 36px 12px 14px;margin-bottom:10px;border:1px solid rgba(168,85,247,0.12);">
-      <button onclick="deleteCollection(this, ${start + i})" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#c4a8d4;font-size:13px;cursor:pointer;padding:2px 6px;border-radius:6px;" title="删除">✕</button>
+      <button onclick="deleteCollection(this, ${start + i}, ${page})" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#c4a8d4;font-size:13px;cursor:pointer;padding:2px 6px;border-radius:6px;" title="删除">✕</button>
       <div style="font-size:13px;color:#3a1a60;line-height:1.6;word-break:break-word;">${item.text.replace(/\n/g, '<br>')}</div>
       <div style="font-size:11px;color:#c4a8d4;margin-top:6px;">${item.time}</div>
     </div>
