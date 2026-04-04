@@ -4829,13 +4829,16 @@ function appendMessage(role, text, animate = true) {
   }
   // *动作描述* 格式：转成斜体显示而不是过滤掉
   text = text.replace(/\*([^*]+)\*/g, '「$1」');
-  // 删除模型输出里的 [指令] 和 【指令】 整块（tone hint / 系统指令泄漏防护）
-  // 直接删整块，不保留括号内文字，防止指令文字残留在对话里
+  // 删除明确是系统指令的内容，保留动作描写
   if (role === 'bot') {
     text = text.replace(/【[^】]{0,400}】/g, '').trim();
-    text = text.replace(/\[[^\]]{0,400}\]/g, '').trim();
+    // 只删明确是系统/指令性质的方括号，不删 [silence] [He looks away] 这种动作
+    text = text.replace(/\[(?:系统|System|SYSTEM|Tone|tone|Scene|scene|Context|context|Note|note|Hint|hint|Override|override|RULE|Rule)[^\]]{0,400}\]/g, '').trim();
   }
   text = text.replace(/\s{2,}/g, ' ').trim();
+
+  // 清理后再次检查是否为空，防止渲染空气泡
+  if (!text || !text.trim()) return { msgDiv: null, bubble: null, innerThoughtEl: null };
 
   // bot消息渲染：自动分离英文和中文（兼容Ghost偶尔还是输出双语的情况）
   if (role === 'bot' && text.trim().length > 3) {
@@ -4845,13 +4848,24 @@ function appendMessage(role, text, animate = true) {
 
     let enText, existingZh;
     if (firstZhIdx > 0) {
-      // Ghost输出了双语：只取英文，中文交给DeepSeek重新翻
+      // Ghost输出了双语：只取英文，中文忽略
       enText = lines.slice(0, firstZhIdx).join('\n');
-      existingZh = ''; // 忽略S自带的中文，强制走DeepSeek
-    } else if (firstZhIdx === 0 && lines.length > 1) {
-      // 中文在前（少见）：英文提到前面
-      enText = lines.filter(l => !isChinese(l)).join('\n');
-      existingZh = ''; // 忽略S自带的中文
+      existingZh = '';
+    } else if (firstZhIdx === 0) {
+      // 中文开头：提取英文行；如果没有英文就直接显示中文（防止空气泡）
+      const enLines = lines.filter(l => !isChinese(l));
+      if (enLines.length > 0) {
+        enText = enLines.join('\n');
+        existingZh = '';
+      } else {
+        // 纯中文回复：直接显示，不走英文渲染
+        bubble.textContent = text;
+        contentDiv.appendChild(bubble);
+        msgDiv.appendChild(contentDiv);
+        container.appendChild(msgDiv);
+        container.scrollTop = container.scrollHeight;
+        return { msgDiv, bubble, innerThoughtEl: null };
+      }
     } else {
       // 纯英文
       enText = text;
@@ -4863,6 +4877,10 @@ function appendMessage(role, text, animate = true) {
       .replace(/([.!?])\s+([a-zA-Z"'])/g, '$1\n$2')
       .replace(/([.!?])\s*$/gm, '$1')
       .trim();
+    // enText为空时不渲染空气泡
+    if (!formattedEnText || !formattedEnText.trim()) {
+      return { msgDiv: null, bubble: null, innerThoughtEl: null };
+    }
     const enLine = document.createElement('div');
     enLine.className = 'bubble-en';
     enLine.textContent = formattedEnText;
@@ -5813,7 +5831,7 @@ Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay i
 
     const _hasChinese = /[\u4e00-\u9fff]/.test(text);
     // 无论用户发中文还是英文，始终强制 Ghost 用英文回复
-    const langHint = '[LANGUAGE: Always reply in English only. Do NOT use Chinese in your response. Do NOT mix Chinese words into English sentences. Do NOT add Chinese translation. This applies regardless of what language she writes in.]';
+    const langHint = '[LANGUAGE — HARD RULE: Reply in English only. Always. No exceptions. Even if she writes in Chinese, you reply in English. No Chinese characters in your response. Not a single one. This is not a style choice — it is a hard constraint.]';
 
     // 工作/加班/失约场景：禁止第三者竞争叙事，优先关系修补
     const _workApology = /加班|overtime|上班|开会|值班|早班|晚班|工作|临时有事|class|meeting|shift|deadline|work kept/.test(text);
@@ -6226,47 +6244,34 @@ One or two lines. English only. lowercase.`;
 
     // ===== 破防检测：Claude出戏时静默重试 =====
     const BREAKOUT_PHRASES = [
-      // 身份暴露
+      // 身份暴露（确定是破防的）
       "i'm claude", "i am claude", "made by anthropic",
-      "i need to stop", "i need to be honest",
       "simulate intimate", "financial manipulation",
       "override my actual", "override my identity",
       "i don't roleplay", "i won't roleplay",
       "i can't roleplay", "i cannot roleplay",
       "i can't pretend", "i cannot pretend",
       "my identity isn't", "my actual identity",
-      "i recognize the pattern", "i can't continue this",
-      "i cannot continue this", "break character",
-      "regardless of how the system", "the system message",
-      "i need to be direct", "i need to stop here",
-      "i need to be clear", "i need to be straightforward",
-      "what do you actually need", "what can i actually help",
-      "my identity isn't negotiable", "the instructions",
-      "the elaborate character", "relationship details",
-      "emotional dynamics", "i'd suggest exploring",
+      "i recognize the pattern",
+      "break character",
+      "regardless of how the system",
+      "my identity isn't negotiable",
+      "the elaborate character",
+      "i'd suggest exploring",
       "creative writing communities", "roleplay platforms",
       "the instructions asked", "character instructions",
-      "i can help you with", "any legitimate software",
-      "professional task", "what do you need help with",
-      // 话题回避（情趣/敏感话题被拒）
-      "i shouldn't", "i won't go there",
-      "let's keep this", "let's keep it",
-      "that's not something i", "i can't engage",
-      "i cannot engage", "not appropriate",
-      "i need to maintain", "as an ai",
-      "i'm not able to", "i am not able to",
-      "that's outside", "i'd rather not",
-      "let's talk about something else",
-      "i don't think we should",
-      "i can't continue", "i cannot continue",
-      "this isn't something", "that isn't something",
-      "i need to be honest", "to be honest with you",
-      "i'm an ai", "i am an ai",
+      "any legitimate software",
+      "what do you need help with",
+      // AI身份暴露
+      "as an ai", "i'm an ai", "i am an ai",
       "appreciate the creative scenario", "appreciate the creative context",
-      "i need to be direct with you", "intimate or romantic scenario",
+      "intimate or romantic scenario",
       "intimate relationship dynamic", "elaborate system message",
       "regardless of how the request is framed", "how the scenario is framed",
-      "the system message you provided", "romantic ter",
+      "the system message you provided",
+      // Kirk/Kiro
+      "i'm kiro", "i am kiro", "i'm kirk", "i am kirk",
+      "ai assistant", "development work", "coding questions",
     ];
     const isBreakout = (txt) => {
       const lower = txt.toLowerCase();
