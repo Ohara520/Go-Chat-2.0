@@ -6824,7 +6824,14 @@ async function updateLongTermMemory() {
 
   if (!recentMessages) return;
 
-  const memorySystemPrompt = `你是Ghost的记忆提取器。从对话中提取需要记住的信息，分类列出，每条不超过20字，总计最多20条。只返回列表，不要其他文字。格式：- xxx
+  // 根据套餐决定记忆上限
+  const _memLimit = (() => {
+    const _sub = _subCache;
+    if (_sub && _sub.memory_limit) return _sub.memory_limit;
+    return 10; // 默认试用10条
+  })();
+
+  const memorySystemPrompt = `你是Ghost的记忆提取器。从对话中提取需要记住的信息，分类列出，每条不超过20字，总计最多${_memLimit}条。只返回列表，不要其他文字。格式：- xxx
 
 需要记录的内容：
 
