@@ -2694,10 +2694,8 @@ function parseAssistantTags(reply) {
   // 4. 删除模型思考过程泄漏（如 "Crafting response - ..." / "Responding with dry humor: ..."）
   cleanedReply = cleanedReply.replace(/^(Crafting|Writing|Generating|Responding|Adding|Using|Acknowledging|Keeping|Maintaining|Playing|Setting|Building|Creating)[^\n]*-[^\n]*/gim, '').trim();
   cleanedReply = cleanedReply.replace(/^(Craft|Write|Generate|Respond|Add|Use|Acknowledge|Keep|Maintain|Play|Set|Build|Create)\s+(a\s+)?(response|reply|line|tone|humor|tension|scene)[^\n]*/gim, '').trim();
-  // 4b. 删除 "正文- 指令描述" 格式（如 "yeah. daily confession with- You acknowledge her..."）
-  cleanedReply = cleanedReply.replace(/^(.{1,60})-\s+(You |He |She |They |This |That |The )[^\n]{10,}/gm, (match, p1) => p1.trim()).trim();
-  // 4c. 删除行尾跟着的指令注释（"正文. 动词 + 描述" 格式）
-  cleanedReply = cleanedReply.replace(/\.\s+(acknowledge|hint|tease|note|suggest|imply|keep|stay|let|make)[^.\n]{5,}$/gim, '.').trim();
+  // 4b. 删除行尾跟着的指令注释（"正文. 动词 + 描述" 格式，只删明显是指令的）
+  cleanedReply = cleanedReply.replace(/\.\s+(acknowledge|hint|tease|note|suggest|imply)[^.\n]{5,}$/gim, '.').trim();
   // 5. 删除 "动作描述: 正文" 格式（如 "dry humor response: 'already am.'"）
   cleanedReply = cleanedReply.replace(/^[A-Z][a-z]+(?:\s+[a-z]+){1,4}:\s*["'][^"']+["']\s*$/gm, match => {
     // 只删除明显是指令格式的，保留正常的对话内容
@@ -6360,6 +6358,13 @@ One or two lines. English only. lowercase.`;
     const giveMoneyMatch = parsedMoney;
     let giveAmount = giveMoneyMatch ? giveMoneyMatch.amount : 0;
 
+    // 清理后如果内容为空，用网络提示替代，不渲染空气泡
+    if (!reply || !reply.trim()) {
+      hideTyping();
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+      _isSending = false;
+      return;
+    }
     const parts = reply.split('\n---\n').filter(p => p.trim());
     if (parts.length === 0) parts.push('...');
     let lastBotResult = null;
