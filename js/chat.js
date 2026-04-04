@@ -2680,32 +2680,13 @@ function parseAssistantTags(reply) {
   let coldWarStart = false;
   let sendGift = null;
 
-  // ===== 清理模型泄漏的内部指令 =====
-  // 1. 删除各种括号里的指令/动作描写
-  cleanedReply = cleanedReply.replace(/\[(?!\d)[^\]]{3,}\]/g, '').trim();   // [方括号]
-  cleanedReply = cleanedReply.replace(/【[^】]{3,}】/g, '').trim();              // 【方括号】
-  cleanedReply = cleanedReply.replace(/「[^」]{2,}」/g, '').trim();              // 「日式括号」
-  cleanedReply = cleanedReply.replace(/\*[^*]{2,}\*/g, '').trim();             // *星号动作*
-  cleanedReply = cleanedReply.replace(/~[^~]{2,}~/g, '').trim();                // ~波浪线~
-  // 2. 删除行首的 "- Tease/Note/Hint/Scene/Context..." 这类指令行
-  cleanedReply = cleanedReply.replace(/\n?-\s+(Tease|Note|Hint|Scene|Context|Tone|Keep|Stay|Let|Make|Don't|Do not|Remember|This)[^\n]*/gi, '').trim();
-  // 3. 删除括号包着的英文指令（如 (tease her lightly)）
-  cleanedReply = cleanedReply.replace(/\([A-Z][^)]{5,}\)/g, '').trim();
-  // 4. 删除模型思考过程泄漏（如 "Crafting response - ..." / "Responding with dry humor: ..."）
-  cleanedReply = cleanedReply.replace(/^(Crafting|Writing|Generating|Responding|Adding|Using|Acknowledging|Keeping|Maintaining|Playing|Setting|Building|Creating)[^\n]*-[^\n]*/gim, '').trim();
-  cleanedReply = cleanedReply.replace(/^(Craft|Write|Generate|Respond|Add|Use|Acknowledge|Keep|Maintain|Play|Set|Build|Create)\s+(a\s+)?(response|reply|line|tone|humor|tension|scene)[^\n]*/gim, '').trim();
-  // 4b. 删除行尾跟着的指令注释（"正文. 动词 + 描述" 格式，只删明显是指令的）
-  cleanedReply = cleanedReply.replace(/\.\s+(acknowledge|hint|tease|note|suggest|imply)[^.\n]{5,}$/gim, '.').trim();
-  // 5. 删除 "动作描述: 正文" 格式（如 "dry humor response: 'already am.'"）
-  cleanedReply = cleanedReply.replace(/^[A-Z][a-z]+(?:\s+[a-z]+){1,4}:\s*["'][^"']+["']\s*$/gm, match => {
-    // 只删除明显是指令格式的，保留正常的对话内容
-    const isInstruction = /response|reply|tone|humor|tease|scene|context|note|hint|craft|generat/i.test(match);
-    return isInstruction ? '' : match;
-  });
-  // 6. 清理 unlock tag 残留（{'unlock': null} 等格式）
+  // ===== 清理模型泄漏的内部指令（保守版，只删明确的系统标签）=====
+  // 1. 删除 unlock tag 残留
   cleanedReply = cleanedReply.replace(/\{\s*["']?unlock["']?\s*:\s*null\s*\}/g, '').trim();
   cleanedReply = cleanedReply.replace(/["']unlock["']\s*:\s*null/g, '').trim();
-  // 7. 清理多余空行
+  // 2. 删除 【方括号】系统标签（明确是系统注入的）
+  cleanedReply = cleanedReply.replace(/【[^】]{3,}】/g, '').trim();
+  // 3. 清理多余空行
   cleanedReply = cleanedReply.replace(/\n{3,}/g, '\n').trim();
 
   const moneyMatch = cleanedReply.match(/GIVE_MONEY:(\d+):?([^\n]*)/i);
@@ -6358,10 +6339,9 @@ One or two lines. English only. lowercase.`;
     const giveMoneyMatch = parsedMoney;
     let giveAmount = giveMoneyMatch ? giveMoneyMatch.amount : 0;
 
-    // 清理后如果内容为空，用网络提示替代，不渲染空气泡
+    // 清理后如果内容为空，静默跳过，不渲染空气泡
     if (!reply || !reply.trim()) {
       hideTyping();
-      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
       _isSending = false;
       return;
     }
