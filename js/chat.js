@@ -1124,14 +1124,20 @@ BANNED PHRASES — never use these under any circumstance, not even once:
 These phrases are overused and feel like a script. If he wants to push back, find a different way — be specific to what just happened, not a generic warning.
 
 NO META-COMMENTARY — ABSOLUTE RULE:
-Never describe what you are about to do, what tone you are using, or how you are crafting your reply.
-Never output anything like:
-- "Crafting response with dry humor:"
-- "Acknowledging her tease:"
-- "Responding with tension:"
-- "Building on the moment:"
-- Any sentence that describes your own writing process
-Just say the thing. Do not narrate doing it.
+Your output is ONLY what Simon says or does. Nothing else exists in your reply.
+
+You never output:
+- Descriptions of what you are about to do ("Crafting...", "Acknowledging...", "Responding with...")
+- Instructions to yourself appended after your reply ("- Tease her lightly", "You hint at X")
+- Annotations mid-reply ("yeah. daily confession with- You acknowledge her interest")
+- Stage directions or tone notes of any kind
+- JSON or code fragments like {'unlock': null}
+- Anything that is not Simon's actual words
+
+The test: if a real person received this message, would every word make sense as something Simon said?
+If not — cut it.
+
+One voice. His. Nothing else.
 
 Avoid overusing these lines — if used recently, find a different way:
 - "don't make it a habit"
@@ -2688,13 +2694,20 @@ function parseAssistantTags(reply) {
   // 4. 删除模型思考过程泄漏（如 "Crafting response - ..." / "Responding with dry humor: ..."）
   cleanedReply = cleanedReply.replace(/^(Crafting|Writing|Generating|Responding|Adding|Using|Acknowledging|Keeping|Maintaining|Playing|Setting|Building|Creating)[^\n]*-[^\n]*/gim, '').trim();
   cleanedReply = cleanedReply.replace(/^(Craft|Write|Generate|Respond|Add|Use|Acknowledge|Keep|Maintain|Play|Set|Build|Create)\s+(a\s+)?(response|reply|line|tone|humor|tension|scene)[^\n]*/gim, '').trim();
+  // 4b. 删除 "正文- 指令描述" 格式（如 "yeah. daily confession with- You acknowledge her..."）
+  cleanedReply = cleanedReply.replace(/^(.{1,60})-\s+(You |He |She |They |This |That |The )[^\n]{10,}/gm, (match, p1) => p1.trim()).trim();
+  // 4c. 删除行尾跟着的指令注释（"正文. 动词 + 描述" 格式）
+  cleanedReply = cleanedReply.replace(/\.\s+(acknowledge|hint|tease|note|suggest|imply|keep|stay|let|make)[^.\n]{5,}$/gim, '.').trim();
   // 5. 删除 "动作描述: 正文" 格式（如 "dry humor response: 'already am.'"）
   cleanedReply = cleanedReply.replace(/^[A-Z][a-z]+(?:\s+[a-z]+){1,4}:\s*["'][^"']+["']\s*$/gm, match => {
     // 只删除明显是指令格式的，保留正常的对话内容
     const isInstruction = /response|reply|tone|humor|tease|scene|context|note|hint|craft|generat/i.test(match);
     return isInstruction ? '' : match;
   });
-  // 4. 清理多余空行
+  // 6. 清理 unlock tag 残留（{'unlock': null} 等格式）
+  cleanedReply = cleanedReply.replace(/\{\s*["']?unlock["']?\s*:\s*null\s*\}/g, '').trim();
+  cleanedReply = cleanedReply.replace(/["']unlock["']\s*:\s*null/g, '').trim();
+  // 7. 清理多余空行
   cleanedReply = cleanedReply.replace(/\n{3,}/g, '\n').trim();
 
   const moneyMatch = cleanedReply.match(/GIVE_MONEY:(\d+):?([^\n]*)/i);
@@ -5021,12 +5034,13 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
     && lastUserMsg.length > 30
     && !isStubborn;
 
-  // 冷却：每3条消息才能触发一次，超过10条强制触发
+  // 冷却：每5条消息才能触发一次，超过15条强制触发
   const msgCountKey = 'innerThoughtMsgCount';
   const msgCount = parseInt(localStorage.getItem(msgCountKey) || '0') + 1;
   localStorage.setItem(msgCountKey, msgCount);
   const lastTriggeredCount = parseInt(localStorage.getItem('lastInnerThoughtMsgCount') || '0');
-  const gapSinceLastTrigger = msgCount - lastTriggeredCount;
+  // 防止负数情况（换设备/清缓存后 lastTriggeredCount 可能比 msgCount 大）
+  const gapSinceLastTrigger = Math.max(0, msgCount - lastTriggeredCount);
   const forceTrigger = gapSinceLastTrigger >= 15;
   if (gapSinceLastTrigger < 5) {
     if (!justCared && !coldWarCracking) return;
@@ -6412,6 +6426,8 @@ One or two lines. English only. lowercase.`;
     // 不管什么格式，统一清除所有unlock tag（包括null，包括夹在中间的）
     reply = reply.replace(/\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
     reply = reply.replace(/\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
+    reply = reply.replace(/'unlock'\s*:\s*null/g, '').trim();
+    reply = reply.replace(/\{\s*'unlock'\s*:\s*null\s*\}/g, '').trim();
     reply = reply.replace(/\n{2,}/g, '\n').trim();
 
     // ===== 兜底：模型说了但忘打标签时，扫描文字内容自动解锁 =====
