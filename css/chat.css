@@ -1519,6 +1519,74 @@
 }
 .secret-save-btn:active { transform: scale(0.98); opacity: 0.9; }
 
+/* 秘密页 头像上传 */
+.secret-avatar-wrap { display: flex; align-items: center; gap: 16px; }
+.secret-avatar-preview {
+    width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(220,245,210,0.6); border: 2px solid rgba(120,180,90,0.35);
+    overflow: hidden; display: flex; align-items: center; justify-content: center;
+}
+.secret-avatar-btn-wrap { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.secret-avatar-btn {
+    display: inline-block; padding: 8px 14px;
+    background: rgba(90,154,70,0.12); border: 1px solid rgba(90,154,70,0.3);
+    border-radius: 12px; font-size: 12px; font-weight: 600;
+    color: #2d6028; cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.secret-avatar-btn:active { background: rgba(90,154,70,0.22); }
+.secret-avatar-hint { font-size: 10px; color: rgba(50,100,40,0.5); line-height: 1.5; }
+
+/* 秘密页 chip 选择器（星座/相遇方式/婚姻状态） */
+.secret-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.secret-chip {
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    background: rgba(255,255,255,0.7); border: 1px solid rgba(140,190,100,0.3);
+    color: rgba(50,100,40,0.75); cursor: pointer; transition: all 0.18s;
+    user-select: none; -webkit-user-select: none;
+}
+.secret-chip:active { transform: scale(0.94); }
+.secret-chip.selected {
+    background: linear-gradient(135deg, rgba(90,154,70,0.85), rgba(120,185,85,0.8));
+    border-color: transparent; color: white;
+    box-shadow: 0 2px 8px rgba(80,150,55,0.25);
+}
+
+/* 秘密页 国家选择 */
+.secret-country-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.country-chip {
+    padding: 5px 11px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    background: rgba(255,255,255,0.7); border: 1px solid rgba(140,190,100,0.3);
+    color: rgba(50,100,40,0.75); cursor: pointer; transition: all 0.18s;
+    user-select: none; -webkit-user-select: none;
+    display: flex; align-items: center; gap: 4px;
+}
+.country-chip:active { transform: scale(0.94); }
+.country-chip.selected {
+    background: linear-gradient(135deg, rgba(90,154,70,0.85), rgba(120,185,85,0.8));
+    border-color: transparent; color: white;
+    box-shadow: 0 2px 8px rgba(80,150,55,0.25);
+}
+
+/* 秘密页 颜色选择 */
+.secret-color-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.secret-color-dot {
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+    border: 2.5px solid transparent; transition: all 0.18s; flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.secret-color-dot:active { transform: scale(0.88); }
+.secret-color-dot.selected {
+    border-color: #1e3d20;
+    box-shadow: 0 0 0 2px rgba(90,154,70,0.5), 0 2px 6px rgba(0,0,0,0.15);
+    transform: scale(1.12);
+}
+
+/* 秘密页 自动保存提示 */
+.secret-save-hint {
+    text-align: center; font-size: 11px; color: rgba(50,100,40,0.5);
+    padding: 10px 0 16px; letter-spacing: 0.3px;
+}
+
 /* ===== 商城 ===== */
 #marketScreen { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .market-container { padding: 0 0 40px; }

@@ -95,14 +95,14 @@ window.onload = async function() {
     loadingEl.id = 'appLoadingScreen';
     loadingEl.style.cssText = [
         'position:fixed;inset:0;z-index:99999',
-        'background:linear-gradient(135deg,#e8d5f5,#f9d0e0)',
+        'background:linear-gradient(135deg,#d8edd8,#eaf2e0)',
         'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px',
     ].join(';');
     loadingEl.innerHTML = `
         <div style="font-size:48px">👻</div>
-        <div style="font-size:15px;color:#7c3aed;font-weight:600;">正在恢复你们的故事…</div>
-        <div style="width:120px;height:4px;background:rgba(192,132,252,0.2);border-radius:2px;overflow:hidden;">
-          <div id="appLoadingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#a855f7,#ec4899);border-radius:2px;transition:width 0.4s ease;"></div>
+        <div style="font-size:15px;color:#2d6028;font-weight:600;">正在恢复你们的故事…</div>
+        <div style="width:120px;height:4px;background:rgba(90,154,70,0.2);border-radius:2px;overflow:hidden;">
+          <div id="appLoadingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#5a9a46,#7dba5a);border-radius:2px;transition:width 0.4s ease;"></div>
         </div>
     `;
     document.body.appendChild(loadingEl);
