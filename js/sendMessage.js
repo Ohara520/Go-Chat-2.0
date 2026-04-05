@@ -100,8 +100,7 @@ let _pendingMessages = [];
 let _mergeTimer = null;
 const MERGE_DELAY = 300;
 
-// ===== 补全函数：pickReadyPendingEvent / decideMainIntent / handlePostReplyActions =====
-// fetchDeepSeek 已在 api.js 定义，此处不重复
+// ===== 补全函数（拆分时遗漏，内嵌确保可用）=====
 
 async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens, signal) {
   maxTokens = maxTokens || 1000;
@@ -1210,7 +1209,7 @@ async function _processMergedMessage(text) {
     // ── 副作用（fire-and-forget）────────────────────────────
     consumeLoveOverride();
     const mainReplyHasCareAction = transferSuccess || !!sendGift;
-    if (!mainReplyHasCareAction) checkMoneyIntent(text).catch(() => {});
+    if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
 
     // SEND_GIFT处理
