@@ -446,46 +446,8 @@ function selectCountry(code, el) {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 情侣空间封面换图
-function uploadCoverImage(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      const MAX_W = 1200, MAX_H = 600;
-      let w = img.width, h = img.height;
-      const ratio = Math.min(MAX_W / w, MAX_H / h, 1);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const base64 = canvas.toDataURL('image/jpeg', 0.75);
-      try {
-        localStorage.setItem('coupleCoverBase64', base64);
-        restoreCoupleCover();
-        if (typeof showToast === 'function') showToast('封面已更新 ✅');
-        if (typeof touchLocalState === 'function') touchLocalState();
-      } catch(e) {
-        if (typeof showToast === 'function') showToast('图片太大，换一张试试');
-      }
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-  input.value = '';
-}
-
-// 恢复自定义封面（initCoupleSpace时调用）
-function restoreCoupleCover() {
-  const saved = localStorage.getItem('coupleCoverBase64');
-  const bannerImg = document.getElementById('coupleBannerImg');
-  if (bannerImg && saved) {
-    bannerImg.src = saved;
-  }
-}
+// 头像
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function getDefaultAvatar() { return 'images/default-avatar.jpg'; }
 
@@ -509,6 +471,12 @@ function uploadAvatar(input) {
         updateAvatarPreview(base64);
         updateAvatarEverywhere(base64);
         showToast('头像已更新 ✅');
+        // 强制立刻写云端，不走防抖
+        if (typeof saveToCloud === 'function') {
+          saveToCloud()
+            .then(() => showToast('已同步到云端 ☁️'))
+            .catch(() => showToast('同步失败，请检查网络'));
+        }
       } catch(e) {
         showToast('图片太大了，换一张小一点的试试');
       }

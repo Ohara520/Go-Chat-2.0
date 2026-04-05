@@ -367,6 +367,7 @@ English only. No translation. Do not mention "profile picture" or "avatar" unles
         if (url) {
           updateGhostAvatar(url);
           localStorage.removeItem('ghostAvatarBase64');
+          if (typeof showToast === 'function') showToast('头像已更新并同步 ☁️');
           console.log('[avatar] 上传成功:', url.slice(0, 60));
         }
       });
