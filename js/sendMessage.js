@@ -464,15 +464,15 @@ async function _processMergedMessage(text) {
         callHaiku(buildGhostStyleCore(), [
           ...chatHistory.filter(m => !m._system).slice(-6),
           { role: 'user', content: _comebackPrompt }
-        ], 80).then(reply => {
+        ], 80).then(r => {
           hideTyping();
-          if (reply && !isBreakout(reply) && reply.length < 120) {
-            appendMessage('bot', reply);
-            chatHistory.push({ role: 'assistant', content: reply });
+          if (r && !isBreakout(r) && r.length < 120) {
+            appendMessage('bot', r);
+            chatHistory.push({ role: 'assistant', content: r });
             saveHistory();
           }
         }).catch(() => hideTyping());
-      }, 800);
+      }, 3500); // 延迟加大，确保主回复先完成
     }
   }
 
@@ -1211,7 +1211,7 @@ async function _processMergedMessage(text) {
     // ── 副作用（fire-and-forget）────────────────────────────
     consumeLoveOverride();
     const mainReplyHasCareAction = transferSuccess || !!sendGift;
-    if (!mainReplyHasCareAction) checkMoneyIntent(text).catch(() => {});
+    if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
 
     // SEND_GIFT处理
@@ -1269,9 +1269,12 @@ async function _processMergedMessage(text) {
     hideTyping();
     _isSending = false;
     _currentAbortController = null;
-    if (err?.name === 'AbortError') return; // 用户主动打断，静默
+    if (err?.name === 'AbortError') return;
     console.error('sendMessage error:', err?.name, err?.message);
-    appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+    const _alreadyReplied = chatHistory.slice(-3).some(m => m.role === 'assistant' && !m._recalled);
+    if (!_alreadyReplied) {
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+    }
   }
 }
 
