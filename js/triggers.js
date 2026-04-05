@@ -82,9 +82,9 @@ async function checkIntimateHighlight(userText, botReply) {
   if (Date.now() - lastAt < 5 * 24 * 3600 * 1000) return;
 
   try {
-    const raw = await fetchDeepSeek(
+    const raw = await callHaiku(
       `Based on Ghost's reply in this intimate exchange, did he show clear desire or wanting — through implication, tension, or controlled restraint? Answer only JSON: {"desire": true} or {"desire": false}`,
-      `Ghost replied: "${botReply.slice(0, 200)}"`,
+      [{ role: 'user', content: `Ghost replied: "${botReply.slice(0, 200)}"` }],
       30
     );
     const result = safeParseJSON(raw);
@@ -145,7 +145,7 @@ async function checkTriggersAndEmotion(userText, botText) {
 
   try {
     // ── 三重判断：一次 Haiku 调用，返回三个结果 ──────────
-    const raw = await fetchDeepSeek(
+    const raw = await callHaiku(
       `你是一个三重判断器。只返回JSON，不要其他文字。
 1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段
 2. 判断用户的消息透露了什么情绪，返回emotion字段
@@ -160,7 +160,7 @@ mood_change规则：
 market分类：保暖类/饮食类/疲惫类/思念类/卫生类
 emotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念
 emotion强度：轻/中/重`,
-      `Ghost说：${botText}\n用户说：${userText}`,
+      [{ role: 'user', content: `Ghost说：${botText}\n用户说：${userText}` }],
       180
     );
 

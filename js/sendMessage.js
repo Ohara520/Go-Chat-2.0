@@ -102,25 +102,7 @@ const MERGE_DELAY = 300;
 
 // ===== 补全函数（拆分时遗漏，内嵌确保可用）=====
 
-async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens, signal) {
-  maxTokens = maxTokens || 1000;
-  let systemField;
-  if (parts && parts.fixed && parts.dynamic) {
-    systemField = [
-      { type: 'text', text: parts.fixed, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: parts.dynamic + '\n' + finalSystem }
-    ];
-  } else {
-    systemField = finalSystem;
-  }
-  const options = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL_SONNET, max_tokens: maxTokens, system: systemField, messages }),
-  };
-  if (signal) options.signal = signal;
-  return await fetchWithRetry('/api/chat', options, 30000, 1);
-}
+// fetchSonnetWithCache 定义在 api.js，此处不重复
 
 function pickReadyPendingEvent() {
   try {
