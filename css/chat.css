@@ -1619,8 +1619,8 @@
 .products-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    padding: 18px 12px 20px;
+    gap: 18px 10px;
+    padding: 24px 12px 20px;
 }
 .product-card {
     background: rgba(255,255,255,0.72);
@@ -1699,7 +1699,7 @@
     background: linear-gradient(145deg, rgba(30,10,20,0.88), rgba(55,15,35,0.85)) !important;
     border: 1px solid rgba(220,80,120,0.35) !important;
     box-shadow: 0 4px 24px rgba(180,40,80,0.18), inset 0 0 30px rgba(200,60,100,0.06) !important;
-    position: relative; overflow: hidden;
+    position: relative; overflow: visible;
 }
 .intimate-card::before {
     content: '';
@@ -1708,6 +1708,8 @@
     background: linear-gradient(105deg, transparent, rgba(255,180,210,0.06), transparent);
     animation: intimateShimmer 4s ease-in-out infinite;
     pointer-events: none;
+    overflow: hidden;
+    border-radius: 16px;
 }
 @keyframes intimateShimmer {
     0%   { left: -60%; }
