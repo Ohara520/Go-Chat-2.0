@@ -100,77 +100,6 @@ let _pendingMessages = [];
 let _mergeTimer = null;
 const MERGE_DELAY = 300;
 
-// ===== 补全函数（拆分时遗漏，内嵌确保可用）=====
-
-async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens, signal) {
-  maxTokens = maxTokens || 1000;
-  let systemField;
-  if (parts && parts.fixed && parts.dynamic) {
-    systemField = [
-      { type: 'text', text: parts.fixed, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: parts.dynamic + '\n' + finalSystem }
-    ];
-  } else {
-    systemField = finalSystem;
-  }
-  const options = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL_SONNET, max_tokens: maxTokens, system: systemField, messages }),
-  };
-  if (signal) options.signal = signal;
-  return await fetchWithRetry('/api/chat', options, 30000, 1);
-}
-
-function pickReadyPendingEvent() {
-  try {
-    const raw = localStorage.getItem('pendingEvents');
-    if (!raw) return null;
-    const events = JSON.parse(raw);
-    if (!Array.isArray(events) || events.length === 0) return null;
-    const now = Date.now();
-    const idx = events.findIndex(e => !e.triggerAt || e.triggerAt <= now);
-    if (idx === -1) return null;
-    const [ready] = events.splice(idx, 1);
-    localStorage.setItem('pendingEvents', JSON.stringify(events));
-    return ready;
-  } catch(e) { return null; }
-}
-
-function decideMainIntent(text, pendingEvent) {
-  if (pendingEvent) return 'event';
-  const t = (text || '').toLowerCase();
-  if (/touch me|want you|naughty|tease me|摸摸|蹭蹭|贴贴|咬|舔|撩|涩涩|色色/.test(t)) return 'intimate';
-  if (/难过|伤心|哭|委屈|不开心|崩溃|hurt|sad|crying|upset|awful/.test(t)) return 'emotional';
-  if (/给我钱|转我|好穷|买不起|要钱|零花钱|缺钱|没钱/.test(t)) return 'money';
-  return 'routine';
-}
-
-async function handlePostReplyActions(text, reply, intent) {
-  try {
-    consumeQuota().catch(() => {});
-    localStorage.setItem('lastUserMessageAt', Date.now().toString());
-    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-    const todayKey = 'dailyChatDone_' + new Date().toDateString();
-    if (!localStorage.getItem(todayKey)) {
-      localStorage.setItem(todayKey, '1');
-      const lastDay = localStorage.getItem('lastVisitDay');
-      const today = new Date().toDateString();
-      if (lastDay !== today) {
-        const yesterday = new Date(Date.now() - 86400000).toDateString();
-        const streak = parseInt(localStorage.getItem('visitStreak') || '1');
-        localStorage.setItem('visitStreak', lastDay === yesterday ? streak + 1 : 1);
-        localStorage.setItem('lastVisitDay', today);
-      }
-    }
-    if (intent === 'intimate') {
-      const lastBot = [...chatHistory].reverse().find(m => m.role === 'assistant' && !m._recalled);
-      if (lastBot) lastBot._intimate = true;
-      if (typeof saveHistory === 'function') saveHistory();
-    }
-  } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
-}
-
 // ===== 破防短语库 =====
 // 注意：Claude 4.5在调情/角色质疑场景下更容易说出部分身份暴露词
 // 关键修复：扩展了检测范围，加入4.5常见的新破防模式
@@ -551,31 +480,8 @@ async function _processMergedMessage(text) {
     // ── Step 3: 预判本轮主意图 ───────────────────────────────
     const intent = decideMainIntent(text, pendingEvent);
 
-    // ── Step 3.5: 情绪识别 + 吃醋衰减（合并一次Haiku调用）───
+    // ── Step 3.5: 情绪识别 + 调情检测 → 合并到调情检测处统一处理 ──
     let emotionHint = '';
-    try {
-      const emotionRaw = await Promise.race([
-        fetchDeepSeek(
-          '判断用户消息的情绪、需求和氛围。只返回JSON。\n格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true/false}',
-          `用户说：${text}`,
-          80
-        ),
-        new Promise(resolve => setTimeout(() => resolve(''), 2500))
-      ]);
-      if (emotionRaw) {
-        const emotionResult = safeParseJSON(emotionRaw);
-        if (emotionResult) {
-          if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
-            if (emotionResult.target === '外人') {
-              emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
-            } else if (emotionResult.need === '安慰') {
-              emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
-            }
-          }
-          if (emotionResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
-        }
-      }
-    } catch(e) {}
 
     // ── 历史清洗 ─────────────────────────────────────────────
     // rawHistory：Grok用（含调情内容，20条）
@@ -776,33 +682,49 @@ async function _processMergedMessage(text) {
     const lastPhotoMsg = chatHistory.filter(m => m.role === 'user' && m._photoBase64 && !m._system).slice(-1)[0];
     const isRecentPhoto = lastPhotoMsg && chatHistory.indexOf(lastPhotoMsg) >= chatHistory.length - 4;
 
-    // ── 调情检测 ─────────────────────────────────────────────
+    // ── 调情检测 + 情绪识别（合并一次Haiku调用）────────────
     // 有图片时强制跳过——Grok看不到图，会破防说Kirk
-    // 词库与 intimacy.js 的 detectFlirtTrigger 保持一致：
-    // 只留明确身体接触/挑逗词，移除亲亲/抱抱/kiss/hug等日常撒娇词
-    // 这些日常词交给下方Haiku语义判断，避免误判触发Venice
     const INTIMATE_PATTERNS = [
-      /摸摸|蹭蹭|贴贴|咬|舔|撩你/,                         // 明确身体接触（中文）
-      /你好坏|坏死了|流氓/,                                  // 明确撩拨（中文）
-      /touch me|want you|naughty|tease me/i,                 // 明确挑逗（英文）
-      /床|被窝|睡觉.*一起|一起.*睡/,                        // 明确暗示共处
-      /性感|诱惑|撩|勾引|暧昧|色色|涩涩/,                  // 明确情色（中文）
-      /胸|腿|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,         // 身体部位+动作
-      /intimate|turn.*on|turned.*on/i,                       // 明确情色（英文）
-      /🍆|🍑|💦|😏|👅|🫦|🥵/,                            // 情色emoji
+      /摸摸|蹭蹭|贴贴|咬|舔|撩你/,
+      /你好坏|坏死了|流氓/,
+      /touch me|want you|naughty|tease me/i,
+      /床|被窝|睡觉.*一起|一起.*睡/,
+      /性感|诱惑|撩|勾引|暧昧|色色|涩涩/,
+      /胸|腿|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
+      /intimate|turn.*on|turned.*on/i,
+      /🍆|🍑|💦|😏|👅|🫦|🥵/,
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 正则没命中，Haiku语义判断（有图片时跳过）
+    // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
     if (!isIntimate && !isRecentPhoto) {
       try {
-        const flirtRaw = await callHaiku(
-          '判断这句话是否带有明确的调情/身体暗示/露骨撩拨意图。注意：单纯撒娇（babe/hubby/宝贝）、表达想念（miss you/想你）、日常亲昵不算调情。只有明显的身体接触暗示、露骨描述、或刻意挑逗才算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
-          [{ role: 'user', content: text }],
-          30
-        );
-        const flirtResult = safeParseJSON(flirtRaw);
-        if (flirtResult?.flirt === true) isIntimate = true;
+        const combinedRaw = await Promise.race([
+          fetchDeepSeek(
+            '判断用户消息。只返回JSON，不要其他文字。\n' +
+            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
+            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            `用户说：${text}`,
+            80
+          ),
+          new Promise(resolve => setTimeout(() => resolve(''), 2500))
+        ]);
+        if (combinedRaw) {
+          const combinedResult = safeParseJSON(combinedRaw);
+          if (combinedResult) {
+            // 调情结果
+            if (combinedResult.flirt === true) isIntimate = true;
+            // 情绪结果
+            if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
+              if (combinedResult.target === '外人') {
+                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
+              } else if (combinedResult.need === '安慰') {
+                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
+              }
+            }
+            if (combinedResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
+          }
+        }
       } catch(e) {}
     }
 
@@ -1209,7 +1131,7 @@ async function _processMergedMessage(text) {
     // ── 副作用（fire-and-forget）────────────────────────────
     consumeLoveOverride();
     const mainReplyHasCareAction = transferSuccess || !!sendGift;
-    if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
+    if (!mainReplyHasCareAction) checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
 
     // SEND_GIFT处理
