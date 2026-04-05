@@ -5,7 +5,7 @@ html { height: 100%; overflow: hidden; }
 /* ===== 背景 ===== */
 body {
     font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
-    background: linear-gradient(135deg, #e8d5f5 0%, #f0d6eb 40%, #f9d0e0 70%, #fce4ec 100%);
+    background: linear-gradient(135deg, #d8edd8 0%, #e2eeda 40%, #eaf2e0 70%, #f0f7ec 100%);
     min-height: 100vh;
     min-height: -webkit-fill-available;
     margin: 0;
@@ -20,7 +20,7 @@ body::before {
     content: '';
     position: fixed;
     width: 500px; height: 500px;
-    background: radial-gradient(circle, rgba(216,145,239,0.45) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(134,187,106,0.28) 0%, transparent 70%);
     top: -150px; right: -100px;
     border-radius: 50%;
     pointer-events: none;
@@ -31,7 +31,7 @@ body::after {
     content: '';
     position: fixed;
     width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(249,168,212,0.5) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(168,210,140,0.3) 0%, transparent 70%);
     bottom: -100px; left: -100px;
     border-radius: 50%;
     pointer-events: none;
@@ -45,18 +45,18 @@ body::after {
 }
 
 @keyframes cardPulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(200,100,180,0.15); }
-    50% { transform: scale(1.04); box-shadow: 0 6px 24px rgba(200,100,180,0.35); }
+    0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(90,150,80,0.15); }
+    50% { transform: scale(1.04); box-shadow: 0 6px 24px rgba(90,150,80,0.32); }
 }
 
 /* ===== 主容器 ===== */
 .container {
     width: 100vw;
     height: 100vh;
-    height: 100dvh; /* iOS 15.4+ 键盘弹出时自动缩小，彻底解决输入框被遮问题 */
-    background: rgba(255,255,255,0.45);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
+    height: 100dvh;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     overflow: hidden;
     display: flex;
     flex-direction: column;

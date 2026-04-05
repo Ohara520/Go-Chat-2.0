@@ -14,7 +14,7 @@
 .couple-petal-container { display: none !important; }
 
 .couple-cover-section {
-  background: linear-gradient(160deg, #ede0f7 0%, #f5d6ed 50%, #fce4ec 100%);
+  background: linear-gradient(160deg, #d8edd8 0%, #e2eeda 50%, #eaf2e0 100%);
   border-radius: 0 0 28px 28px;
   overflow: hidden;
   margin-bottom: 16px;
@@ -42,9 +42,9 @@
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    rgba(237,224,247,0.4) 40%,
-    rgba(237,224,247,0.85) 70%,
-    rgba(237,224,247,1) 100%
+    rgba(216,237,216,0.4) 40%,
+    rgba(216,237,216,0.85) 70%,
+    rgba(216,237,216,1) 100%
   );
 }
 
@@ -74,7 +74,7 @@
   align-items: center;
   justify-content: center;
   font-size: 30px;
-  box-shadow: 0 4px 16px rgba(107,63,160,0.12);
+  box-shadow: 0 4px 16px rgba(80,140,55,0.12);
 }
 
 .couple-cover-connector {
@@ -87,13 +87,13 @@
 .couple-connector-line {
   flex: 1;
   height: 1.5px;
-  background: rgba(160,124,192,0.4);
+  background: rgba(90,150,70,0.35);
 }
 .couple-connector-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(160,124,192,0.65);
+  background: rgba(90,150,70,0.6);
   flex-shrink: 0;
   margin: 0 3px;
 }
@@ -105,13 +105,13 @@
 .couple-cover-main {
   font-size: 17px;
   font-weight: 600;
-  color: #6b3fa0;
+  color: #1e4020;
   letter-spacing: 0.5px;
   margin-bottom: 3px;
 }
 .couple-cover-sub {
   font-size: 12px;
-  color: rgba(107,63,160,0.5);
+  color: rgba(40,90,30,0.5);
   margin-bottom: 10px;
 }
 .couple-cover-days {
@@ -123,18 +123,18 @@
 .couple-days-num {
   font-size: 28px;
   font-weight: 700;
-  color: #6b3fa0;
+  color: #1e4020;
   line-height: 1;
 }
 .couple-days-label {
   font-size: 13px;
-  color: rgba(107,63,160,0.65);
+  color: rgba(40,90,30,0.65);
 }
 
     /* ===== 签到系统 ===== */
     .checkin-section {
-      background: rgba(168,85,247,0.12);
-      border: 1.5px solid rgba(168,85,247,0.3);
+      background: rgba(90,160,70,0.1);
+      border: 1.5px solid rgba(90,160,70,0.28);
       border-radius: 16px;
       padding: 16px;
       margin: 12px 0;
@@ -153,35 +153,35 @@
     }
     .checkin-label {
       font-size: 11px;
-      color: rgba(120,60,180,0.7);
+      color: rgba(40,100,30,0.7);
       letter-spacing: 0.5px;
     }
     .checkin-value {
       font-size: 24px;
       font-weight: 700;
-      color: #7c3aed;
+      color: #3a7a2a;
     }
     .checkin-unit {
       font-size: 11px;
-      color: rgba(120,60,180,0.6);
+      color: rgba(40,100,30,0.6);
     }
     .checkin-hint {
       font-size: 11px;
-      color: rgba(120,60,180,0.6);
+      color: rgba(40,100,30,0.6);
       margin-top: 4px;
     }
 
     /* ===== 签到日历样式 ===== */
     .day.can-checkin {
       cursor: pointer;
-      background: linear-gradient(135deg, rgba(168,85,247,0.3), rgba(124,58,237,0.2));
-      border: 2px solid rgba(168,85,247,0.6);
+      background: linear-gradient(135deg, rgba(90,160,70,0.28), rgba(60,140,45,0.18));
+      border: 2px solid rgba(90,160,70,0.6);
       border-radius: 10px;
       position: relative;
     }
     .day.can-checkin:active { transform: scale(0.92); }
     .day.checked-in {
-      background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(236,72,153,0.1));
+      background: linear-gradient(135deg, rgba(90,160,70,0.14), rgba(120,185,85,0.1));
       border-radius: 10px;
     }
     /* 确保日期格子能定位子元素 */
@@ -195,12 +195,12 @@
       width: 5px;
       height: 5px;
       border-radius: 50%;
-      background: rgba(124,58,237,0.4);
+      background: rgba(60,140,45,0.38);
       pointer-events: none;
     }
     .checkin-dot-mark.done {
-      background: #7c3aed;
-      box-shadow: 0 0 4px rgba(124,58,237,0.4);
+      background: #3a7a2a;
+      box-shadow: 0 0 4px rgba(60,140,45,0.4);
     }
     .checkin-pulse-dot {
       position: absolute;
@@ -209,7 +209,7 @@
       width: 5px;
       height: 5px;
       border-radius: 50%;
-      background: #a855f7;
+      background: #5a9a46;
       animation: pulse 1.2s ease-in-out infinite;
       pointer-events: none;
     }
@@ -229,13 +229,13 @@
 
     /* ===== 氛围音乐系统 ===== */
     .ambient-section {
-      background: rgba(255,255,255,0.6);
+      background: rgba(255,255,255,0.65);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1.5px solid rgba(255,255,255,0.88);
       border-radius: 22px;
       overflow: hidden;
-      box-shadow: 0 4px 20px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
+      box-shadow: 0 4px 20px rgba(80,140,55,0.07), inset 0 1px 0 rgba(255,255,255,0.9);
       margin-bottom: 12px;
     }
     .ambient-header {
@@ -254,18 +254,18 @@
     .ambient-title {
       font-size: 13px;
       font-weight: 700;
-      color: #4c1d95;
+      color: #1e4020;
     }
     .ambient-subtitle {
       font-size: 10px;
-      color: rgba(139,92,246,0.5);
+      color: rgba(60,120,45,0.5);
       display: flex;
       align-items: center;
       gap: 5px;
     }
     .ambient-arrow {
       font-size: 13px;
-      color: rgba(139,92,246,0.4);
+      color: rgba(60,120,45,0.4);
       transition: transform 0.25s;
     }
     .ambient-arrow.open { transform: rotate(180deg); }
@@ -284,13 +284,13 @@
       position: relative;
       height: 4px;
       border-radius: 2px;
-      background: rgba(139,92,246,0.08);
+      background: rgba(90,150,70,0.08);
     }
     .ambient-volume-fill {
       position: absolute;
       left: 0; top: 0; bottom: 0;
       border-radius: 2px;
-      background: linear-gradient(90deg,#a855f7,#ec4899);
+      background: linear-gradient(90deg,#5a9a46,#7dba5a);
       transition: width 0.1s;
       pointer-events: none;
     }
@@ -309,8 +309,8 @@
       gap: 8px;
     }
     .ambient-track {
-      background: rgba(139,92,246,0.05);
-      border: 1.5px solid rgba(255,255,255,0.7);
+      background: rgba(90,150,70,0.05);
+      border: 1.5px solid rgba(255,255,255,0.72);
       border-radius: 14px;
       padding: 10px 6px;
       text-align: center;
@@ -318,18 +318,18 @@
       transition: all 0.2s;
     }
     .ambient-track.playing {
-      background: rgba(255,255,255,0.9);
-      border-color: rgba(168,85,247,0.45);
-      box-shadow: 0 4px 14px rgba(168,85,247,0.15);
+      background: rgba(255,255,255,0.92);
+      border-color: rgba(90,160,70,0.42);
+      box-shadow: 0 4px 14px rgba(80,150,55,0.14);
       transform: translateY(-2px);
     }
     .ambient-track-emoji { font-size: 18px; margin-bottom: 4px; }
     .ambient-track-name {
       font-size: 10px;
       font-weight: 700;
-      color: #6b21a8;
+      color: #2d6028;
     }
-    .ambient-track.playing .ambient-track-name { color: #3b0764; }
+    .ambient-track.playing .ambient-track-name { color: #1e4020; }
     .ambient-wave {
       display: flex;
       justify-content: center;
@@ -390,9 +390,9 @@
       width: 34px;
       height: 34px;
       border-radius: 50%;
-      border: 2px solid rgba(168,85,247,0.4);
-      background: rgba(168,85,247,0.06);
-      color: #7c3aed;
+      border: 2px solid rgba(90,160,70,0.38);
+      background: rgba(90,160,70,0.06);
+      color: #3a7a2a;
       font-size: 20px;
       font-weight: 300;
       cursor: pointer;
@@ -403,24 +403,20 @@
       transition: all 0.2s;
       line-height: 1;
     }
-    .plus-btn:active { transform: scale(0.9); background: rgba(168,85,247,0.15); }
+    .plus-btn:active { transform: scale(0.9); background: rgba(90,160,70,0.14); }
 
+    /* 表情包面板：不用absolute，改为在input-area上方流动展开，避免键盘弹起时位置错乱 */
     .plus-panel {
-      position: absolute;
-      bottom: 70px;
-      left: 12px;
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1.5px solid rgba(168,85,247,0.2);
-      border-radius: 20px;
+      position: relative;
+      width: 100%;
+      background: rgba(255,255,255,0.97);
+      border: 1.5px solid rgba(90,160,70,0.18);
+      border-radius: 20px 20px 0 0;
       padding: 12px;
-      box-shadow: 0 8px 32px rgba(139,92,246,0.15);
+      box-shadow: 0 -4px 24px rgba(60,120,40,0.1);
       z-index: 100;
       animation: fadeUp 0.2s ease;
-      min-width: 280px;
-      max-width: calc(100vw - 24px);
-      max-height: 70vh;
+      max-height: 60vh;
       overflow-y: auto;
     }
     .plus-panel-actions {
@@ -442,14 +438,14 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    .plus-action-btn:active { background: rgba(168,85,247,0.08); }
+    .plus-action-btn:active { background: rgba(90,160,70,0.08); }
     .plus-action-icon { font-size: 26px; }
-    .plus-action-label { font-size: 11px; color: #6b21a8; font-weight: 600; }
+    .plus-action-label { font-size: 11px; color: #2d6028; font-weight: 600; }
 
     .sticker-sub-panel {
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px solid rgba(168,85,247,0.1);
+      border-top: 1px solid rgba(90,160,70,0.1);
       animation: fadeUp 0.15s ease;
     }
     .sticker-grid {
@@ -463,8 +459,8 @@
       border-radius: 14px;
       overflow: hidden;
       cursor: pointer;
-      background: rgba(168,85,247,0.05);
-      border: 1.5px solid rgba(168,85,247,0.1);
+      background: rgba(90,160,70,0.05);
+      border: 1.5px solid rgba(90,160,70,0.1);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -500,19 +496,19 @@
   <!-- 主页 -->
 
   <!-- 未成年警告弹窗 -->
-<div id="ageWarningModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(180,140,200,0.35);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;">
-  <div style="background:rgba(255,255,255,0.92);border:1px solid rgba(210,170,230,0.4);border-radius:20px;padding:32px 24px;max-width:320px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(160,100,200,0.15);">
+<div id="ageWarningModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,80,20,0.3);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:rgba(255,255,255,0.94);border:1px solid rgba(120,185,90,0.35);border-radius:20px;padding:32px 24px;max-width:320px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(60,130,40,0.14);">
     <div style="font-size:36px;margin-bottom:12px;">🔞</div>
-    <div style="font-size:18px;font-weight:700;color:#6b21a8;margin-bottom:16px;">年龄确认</div>
-    <div style="font-size:14px;line-height:1.7;color:#5b4168;margin-bottom:24px;">
+    <div style="font-size:18px;font-weight:700;color:#1e4020;margin-bottom:16px;">年龄确认</div>
+    <div style="font-size:14px;line-height:1.7;color:#3a5a3c;margin-bottom:24px;">
       本应用包含成人向内容，包括亲密关系模拟、情感互动等内容。<br><br>
-      <strong style="color:#be185d;">未满18岁请立即离开。</strong><br><br>
+      <strong style="color:#b91c1c;">未满18岁请立即离开。</strong><br><br>
       继续使用即代表您确认已年满18周岁，并自愿承担相应责任。本应用不对未成年人使用承担任何责任。
     </div>
-    <button onclick="confirmAge()" style="width:100%;padding:14px;background:linear-gradient(135deg,#a855f7,#ec4899);border:none;border-radius:12px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+    <button onclick="confirmAge()" style="width:100%;padding:14px;background:linear-gradient(135deg,#5a9a46,#7dba5a);border:none;border-radius:12px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px;">
       我已年满18岁，继续
     </button>
-    <button onclick="denyAge()" style="width:100%;padding:12px;background:transparent;border:1px solid rgba(168,85,247,0.25);border-radius:12px;color:#9ca3af;font-size:14px;cursor:pointer;">
+    <button onclick="denyAge()" style="width:100%;padding:12px;background:transparent;border:1px solid rgba(90,160,70,0.25);border-radius:12px;color:#9ca3af;font-size:14px;cursor:pointer;">
       我未满18岁，离开
     </button>
   </div>
@@ -570,12 +566,12 @@
     <!-- QQ群弹窗 -->
     <div id="qqGroupModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
       <div style="background:white;border-radius:24px;padding:24px 20px;width:85%;max-width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-        <div style="font-size:18px;font-weight:900;color:#4a1d96;margin-bottom:4px;">💬 加入反馈群</div>
+        <div style="font-size:18px;font-weight:900;color:#1e4020;margin-bottom:4px;">💬 加入反馈群</div>
         <div style="font-size:12px;color:#999;margin-bottom:16px;">有问题、想法都可以来聊</div>
         <img src="images/qq-group.jpg" style="width:100%;border-radius:14px;margin-bottom:14px;" />
         <div style="font-size:12px;color:#888;margin-bottom:16px;">群号：384313545</div>
         <button onclick="document.getElementById('qqGroupModal').style.display='none'"
-          style="width:100%;padding:12px;background:linear-gradient(135deg,#7c3aed,#c084fc);color:white;border:none;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">
+          style="width:100%;padding:12px;background:linear-gradient(135deg,#5a9a46,#7dba5a);color:white;border:none;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">
           关闭
         </button>
       </div>
@@ -583,19 +579,19 @@
 
     <!-- 账户区域 -->
     <div style="padding: 8px 16px 32px; text-align:center;">
-      <div id="main-account-email" style="font-size:12px;color:#c9aee0;margin-bottom:10px;"></div>
+      <div id="main-account-email" style="font-size:12px;color:#9aca9a;margin-bottom:10px;"></div>
 
       <!-- 订阅状态卡片 -->
       <div id="subscribeCard" onclick="openSubscribePage()" style="
-        background: linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.1) 100%);
-        border: 1px solid rgba(168,85,247,0.25);
+        background: linear-gradient(135deg, rgba(90,160,70,0.1) 0%, rgba(120,185,85,0.08) 100%);
+        border: 1px solid rgba(90,160,70,0.22);
         border-radius: 16px; padding: 12px 16px; margin-bottom: 6px;
         cursor: pointer; transition: all 0.2s; text-align: left;
       ">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div id="subPlanName" style="font-size:13px;font-weight:600;color:#7c3aed;">✨ 开通会员</div>
-            <div id="subRemaining" style="font-size:11px;color:#a78bbd;margin-top:2px;">与Ghost无限畅聊</div>
+            <div id="subPlanName" style="font-size:13px;font-weight:600;color:#2d6028;">✨ 开通会员</div>
+            <div id="subRemaining" style="font-size:11px;color:#7aaa7a;margin-top:2px;">与Ghost无限畅聊</div>
           </div>
           <div style="font-size:20px;">💌</div>
         </div>
@@ -603,20 +599,20 @@
 
       <!-- 福利提示 -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px;">
-        <div style="font-size:11px;color:#c4a8e0;line-height:1.9;text-align:left;">
+        <div style="font-size:11px;color:#7aaa7a;line-height:1.9;text-align:left;">
           🎁 新用户注册免费赠送100条<br>
           📅 每日签到随机获得英镑或条数奖励<br>
           🏆 连续签到达里程碑额外赠条数
         </div>
-        <button onclick="showQQGroup()" style="flex-shrink:0;margin-left:10px;padding:8px 12px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:16px;font-size:11px;color:#7c3aed;cursor:pointer;font-family:inherit;line-height:1.4;text-align:center;">
+        <button onclick="showQQGroup()" style="flex-shrink:0;margin-left:10px;padding:8px 12px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);border-radius:16px;font-size:11px;color:#3a7a2a;cursor:pointer;font-family:inherit;line-height:1.4;text-align:center;">
           💬<br>反馈群
         </button>
       </div>
 
       <button onclick="handleLogout()" style="
-        padding:10px 28px; border:1.5px solid #e8d5f5;
+        padding:10px 28px; border:1.5px solid #c8e0c0;
         background:white; border-radius:20px; font-size:13px;
-        color:#a07ab8; cursor:pointer;
+        color:#7aaa7a; cursor:pointer;
       ">退出登录</button>
     </div>
   </div>
@@ -656,18 +652,7 @@
 
       <div class="messages" id="messagesContainer" onclick="closePlusPanel()"></div>
 
-      <div class="input-area">
-        <button class="plus-btn" onclick="togglePlusPanel()" title="更多">+</button>
-        <textarea class="input-field" id="chatInput" placeholder="输入消息..." rows="1" onkeypress="handleKeyPress(event)" oninput="autoResizeInput(this)"></textarea>
-        <button class="send-btn" onclick="sendMessage()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
-      </div>
-
-      <!-- +号展开面板 -->
+      <!-- +号展开面板：放在input-area上方，避免absolute定位在键盘弹起时错位 -->
       <!-- 预埋图片上传input，避免移动端浏览器拦截 -->
       <input type="file" id="photoFileInput" accept="image/*" multiple style="display:none" onchange="handlePhotoInputChange(event)">
 
@@ -689,7 +674,7 @@
         <!-- 表情包子面板 -->
         <div class="sticker-sub-panel" id="stickerSubPanel" style="display:none">
           <div style="display:flex;justify-content:flex-end;padding:4px 8px 0;">
-            <button onclick="document.getElementById('stickerSubPanel').style.display='none'" style="background:none;border:none;font-size:18px;color:#9b72c4;cursor:pointer;padding:4px 8px;">✕</button>
+            <button onclick="document.getElementById('stickerSubPanel').style.display='none'" style="background:none;border:none;font-size:18px;color:#4a8a30;cursor:pointer;padding:4px 8px;">✕</button>
           </div>
           <!-- emoji 快捷表情 -->
           <div style="display:flex;flex-wrap:wrap;gap:4px;padding:6px 8px 8px;">
@@ -714,7 +699,7 @@
             <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">💔</button>
             <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">🥳</button>
           </div>
-          <div style="height:1px;background:rgba(168,85,247,0.15);margin:0 8px;"></div>
+          <div style="height:1px;background:rgba(90,160,70,0.14);margin:0 8px;"></div>
           <!-- 猫猫表情包 -->
           <div class="sticker-grid">
             <div class="sticker-item" onclick="sendSticker('cry')"><img src="images/stickers/cry.png" alt="哭"></div>
@@ -735,6 +720,17 @@
             <div class="sticker-item" onclick="sendSticker('cat-rage')"><img src="images/stickers/cat-rage.png" alt="生气"></div>
           </div>
         </div>
+      </div>
+
+      <div class="input-area">
+        <button class="plus-btn" onclick="togglePlusPanel()" title="更多">+</button>
+        <textarea class="input-field" id="chatInput" placeholder="输入消息..." rows="1" onkeypress="handleKeyPress(event)" oninput="autoResizeInput(this)"></textarea>
+        <button class="send-btn" onclick="sendMessage()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
       </div>
 
       <!-- 转账弹窗 -->
@@ -1025,7 +1021,7 @@
               <circle cx="60" cy="60" r="52" class="ring-bg"/>
               <circle cx="60" cy="60" r="52" class="ring-progress" id="ringProgress"/>
             </svg>
-            <svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#c084fc"/><stop offset="100%" style="stop-color:#f472b6"/></linearGradient></defs></svg>
+            <svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#5a9a46"/><stop offset="100%" style="stop-color:#7dba5a"/></linearGradient></defs></svg>
             <div class="pomodoro-time" id="timerDisplay">25:00</div>
           </div>
           <button class="pomodoro-cancel-btn" onclick="cancelPomodoro()">放弃</button>
@@ -1161,7 +1157,7 @@
     <div class="screen-header">
       <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
       <div class="screen-title">🏪 商城</div>
-      <div id="marketBalanceDisplay" style="font-size:13px;color:#6b3fa0;font-weight:600;margin-left:auto;padding-right:4px;">£0</div>
+      <div id="marketBalanceDisplay" style="font-size:13px;color:#2d6028;font-weight:600;margin-left:auto;padding-right:4px;">£0</div>
     </div>
     <div class="market-container">
       <!-- 快递追踪栏 -->
@@ -1180,7 +1176,7 @@
     <div class="screen-header">
       <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
       <div class="screen-title" id="achievementTitle">📖 我们的故事</div>
-      <div id="storyBookCounter" style="font-size:12px;color:#9b59b6;margin-left:auto;padding-right:4px;"></div>
+      <div id="storyBookCounter" style="font-size:12px;color:#4a8a30;margin-left:auto;padding-right:4px;"></div>
     </div>
     <!-- 标签切换 -->
     <div class="achievement-tabs">
@@ -1301,7 +1297,7 @@
           <label class="secret-label">💬 我的昵称</label>
           <input class="secret-input" id="sec_username" type="text" placeholder="Ghost 叫你什么？"
                  maxlength="10" onchange="saveSecret('userName', this.value)">
-          <div style="font-size:11px;color:#c9aee0;margin-top:4px;">Ghost 会用这个名字叫你</div>
+          <div style="font-size:11px;color:#7aaa7a;margin-top:4px;">Ghost 会用这个名字叫你</div>
         </div>
         <div class="secret-field">
           <label class="secret-label">🎂 我的生日</label>
@@ -1353,7 +1349,7 @@
 
         <div class="secret-field">
           <label class="secret-label">💍 你们的婚姻状态</label>
-          <div style="font-size:11px;color:#c9aee0;margin-bottom:8px;">会影响 Ghost 跟你相处的方式</div>
+          <div style="font-size:11px;color:#7aaa7a;margin-bottom:8px;">会影响 Ghost 跟你相处的方式</div>
           <div class="secret-chips" id="marriageTypeChips"></div>
         </div>
       </div>
@@ -1363,14 +1359,14 @@
       <!-- 记忆导出导入 -->
       <div class="secret-section" style="margin-top:16px;">
         <div class="secret-section-title">💾 记忆备份</div>
-        <div style="font-size:12px;color:#c9aee0;margin-bottom:12px;line-height:1.6;">
+        <div style="font-size:12px;color:#7aaa7a;margin-bottom:12px;line-height:1.6;">
           导出记忆文件可以在换设备或正式版上线时恢复你们的故事。
         </div>
         <div style="display:flex;gap:10px;">
-          <button onclick="exportUserData()" style="flex:1;padding:10px;background:linear-gradient(135deg,rgba(192,132,252,0.2),rgba(244,114,182,0.2));border:1px solid rgba(192,132,252,0.4);border-radius:12px;color:#7c3aed;font-size:13px;cursor:pointer;">
+          <button onclick="exportUserData()" style="flex:1;padding:10px;background:linear-gradient(135deg,rgba(90,160,70,0.18),rgba(120,185,85,0.15));border:1px solid rgba(90,160,70,0.38);border-radius:12px;color:#2d6028;font-size:13px;cursor:pointer;">
             📤 导出记忆
           </button>
-          <button onclick="importUserData()" style="flex:1;padding:10px;background:linear-gradient(135deg,rgba(192,132,252,0.2),rgba(244,114,182,0.2));border:1px solid rgba(192,132,252,0.4);border-radius:12px;color:#7c3aed;font-size:13px;cursor:pointer;">
+          <button onclick="importUserData()" style="flex:1;padding:10px;background:linear-gradient(135deg,rgba(90,160,70,0.18),rgba(120,185,85,0.15));border:1px solid rgba(90,160,70,0.38);border-radius:12px;color:#2d6028;font-size:13px;cursor:pointer;">
             📥 导入记忆
           </button>
         </div>
@@ -1510,7 +1506,7 @@ async function loadSubscribeCard() {
         const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
         remEl.textContent = `剩余 ${data.remaining} 条 · ${endDate}到期`;
       }
-      card.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(236,72,153,0.12) 100%)';
+      card.style.background = 'linear-gradient(135deg, rgba(90,160,70,0.13) 0%, rgba(120,185,85,0.1) 100%)';
     }
   } catch(e) {}
 }
@@ -1519,32 +1515,32 @@ function openSubscribePage() {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
   overlay.innerHTML = `
-    <div style="background:linear-gradient(180deg,#fdf4ff,#fff5fb);border-radius:24px 24px 0 0;padding:24px;width:100%;max-width:480px;padding-bottom:calc(24px + env(safe-area-inset-bottom));">
-      <div style="width:36px;height:4px;background:rgba(168,85,247,0.3);border-radius:2px;margin:0 auto 20px;"></div>
+    <div style="background:linear-gradient(180deg,#f2fce8,#f8fff2);border-radius:24px 24px 0 0;padding:24px;width:100%;max-width:480px;padding-bottom:calc(24px + env(safe-area-inset-bottom));">
+      <div style="width:36px;height:4px;background:rgba(90,160,70,0.28);border-radius:2px;margin:0 auto 20px;"></div>
       <div style="text-align:center;margin-bottom:20px;">
-        <div style="font-size:18px;font-weight:700;color:#4a1a70;margin-bottom:4px;">选择你们的故事</div>
-        <div style="font-size:13px;color:#a78bbd;">付款后在爱发电备注填写登录邮箱</div>
+        <div style="font-size:18px;font-weight:700;color:#1e4020;margin-bottom:4px;">选择你们的故事</div>
+        <div style="font-size:13px;color:#7aaa7a;">付款后在爱发电备注填写登录邮箱</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-        <a href="https://ifdian.net/order/create?plan_id=6c9cd46425d211f1964152540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;">
-          <div><div style="font-size:14px;font-weight:600;color:#6b21a8;">新婚</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">1800条/月 · 记忆15条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥49.9</div>
+        <a href="https://ifdian.net/order/create?plan_id=6c9cd46425d211f1964152540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);text-decoration:none;">
+          <div><div style="font-size:14px;font-weight:600;color:#2d6028;">新婚</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">1800条/月 · 记忆15条</div></div>
+          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥49.9</div>
         </a>
-        <a href="https://ifdian.net/order/create?plan_id=6e82f4a225d211f1b43e52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(236,72,153,0.15));border:1.5px solid rgba(168,85,247,0.35);text-decoration:none;position:relative;">
-          <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;">推荐</div>
-          <div><div style="font-size:14px;font-weight:700;color:#6b21a8;">蜜月</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">2500条/月 · 记忆20条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥69.9</div>
+        <a href="https://ifdian.net/order/create?plan_id=6e82f4a225d211f1b43e52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(90,160,70,0.16),rgba(120,185,85,0.13));border:1.5px solid rgba(90,160,70,0.35);text-decoration:none;position:relative;">
+          <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#5a9a46,#7dba5a);color:white;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;">推荐</div>
+          <div><div style="font-size:14px;font-weight:700;color:#2d6028;">蜜月</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">2500条/月 · 记忆20条</div></div>
+          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥69.9</div>
         </a>
-        <a href="https://ifdian.net/order/create?plan_id=6f7c680225d211f19aca52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;">
-          <div><div style="font-size:14px;font-weight:600;color:#6b21a8;">金婚</div><div style="font-size:11px;color:#a78bbd;margin-top:2px;">4500条/月 · 记忆25条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#7c3aed;">¥109.9</div>
+        <a href="https://ifdian.net/order/create?plan_id=6f7c680225d211f19aca52540025c377" target="_blank" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:16px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);text-decoration:none;">
+          <div><div style="font-size:14px;font-weight:600;color:#2d6028;">金婚</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">4500条/月 · 记忆25条</div></div>
+          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥109.9</div>
         </a>
       </div>
       <div style="display:flex;gap:8px;">
-        <a href="https://ifdian.net/item/9effc14425d411f19ee752540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;font-size:12px;color:#7c3aed;">⚡ 小加油包<br><span style="font-weight:700;">¥9.9 · 300条</span></a>
-        <a href="https://ifdian.net/item/8e7858cc25d411f1ba9852540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);text-decoration:none;font-size:12px;color:#7c3aed;">⚡ 大加油包<br><span style="font-weight:700;">¥28.8 · 1000条</span></a>
+        <a href="https://ifdian.net/item/9effc14425d411f19ee752540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);text-decoration:none;font-size:12px;color:#3a7a2a;">⚡ 小加油包<br><span style="font-weight:700;">¥9.9 · 300条</span></a>
+        <a href="https://ifdian.net/item/8e7858cc25d411f1ba9852540025c377" target="_blank" style="flex:1;display:block;text-align:center;padding:10px;border-radius:12px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);text-decoration:none;font-size:12px;color:#3a7a2a;">⚡ 大加油包<br><span style="font-weight:700;">¥28.8 · 1000条</span></a>
       </div>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:14px;padding:12px;border-radius:14px;border:1px solid rgba(168,85,247,0.2);background:transparent;color:#a78bbd;font-size:13px;cursor:pointer;">稍后再说</button>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:14px;padding:12px;border-radius:14px;border:1px solid rgba(90,160,70,0.2);background:transparent;color:#7aaa7a;font-size:13px;cursor:pointer;">稍后再说</button>
     </div>
   `;
   document.body.appendChild(overlay);
