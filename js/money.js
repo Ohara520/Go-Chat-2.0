@@ -330,6 +330,15 @@ function canJealousyTriggerMoney() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function shouldGiveMoney(userText, context = {}) {
+  // 读统一状态
+  const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
+
+  // availability closed → 绝不给
+  if (gs && gs.availability === 'closed') return { ok: false, motive: null };
+
+  // moneyEase 0 → 不给
+  if (gs && gs.moneyEase === 0) return { ok: false, motive: null };
+
   // 0. 拒绝态持续时间
   if (isMoneyRefuseActive()) return { ok: false, motive: null };
 
@@ -343,7 +352,11 @@ function shouldGiveMoney(userText, context = {}) {
   const motive = classifyMoneyMotive({ ...context, userText });
   if (!motive) return { ok: false, motive: null };
 
-  // 3. comfort门槛
+  // 3. comfort门槛（统一状态补强：moneyEase高可降低门槛）
+  if (gs && gs.moneyEase >= 3) {
+    // 高ease：practical直接放行
+    if (motive === 'practical') return { ok: true, motive };
+  }
   if (!canGiveMoneyForMotive(motive)) return { ok: false, motive: null };
 
   return { ok: true, motive };

@@ -298,24 +298,60 @@ function getStickerToneHint(userText) {
 function checkUserSticker(userText) {
   const toneHint = getStickerToneHint(userText);
 
+  // 读统一状态，决定允许哪些池子
+  const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
+  const warmth    = gs ? gs.warmth    : 1;
+  const sharpness = gs ? gs.sharpness : 0;
+  const intimacy  = gs ? gs.intimacy  : 1;
+
   for (const [key, config] of Object.entries(USER_STICKER_REACTIONS)) {
     const hasEmoji = config.triggers.some(e => userText.includes(e));
     if (!hasEmoji) continue;
 
-    // 歧义修正：🥺如果是道歉/委屈，不按撒娇处理
+    // 歧义修正
     if (key === 'tease_reaction' && (toneHint === 'repair' || toneHint === 'upset')) continue;
-    // 歧义修正：😭如果上下文是撒娇，不按难过处理
     if (key === 'upset_reaction' && toneHint === 'tease') continue;
+
+    // 统一状态过滤：suggestive 需要 intimacy >= 2
+    if (key === 'suggestive_reaction' && intimacy < 2) continue;
+
+    // availability closed 时只允许 neutral/skull/annoyed
+    if (gs && gs.availability === 'closed') {
+      const coldOnly = new Set(['neutral', 'skull', 'annoyed', 'eyeroll']);
+      const coldResponses = config.responses.filter(r => coldOnly.has(r));
+      if (coldResponses.length === 0) continue;
+    }
 
     if (Math.random() > config.chance) continue;
 
-    // 冷却：同类反应2分钟内不重复
+    // 冷却
     const coolKey = 'userStickerCool_' + key;
     const lastAt = parseInt(localStorage.getItem(coolKey) || '0');
     if (Date.now() - lastAt < 2 * 60 * 1000) continue;
     localStorage.setItem(coolKey, Date.now());
 
-    const poolName = config.responses[Math.floor(Math.random() * config.responses.length)];
+    // 根据 warmth/sharpness 选池子
+    let poolName;
+    if (gs && gs.availability === 'closed') {
+      const coldOnly = ['neutral', 'skull', 'annoyed', 'eyeroll'];
+      const available = config.responses.filter(r => coldOnly.includes(r));
+      poolName = available[Math.floor(Math.random() * available.length)] || 'neutral';
+    } else if (warmth <= 0 || sharpness >= 2) {
+      // 冷淡状态：强制降级到冷池
+      const coldFallback = ['eyeroll', 'skull', 'neutral', 'annoyed'];
+      const available = config.responses.filter(r => coldFallback.includes(r));
+      poolName = available.length > 0
+        ? available[Math.floor(Math.random() * available.length)]
+        : coldFallback[Math.floor(Math.random() * coldFallback.length)];
+    } else {
+      poolName = config.responses[Math.floor(Math.random() * config.responses.length)];
+      // warmth 1：50%概率降级
+      if (warmth === 1 && !COLD_POOLS.has(poolName) && Math.random() < 0.5) {
+        const cold = ['eyeroll', 'skull', 'neutral', 'annoyed'];
+        poolName = cold[Math.floor(Math.random() * cold.length)];
+      }
+    }
+
     return pickStickerFromPool(poolName);
   }
   return null;

@@ -118,6 +118,16 @@ function addDelivery(product, isGhostSend, isLuxury) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function addGhostReverseDelivery(item, emotionType) {
+  // 读统一状态
+  const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
+
+  // initiative 0 + availability closed → 不主动寄
+  if (gs && gs.initiative === 0 && gs.availability === 'closed') return;
+
+  // warmth 0 + 非 longing/sick 类型 → 不寄软性礼物
+  const softTypes = ['longing', 'sad', 'heartbroken', 'worry'];
+  if (gs && gs.warmth === 0 && softTypes.includes(emotionType)) return;
+
   if (typeof canTriggerReverseDelivery  === 'function' && !canTriggerReverseDelivery()) return;
   if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
 

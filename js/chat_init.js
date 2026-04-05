@@ -53,16 +53,22 @@ async function maybeProactiveMessage() {
     scheduleProactiveMessage(); return;
   }
 
-  // 今天已触发过2次就停
+  // 读统一状态：initiative 0 → 不主动
+  const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
+  if (gs && gs.initiative === 0) { scheduleProactiveMessage(); return; }
+
+  // 今天已触发过2次就停（initiative高可以到3次）
+  const maxToday = (gs && gs.initiative >= 2) ? 3 : 2;
   const todayKey = 'proactiveCount_' + new Date().toDateString();
   const todayCount = parseInt(localStorage.getItem(todayKey) || '0');
-  if (todayCount >= 2) { scheduleProactiveMessage(); return; }
+  if (todayCount >= maxToday) { scheduleProactiveMessage(); return; }
 
-  // 触发概率
+  // 触发概率：initiative 越高概率越高
   const trust = getTrustHeat ? getTrustHeat() : 60;
   const mood = getMoodLevel ? getMoodLevel() : 7;
-  const triggerChance = 0.3 * ((trust + mood * 10) / 2) / 100;
-  if (Math.random() > triggerChance) { scheduleProactiveMessage(); return; }
+  const baseChance = 0.3 * ((trust + mood * 10) / 2) / 100;
+  const initiativeBonus = gs ? gs.initiative * 0.08 : 0;
+  if (Math.random() > baseChance + initiativeBonus) { scheduleProactiveMessage(); return; }
 
   // 最近5分钟有消息，不打扰
   const lastMsg = chatHistory.filter(m => m.role === 'assistant').slice(-1)[0];
