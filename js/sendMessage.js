@@ -4,6 +4,84 @@
 //       money.js、events.js、jealousy.js、delivery.js
 // ============================================================
 
+// ===== 条数系统（本地实现，兼容订阅和免费用户）=====
+const DAILY_LIMIT = 30;
+
+function getTodayCount() {
+  const key = 'dailyCount_' + new Date().toDateString();
+  return parseInt(localStorage.getItem(key) || '0');
+}
+
+function incrementTodayCount() {
+  const key = 'dailyCount_' + new Date().toDateString();
+  localStorage.setItem(key, getTodayCount() + 1);
+}
+
+// 订阅检查：从云端获取剩余条数
+let _subCache = null;
+async function getSubscription() {
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
+  if (!email) return null;
+  // 有缓存且未过期（5分钟内）
+  if (_subCache && Date.now() - (_subCache._fetchedAt || 0) < 5 * 60 * 1000) return _subCache;
+  try {
+    const res = await fetch('/api/subscription?email=' + encodeURIComponent(email));
+    if (!res.ok) return null;
+    const data = await res.json();
+    _subCache = { ...data, _fetchedAt: Date.now() };
+    return _subCache;
+  } catch(e) {
+    // 网络失败：允许继续，不卡住用户
+    return { remaining: 999, plan: 'unknown', _fetchedAt: Date.now() };
+  }
+}
+
+// 消耗一条云端额度
+async function consumeQuota() {
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
+  if (!email) return;
+  try {
+    const res = await fetch('/api/consume-quota', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (_subCache) _subCache.remaining = data.remaining;
+    }
+  } catch(e) {}
+}
+
+// 订阅引导弹窗
+function showSubscribePrompt() {
+  if (document.getElementById('subscribePromptOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'subscribePromptOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:28px 24px;width:280px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px">💌</div>
+      <div style="font-size:16px;font-weight:700;color:#3a1a60;margin-bottom:8px">今日消息已用完</div>
+      <div style="font-size:13px;color:#9b72c4;margin-bottom:20px">订阅解锁每日更多条数，继续和他聊下去</div>
+      <button onclick="document.getElementById('subscribePromptOverlay').remove()"
+        style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:15px;font-weight:600;cursor:pointer;">
+        知道了
+      </button>
+    </div>`;
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+
+// ===== 全局状态 =====
+let chatHistory = [];
+let _isSending = false;
+let _chatInited = false;
+let _renderedMsgCount = 0;
+let _currentAbortController = null;
+let _sendVersion = 0;
+let _globalTurnCount = parseInt(localStorage.getItem('globalTurnCount') || '0');
 
 // 消息合并（300ms内连发合并）
 let _pendingMessages = [];

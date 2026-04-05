@@ -403,36 +403,41 @@ function renderMarket(categoryId) {
     if (!gridEl3) return;
     const purchased = _safeGet('purchasedItems', []);
     const purchaseCounts = _safeGet('purchaseCounts', {});
-    const products = (MARKET_PRODUCTS.intimate || []).filter(canUnlockProduct);
+    // 修改：全部显示，未解锁的显示锁定状态，不再隐藏
+    const allIntimateProducts = MARKET_PRODUCTS.intimate || [];
     const intimateTriggered = _safeGet('intimateTriggered', {});
     const now = Date.now();
     let intimateHtml = '';
-    products.forEach((p, i) => {
+    allIntimateProducts.forEach((p, i) => {
+      const isUnlocked = canUnlockProduct(p);
       const maxBuy = p.maxPurchase || 1;
       const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
       const owned = buyCount >= maxBuy;
       const btnLabel = p.isUserItem ? '🛍️ 为自己购买' : '📦 寄给 Ghost';
 
-      // 高亮判断：intimateTriggered 里有且未过期（2天）
       const iTrigger = intimateTriggered[p.name];
-      const isHighlighted = !owned && iTrigger && (now - iTrigger.timestamp < 2 * 24 * 3600 * 1000);
+      const isHighlighted = isUnlocked && !owned && iTrigger && (now - iTrigger.timestamp < 2 * 24 * 3600 * 1000);
 
-      const badgeHtml = isHighlighted
-        ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(192,132,252,0.15));border:1px solid rgba(236,72,153,0.5);color:#be185d;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">💡 也许正合时机</div>`
-        : p.badge
-          ? `<div class="ghost-mentioned-tag" style="background:rgba(236,72,153,0.12);border-color:rgba(236,72,153,0.4);color:#be185d;">💕 ${p.badge}</div>`
-          : '';
+      const badgeHtml = !isUnlocked
+        ? `<div class="ghost-mentioned-tag" style="background:rgba(100,100,120,0.12);border:1px solid rgba(150,150,180,0.3);color:#9ca3af;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">🔒 继续相处后解锁</div>`
+        : isHighlighted
+          ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(192,132,252,0.15));border:1px solid rgba(236,72,153,0.5);color:#be185d;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">💡 也许正合时机</div>`
+          : p.badge
+            ? `<div class="ghost-mentioned-tag" style="background:rgba(236,72,153,0.12);border-color:rgba(236,72,153,0.4);color:#be185d;">💕 ${p.badge}</div>`
+            : '';
 
-      const actionHtml = owned
-        ? `<div class="product-owned-tag">✅ 已购买</div>`
-        : `<button class="product-buy-btn intimate-buy-btn" onclick="openBuyModal(${i})">${btnLabel}</button>`;
+      const actionHtml = !isUnlocked
+        ? `<button class="product-buy-btn intimate-buy-btn" disabled style="opacity:0.38;cursor:not-allowed;filter:grayscale(0.5);">🔒 未解锁</button>`
+        : owned
+          ? `<div class="product-owned-tag">✅ 已购买</div>`
+          : `<button class="product-buy-btn intimate-buy-btn" onclick="openBuyModal(${i})">${btnLabel}</button>`;
 
-      intimateHtml += `<div class="product-card intimate-card ${owned ? 'owned-card' : ''} ${isHighlighted ? 'ghost-mentioned' : ''}">
+      intimateHtml += `<div class="product-card intimate-card ${owned ? 'owned-card' : ''} ${isHighlighted ? 'ghost-mentioned' : ''}" style="${!isUnlocked ? 'opacity:0.55;' : ''}">
         ${badgeHtml}
         <div class="product-emoji">${p.emoji}</div>
         <div class="product-name">${p.name}</div>
-        <div class="product-desc">${p.desc}</div>
-        <div class="product-price">£${p.price.toLocaleString()}</div>
+        <div class="product-desc">${!isUnlocked ? '继续和他相处，慢慢解锁' : p.desc}</div>
+        <div class="product-price">${!isUnlocked ? '— —' : '£' + p.price.toLocaleString()}</div>
         ${actionHtml}
       </div>`;
     });
@@ -440,10 +445,11 @@ function renderMarket(categoryId) {
     return;
   }
 
+  // 修改：全部显示，未解锁的显示锁定状态
   const isFromHome = categoryId === 'fromhome';
-  let products = (MARKET_PRODUCTS[categoryId] || []).filter(canUnlockProduct);
+  let products = MARKET_PRODUCTS[categoryId] || [];
   if (isFromHome) {
-    const seasonal = getSeasonalFromHome().filter(canUnlockProduct);
+    const seasonal = getSeasonalFromHome();
     products = [...products, ...seasonal];
   }
   const gridEl = document.getElementById('productsGrid');
@@ -456,12 +462,13 @@ function renderMarket(categoryId) {
   const weeklySale = isLuxury ? getWeeklySale() : null;
 
   gridEl.innerHTML = products.map((p, i) => {
+    const isUnlocked = canUnlockProduct(p);  // 关系是否满足解锁条件
     const maxBuy = p.maxPurchase || 1;
     const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
     const owned = buyCount >= maxBuy;
     const onSale = weeklySale && weeklySale.name === p.name;
     const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
-    const triggerReason = getProductTrigger(p.name);
+    const triggerReason = isUnlocked ? getProductTrigger(p.name) : null;
     const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
     const discountPct = onSale ? Math.round((1 - weeklySale.discount) * 100) : 0;
     const discountLabel = discountPct >= 30 ? `${discountPct}% OFF · 限时${discountPct}折`
@@ -477,6 +484,20 @@ function renderMarket(categoryId) {
           <div class="product-name">${p.name}</div>
           <div class="product-desc">${p.desc}</div>
           <div class="ghost-mentioned-tag" style="position:relative;transform:none;margin:8px auto 0;display:inline-block;">🔒 后续开放</div>
+        </div>`;
+    }
+
+    // 未解锁：显示锁定卡片
+    if (!isUnlocked) {
+      return `
+        <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''}"
+             style="opacity:0.55;" onclick="showToast('继续和 Ghost 相处，解锁更多商品 💜')">
+          <div class="ghost-mentioned-tag" style="background:rgba(100,100,120,0.12);border:1px solid rgba(150,150,180,0.3);color:#9ca3af;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;">🔒 继续相处后解锁</div>
+          <div class="product-emoji">${p.emoji}</div>
+          <div class="product-name">${p.name}</div>
+          <div class="product-desc">继续和他相处，慢慢解锁</div>
+          <div class="product-price">— —</div>
+          <button class="product-buy-btn" disabled style="opacity:0.38;cursor:not-allowed;filter:grayscale(0.5);">🔒 未解锁</button>
         </div>`;
     }
 
