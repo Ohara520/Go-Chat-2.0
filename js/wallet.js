@@ -46,6 +46,31 @@ function addTransaction(tx) {
   if (typeof saveToCloud === 'function') saveToCloud().catch(()=>{});
 }
 
+function formatTxTime(timeStr) {
+  if (!timeStr) return '';
+  const now = new Date();
+  const todayStr = now.getFullYear() + '-' +
+    String(now.getMonth()+1).padStart(2,'0') + '-' +
+    String(now.getDate()).padStart(2,'0');
+  const yesterday = new Date(now - 86400000);
+  const yStr = yesterday.getFullYear() + '-' +
+    String(yesterday.getMonth()+1).padStart(2,'0') + '-' +
+    String(yesterday.getDate()).padStart(2,'0');
+  const timePart = timeStr.slice(11, 16); // HH:MM
+  const datePart = timeStr.slice(0, 10);  // YYYY-MM-DD
+  if (datePart === todayStr) return '今天 ' + timePart;
+  if (datePart === yStr)     return '昨天 ' + timePart;
+  // 更早：显示 Apr 5 · HH:MM
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [, m, d] = datePart.split('-').map(Number);
+  return months[m-1] + ' ' + d + ' · ' + timePart;
+}
+
+function getTxIconStyle(amount) {
+  const base = 'border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;';
+  return base + (amount > 0 ? 'background:#EAF3DE;' : 'background:#FAECE7;');
+}
+
 let txExpanded = false;
 const TX_PREVIEW = 5;
 
@@ -81,13 +106,13 @@ function renderWallet() {
 
   const showList = txExpanded ? txList : txList.slice(0, TX_PREVIEW);
   container.innerHTML = showList.map(tx => `
-    <div class="transaction-item">
-      <div class="transaction-icon">${tx.icon || '💰'}</div>
-      <div class="transaction-info">
-        <div class="transaction-name">${tx.name}</div>
-        <div class="transaction-time">${tx.time || ''}</div>
+    <div class="transaction-item" style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:0.5px solid var(--color-border-tertiary);">
+      <div style="${getTxIconStyle(tx.amount)}">${tx.icon || '💰'}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="transaction-name" style="font-size:13px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tx.name}</div>
+        <div class="transaction-time" style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px;">${formatTxTime(tx.time)}</div>
       </div>
-      <div class="transaction-amount ${tx.amount > 0 ? 'in' : 'out'}">
+      <div class="transaction-amount ${tx.amount > 0 ? 'in' : 'out'}" style="font-size:14px;font-weight:500;flex-shrink:0;color:${tx.amount > 0 ? '#3B6D11' : '#993C1D'};">
         ${tx.amount > 0 ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}
       </div>
     </div>
