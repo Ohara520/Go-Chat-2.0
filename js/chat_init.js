@@ -177,29 +177,35 @@ async function initChat() {
   if (!localStorage.getItem('affection')) setAffection(70);
 
   // 老用户补偿：established模式下trust/affection低于新默认值的，一次性升上来
-  const _mode = localStorage.getItem('marriageType') || 'established';
-  if (_mode === 'established') {
-    if (getTrustHeat() < 75) setTrustHeat(75);
-    if (getAffection() < 70) setAffection(70);
-  }
-
-  // 维护补偿（每个用户只发一次）
-  if (!localStorage.getItem('maintenanceCompensation_20260402')) {
-    localStorage.setItem('maintenanceCompensation_20260402', '1');
-    if (typeof addTransaction === 'function') {
-      addTransaction({ icon: '🎁', name: '维护补偿', amount: 100 });
-      if (typeof renderWallet === 'function') renderWallet();
+  if (!localStorage.getItem('trustAffectionUpgrade_20260405')) {
+    localStorage.setItem('trustAffectionUpgrade_20260405', '1');
+    const _mode = localStorage.getItem('marriageType') || 'established';
+    if (_mode === 'established') {
+      if (getTrustHeat() < 75) setTrustHeat(75);
+      if (getAffection() < 70) setAffection(70);
     }
   }
 
-  // 开服补偿£200（每个用户只发一次）
-  if (!localStorage.getItem('openingCompensation_20260405')) {
-    localStorage.setItem('openingCompensation_20260405', '1');
-    if (typeof addTransaction === 'function') {
-      addTransaction({ icon: '💷', name: '开服补偿', amount: 200 });
-      if (typeof renderWallet === 'function') renderWallet();
+  // 补偿逻辑延迟执行——必须等云端数据完全加载后再写入，防止覆盖云端数据
+  setTimeout(() => {
+    // 维护补偿（每个用户只发一次）
+    if (!localStorage.getItem('maintenanceCompensation_20260402')) {
+      localStorage.setItem('maintenanceCompensation_20260402', '1');
+      if (typeof addTransaction === 'function') {
+        addTransaction({ icon: '🎁', name: '维护补偿', amount: 100 });
+        if (typeof renderWallet === 'function') renderWallet();
+      }
     }
-  }
+
+    // 开服补偿£200（每个用户只发一次）
+    if (!localStorage.getItem('openingCompensation_20260405')) {
+      localStorage.setItem('openingCompensation_20260405', '1');
+      if (typeof addTransaction === 'function') {
+        addTransaction({ icon: '💷', name: '开服补偿', amount: 200 });
+        if (typeof renderWallet === 'function') renderWallet();
+      }
+    }
+  }, 5000); // 5秒后执行，确保云端数据已完全加载完毕
 
   // 副作用初始化
   if (typeof ensureGhostBirthday === 'function') ensureGhostBirthday();
