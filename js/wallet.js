@@ -56,19 +56,13 @@ function formatTxTime(timeStr) {
   const yStr = yesterday.getFullYear() + '-' +
     String(yesterday.getMonth()+1).padStart(2,'0') + '-' +
     String(yesterday.getDate()).padStart(2,'0');
-  const timePart = timeStr.slice(11, 16); // HH:MM
-  const datePart = timeStr.slice(0, 10);  // YYYY-MM-DD
+  const timePart = timeStr.slice(11, 16);
+  const datePart = timeStr.slice(0, 10);
   if (datePart === todayStr) return '今天 ' + timePart;
   if (datePart === yStr)     return '昨天 ' + timePart;
-  // 更早：显示 Apr 5 · HH:MM
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [, m, d] = datePart.split('-').map(Number);
   return months[m-1] + ' ' + d + ' · ' + timePart;
-}
-
-function getTxIconStyle(amount) {
-  const base = 'border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;';
-  return base + (amount > 0 ? 'background:#EAF3DE;' : 'background:#FAECE7;');
 }
 
 let txExpanded = false;
@@ -105,18 +99,20 @@ function renderWallet() {
   }
 
   const showList = txExpanded ? txList : txList.slice(0, TX_PREVIEW);
-  container.innerHTML = showList.map(tx => `
-    <div class="transaction-item" style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:0.5px solid var(--color-border-tertiary);">
-      <div style="${getTxIconStyle(tx.amount)}">${tx.icon || '💰'}</div>
+  container.innerHTML = showList.map(tx => {
+    const isIn = tx.amount > 0;
+    const iconBg  = isIn ? 'rgba(99,153,34,0.12)' : 'rgba(216,90,48,0.10)';
+    const amtColor = isIn ? '#3B6D11' : '#712B13';
+    return `
+    <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:0.5px solid rgba(100,160,80,0.1);">
+      <div style="width:38px;height:38px;border-radius:10px;background:${iconBg};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${tx.icon || '💰'}</div>
       <div style="flex:1;min-width:0;">
-        <div class="transaction-name" style="font-size:13px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tx.name}</div>
-        <div class="transaction-time" style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px;">${formatTxTime(tx.time)}</div>
+        <div style="font-size:13px;font-weight:500;color:#2d5a30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tx.name}</div>
+        <div style="font-size:11px;color:rgba(50,100,45,0.4);margin-top:2px;">${formatTxTime(tx.time)}</div>
       </div>
-      <div class="transaction-amount ${tx.amount > 0 ? 'in' : 'out'}" style="font-size:14px;font-weight:500;flex-shrink:0;color:${tx.amount > 0 ? '#3B6D11' : '#993C1D'};">
-        ${tx.amount > 0 ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}
-      </div>
-    </div>
-  `).join('');
+      <div style="font-size:14px;font-weight:700;flex-shrink:0;color:${amtColor};">${isIn ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}</div>
+    </div>`;
+  }).join('');
 
   if (toggleBtn) {
     if (txList.length > TX_PREVIEW) {
