@@ -1167,24 +1167,49 @@ function checkStoryOnColdWarEnd() {
 }
 
 function renderStoryBook() {
-  const el = document.getElementById('storyBookList');
-  if (!el) return;
+  const container = document.getElementById('storyBookList');
+  if (!container) return;
   const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
-  const counterEl = document.getElementById('storyCounter');
+  const counterEl = document.getElementById('storyBookCounter');
   if (counterEl) counterEl.textContent = `${book.length} / ${STORY_EVENTS.length}`;
 
   if (book.length === 0) {
-    el.innerHTML = '<div class="story-empty">还没有解锁任何故事</div>';
+    container.innerHTML = `<div class="story-empty">还没有解锁任何回忆<br><span>继续和他相处，故事会自然发生</span></div>`;
     return;
   }
 
-  el.innerHTML = book.map(e => {
+  // 已解锁：胶片横滑
+  const unlockedFilms = book.map(e => {
     const event = STORY_EVENTS.find(ev => ev.id === e.id);
-    return `<div class="story-item">
-      <div class="story-title">${e.title}</div>
-      <div class="story-desc">${event?.desc || e.desc}</div>
+    const icon = event?.icon || '📖';
+    const dateStr = new Date(e.unlockedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    return `
+    <div class="film-card unlocked">
+      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
+      <div class="film-img"><div class="film-img-icon">${icon}</div></div>
+      <div class="film-info">
+        <div class="film-title">${e.title}</div>
+        <div class="film-desc">${event?.desc || e.desc || ''}</div>
+        <div class="film-date">${dateStr}</div>
+      </div>
+      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
     </div>`;
   }).join('');
+
+  // 未解锁：简洁列表
+  const lockedItems = STORY_EVENTS.filter(e => !book.find(b => b.id === e.id)).map(() => `
+    <div class="locked-item">
+      <div class="locked-dot"></div>
+      <div class="locked-text">· · · 继续和他相处，也许有一天会发生</div>
+    </div>`).join('');
+
+  container.innerHTML = `
+    <div class="story-section-label">已解锁的回忆</div>
+    <div class="film-track">${unlockedFilms}</div>
+    <div class="swipe-hint">← 左右滑动 →</div>
+    <div class="story-section-label" style="margin-top:16px;">尚未发生的故事</div>
+    <div class="locked-list">${lockedItems}</div>
+  `;
 }
 
 
