@@ -1087,19 +1087,25 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 18px;
-    border-bottom: 1px solid rgba(140,190,100,0.1);
+    padding: 11px 0;
+    border-bottom: 0.5px solid rgba(100,160,80,0.1);
 }
 .transaction-item:last-child { border-bottom: none; }
-.transaction-icon { font-size: 22px; }
-.transaction-info { flex: 1; }
-.transaction-name { font-size: 13px; color: #233d25; font-weight: 500; }
-.transaction-date { font-size: 11px; color: rgba(50,100,40,0.45); margin-top: 2px; }
-.transaction-amount {
-    font-size: 15px; font-weight: 700;
+.transaction-icon {
+    font-size: 18px;
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
 }
-.transaction-amount.income { color: #3a7a2a; }
-.transaction-amount.expense { color: #c0392b; }
+.transaction-icon.in  { background: rgba(99,153,34,0.12); }
+.transaction-icon.out { background: rgba(216,90,48,0.10); }
+.transaction-info { flex: 1; min-width: 0; }
+.transaction-name { font-size: 13px; color: #2d5a30; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.transaction-time { font-size: 11px; color: rgba(50,100,45,0.4); margin-top: 2px; }
+.transaction-amount { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.transaction-amount.in  { color: #3B6D11; }
+.transaction-amount.out { color: #712B13; }
 
 /* 转账卡片 */
 .transfer-card {

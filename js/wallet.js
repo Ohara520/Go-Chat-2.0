@@ -101,16 +101,18 @@ function renderWallet() {
   const showList = txExpanded ? txList : txList.slice(0, TX_PREVIEW);
   container.innerHTML = showList.map(tx => {
     const isIn = tx.amount > 0;
-    const iconBg  = isIn ? 'rgba(99,153,34,0.12)' : 'rgba(216,90,48,0.10)';
+    const iconBg   = isIn ? 'rgba(99,153,34,0.12)' : 'rgba(216,90,48,0.10)';
     const amtColor = isIn ? '#3B6D11' : '#712B13';
     return `
-    <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:0.5px solid rgba(100,160,80,0.1);">
-      <div style="width:38px;height:38px;border-radius:10px;background:${iconBg};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${tx.icon || '💰'}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:500;color:#2d5a30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tx.name}</div>
-        <div style="font-size:11px;color:rgba(50,100,45,0.4);margin-top:2px;">${formatTxTime(tx.time)}</div>
+    <div class="transaction-item">
+      <div class="transaction-icon" style="background:${iconBg};">${tx.icon || '💰'}</div>
+      <div class="transaction-info">
+        <div class="transaction-name">${tx.name}</div>
+        <div class="transaction-time">${formatTxTime(tx.time)}</div>
       </div>
-      <div style="font-size:14px;font-weight:700;flex-shrink:0;color:${amtColor};">${isIn ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}</div>
+      <div class="transaction-amount ${isIn ? 'in' : 'out'}" style="color:${amtColor};">
+        ${isIn ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}
+      </div>
     </div>`;
   }).join('');
 
