@@ -506,54 +506,48 @@ function updateAvatarEverywhere(base64) {
 // 数据导出导入
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// ===== 记忆导出导入（XOR加密 + 字段名混淆）=====
+const _FM = {
+  userName:'_p1',userBirthday:'_p2',userZodiac:'_p3',userMBTI:'_p4',
+  userCountry:'_p5',userFavFood:'_p6',userFavMusic:'_p7',userFavColor:'_p8',
+  marriageDate:'_p9',botNickname:'_pa',meetType:'_pb',marriageType:'_pc',
+  ghostBirthday:'_g1',ghostZodiac:'_g2',ghostAvatarUrl:'_g3',ghostHeight:'_g4',
+  ghostWeight:'_g5',ghostBloodType:'_g6',ghostHometown:'_g7',
+  ghostUnlocked_birthday:'_g8',ghostUnlocked_zodiac:'_g9',ghostUnlocked_height:'_ga',
+  ghostUnlocked_weight:'_gb',ghostUnlocked_blood_type:'_gc',ghostUnlocked_hometown:'_gd',
+  affection:'_r1',moodLevel:'_r2',relationshipFlags:'_r3',metInPerson:'_r4',
+};
+const _FMR = Object.fromEntries(Object.entries(_FM).map(([k,v])=>[v,k]));
+const _EK = 'Gh0st.N0Agc.S1m0n.R1ley.TF141';
+function _enc(str) {
+  const k=_EK; let o='';
+  for(let i=0;i<str.length;i++) o+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));
+  return btoa(unescape(encodeURIComponent(o)));
+}
+function _dec(b64) {
+  const str=decodeURIComponent(escape(atob(b64)));
+  const k=_EK; let o='';
+  for(let i=0;i<str.length;i++) o+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));
+  return o;
+}
+function _ob(obj){ const r={}; for(const[k,v]of Object.entries(obj)) r[_FM[k]||k]=v; return r; }
+function _dob(obj){ const r={}; for(const[k,v]of Object.entries(obj)) r[_FMR[k]||k]=v; return r; }
+
 function exportUserData() {
   const rawHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
   const cleanHistory = rawHistory.filter(m => !m._system && !m._recalled && !m._intimate);
-  const data = {
-    version: '2.0',
-    exportedAt: new Date().toISOString(),
-    chatHistory: cleanHistory,
-    profile: {
-      userName: localStorage.getItem('userName') || '',
-      userBirthday: localStorage.getItem('userBirthday') || '',
-      userZodiac: localStorage.getItem('userZodiac') || '',
-      userMBTI: localStorage.getItem('userMBTI') || '',
-      userCountry: localStorage.getItem('userCountry') || '',
-      userFavFood: localStorage.getItem('userFavFood') || '',
-      userFavMusic: localStorage.getItem('userFavMusic') || '',
-      userFavColor: localStorage.getItem('userFavColor') || '',
-      marriageDate: localStorage.getItem('marriageDate') || '',
-      botNickname: localStorage.getItem('botNickname') || '',
-      meetType: localStorage.getItem('meetType') || '',
-      marriageType: localStorage.getItem('marriageType') || 'established',
-    },
-    ghostData: {
-      ghostBirthday: localStorage.getItem('ghostBirthday') || '',
-      ghostZodiac: localStorage.getItem('ghostZodiac') || '',
-      ghostAvatarUrl: localStorage.getItem('ghostAvatarUrl') || '',
-      ghostHeight: localStorage.getItem('ghostHeight') || '',
-      ghostWeight: localStorage.getItem('ghostWeight') || '',
-      ghostBloodType: localStorage.getItem('ghostBloodType') || '',
-      ghostHometown: localStorage.getItem('ghostHometown') || '',
-      ghostUnlocked_birthday: localStorage.getItem('ghostUnlocked_birthday') || '',
-      ghostUnlocked_zodiac: localStorage.getItem('ghostUnlocked_zodiac') || '',
-      ghostUnlocked_height: localStorage.getItem('ghostUnlocked_height') || '',
-      ghostUnlocked_weight: localStorage.getItem('ghostUnlocked_weight') || '',
-      ghostUnlocked_blood_type: localStorage.getItem('ghostUnlocked_blood_type') || '',
-      ghostUnlocked_hometown: localStorage.getItem('ghostUnlocked_hometown') || '',
-    },
-    relationship: {
-      affection: localStorage.getItem('affection') || '60',
-      moodLevel: localStorage.getItem('moodLevel') || '7',
-      relationshipFlags: localStorage.getItem('relationshipFlags') || '{}',
-      metInPerson: localStorage.getItem('metInPerson') || 'false',
-    },
+  const inner = {
+    _v: '3.0', _t: new Date().toISOString(), _h: cleanHistory,
+    _a: _ob({ userName:localStorage.getItem('userName')||'', userBirthday:localStorage.getItem('userBirthday')||'', userZodiac:localStorage.getItem('userZodiac')||'', userMBTI:localStorage.getItem('userMBTI')||'', userCountry:localStorage.getItem('userCountry')||'', userFavFood:localStorage.getItem('userFavFood')||'', userFavMusic:localStorage.getItem('userFavMusic')||'', userFavColor:localStorage.getItem('userFavColor')||'', marriageDate:localStorage.getItem('marriageDate')||'', botNickname:localStorage.getItem('botNickname')||'', meetType:localStorage.getItem('meetType')||'', marriageType:localStorage.getItem('marriageType')||'established' }),
+    _b: _ob({ ghostBirthday:localStorage.getItem('ghostBirthday')||'', ghostZodiac:localStorage.getItem('ghostZodiac')||'', ghostAvatarUrl:localStorage.getItem('ghostAvatarUrl')||'', ghostHeight:localStorage.getItem('ghostHeight')||'', ghostWeight:localStorage.getItem('ghostWeight')||'', ghostBloodType:localStorage.getItem('ghostBloodType')||'', ghostHometown:localStorage.getItem('ghostHometown')||'', ghostUnlocked_birthday:localStorage.getItem('ghostUnlocked_birthday')||'', ghostUnlocked_zodiac:localStorage.getItem('ghostUnlocked_zodiac')||'', ghostUnlocked_height:localStorage.getItem('ghostUnlocked_height')||'', ghostUnlocked_weight:localStorage.getItem('ghostUnlocked_weight')||'', ghostUnlocked_blood_type:localStorage.getItem('ghostUnlocked_blood_type')||'', ghostUnlocked_hometown:localStorage.getItem('ghostUnlocked_hometown')||'' }),
+    _c: _ob({ affection:localStorage.getItem('affection')||'60', moodLevel:localStorage.getItem('moodLevel')||'7', relationshipFlags:localStorage.getItem('relationshipFlags')||'{}', metInPerson:localStorage.getItem('metInPerson')||'false' }),
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const output = { gc: _enc(JSON.stringify(inner)), _: '1' };
+  const blob = new Blob([JSON.stringify(output)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ghost-memory-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `gc-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('✅ 记忆已导出，请保存好文件');
@@ -568,16 +562,29 @@ function importUserData() {
     if (!file) return;
     try {
       const text = await file.text();
-      const data = JSON.parse(text);
-      if (!data.version) { showToast('❌ 文件格式不对，请选择正确的记忆文件'); return; }
-      if (data.chatHistory?.length > 0) localStorage.setItem('chatHistory', JSON.stringify(data.chatHistory));
-      if (data.longTermMemory) localStorage.setItem('longTermMemory', data.longTermMemory);
-      if (data.profile) Object.entries(data.profile).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
-      if (data.ghostData) Object.entries(data.ghostData).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
-      if (data.relationship) Object.entries(data.relationship).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
+      const outer = JSON.parse(text);
+      if (outer.version) {
+        // 旧版明文文件兼容
+        if (outer.chatHistory?.length > 0) localStorage.setItem('chatHistory', JSON.stringify(outer.chatHistory));
+        if (outer.longTermMemory) localStorage.setItem('longTermMemory', outer.longTermMemory);
+        if (outer.profile)       Object.entries(outer.profile).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+        if (outer.ghostData)     Object.entries(outer.ghostData).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+        if (outer.relationship)  Object.entries(outer.relationship).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+      } else if (outer.gc) {
+        // 新版加密文件
+        let inner;
+        try { inner = JSON.parse(_dec(outer.gc)); } catch(e) { showToast('❌ 文件已损坏或不兼容'); return; }
+        if (!inner._v) { showToast('❌ 文件格式不对'); return; }
+        if (inner._h?.length > 0) localStorage.setItem('chatHistory', JSON.stringify(inner._h));
+        if (inner._a) Object.entries(_dob(inner._a)).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+        if (inner._b) Object.entries(_dob(inner._b)).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+        if (inner._c) Object.entries(_dob(inner._c)).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+      } else {
+        showToast('❌ 文件格式不对，请选择正确的记忆文件'); return;
+      }
       showToast('✅ 记忆已恢复！正在刷新...');
       setTimeout(() => location.reload(), 1500);
-    } catch(e) {
+    } catch(err) {
       showToast('❌ 导入失败，文件可能已损坏');
     }
   };
