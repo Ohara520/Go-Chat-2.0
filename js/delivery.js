@@ -660,7 +660,7 @@ A short pause. Then it shifts.
 
 He doesn't make a thing out of it. But there's a slight edge — not at her, at the situation. Keeps it simple. Doesn't let her sit with it. Closes it himself.]`;
 
-    chatHistory.push({ role: 'user', content: contextPrompt });
+    chatHistory.push({ role: 'user', content: contextPrompt, _system: true });
     if (typeof showTyping === 'function') showTyping();
 
     const res = await fetchWithTimeout('/api/chat', {
