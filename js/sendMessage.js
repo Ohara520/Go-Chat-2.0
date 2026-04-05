@@ -4,14 +4,6 @@
 //       money.js、events.js、jealousy.js、delivery.js
 // ============================================================
 
-// ===== 全局状态 =====
-let chatHistory = [];
-let _isSending = false;
-let _chatInited = false;
-let _renderedMsgCount = 0;
-let _currentAbortController = null;
-let _sendVersion = 0;
-let _globalTurnCount = parseInt(localStorage.getItem('globalTurnCount') || '0');
 
 // 消息合并（300ms内连发合并）
 let _pendingMessages = [];

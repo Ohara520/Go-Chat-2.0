@@ -1,4 +1,10 @@
 // ============================================================
+
+// ===== 全局状态变量（供 sendMessage.js / chat_init.js 共用）=====
+let chatHistory = [];
+let _isSending = false;
+let _chatInited = false;
+let _renderedMsgCount = 0;
 // chat_init.js — 聊天页初始化 & 后台系统
 //
 // 职责：
