@@ -489,6 +489,44 @@
 </head>
 <body>
 
+<!-- ===== 维护公告 ===== -->
+<div id="maintenanceOverlay" style="
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:linear-gradient(160deg,#0d0d1a 0%,#1a0d2e 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:999999;font-family:-apple-system,sans-serif;padding:32px;box-sizing:border-box;
+  text-align:center;
+">
+  <div style="font-size:48px;margin-bottom:20px">🔧</div>
+  <div style="font-size:20px;font-weight:600;color:#fff;margin-bottom:12px;letter-spacing:0.02em">
+    系统维护中
+  </div>
+  <div style="font-size:14px;color:rgba(255,255,255,0.5);margin-bottom:6px">
+    维护时间：凌晨 1:30 — 早上 9:00
+  </div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.35);margin-bottom:32px">
+    感谢大家的耐心等待 💜
+  </div>
+  <div style="
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:16px;padding:20px 28px;
+    max-width:320px;width:100%;
+  ">
+    <div style="font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:8px">维护完成后将发放</div>
+    <div style="font-size:28px;font-weight:700;color:#c084fc;letter-spacing:-0.02em">£200</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.3);margin-top:4px">补偿金 · 直接到账</div>
+  </div>
+  <div style="margin-top:28px;font-size:12px;color:rgba(255,255,255,0.2)">Go Chat</div>
+</div>
+
+<script>
+  // 开发者绕过：控制台输入 localStorage.setItem('devAccess','12138') 后刷新
+  if (localStorage.getItem('devAccess') === '12138') {
+    document.getElementById('maintenanceOverlay').style.display = 'none';
+  }
+</script>
+<!-- ===== 维护公告结束 ===== -->
 <div class="container">
 
   <!-- 启动页 -->
@@ -685,6 +723,9 @@
         </div>
         <!-- 表情包子面板 -->
         <div class="sticker-sub-panel" id="stickerSubPanel" style="display:none">
+          <div style="display:flex;justify-content:flex-end;padding:4px 8px 0;">
+            <button onclick="document.getElementById('stickerSubPanel').style.display='none'" style="background:none;border:none;font-size:18px;color:#9b72c4;cursor:pointer;padding:4px 8px;">✕</button>
+          </div>
           <div class="sticker-grid">
             <div class="sticker-item" onclick="sendSticker('cry')"><img src="images/stickers/cry.png" alt="哭"></div>
             <div class="sticker-item" onclick="sendSticker('shy')"><img src="images/stickers/shy.png" alt="害羞"></div>
@@ -1595,58 +1636,10 @@ function closePlusPanel() {
 // ===== 表情包面板（从加号入口打开）=====
 function toggleStickerFromPlus() {
   closePlusPanel();
-  // 找已有的表情包面板，或创建一个简单的emoji选择器
-  let panel = document.getElementById('stickerPanelFromPlus');
-  if (panel) {
-    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-    return;
-  }
-
-  // 创建表情包面板
-  panel = document.createElement('div');
-  panel.id = 'stickerPanelFromPlus';
-  panel.style.cssText = [
-    'position:fixed;bottom:70px;left:0;right:0;z-index:1000',
-    'background:white;border-top:1px solid rgba(168,85,247,0.2)',
-    'padding:12px;display:flex;flex-wrap:wrap;gap:8px',
-    'max-height:200px;overflow-y:auto;box-shadow:0 -4px 20px rgba(0,0,0,0.1)'
-  ].join(';');
-
-  // 常用表情池
-  const stickerEmojis = [
-    '😂','🤣','😭','😅','🙄','💀','😏','😤','🥺','😳',
-    '😍','🥰','😘','💕','❤️','🫶','😎','🤭','😈','👻',
-    '🤔','😑','😒','🫠','💔','😡','🤬','😱','🤯','🥳'
-  ];
-
-  stickerEmojis.forEach(emoji => {
-    const btn = document.createElement('button');
-    btn.textContent = emoji;
-    btn.style.cssText = 'font-size:28px;background:none;border:none;cursor:pointer;padding:4px;border-radius:8px;';
-    btn.onclick = () => {
-      panel.style.display = 'none';
-      const input = document.getElementById('chatInput');
-      if (input) {
-        input.value += emoji;
-        input.focus();
-        if (typeof autoResizeInput === 'function') autoResizeInput(input);
-      }
-    };
-    panel.appendChild(btn);
-  });
-
-  // 点击外部关闭
-  const closeOnOutside = (e) => {
-    if (!panel.contains(e.target)) {
-      panel.style.display = 'none';
-      document.removeEventListener('click', closeOnOutside);
-    }
-  };
-  setTimeout(() => document.addEventListener('click', closeOnOutside), 100);
-
-  const chatScreen = document.getElementById('chatScreen');
-  if (chatScreen) chatScreen.appendChild(panel);
-  else document.body.appendChild(panel);
+  const sub = document.getElementById('stickerSubPanel');
+  if (!sub) return;
+  const isOpen = sub.style.display !== 'none';
+  sub.style.display = isOpen ? 'none' : 'block';
 }
 </script>
 
