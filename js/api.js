@@ -86,7 +86,7 @@ function cleanMessages(messages) {
  */
 async function callHaiku(system, messages, maxTokens = 200) {
   try {
-    const res = await fetchWithTimeout('https://quiet-flower-0cc7.qian78738.workers.dev/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -113,7 +113,7 @@ async function callHaiku(system, messages, maxTokens = 200) {
  */
 async function callSonnet(system, messages, maxTokens = 400) {
   try {
-    const res = await fetchWithTimeout('https://quiet-flower-0cc7.qian78738.workers.dev/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -143,7 +143,7 @@ async function callSonnet(system, messages, maxTokens = 400) {
  */
 async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
   try {
-    const res = await fetchWithTimeout('https://quiet-flower-0cc7.qian78738.workers.dev/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -176,7 +176,7 @@ async function callGrok(system, user, maxTokens = 300, imageBase64 = null) {
   try {
     const body = { system, user, max_tokens: maxTokens };
     if (imageBase64) body.image_base64 = imageBase64;
-    const res = await fetchWithTimeout('https://quiet-flower-0cc7.qian78738.workers.dev/api/gemini', {
+    const res = await fetchWithTimeout('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -202,7 +202,7 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
   try {
     const body = { system, user, max_tokens: maxTokens };
     if (intimateMemory) body.intimateMemory = intimateMemory;
-    const res = await fetchWithTimeout('https://quiet-flower-0cc7.qian78738.workers.dev/api/venice', {
+    const res = await fetchWithTimeout('/api/venice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -228,7 +228,7 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
  */
 async function callDeepSeek(prompt, maxTokens = 500) {
   try {
-    const res = await fetchWithTimeout('https://quiet-flower-0cc7.qian78738.workers.dev/api/translate', {
+    const res = await fetchWithTimeout('/api/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user: prompt, max_tokens: maxTokens }),
@@ -279,7 +279,7 @@ async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 10
   };
   if (signal) options.signal = signal;
 
-  return await fetchWithRetry('https://quiet-flower-0cc7.qian78738.workers.dev/api/chat', options, 30000, 1);
+  return await fetchWithRetry('/api/chat', options, 30000, 1);
 }
 
 // ===== 破防检测 =====
