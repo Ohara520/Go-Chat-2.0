@@ -1257,6 +1257,12 @@ async function _processMergedMessage(text) {
     if (!_alreadyReplied) {
       appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
     }
+  } finally {
+    // 保底：无论任何路径结束，都确保 _isSending 复位
+    _isSending = false;
+    if (_currentAbortController) {
+      _currentAbortController = null;
+    }
   }
 }
 
