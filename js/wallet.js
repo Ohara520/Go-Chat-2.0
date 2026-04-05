@@ -101,16 +101,14 @@ function renderWallet() {
   const showList = txExpanded ? txList : txList.slice(0, TX_PREVIEW);
   container.innerHTML = showList.map(tx => {
     const isIn = tx.amount > 0;
-    const iconBg   = isIn ? 'rgba(99,153,34,0.12)' : 'rgba(216,90,48,0.10)';
-    const amtColor = isIn ? '#3B6D11' : '#712B13';
     return `
     <div class="transaction-item">
-      <div class="transaction-icon" style="background:${iconBg};">${tx.icon || '💰'}</div>
+      <div class="transaction-icon ${isIn ? 'in' : 'out'}">${tx.icon || '💰'}</div>
       <div class="transaction-info">
         <div class="transaction-name">${tx.name}</div>
         <div class="transaction-time">${formatTxTime(tx.time)}</div>
       </div>
-      <div class="transaction-amount ${isIn ? 'in' : 'out'}" style="color:${amtColor};">
+      <div class="transaction-amount ${isIn ? 'in' : 'out'}">
         ${isIn ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}
       </div>
     </div>`;

@@ -1086,24 +1086,24 @@
 .transaction-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 11px 0;
+    gap: 10px;
+    padding: 10px 0;
     border-bottom: 0.5px solid rgba(100,160,80,0.1);
 }
 .transaction-item:last-child { border-bottom: none; }
 .transaction-icon {
-    font-size: 18px;
-    width: 38px; height: 38px;
-    border-radius: 10px;
+    width: 32px; height: 32px;
+    border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
     flex-shrink: 0;
 }
-.transaction-icon.in  { background: rgba(99,153,34,0.12); }
-.transaction-icon.out { background: rgba(216,90,48,0.10); }
+.transaction-icon.in  { background: rgba(99,153,34,0.10); }
+.transaction-icon.out { background: rgba(216,90,48,0.08); }
 .transaction-info { flex: 1; min-width: 0; }
 .transaction-name { font-size: 13px; color: #2d5a30; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.transaction-time { font-size: 11px; color: rgba(50,100,45,0.4); margin-top: 2px; }
-.transaction-amount { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.transaction-time { font-size: 11px; color: rgba(50,100,45,0.45); margin-top: 1px; }
+.transaction-amount { font-size: 13px; font-weight: 600; flex-shrink: 0; }
 .transaction-amount.in  { color: #3B6D11; }
 .transaction-amount.out { color: #712B13; }
 
