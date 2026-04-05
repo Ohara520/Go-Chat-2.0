@@ -100,6 +100,77 @@ let _pendingMessages = [];
 let _mergeTimer = null;
 const MERGE_DELAY = 300;
 
+// ===== 补全函数（拆分时遗漏，内嵌确保可用）=====
+
+async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens, signal) {
+  maxTokens = maxTokens || 1000;
+  let systemField;
+  if (parts && parts.fixed && parts.dynamic) {
+    systemField = [
+      { type: 'text', text: parts.fixed, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: parts.dynamic + '\n' + finalSystem }
+    ];
+  } else {
+    systemField = finalSystem;
+  }
+  const options = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL_SONNET, max_tokens: maxTokens, system: systemField, messages }),
+  };
+  if (signal) options.signal = signal;
+  return await fetchWithRetry('/api/chat', options, 30000, 1);
+}
+
+function pickReadyPendingEvent() {
+  try {
+    const raw = localStorage.getItem('pendingEvents');
+    if (!raw) return null;
+    const events = JSON.parse(raw);
+    if (!Array.isArray(events) || events.length === 0) return null;
+    const now = Date.now();
+    const idx = events.findIndex(e => !e.triggerAt || e.triggerAt <= now);
+    if (idx === -1) return null;
+    const [ready] = events.splice(idx, 1);
+    localStorage.setItem('pendingEvents', JSON.stringify(events));
+    return ready;
+  } catch(e) { return null; }
+}
+
+function decideMainIntent(text, pendingEvent) {
+  if (pendingEvent) return 'event';
+  const t = (text || '').toLowerCase();
+  if (/touch me|want you|naughty|tease me|摸摸|蹭蹭|贴贴|咬|舔|撩|涩涩|色色/.test(t)) return 'intimate';
+  if (/难过|伤心|哭|委屈|不开心|崩溃|hurt|sad|crying|upset|awful/.test(t)) return 'emotional';
+  if (/给我钱|转我|好穷|买不起|要钱|零花钱|缺钱|没钱/.test(t)) return 'money';
+  return 'routine';
+}
+
+async function handlePostReplyActions(text, reply, intent) {
+  try {
+    consumeQuota().catch(() => {});
+    localStorage.setItem('lastUserMessageAt', Date.now().toString());
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    const todayKey = 'dailyChatDone_' + new Date().toDateString();
+    if (!localStorage.getItem(todayKey)) {
+      localStorage.setItem(todayKey, '1');
+      const lastDay = localStorage.getItem('lastVisitDay');
+      const today = new Date().toDateString();
+      if (lastDay !== today) {
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        const streak = parseInt(localStorage.getItem('visitStreak') || '1');
+        localStorage.setItem('visitStreak', lastDay === yesterday ? streak + 1 : 1);
+        localStorage.setItem('lastVisitDay', today);
+      }
+    }
+    if (intent === 'intimate') {
+      const lastBot = [...chatHistory].reverse().find(m => m.role === 'assistant' && !m._recalled);
+      if (lastBot) lastBot._intimate = true;
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+  } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
+}
+
 // ===== 破防短语库 =====
 // 注意：Claude 4.5在调情/角色质疑场景下更容易说出部分身份暴露词
 // 关键修复：扩展了检测范围，加入4.5常见的新破防模式
