@@ -418,28 +418,28 @@ function renderMarket(categoryId) {
       const iTrigger = intimateTriggered[p.name];
       const isHighlighted = isUnlocked && !owned && iTrigger && (now - iTrigger.timestamp < 2 * 24 * 3600 * 1000);
 
-      const lockIconSvg = `<svg width="9" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:3px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#5a8a40" opacity=".85"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#5a8a40" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="9.5" r="1" fill="white"/></svg>`;
+      const lockIconSvg = `<svg width="9" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:3px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#c08090" opacity=".85"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#c08090" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="9.5" r="1" fill="white"/></svg>`;
       const badgeHtml = !isUnlocked
-        ? `<div class="ghost-mentioned-tag" style="background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#4a7a30;font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:flex;align-items:center;">${lockIconSvg}继续相处后解锁</div>`
+        ? `<div class="ghost-mentioned-tag" style="background:rgba(180,40,80,0.15);border:1px solid rgba(220,80,120,0.35);color:#f0a0c0;font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:flex;align-items:center;">${lockIconSvg}继续相处后解锁</div>`
         : isHighlighted
           ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(192,132,252,0.15));border:1px solid rgba(236,72,153,0.5);color:#be185d;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">💡 也许正合时机</div>`
           : p.badge
             ? `<div class="ghost-mentioned-tag" style="background:rgba(236,72,153,0.12);border-color:rgba(236,72,153,0.4);color:#be185d;">💕 ${p.badge}</div>`
             : '';
 
-      const lockBtnSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:4px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#5a8a40"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#5a8a40" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      const lockBtnSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:4px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#c08090"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#c08090" stroke-width="1.4" stroke-linecap="round"/></svg>`;
       const actionHtml = !isUnlocked
-        ? `<button class="product-buy-btn intimate-buy-btn" disabled style="background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#5a8a40;cursor:not-allowed;display:flex;align-items:center;justify-content:center;">${lockBtnSvg}未解锁</button>`
+        ? `<button class="product-buy-btn intimate-buy-btn" disabled style="background:rgba(180,40,80,0.15);border:1px solid rgba(220,80,120,0.35);color:#f0a0c0;cursor:not-allowed;display:flex;align-items:center;justify-content:center;">${lockBtnSvg}未解锁</button>`
         : owned
           ? `<div class="product-owned-tag">✅ 已购买</div>`
           : `<button class="product-buy-btn intimate-buy-btn" onclick="openBuyModal(${i})">${btnLabel}</button>`;
 
-      intimateHtml += `<div class="product-card intimate-card ${owned ? 'owned-card' : ''} ${isHighlighted ? 'ghost-mentioned' : ''}" style="${!isUnlocked ? 'background:rgba(30,10,20,0.7);opacity:0.82;' : ''}">
+      intimateHtml += `<div class="product-card intimate-card ${owned ? 'owned-card' : ''} ${isHighlighted ? 'ghost-mentioned' : ''}">
         ${badgeHtml}
         <div class="product-emoji">${p.emoji}</div>
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${!isUnlocked ? '继续和他相处，慢慢解锁' : p.desc}</div>
-        <div class="product-price" style="${!isUnlocked ? 'color:#c08090;display:flex;align-items:center;gap:4px;' : ''}">
+        <div class="product-price" style="${!isUnlocked ? 'color:#e8829c;display:flex;align-items:center;gap:4px;' : ''}">
           ${!isUnlocked ? `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="opacity:.6"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#c08090"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#c08090" stroke-width="1.4" stroke-linecap="round"/></svg>£${p.price.toLocaleString()}` : '£' + p.price.toLocaleString()}
         </div>
         ${actionHtml}
@@ -493,19 +493,23 @@ function renderMarket(categoryId) {
 
     // 未解锁：显示锁定卡片
     if (!isUnlocked) {
-      const lockIconSvg = `<svg width="9" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:3px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#5a8a40" opacity=".85"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#5a8a40" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="9.5" r="1" fill="white"/></svg>`;
-      const lockBtnSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:4px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#5a8a40"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#5a8a40" stroke-width="1.4" stroke-linecap="round"/></svg>`;
-      const lockPriceSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:3px;opacity:.6;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="#6a9a58"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="#6a9a58" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      const lockColor = isLuxury ? '#c9a84c' : '#5a8a40';
+      const lockColorLight = isLuxury ? '#f5e8c0' : '#5a8a40';
+      const lockBgColor = isLuxury ? 'rgba(200,160,60,0.12)' : 'rgba(80,130,55,0.1)';
+      const lockBorderColor = isLuxury ? 'rgba(200,160,60,0.35)' : 'rgba(90,150,60,0.28)';
+      const lockIconSvg = `<svg width="9" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:3px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="${lockColor}" opacity=".85"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="${lockColor}" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="9.5" r="1" fill="white"/></svg>`;
+      const lockBtnSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:4px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="${lockColor}"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="${lockColor}" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      const lockPriceSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:3px;opacity:.6;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="${lockColor}"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="${lockColor}" stroke-width="1.4" stroke-linecap="round"/></svg>`;
       return `
         <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''}"
-             style="background:#f4f9f0;border:1px solid rgba(140,190,100,0.22);opacity:0.88;"
+             style="${isLuxury ? '' : 'background:#f4f9f0;border:1px solid rgba(140,190,100,0.22);'}opacity:0.88;"
              onclick="showToast('继续和 Ghost 相处，解锁更多商品 🌿')">
-          <div class="ghost-mentioned-tag" style="background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#4a7a30;font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:flex;align-items:center;">${lockIconSvg}继续相处后解锁</div>
+          <div class="ghost-mentioned-tag" style="background:${lockBgColor};border:1px solid ${lockBorderColor};color:${isLuxury ? '#f5e8c0' : '#4a7a30'};font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:flex;align-items:center;">${lockIconSvg}继续相处后解锁</div>
           <div class="product-emoji">${p.emoji}</div>
-          <div class="product-name" style="color:#6a9a58;">${p.name}</div>
-          <div class="product-desc" style="color:#9aba88;">继续和他相处，慢慢解锁</div>
-          <div class="product-price" style="color:#6a9a58;display:flex;align-items:center;justify-content:center;">${lockPriceSvg}£${p.price.toLocaleString()}</div>
-          <button class="product-buy-btn" disabled style="background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#5a8a40;cursor:not-allowed;display:flex;align-items:center;justify-content:center;">${lockBtnSvg}未解锁</button>
+          <div class="product-name" style="${isLuxury ? '' : 'color:#6a9a58;'}">${p.name}</div>
+          <div class="product-desc" style="${isLuxury ? '' : 'color:#9aba88;'}">继续和他相处，慢慢解锁</div>
+          <div class="product-price" style="color:${isLuxury ? '#fcd34d' : '#6a9a58'};display:flex;align-items:center;justify-content:center;">${lockPriceSvg}£${p.price.toLocaleString()}</div>
+          <button class="product-buy-btn" disabled style="background:${lockBgColor};border:1px solid ${lockBorderColor};color:${isLuxury ? '#f5e8c0' : '#5a8a40'};cursor:not-allowed;display:flex;align-items:center;justify-content:center;">${lockBtnSvg}未解锁</button>
         </div>`;
     }
 
