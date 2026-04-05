@@ -1202,7 +1202,7 @@ async function _processMergedMessage(text) {
     // ── 副作用（fire-and-forget）────────────────────────────
     consumeLoveOverride();
     const mainReplyHasCareAction = transferSuccess || !!sendGift;
-    if (!mainReplyHasCareAction) checkMoneyIntent(text).catch(() => {});
+    if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
 
     // SEND_GIFT处理
