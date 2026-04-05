@@ -612,6 +612,10 @@ function getRelationshipModifiers() {
 
 let _globalTurnCount = parseInt(localStorage.getItem('globalTurnCount') || '0');
 
+function getGlobalTurnCount() {
+  return _globalTurnCount;
+}
+
 function tickTurn() {
   _globalTurnCount++;
   localStorage.setItem('globalTurnCount', _globalTurnCount);

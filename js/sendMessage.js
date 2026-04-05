@@ -93,7 +93,7 @@ let _chatInited = false;
 let _renderedMsgCount = 0;
 let _currentAbortController = null;
 let _sendVersion = 0;
-let _globalTurnCount = parseInt(localStorage.getItem('globalTurnCount') || '0');
+// _globalTurnCount 声明在 state.js，此处不重复声明
 
 // 消息合并（300ms内连发合并）
 let _pendingMessages = [];
@@ -256,7 +256,8 @@ function saveLongTermMemory(memory) {
 
 async function updateLongTermMemory() {
   // 每6轮触发一次
-  if (_globalTurnCount % 6 !== 0) return;
+  const _tc = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
+  if (_tc % 6 !== 0) return;
 
   const existingMemory = getLongTermMemory();
   const recentMessages = chatHistory
@@ -462,8 +463,7 @@ async function _processMergedMessage(text) {
 
   try {
     // ── Step 1: 状态更新 ────────────────────────────────────
-    _globalTurnCount++;
-    localStorage.setItem('globalTurnCount', _globalTurnCount);
+    if (typeof tickTurn === 'function') tickTurn();
     updateStateFromUserInput(text);
 
     // 吃醋检测（500ms窗口，超时跳过）
@@ -1178,7 +1178,8 @@ async function _processMergedMessage(text) {
     if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
-    if (_globalTurnCount % 8 === 0) try { updateLongTermMemory(); } catch(e) {}
+    const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
+    if (_currentTurn % 8 === 0) try { updateLongTermMemory(); } catch(e) {}
 
     // 心声生成（修复 #055: innerThoughtEl来自appendMessage返回值，不会混入主气泡）
     const itEl = firstBotResult?.innerThoughtEl || null;
