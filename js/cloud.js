@@ -406,14 +406,14 @@ async function saveChatHistoryNow() {
         ...(m._userTransfer ? { _userTransfer: m._userTransfer } : {}) }));
     if (chatHistoryData.length === 0) return;
 
-    // 关键修复：不更新 updated_at
-    // 只写 chat_history，不碰 updated_at，避免时间戳被更新后
-    // 下次 loadFromCloud 误认为这条"只有聊天记录"的数据是最新的
-    // 从而覆盖掉包含 transactions/deliveries/purchasedItems 的完整数据
+    const now = new Date().toISOString();
+    localStorage.setItem('chatUpdatedAt', now);
+
     await sb.from('user_data').upsert({
       user_id: userId,
       chat_history: chatHistoryData,
-      // updated_at 不在这里更新，由 saveToCloud 统一管理
+      chat_updated_at: now,
+      updated_at: now,
     }, { onConflict: 'user_id' });
   } catch(e) {
     console.warn('[cloud] 聊天记录快速保存失败:', e);
