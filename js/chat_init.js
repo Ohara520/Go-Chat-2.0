@@ -53,22 +53,16 @@ async function maybeProactiveMessage() {
     scheduleProactiveMessage(); return;
   }
 
-  // 读统一状态：initiative 0 → 不主动
-  const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
-  if (gs && gs.initiative === 0) { scheduleProactiveMessage(); return; }
-
-  // 今天已触发过2次就停（initiative高可以到3次）
-  const maxToday = (gs && gs.initiative >= 2) ? 3 : 2;
+  // 今天已触发过2次就停
   const todayKey = 'proactiveCount_' + new Date().toDateString();
   const todayCount = parseInt(localStorage.getItem(todayKey) || '0');
-  if (todayCount >= maxToday) { scheduleProactiveMessage(); return; }
+  if (todayCount >= 2) { scheduleProactiveMessage(); return; }
 
-  // 触发概率：initiative 越高概率越高
+  // 触发概率
   const trust = getTrustHeat ? getTrustHeat() : 60;
   const mood = getMoodLevel ? getMoodLevel() : 7;
-  const baseChance = 0.3 * ((trust + mood * 10) / 2) / 100;
-  const initiativeBonus = gs ? gs.initiative * 0.08 : 0;
-  if (Math.random() > baseChance + initiativeBonus) { scheduleProactiveMessage(); return; }
+  const triggerChance = 0.3 * ((trust + mood * 10) / 2) / 100;
+  if (Math.random() > triggerChance) { scheduleProactiveMessage(); return; }
 
   // 最近5分钟有消息，不打扰
   const lastMsg = chatHistory.filter(m => m.role === 'assistant').slice(-1)[0];
@@ -180,7 +174,14 @@ function checkSalaryDay() {
 // ===== 聊天页初始化 =====
 async function initChat() {
   // 好感度首次初始化
-  if (!localStorage.getItem('affection')) setAffection(60);
+  if (!localStorage.getItem('affection')) setAffection(70);
+
+  // 老用户补偿：established模式下trust/affection低于新默认值的，一次性升上来
+  const _mode = localStorage.getItem('marriageType') || 'established';
+  if (_mode === 'established') {
+    if (getTrustHeat() < 75) setTrustHeat(75);
+    if (getAffection() < 70) setAffection(70);
+  }
 
   // 维护补偿（每个用户只发一次）
   if (!localStorage.getItem('maintenanceCompensation_20260402')) {

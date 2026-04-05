@@ -214,7 +214,7 @@ function initMood() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function getTrustHeat() {
-  return parseInt(localStorage.getItem('trustHeat') || '60');
+  return parseInt(localStorage.getItem('trustHeat') || '75');
 }
 
 function setTrustHeat(val) {
@@ -647,105 +647,6 @@ function savePendingReversePackages(arr, { markChanged = true } = {}) {
 }
 
 function resolvePendingReversePackages() {} // 兼容旧调用
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 统一状态层 — getGhostResponseState
-// 所有模块读这一份，不再各自推算
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getGhostResponseState() {
-  const coldWar      = localStorage.getItem('coldWarMode') === 'true';
-  const coldWarStage = parseInt(localStorage.getItem('coldWarStage') || '1');
-  const jealousy     = getJealousyLevelCapped();
-  const mood         = getMoodLevel();
-  const trust        = getTrustHeat();
-  const affection    = getAffection();
-  const mode         = localStorage.getItem('marriageType') || 'established';
-  const override     = sessionStorage.getItem('loveOverride') === 'true';
-
-  let availability = 'normal';  // closed / guarded / normal / open
-  let warmth       = 0;         // 0-3
-  let sharpness    = 0;         // 0-3
-  let initiative   = 0;         // 0-3
-  let intimacy     = 0;         // 0-4
-  let moneyEase    = 0;         // 0-3
-
-  // 1. 大状态
-  if (coldWar) {
-    availability = coldWarStage <= 2 ? 'closed' : 'guarded';
-    sharpness += 1;
-  } else if (override) {
-    availability = 'guarded';
-    sharpness += 2;
-    initiative += 1;
-  }
-
-  // 2. jealousy 修饰
-  if (jealousy === 'mild')   { sharpness += 1; }
-  if (jealousy === 'medium') { sharpness += 2; warmth = Math.max(0, warmth - 1); }
-  if (jealousy === 'severe') { sharpness += 3; if (availability === 'normal') availability = 'guarded'; }
-
-  // 3. trust / affection / mood 基础温度
-  if (!coldWar) {
-    if (trust >= 60)                                                       warmth += 1;
-    if (trust >= 80 && affection >= 70)                                    warmth += 1;
-    if (mood >= 7)                                                         warmth += 1;
-    if (mood <= 3)                                                         warmth = Math.max(0, warmth - 1);
-    if (trust >= 75 && affection >= 65 && mode === 'established')          availability = 'open';
-  }
-
-  // 4. initiative
-  if (!coldWar) {
-    if (trust >= 65)                    initiative += 1;
-    if (mood >= 7 && affection >= 70)   initiative += 1;
-    if (mode === 'slowBurn')            initiative = Math.max(0, initiative - 1);
-  }
-
-  // 5. intimacy
-  if (!coldWar) {
-    if (mode === 'slowBurn') {
-      if (trust >= 60 && mood >= 5) intimacy = 1;
-      if (trust >= 70 && mood >= 7) intimacy = 2;
-    } else {
-      if (trust >= 50 && mood >= 4) intimacy = 1;
-      if (trust >= 60 && mood >= 5) intimacy = 2;
-      if (trust >= 72 && mood >= 6) intimacy = 3;
-      if (trust >= 82 && affection >= 80 && mood >= 7) intimacy = 4;
-    }
-    if (jealousy === 'medium' || jealousy === 'severe') intimacy = Math.min(intimacy, 1);
-  }
-
-  // 6. moneyEase
-  if (!coldWar) {
-    if (trust >= 45) moneyEase = 1;
-    if (trust >= 65) moneyEase = 2;
-    if (trust >= 82) moneyEase = 3;
-    if (mode === 'slowBurn')       moneyEase = Math.max(0, moneyEase - 1);
-    if (jealousy === 'severe')     moneyEase = Math.max(0, moneyEase - 1);
-  }
-
-  return {
-    availability,
-    warmth:     Math.min(warmth, 3),
-    sharpness:  Math.min(sharpness, 3),
-    initiative: Math.min(initiative, 3),
-    intimacy,
-    moneyEase,
-  };
-}
-
-// prompt 注入用
-function buildUnifiedGhostStateBlock() {
-  const s = getGhostResponseState();
-  return `[UNIFIED STATE]
-Availability: ${s.availability}
-Warmth: ${s.warmth}/3
-Sharpness: ${s.sharpness}/3
-Initiative: ${s.initiative}/3
-Intimacy ceiling: ${s.intimacy}/4
-Money ease: ${s.moneyEase}/3`;
-}
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
