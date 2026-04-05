@@ -837,7 +837,7 @@ function updateUserTransferCard(cardId, kept) {
   const el = document.getElementById(cardId + '_status');
   if (!el) return;
   el.textContent = kept ? '✅ 已收到' : '↩️ 已退回';
-  el.style.color = kept ? '#a855f7' : '#9ca3af';
+  el.style.color = kept ? '#4a8a30' : '#9ca3af';
 }
 
 function showGhostTransferCard(container, amount, noteText, isRefund) {
@@ -869,7 +869,7 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
         <div class="transfer-amount">£${amount}</div>
       </div>
       <div class="transfer-footer">
-        <div class="transfer-status">${isRefund ? '退款中' : '转账中'}</div>
+        <div class="transfer-status ${isRefund ? 'refund-status' : ''}">${isRefund ? '退款中' : '转账中'}</div>
         <div class="transfer-time">${timeStr}</div>
       </div></div>`;
     c.appendChild(divOut);
