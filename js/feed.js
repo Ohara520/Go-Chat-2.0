@@ -702,79 +702,331 @@ async function maybeGenerateAmbientPost(triggerSource) {
 }
 
 // ----- 根据事件生成帖子 -----
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 朋友圈评论链系统
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 按发帖人选评论结构
+function pickCommentPattern(postAuthor) {
+  if (postAuthor === 'Ghost' || postAuthor === localStorage.getItem('botNickname')) {
+    const pool = ['soap_ghost_gaz', 'gaz_only', 'soap_only', 'price_end'];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  if (postAuthor === 'Soap') {
+    const pool = ['ghost_only', 'ghost_gaz', 'price_end', 'gaz_only'];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  if (postAuthor === 'Gaz') {
+    const pool = ['soap_only', 'ghost_only', 'price_end'];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  // Price 发帖——其他人偶尔回
+  return Math.random() < 0.5 ? 'soap_only' : 'gaz_only';
+}
+
+// 结构 → 评论者顺序
+const COMMENT_PATTERN_STEPS = {
+  soap_ghost_gaz: ['Soap', 'Ghost', 'Gaz'],
+  soap_ghost:     ['Soap', 'Ghost'],
+  soap_only:      ['Soap'],
+  ghost_only:     ['Ghost'],
+  ghost_gaz:      ['Ghost', 'Gaz'],
+  gaz_only:       ['Gaz'],
+  price_end:      ['Price'],
+};
+
+// 各角色评论人设
+function buildFeedCommentPrompt(author) {
+  const common = `Write one short in-character comment in a military teammate thread.
+Rules:
+- English only
+- One line only
+- Natural, not polished
+- No emojis, no hashtags
+- React to the post or previous comment — do not repeat the post wording
+- No generic reactions like "lol" / "nice" / "wow"
+- No babe/honey/love or out-of-character sweetness`;
+
+  const byAuthor = {
+    Ghost: `${common}
+
+Ghost comment style:
+- dry, minimal, blunt
+- only replies when necessary
+- never explains himself
+- can shut down a joke with one line
+- Ghost comments are LOW FREQUENCY — if this is Ghost commenting, it should feel like a rare, deliberate move
+- Do NOT have Ghost comment unless it adds something real`,
+
+    Soap: `${common}
+
+Soap comment style:
+- playful, teasing, energetic
+- reacts fast, jokes at Ghost's expense when possible
+- genuine lad energy, not a meme bot
+- can use light Scottish flavor`,
+
+    Gaz: `${common}
+
+Gaz comment style:
+- calm, observant, slightly amused
+- notices what others miss
+- not loud, drops one line then goes quiet`,
+
+    Price: `${common}
+
+Price comment style:
+- 2–5 words max
+- weighted, no fluff
+- rare, but when he speaks it means something`,
+  };
+
+  return byAuthor[author] || common;
+}
+
+// 兜底评论
+function getFallbackComment(author) {
+  const map = {
+    Ghost: ['barely.', 'noted.', 'enough.'],
+    Soap:  ["that's grim.", 'there he is.', 'you hate fun.'],
+    Gaz:   ['sounds about right.', 'not subtle.', 'figured.'],
+    Price: ['good.', 'enough.', 'solid.'],
+  };
+  const opts = map[author] || ['right.'];
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+
+// 链式生成评论（每条评论能看到前面的评论）
+async function generateFeedCommentChain(post, evt, avatarMap) {
+  // Ghost 评论严格限频——30% 才让 Ghost 参与评论
+  const postAuthor = (post.author || '').toLowerCase();
+  let pattern = pickCommentPattern(post.author);
+
+  // Ghost 是发帖人时，Ghost 不能同时是评论者
+  // Ghost 作为评论者：只有 30% 概率真的让他出现
+  const stepsRaw = COMMENT_PATTERN_STEPS[pattern] || ['Gaz'];
+  const steps = stepsRaw.filter(author => {
+    if (author === 'Ghost' && postAuthor === 'ghost') return false;
+    if (author === 'Ghost' && Math.random() > 0.3) return false; // Ghost 评论低频
+    return true;
+  });
+
+  if (steps.length === 0) return [];
+
+  const comments = [];
+
+  for (const author of steps) {
+    // 最多3条
+    if (comments.length >= 3) break;
+
+    const previousStr = comments.map(c => `${c.author}: ${c.text}`).join('\n');
+    const systemPrompt = buildFeedCommentPrompt(author);
+    const userPrompt = `Post by ${post.author}: "${post.en}"
+${previousStr ? `\nPrevious comments:\n${previousStr}` : ''}
+
+Write ${author}'s comment. Return JSON only: {"text":"...","zh":"..."}`;
+
+    try {
+      let raw = '';
+      if (typeof callHaiku === 'function') {
+        raw = await callHaiku(systemPrompt, [{ role: 'user', content: userPrompt }]);
+      } else {
+        const res = await fetchWithTimeout('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 80, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+        }, 6000);
+        const d = await res.json();
+        raw = d.content?.[0]?.text || '';
+      }
+      const parsed = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
+      if (parsed.text) {
+        comments.push({
+          avatar:    avatarMap[author] || '👤',
+          author,
+          name:      author,
+          text:      parsed.text,
+          en:        parsed.text,
+          zh:        parsed.zh || parsed.text,
+          nameClass: author.toLowerCase(),
+        });
+      }
+    } catch(e) {
+      const fb = getFallbackComment(author);
+      comments.push({
+        avatar: avatarMap[author] || '👤',
+        author, name: author,
+        text: fb, en: fb, zh: fb,
+        nameClass: author.toLowerCase(),
+      });
+    }
+  }
+
+  return comments;
+}
+
+
 async function generateFeedPostFromEvent(evt) {
-  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
-  const weather = localStorage.getItem('lastWeatherDisplay') || '';
-  const isColdWar = localStorage.getItem('coldWarMode') === 'true';
+  const location   = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const weather    = localStorage.getItem('lastWeatherDisplay') || '';
+  const isColdWar  = localStorage.getItem('coldWarMode') === 'true';
   const _ghostAvUrl = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
-  const GHOST_AV = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-  const posterMap = {
+  const GHOST_AV   = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  const posterMap  = {
     ghost: { name: localStorage.getItem('botNickname') || 'Simon Riley', avatar: GHOST_AV, nameClass: 'couple-ghost-name' },
-    soap:  { name: 'Soap', avatar: '🧼', nameClass: 'couple-soap-name' },
-    gaz:   { name: 'Gaz', avatar: '🎖️', nameClass: 'couple-gaz-name' },
+    soap:  { name: 'Soap',  avatar: '🧼', nameClass: 'couple-soap-name'  },
+    gaz:   { name: 'Gaz',   avatar: '🎖️', nameClass: 'couple-gaz-name'   },
     price: { name: 'Price', avatar: '🚬', nameClass: 'couple-price-name' },
   };
   const posterInfo = posterMap[evt.actor] || posterMap['ghost'];
 
-  // 按事件类型拼 prompt
+  // ── Ghost 发帖角度池 ──────────────────────────────
+  const GHOST_POST_TYPES = [
+    'physical_state',      // 身体状态：手还是冷、睡得不好、肩膀酸
+    'environment',         // 环境：又在下雨、雾、走廊很静
+    'routine',             // 日常：简报、训练、文件、例行任务
+    'teammate_friction',   // 队友摩擦：Soap太吵、Gaz注意到了什么
+    'subtle_her_presence', // 她的影子：没她更静、老看手机、时区问题
+    'dry_humor',           // 干幽默：蹩脚的咖啡还是喝了、简报侥幸撑过去
+  ];
+
+  // ── Ghost 核心发帖人设（固定层）────────────────────
+  const GHOST_FEED_PROMPT = `Ghost posting style: He does not post for attention.
+If he posts, something small caught on him enough to leave a trace.
+
+Posts are:
+- short (2–8 words preferred)
+- specific — always has ONE concrete anchor (time / place / weather / body state / object / teammate detail)
+- offhand, dry, understated
+- never polished, never empty
+
+He does NOT write:
+- "still here" / "long day" / "worth it"
+- generic emotional statements
+- vague romance with no detail
+- anything that sounds like a caption
+
+Format rules:
+- lowercase where natural
+- can be a fragment, no full sentence needed
+- no hashtags, no emojis, no poetic writing
+- no direct confession, no obvious romance
+
+He feels like: someone who rarely posts, but when he does, it comes from a real moment.`;
+
+  // ── 按事件类型拼 prompt ─────────────────────────────
+  const buildGhostDailyPrompt = () => {
+    // 去重：取最近3条 Ghost 帖子
+    const feedHistory = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    const recentGhostPosts = feedHistory
+      .filter(p => p.post?.author === 'Ghost' || p.post?.author === posterMap.ghost.name)
+      .slice(-3)
+      .map(p => p.post.en)
+      .join('\n');
+
+    // 随机选一个角度，避免连续同角度
+    const lastType = localStorage.getItem('lastGhostPostType') || '';
+    const available = GHOST_POST_TYPES.filter(t => t !== lastType);
+    const postType  = available[Math.floor(Math.random() * available.length)];
+    localStorage.setItem('lastGhostPostType', postType);
+
+    // 各角度的写作提示
+    const typeHints = {
+      physical_state:      `Focus on body state: cold hands, bad sleep, sore shoulders, bad coffee, still functional.`,
+      environment:         `Focus on environment: rain, fog, dark morning, empty corridor, the base at night.`,
+      routine:             `Focus on routine: briefing, range day, paperwork, kit check, late return from something.`,
+      teammate_friction:   `Focus on a teammate: Soap too loud, Gaz noticed something annoying, Price said one word.`,
+      subtle_her_presence: `Something that implies her without naming her: quieter without her, checked the phone again, time zone math.`,
+      dry_humor:           `Dry complaint or blunt observation. Takes something small too seriously. Deadpan.`,
+    };
+
+    return `Write one Ghost social media post.
+
+${GHOST_FEED_PROMPT}
+
+Current context:
+- Location: ${location}
+- Weather: ${weather || 'unclear'}
+- Post angle this time: ${postType}
+- Angle hint: ${typeHints[postType]}
+${isColdWar ? '- Mood note: something is off. Do not explain it.' : ''}
+
+${recentGhostPosts ? `Recent Ghost posts — do NOT echo their wording, sentence shape, or emotional angle:\n${recentGhostPosts}` : ''}
+
+Return JSON only: {"en":"...","zh":"..."}`;
+  };
+
+  // ── 队友发帖人设（精简稳定版）────────────────────
+
+  const SOAP_PROMPT = `Soap posting style: He posts casually, like talking out loud. Energetic, slightly chaotic, but not stupid.
+Posts are: playful, teasing, slightly exaggerated, sometimes directed at teammates.
+He often: jokes about Ghost, reacts to something that just happened, makes fun of the situation.
+Tone: informal English, can be one or two short lines, light humor — not forced.
+Do NOT: repeat the same joke structure, use heavy internet slang, sound like a comedian trying too hard, write long stories.
+Good angles: teasing Ghost ("he smiled. i'm concerned.") / reacting to chaos ("that went wrong fast.") / casual brag ("still the best shot here.") / light complaint ("someone needs to make better coffee.")
+Feels like: he hit post without thinking too much.
+Return JSON only: {"en":"...","zh":"..."}`;
+
+  const GAZ_PROMPT = `Gaz posting style: Observant, grounded. Does not post often — when he does, it's intentional.
+Posts are: calm, slightly amused, quietly insightful, sometimes dry humor.
+He often: notices subtle changes, comments on others (especially Ghost), says less but means more.
+Tone: clean natural English, one sentence, no exaggeration, no chaos energy.
+Do NOT: make loud jokes, overshare emotionally, sound like a narrator explaining things, be dramatic.
+Good angles: "he's different lately." / "something changed. not a bad thing." / "never thought i'd see that."
+Feels like: he saw something real and just noted it.
+Return JSON only: {"en":"...","zh":"..."}`;
+
+  const PRICE_PROMPT = `Price posting style: Rarely posts. When he does, it carries weight.
+Posts are: short (2–6 words preferred), controlled, grounded, authoritative without trying.
+He does NOT: joke around, overshare, comment on trivial things, use slang, write multiple sentences.
+Good angles: "good man." / "that matters." / "keep it that way." / "solid."
+Feels like: he decided it was worth saying. Nothing more.
+Return JSON only: {"en":"...","zh":"..."}`;
+
   const promptMap = {
     cold_war_started: `You are Simon Riley. Just had a fight with your wife. One line, lowercase English — something is off but you are not saying what. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
-    made_up: `You are Simon Riley. Just made up with your wife. One line, lowercase English — do not say you made up, but you are visibly looser. Something casual. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
-    gift_received: `You are Simon Riley. Just received ${evt.meta?.itemName || "something"} from your wife. One line, lowercase English — not saying anything about it, but you posted this anyway. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
+    made_up:          `You are Simon Riley. Just made up with your wife. One line, lowercase English — do not say you made up, but you are visibly looser. Something casual. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
+    gift_received:    `You are Simon Riley. Just received ${evt.meta?.itemName || 'something'} from your wife. One line, lowercase English — not saying anything about it, but you posted this anyway. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
     daily_moment: (() => {
       const actor = evt.actor;
-      if (actor === 'soap') return `你是Soap（约翰·麦克塔维什），141特遣队成员。发一条日常朋友圈，一句话，英文，活泼，可以调侃队友。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`;
-      if (actor === 'gaz')  return `你是Gaz（凯尔·加里克），141特遣队成员。发一条日常朋友圈，一句话，英文，稳重幽默。附中文翻译。只返回JSON：{"en":"...","zh":"..."}`;
-      // 三种类型随机偏向
-      const _postType = Math.random();
-      if (_postType < 0.45) {
-        // 无意义记录（最多）
-        return `You are Simon Riley. Post one offhand line about right now — something trivial, not worth explaining. Examples: "rain again." / "third coffee." / "too quiet today." / "couldn't sleep." Lowercase English only, under 6 words. Add Chinese (same brevity). Return JSON only: {"en":"...","zh":"..."}`;
-      } else if (_postType < 0.75) {
-        // 轻吐槽（班味）
-        return `You are Simon Riley, currently in ${location}. Post one dry complaint or observation about work/teammates/routine. No drama, no explanation. Examples: "soap won't shut up." / "equipment's still broken." / "briefing ran long. again." Lowercase English. Add Chinese. Return JSON only: {"en":"...","zh":"..."}`;
-      } else {
-        // 偶发关系影子（少量，不点明）
-        return `You are Simon Riley. Post one line that means something but doesn't explain itself. Could be about something you kept, something you noticed, something small. She'd understand. He wouldn't explain it to anyone else. Lowercase English. Add Chinese. Return JSON only: {"en":"...","zh":"..."}`;
-      }
+      if (actor === 'soap')  return SOAP_PROMPT;
+      if (actor === 'gaz')   return GAZ_PROMPT;
+      if (actor === 'price') return PRICE_PROMPT;
+      return buildGhostDailyPrompt();
     })(),
   };
+
   const prompt = promptMap[evt.type] || promptMap['daily_moment'];
 
   try {
-    const raw = await fetchDeepSeek('You are a roleplay generator for Simon "Ghost" Riley (SAS, 35, Manchester). Dry, blunt, minimal. Lowercase English. Return JSON only, no other text.', prompt, 150);
-    const post = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const systemPrompt = evt.actor === 'ghost' || !evt.actor
+      ? `You are a roleplay generator for Simon "Ghost" Riley (SAS, 35, Manchester). Dry, blunt, minimal. Lowercase English. Return JSON only, no other text.`
+      : `You are a roleplay generator for Task Force 141. Return JSON only, no other text.`;
+
+    let raw = '';
+    if (typeof callHaiku === 'function') {
+      raw = await callHaiku(systemPrompt, [{ role: 'user', content: prompt }]);
+    } else {
+      const res = await fetchWithTimeout('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 150, system: systemPrompt, messages: [{ role: 'user', content: prompt }] })
+      }, 8000);
+      const d = await res.json();
+      raw = d.content?.[0]?.text || '';
+    }
+
+    const post = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
     if (!post?.en) return null;
 
-    // 60% 概率生成评论
+    // ── 链式评论生成 ──────────────────────────────
+    // 评论最多3条，Ghost 评论低频（30%），后面的评论能看到前面的
+    const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
     let comments = [];
     if (Math.random() < 0.72) {
-      const others = ['Ghost', 'Soap', 'Gaz', 'Price'].filter(n => n.toLowerCase() !== evt.actor);
-      const commenters = others.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1);
-      const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
-      const res2 = await fetchWithTimeout('/api/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001', max_tokens: 200,
-          messages: [{ role: 'user', content: `${posterInfo.name}发了朋友圈："${post.en}"。生成${commenters.length}条评论，评论者：${commenters.join('、')}。
-
-角色人设（严格遵守）：
-- Soap: loud, always winding Ghost up, bit of Scottish slang, genuine lad energy. Jokes land because he means them.
-- Gaz: steady. Dry. Drops a good line when least expected, then goes quiet again.
-- Price: barely there. If he says something it matters. No fluff.
-- Ghost: comments occasionally. One line, lowercase. Responds to what was actually posted — could be dry, a jab, a deadpan observation, or something almost warm but pulled back before it lands. Let the post decide the tone. Never sentimental, never explains himself.
-
-Forbidden: babe/honey/love or similar terms, out-of-character sweetness, anything beyond soldier-level camaraderie.
-
-每行格式：角色名|英文|中文。只返回评论。` }]
-        })
-      });
-      const d2 = await res2.json();
-      comments = (d2.content?.[0]?.text?.trim() || '').split('\n')
-        .filter(l => l.includes('|'))
-        .map(l => { const [name, en, zh] = l.split('|'); return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() }; })
-        .filter(c => c.name && c.en)
-        .map(c => ({ avatar: avatarMap[c.name] || '👤', author: c.name, name: c.name, en: c.en, zh: c.zh, text: c.en }));
+      comments = await generateFeedCommentChain(
+        { author: posterInfo.name, en: post.en },
+        evt,
+        avatarMap
+      );
     }
 
     // 朋友圈类型冷却：同类型6小时内不重复

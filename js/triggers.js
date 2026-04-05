@@ -1,0 +1,259 @@
+// ============================================================
+// triggers.js — 回复后副作用检测
+//
+// 职责：每轮对话结束后的三重判断
+//   1. mood_change  — Ghost心情微变化
+//   2. market       — 商城高亮触发（Ghost暗示缺少某样东西）
+//   3. emotion      — 情绪反寄触发（用户情绪触发Ghost悄悄寄东西）
+//   + checkLocationSpecialTrigger — 地点特产反寄（来自 events.js）
+//
+// 依赖：api.js、state.js、delivery.js、events.js
+// 注意：checkLocationSpecialTrigger 定义在 events.js，这里直接调用
+// ============================================================
+
+
+// ── 商城触发分类表 ────────────────────────────────────────
+const MARKET_TRIGGER_CATS = {
+  '保暖类': {
+    products: ['羊毛大衣','毛线手套','格纹围巾','厚羊毛袜','兔毛围巾耳罩套装'],
+    reason: '他说他冷 🧣'
+  },
+  '饮食类': {
+    products: ['英式早餐茶罐','Cadbury 巧克力礼盒','苏格兰威士忌','黄油饼干礼盒','蘑菇果干盒'],
+    reason: '他在抱怨伙食 🍫'
+  },
+  '疲惫类': {
+    products: ['香薰蜡烛','男士护肤套装','沐浴礼盒','面膜礼盒'],
+    reason: '他说他累了 🕯️'
+  },
+  '思念类': {
+    products: ['情侣吊坠','定制相框','永生玫瑰','音乐盒','手写信封套装'],
+    reason: '他说他在想你 💍'
+  },
+  '卫生类': {
+    products: ['男士护肤套装','除臭喷雾','Tom Ford 剃须套装','手工香皂'],
+    reason: '他需要补给 🧴'
+  },
+};
+
+// ── 商城触发辅助函数 ──────────────────────────────────────
+function getProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
+  const item = triggered[name];
+  if (!item) return null;
+  if (Date.now() - item.timestamp > 3 * 24 * 3600 * 1000) return null; // 3天冷却
+  return item.reason;
+}
+
+function clearProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
+  const reason = triggered[name]?.reason;
+  if (reason) {
+    Object.keys(triggered).forEach(k => {
+      if (triggered[k]?.reason === reason) delete triggered[k];
+    });
+  }
+  localStorage.setItem('marketTriggered', JSON.stringify(triggered));
+}
+
+// ── 私密商品高亮辅助函数 ──────────────────────────────────
+function getIntimateProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+  const item = triggered[name];
+  if (!item) return null;
+  if (Date.now() - item.timestamp > 5 * 24 * 3600 * 1000) return null; // 5天冷却
+  return item.reason;
+}
+
+function clearIntimateProductTrigger(name) {
+  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+  delete triggered[name];
+  localStorage.setItem('intimateTriggered', JSON.stringify(triggered));
+}
+
+// ── 私密商品高亮触发 ──────────────────────────────────────
+async function checkIntimateHighlight(userText, botReply) {
+  // 预筛：本轮或最近几条有 _intimate 标记才调模型
+  const hasIntimate = chatHistory.slice(-6).some(m => m._intimate);
+  if (!hasIntimate) return;
+
+  // 5天冷却
+  const lastAt = parseInt(localStorage.getItem('intimateHighlightAt') || '0');
+  if (Date.now() - lastAt < 5 * 24 * 3600 * 1000) return;
+
+  try {
+    const raw = await fetchDeepSeek(
+      `Based on Ghost's reply in this intimate exchange, did he show clear desire or wanting — through implication, tension, or controlled restraint? Answer only JSON: {"desire": true} or {"desire": false}`,
+      `Ghost replied: "${botReply.slice(0, 200)}"`,
+      30
+    );
+    const result = safeParseJSON(raw);
+    if (!result?.desire) return;
+  } catch(e) { return; }
+
+  localStorage.setItem('intimateHighlightAt', Date.now());
+
+  // 随机选1件私密商品高亮
+  const pool = (typeof MARKET_PRODUCTS !== 'undefined' && MARKET_PRODUCTS.intimate) || [];
+  const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  const available = pool.filter(p => !purchased.includes(p.name));
+  if (available.length === 0) return;
+
+  const picked = available[Math.floor(Math.random() * available.length)];
+  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
+  triggered[picked.name] = { reason: '他很想要你', timestamp: Date.now() };
+  localStorage.setItem('intimateTriggered', JSON.stringify(triggered));
+}
+
+
+// ============================================================
+// 核心：checkTriggersAndEmotion
+// 每轮25%概率触发（由sendMessage.js控制）
+// 修复：地点特产调用从 checkLocationSpecial(userText, botText)
+//       改为 checkLocationSpecialTrigger(userText)（来自events.js）
+// ============================================================
+
+async function checkTriggersAndEmotion(userText, botText) {
+
+  // ── 关键词预筛——没命中就直接走地点检测，跳过模型调用 ──
+  const marketKeywords = [
+    '冷','冻','暖','饿','吃','伙食','食物','累了','疲惫','想你','想念','思念',
+    'tired','cold','hungry','miss'
+  ];
+  const emotionKeywords = [
+    '开心','难过','委屈','饿','累','压力','生病','冷','热','想你','哭','不舒服','心情'
+  ];
+  const moneyContextKeywords = [
+    '买','钱','贵','便宜','省','花','穷','价格','折扣','划算','预算','负担',
+    '工资','发薪','想要','喜欢','看中','订单',
+    'pay','afford','expensive','cheap','price','buy','want','sale'
+  ];
+
+  const combined = userText + botText;
+  const hasMarketHint    = marketKeywords.some(k => combined.includes(k));
+  const hasEmotionHint   = emotionKeywords.some(k => userText.includes(k));
+  const hasMoneyContext  = moneyContextKeywords.some(k => userText.toLowerCase().includes(k));
+
+  // 预筛没命中：跳过三重判断，只跑地点检测
+  if (!hasMarketHint && !hasEmotionHint && !hasMoneyContext) {
+    // 【修复】原来传 botText，现在只传 userText，判断更准确
+    if (typeof checkLocationSpecialTrigger === 'function') {
+      checkLocationSpecialTrigger(userText).catch(() => {});
+    }
+    return;
+  }
+
+  try {
+    // ── 三重判断：一次 Haiku 调用，返回三个结果 ──────────
+    const raw = await fetchDeepSeek(
+      `你是一个三重判断器。只返回JSON，不要其他文字。
+1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段
+2. 判断用户的消息透露了什么情绪，返回emotion字段
+3. 判断这次对话后Ghost的心情变化，返回mood_change字段
+
+mood_change规则：
+用户真的生气/冷漠/拒绝/说很伤人的话 → -1
+用户撒娇式吵架/开玩笑/正常拌嘴 → 0
+用户说了温暖/感动的话 → 1
+
+格式：{"market":{"triggered":false},"emotion":{"triggered":false},"mood_change":0}
+market分类：保暖类/饮食类/疲惫类/思念类/卫生类
+emotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念
+emotion强度：轻/中/重`,
+      `Ghost说：${botText}\n用户说：${userText}`,
+      180
+    );
+
+    const result = safeParseJSON(raw);
+    if (!result) return;
+
+    // ── 1. mood变化 ───────────────────────────────────────
+    if (result.mood_change && result.mood_change !== 0) {
+      changeMood(result.mood_change);
+    }
+
+    // ── 2. 商城高亮触发 ───────────────────────────────────
+    if (result.market?.triggered) {
+      const cat = MARKET_TRIGGER_CATS[result.market.category];
+      if (cat) {
+        const triggered = JSON.parse(localStorage.getItem('marketTriggered') || '{}');
+        const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+        const now = Date.now();
+        const cooldownMs = 3 * 24 * 3600 * 1000;
+
+        const availableProducts = cat.products.filter(name => !purchased.includes(name));
+        if (availableProducts.length === 0) return; // 全买完了不再触发
+
+        const alreadyTriggered = availableProducts.some(
+          name => triggered[name] && now - triggered[name].timestamp < cooldownMs
+        );
+        if (!alreadyTriggered) {
+          availableProducts.forEach(name => {
+            triggered[name] = { reason: cat.reason, timestamp: now };
+          });
+          localStorage.setItem('marketTriggered', JSON.stringify(triggered));
+        }
+      }
+    }
+
+    // ── 3. 情绪反寄触发 ───────────────────────────────────
+    if (result.emotion?.triggered) {
+      const type      = result.emotion.type;
+      const intensity = result.emotion.intensity;
+
+      // 7天冷却
+      const coolKey  = 'reverseShipCool_' + type;
+      const lastTime = parseInt(localStorage.getItem(coolKey) || '0');
+      if (Date.now() - lastTime < 7 * 24 * 3600 * 1000) return;
+
+      // 概率：轻5% 中10% 重15%
+      const probMap = { '轻': 0.05, '中': 0.10, '重': 0.15 };
+      const prob = probMap[intensity] || 0.08;
+      if (Math.random() > prob) return;
+
+      // 从礼物池抽取，去重
+      const pool = (typeof GHOST_REVERSE_POOL !== 'undefined') ? GHOST_REVERSE_POOL[type] : null;
+      if (!pool || pool.length === 0) return;
+
+      const sentNames = [
+        ...JSON.parse(localStorage.getItem('deliveries') || '[]'),
+        ...JSON.parse(localStorage.getItem('deliveryHistory') || '[]'),
+      ].filter(d => d.isGhostSend).map(d => d.name);
+      const allSent = new Set(sentNames);
+
+      const available = pool.filter(i => !allSent.has(i.name));
+      const finalPool = available.length > 0 ? available : pool;
+      const item = finalPool[Math.floor(Math.random() * finalPool.length)];
+
+      localStorage.setItem(coolKey, Date.now());
+
+      // 注入系统记忆
+      chatHistory.push({
+        role: 'user',
+        content: `[System: You quietly sent her "${item.name}". She doesn't know yet — it's on the way. Don't bring it up. If she asks, deflect or stay vague. Once it arrives, you can admit it.]`,
+        _system: true
+      });
+      saveHistory();
+
+      // 3-5天后出现包裹
+      const delay = (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000;
+      setTimeout(() => {
+        if (typeof addGhostReverseDelivery === 'function') {
+          addGhostReverseDelivery(item, type);
+        }
+      }, delay);
+    }
+
+    // ── 4. 地点特产触发 ───────────────────────────────────
+    // 【修复】原版传了 botText，新版只传 userText，判断更准确
+    if (typeof checkLocationSpecialTrigger === 'function') {
+      checkLocationSpecialTrigger(userText).catch(() => {});
+    }
+
+  } catch(e) {
+    // 三重判断失败：至少还跑地点检测
+    if (typeof checkLocationSpecialTrigger === 'function') {
+      checkLocationSpecialTrigger(userText).catch(() => {});
+    }
+  }
+}

@@ -177,7 +177,7 @@ const GHOST_STICKER_POOL = {
   // 热/身体热
   hot: ['😓', '🌡️', '💦'],
 
-  // 性感/火辣/撩人
+  // 性感/火辣/撩人（suggestive场景也走这个池）
   sexy: ['🥵', '🔥', '💋', '😈'],
 
   // 冷/冷漠
@@ -216,50 +216,52 @@ const GHOST_STICKER_POOL = {
 
 
 // ===== 用户发emoji时Ghost的反应池 =====
+// 精简为6组，边界清晰，Ghost风格更稳
 const USER_STICKER_REACTIONS = {
-  // 用户发爱心类
-  love_reaction: {
+
+  // 用户发爱意/想念
+  affection_reaction: {
     triggers: ['❤️','💕','💗','💖','💓','🥰','😍','💝','💞','💘','🫶'],
-    responses: ['neutral', 'eyeroll', 'eyeroll', 'skull'],
-    chance: 0.35
+    responses: ['neutral', 'smirk', 'eyeroll', 'skull'],
+    chance: 0.28
   },
-  // 用户发哭泣类
-  cry_reaction: {
-    triggers: ['😭','😢','🥺','💔'],
-    responses: ['worry', 'hug', 'sad', 'neutral'],
-    chance: 0.35
+
+  // 用户明显难过/哭
+  upset_reaction: {
+    triggers: ['😭','😢','💔'],
+    responses: ['worry', 'neutral', 'silent'],
+    chance: 0.38
   },
-  // 用户发搞笑类
+
+  // 用户发搞笑/死了算了这种
   funny_reaction: {
     triggers: ['😂','🤣','😹','💀'],
     responses: ['laugh', 'smirk', 'skull'],
     chance: 0.35
   },
-  // 用户发生气类
+
+  // 用户发火/情绪上来
   angry_reaction: {
     triggers: ['😡','🤬','😤','💢'],
-    responses: ['neutral', 'tense', 'skull', 'annoyed'],
-    chance: 0.3
+    responses: ['neutral', 'tense', 'annoyed', 'skull'],
+    chance: 0.26
   },
-  // 用户发撒娇类
-  cute_reaction: {
+
+  // 用户撒娇/装可怜/要他看自己
+  tease_reaction: {
     triggers: ['🥺','🥹','😳','🫣','🙈'],
-    responses: ['eyeroll', 'smirk', 'neutral', 'annoyed'],
-    chance: 0.3
+    responses: ['eyeroll', 'smirk', 'neutral'],
+    chance: 0.24
   },
-  // 用户发亲亲类
-  kiss_reaction: {
-    triggers: ['😘','💋','🫦'],
-    responses: ['neutral', 'eyeroll', 'smirk', 'skull', 'sexy'],
-    chance: 0.4
-  },
-  // 用户发性感/暗示类
-  sexy_reaction: {
-    triggers: ['🥵','🔥','💦','😏','🍆','🍑','🫦','😈','👅'],
+
+  // 用户发亲亲/暗示/明显撩（suggestive走sexy池）
+  suggestive_reaction: {
+    triggers: ['😘','💋','🫦','🥵','🔥','💦','😏','😈','👅'],
     responses: ['sexy', 'smirk', 'eyeroll', 'skull'],
-    chance: 0.45
+    chance: 0.32
   },
 };
+
 
 // ===== 核心函数 =====
 
@@ -267,9 +269,8 @@ const USER_STICKER_REACTIONS = {
 const COLD_POOLS = new Set(['eyeroll','skull','neutral','silent','annoyed','tense','cold']);
 
 // 从池子里随机抽一个emoji
-// 冷淡池子直接随机，热情池子有30%概率被替换成冷淡的
+// 冷淡池子直接随机，热情池子有30%概率降级成克制的
 function pickStickerFromPool(poolName) {
-  // 热情池子有概率降级成更克制的
   if (!COLD_POOLS.has(poolName) && Math.random() < 0.3) {
     const coldFallback = ['eyeroll','skull','neutral','annoyed'];
     poolName = coldFallback[Math.floor(Math.random() * coldFallback.length)];
@@ -280,11 +281,32 @@ function pickStickerFromPool(poolName) {
 }
 
 
+// ===== 歧义修正：🥺等多义表情的上下文识别 =====
+// 不花模型调用，纯关键词，让tease/upset边界更清晰
+function getStickerToneHint(userText) {
+  const t = String(userText || '').toLowerCase();
+  if (/对不起|错了|别生气|i'm sorry|i was wrong/.test(t)) return 'repair';
+  if (/想你|爱你|亲亲|love you|miss you/.test(t))         return 'affection';
+  if (/看我|夸我|漂亮吗|cute|pretty|am i cute/.test(t))   return 'tease';
+  if (/难过|委屈|哭|sad|cry|upset/.test(t))               return 'upset';
+  if (/想要你|撩你|亲我|kiss me|want you/.test(t))         return 'suggestive';
+  return 'none';
+}
+
+
 // 检测用户消息里的emoji，决定Ghost是否回应
 function checkUserSticker(userText) {
+  const toneHint = getStickerToneHint(userText);
+
   for (const [key, config] of Object.entries(USER_STICKER_REACTIONS)) {
     const hasEmoji = config.triggers.some(e => userText.includes(e));
     if (!hasEmoji) continue;
+
+    // 歧义修正：🥺如果是道歉/委屈，不按撒娇处理
+    if (key === 'tease_reaction' && (toneHint === 'repair' || toneHint === 'upset')) continue;
+    // 歧义修正：😭如果上下文是撒娇，不按难过处理
+    if (key === 'upset_reaction' && toneHint === 'tease') continue;
+
     if (Math.random() > config.chance) continue;
 
     // 冷却：同类反应2分钟内不重复
@@ -311,10 +333,8 @@ function sendGhostStickerMessage(emoji, delayMs = 1000) {
   }, delayMs);
 }
 
-// ===== 对外暴露的主入口 =====
-
-
-// 在用户发消息后调用这个，检测emoji并回应
+// ===== 对外主入口 =====
+// 在用户发消息后调用，检测emoji并决定Ghost是否回应
 function triggerGhostStickerByUserInput(userText, delayMs = 1200) {
   const emoji = checkUserSticker(userText);
   if (emoji) sendGhostStickerMessage(emoji, delayMs);

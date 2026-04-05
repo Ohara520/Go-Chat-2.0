@@ -187,28 +187,45 @@ async function loadFromCloud() {
       }
     }
 
-    // ── 4. 钱包迁移标记：必须先恢复，防止 getBalance() 里的迁移代码清空已恢复的交易记录 ──
-    // Bug2根本原因：walletMigrated_v3 没存云端，换设备后迁移代码重跑，清空 transactions
+    // ── 4. 钱包迁移标记 + 余额恢复（必须最早执行）────────────
+    // 根本原因：walletMigrated_v3 丢失后，getBalance() 一被调用就清空 transactions
+    // 必须在任何可能触发 getBalance() 的代码之前恢复这个标记
+
+    // 4a. 恢复迁移标记
     if (data.profile?.walletMigrated_v3) {
       localStorage.setItem('walletMigrated_v3', data.profile.walletMigrated_v3);
-    } else if (data.chat_history && data.chat_history.length > 0) {
-      // 有聊天记录说明是老用户，直接标记为已迁移，防止清空
+    } else if (data.chat_history?.length > 0 || data.state_snapshot?.transactions?.length > 0) {
+      // 云端有聊天记录或交易记录 → 一定是老用户，直接标记已迁移防止清空
       localStorage.setItem('walletMigrated_v3', '1');
-    } else {
-      // 新用户：云端没有记录
-      // 先标记已迁移，再手动给初始礼金，防止 getBalance() 重复触发清空+给钱
-      if (!localStorage.getItem('walletMigrated_v3')) {
-        localStorage.setItem('walletMigrated_v3', '1');
-        // 给初始礼金（跟 wallet.js 里迁移代码一致）
-        if (typeof addTransaction === 'function') {
-          addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
-        }
+    } else if (!localStorage.getItem('walletMigrated_v3')) {
+      // 全新用户：标记并给初始礼金
+      localStorage.setItem('walletMigrated_v3', '1');
+      if (typeof addTransaction === 'function') {
+        addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
       }
     }
 
-    // ── 5. 余额：本地没有才从云端恢复，有就保留本地 ──────────
-    if (data.balance != null && data.balance > 0 && !localStorage.getItem('wallet')) {
-      localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
+    // 4b. 优先从 state_snapshot.transactions 恢复交易记录
+    // 必须在 getBalance() 被调用前完成，防止余额算成0
+    // （state_snapshot 在下方第5步才完整处理，这里提前恢复 transactions）
+    if (data.state_snapshot?.transactions?.length > 0) {
+      const localTxs = JSON.parse(localStorage.getItem('transactions') || '[]');
+      if (localTxs.length === 0) {
+        // 本地完全没有 → 直接从云端恢复
+        localStorage.setItem('transactions', JSON.stringify(data.state_snapshot.transactions.slice(0, 200)));
+        console.log('[cloud] 交易记录从云端恢复:', data.state_snapshot.transactions.length, '条');
+      }
+      // 有本地记录的情况在第5步的合并逻辑里处理
+    }
+
+    // 4c. wallet字段作为兜底（transactions为空时才用）
+    if (data.balance != null && data.balance > 0) {
+      const localTxs = JSON.parse(localStorage.getItem('transactions') || '[]');
+      const localBal = localTxs.reduce((s, t) => s + (t.amount || 0), 0);
+      if (localBal <= 0) {
+        // transactions为空且余额为0，说明数据丢了，用云端balance兜底
+        localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
+      }
     }
 
     // ── 5. state_snapshot ─────────────────────────────────────
@@ -365,9 +382,10 @@ function scheduleCloudSave(urgent = false) {
   }, delay);
 }
 
-// 节流锁：同一用户5秒内最多写一次，防止快速操作产生大量并发写入
+// 写入锁：防止 saveToCloud 和 saveChatHistoryNow 并发写入互相覆盖
 let _saveThrottleTimer = null;
 let _savePending = false;
+let _isSavingToCloud = false; // 写入锁：同一时间只允许一个完整saveToCloud在跑
 
 // 聊天记录单独写入，绕过节流——每条消息成功后立刻调用
 async function saveChatHistoryNow() {
@@ -377,12 +395,22 @@ async function saveChatHistoryNow() {
   try {
     const chatHistoryRaw = localStorage.getItem('chatHistory');
     if (!chatHistoryRaw) return;
-    const chatHistoryData = JSON.parse(chatHistoryRaw).slice(-300);
+    const chatHistoryData = JSON.parse(chatHistoryRaw)
+      .filter(m => !m._system && !m._recalled)
+      .slice(-300)
+      .map(m => ({ role: m.role, content: m.content,
+        ...(m._transfer ? { _transfer: m._transfer } : {}),
+        ...(m._userTransfer ? { _userTransfer: m._userTransfer } : {}) }));
     if (chatHistoryData.length === 0) return;
+
+    // 关键修复：不更新 updated_at
+    // 只写 chat_history，不碰 updated_at，避免时间戳被更新后
+    // 下次 loadFromCloud 误认为这条"只有聊天记录"的数据是最新的
+    // 从而覆盖掉包含 transactions/deliveries/purchasedItems 的完整数据
     await sb.from('user_data').upsert({
       user_id: userId,
       chat_history: chatHistoryData,
-      updated_at: new Date().toISOString(),
+      // updated_at 不在这里更新，由 saveToCloud 统一管理
     }, { onConflict: 'user_id' });
   } catch(e) {
     console.warn('[cloud] 聊天记录快速保存失败:', e);
@@ -393,6 +421,12 @@ async function saveToCloud() {
   const sb = getSbClient();
   const userId = getSbUserId();
   if (!sb || !userId) return;
+
+  // 写入锁：如果当前有完整saveToCloud在执行，等它完成后再调度一次
+  if (_isSavingToCloud) {
+    scheduleCloudSave(); // 重新调度，不丢数据
+    return;
+  }
 
   // 5秒节流：如果距上次写入不足5秒，等到5秒后再写（且只写最后一次）
   const now = Date.now();
@@ -406,13 +440,14 @@ async function saveToCloud() {
         await saveToCloud();
       }, 5000 - sinceLastSave);
     }
-    return; // 等节流结束后自动写
+    return;
   }
   if (_saveThrottleTimer) {
     clearTimeout(_saveThrottleTimer);
     _saveThrottleTimer = null;
   }
   _lastSyncTime = now;
+  _isSavingToCloud = true;
   try {
     const profile = {
       userName: localStorage.getItem('userName') || '',
@@ -553,12 +588,13 @@ async function saveToCloud() {
       console.log('[cloud] 保存成功');
     } else {
       console.error('[cloud] 保存最终失败，数据暂存本地');
-      // 标记本地有未同步数据，下次进入时重试
       localStorage.setItem('cloudSavePending', '1');
     }
   } catch(e) {
     console.error('[cloud] 保存异常:', e);
     localStorage.setItem('cloudSavePending', '1');
+  } finally {
+    _isSavingToCloud = false; // 无论成功失败都释放锁
   }
 }
 

@@ -51,29 +51,21 @@ async function uploadToStorage(base64, bucket, fileName) {
   } catch(e) { return null; }
 }
 
-// ===== 把头像URL写入Supabase user_data表 =====
+// ===== 把头像URL写入云端 =====
+// 修复：不再单独upsert profile（会被后来的saveToCloud覆盖掉）
+// 改为：写入localStorage后触发完整的scheduleCloudSave，让saveToCloud统一处理
 async function saveAvatarUrlToProfile(url) {
-  try {
-    const sb = typeof getSbClient === 'function' ? getSbClient() : null;
-    const userId = typeof getSbUserId === 'function' ? getSbUserId() : null;
-    if (!sb || !userId) return;
+  if (!url || url.startsWith('data:')) return; // 只存正式URL，不存base64
 
-    const { data: row } = await sb
-      .from('user_data')
-      .select('profile')
-      .eq('user_id', userId)
-      .single();
+  // 写入localStorage（saveToCloud会从这里读）
+  localStorage.setItem('ghostAvatarUrl', url);
+  if (typeof touchLocalState === 'function') touchLocalState();
 
-    const profile = row?.profile || {};
-    profile.ghostAvatarUrl = url;
-
-    await sb
-      .from('user_data')
-      .upsert({ user_id: userId, profile }, { onConflict: 'user_id' });
-
-    console.log('[avatar] URL已写入数据库:', url);
-  } catch(e) {
-    console.warn('[avatar] 写库失败:', e);
+  // 触发完整云端保存（urgent=true，2秒内执行）
+  // saveToCloud里会读localStorage.ghostAvatarUrl并存入profile
+  if (typeof scheduleCloudSave === 'function') {
+    scheduleCloudSave(true);
+    console.log('[avatar] 已触发云端保存:', url.slice(0, 60));
   }
 }
 
@@ -213,24 +205,28 @@ async function handlePhotoUpload(fileDataList) {
       ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => m.content || '').join(' ')
       : '';
     // 检测情头上下文：只看最近3条消息，避免误触发
-    const _avatarKeyword = /couple.*profile|profile.*picture|情头|换头像|couple avatar|switch.*avatar|换嘛|换一下|换个头|情侣头像|头像.*换|换.*头像/i;
-    const recentFew = typeof chatHistory !== 'undefined'
-      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6).map(m => m.content || '').join(' ')
-      : '';
-    const isAvatarContext = _avatarKeyword.test(recentFew) || sessionStorage.getItem('avatarRequestPending') === '1';
-    // 用户提过换情头，记录pending状态
-    if (_avatarKeyword.test(recentFew)) sessionStorage.setItem('avatarRequestPending', '1');
-    console.log('[photo] isAvatarContext:', isAvatarContext);
+    // 统一 prompt——让模型自己判断是不是情头，不再由前端猜
+    // 模型判断是情头 → 回复里带 AVATAR_SET（隐藏tag）
+    // 前端只检测这个tag，有就换，没有就不换
+    // 彻底解决"关键词误触发"和"时间窗口不可靠"的问题
+    const photoHint = `[You just received a photo from her. Look at the image carefully.
 
-    const photoHint = isAvatarContext
-      ? `[场景：她发来了情侣头像图片想换情头。
-看图做出Ghost式真实反应：
-- 说清楚你看到了什么，要具体（比如"a blue rabbit with its tongue out"不是"cute"）
-- 如果图很离谱/搞笑，要吐槽那个具体的细节，干燥地嘲讽
-- 可以嘴硬，但90%最终换上——如果换了，用"fine. it's up."/"already set it."/"done."等自然带出
-- 只有真的不雅/色情内容才能拒绝。不能因为颜色不对、不够帅、风格不喜欢而拒绝——那种情况嘴硬吐槽完就换上。
-英文回复，1-2句话，不要太礼貌，不要用"cute"这种通用词。]`
-      : `[场景：她发来了图片。你能清楚看到图片内容。直接回应你看到的东西，具体说出细节——颜色、物体、场景、表情或氛围。Ghost式反应，1-2句，不要说"看不清"或"我看到了一张图"这种废话。]`;
+FIRST — decide what kind of photo this is:
+
+A) Couple profile pictures — two matching images meant to be used as profile photos together (cartoon couple, matching avatars, two people posed together as a pair, etc.)
+B) Any other photo — selfie, food, scenery, meme, random image, screenshot, etc.
+
+If it's (A) — couple profile pictures:
+- React as Ghost would. Describe what you actually see, specifically (e.g. "a fox and a rabbit" not "cute"). Dry tone. You can be reluctant or mock the style, but 90% of the time you set it anyway.
+- If you decide to set it, naturally say so in your reply ("fine. it's up." / "already set it." / "done." etc.)
+- Only refuse if the image is genuinely inappropriate or explicit.
+- Add AVATAR_SET on its own line at the end of your reply.
+
+If it's (B) — any other photo:
+- React as Ghost would to what you see. Specific details, dry delivery. 1-2 lines.
+- Do NOT add AVATAR_SET.
+
+English only. No translation. Do not mention "profile picture" or "avatar" unless she asked about it.]`;
 
     // 5. 发给模型看图回复
     if (typeof showTyping === 'function') showTyping();
@@ -312,100 +308,102 @@ async function handlePhotoUpload(fileDataList) {
 
     if (!reply) reply = 'noted.';
 
-    if (typeof hideTyping === 'function') hideTyping();
+    // 检测 AVATAR_SET tag（由模型判断，前端只执行）
+    const shouldSetAvatar = /\bAVATAR_SET\b/i.test(reply);
+    reply = reply.replace(/\n?AVATAR_SET\n?/gi, '').trim();
+    if (!reply) reply = 'noted.';
 
-    // 注意：avatarRequestPending 只在换头像成功后清除，不在这里清
+    if (typeof hideTyping === 'function') hideTyping();
 
     // 6. 显示回复
     if (typeof appendMessage === 'function') appendMessage('bot', reply);
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({ role: 'assistant', content: reply });
 
-      // 生成图片描述存进chatHistory，后续聊天不会脑补
-      try {
-        const descRes = await fetchWithTimeout('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
-            max_tokens: 150,
-            system: 'You are a neutral image describer. Describe what you see in 2-3 sentences. Be specific about details: colors, objects, mood, setting, expression if there are people. Write in Chinese. Start with "她发了一张".',
-            messages: [{
-              role: 'user',
-              content: [
-                ...base64List.map(b64 => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } })),
-                { type: 'text', text: '描述这张图片的内容，2-3句，用中文。' }
-              ]
-            }]
-          })
-        }, 10000);
-        if (descRes.ok) {
-          const descData = await descRes.json();
-          const desc = descData.content?.[0]?.text?.trim() || '';
-          if (desc) {
-            chatHistory.push({ role: 'user', content: `[图片内容：${desc}]`, _system: true, _imageDesc: true });
-          }
+      // 生成图片描述（异步，不阻塞，后续对话用）
+      fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-5-20250929',
+          max_tokens: 100,
+          system: 'Describe the image in 1-2 sentences. Specific details: colors, objects, people, mood. English only. Start with "She sent a photo of".',
+          messages: [{
+            role: 'user',
+            content: [
+              ...base64List.map(b64 => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } })),
+              { type: 'text', text: 'Describe this image briefly.' }
+            ]
+          }]
+        })
+      }, 10000).then(async res => {
+        if (!res?.ok) return;
+        const data = await res.json();
+        const desc = data.content?.[0]?.text?.trim() || '';
+        if (desc && typeof chatHistory !== 'undefined') {
+          chatHistory.push({ role: 'user', content: `[Image: ${desc}]`, _system: true, _imageDesc: true });
+          if (typeof saveHistory === 'function') saveHistory();
         }
-      } catch(e) {}
+      }).catch(() => {});
 
       if (typeof saveHistory === 'function') saveHistory();
     }
 
-    // 7. 判断是否换头像
-    if (isAvatarContext) {
-      // 默认换，除非明确拒绝
-      const refused = /not putting|won\'t put|not happening|not doing that/i.test(reply);
-      const willSwitch = !refused && Math.random() < 0.90;
-      console.log('[photo] 换头像判断: refused=', refused, 'willSwitch=', willSwitch, 'reply=', reply.slice(0, 50));
+    // 7. 换头像（由模型通过 AVATAR_SET tag 决定，前端执行）
+    if (shouldSetAvatar) {
+      // 多张图选第二张（通常是Ghost那张），单张直接用
+      const ghostIdx = base64List.length > 1 ? 1 : 0;
+      const ghostB64 = base64List[ghostIdx];
 
-      if (willSwitch) {
-        // 多张图选第二张（通常是Ghost的那张），单张直接用
-        const ghostIdx = base64List.length > 1 ? 1 : 0;
-        const ghostB64 = base64List[ghostIdx];
+      // 先用base64临时显示（即时反馈）
+      const _avatarDataUrl = `data:image/jpeg;base64,${ghostB64}`;
+      updateGhostAvatar(_avatarDataUrl);
+      localStorage.setItem('ghostAvatarUrl', _avatarDataUrl);
+      localStorage.setItem('ghostAvatarBase64', ghostB64);
+      if (typeof touchLocalState === 'function') touchLocalState();
 
-        // 先用base64临时显示（即时反馈）
-        const _avatarDataUrl = `data:image/jpeg;base64,${ghostB64}`;
-        updateGhostAvatar(_avatarDataUrl);
-        // 存 base64 到两个 key：
-        // ghostAvatarUrl → 当前使用的头像（可能被正式URL覆盖）
-        // ghostAvatarBase64 → 永久备份，用于上传失败时重试恢复
-        localStorage.setItem('ghostAvatarUrl', _avatarDataUrl);
-        localStorage.setItem('ghostAvatarBase64', ghostB64); // 纯base64，不带前缀
-        if (typeof touchLocalState === 'function') touchLocalState();
-        sessionStorage.removeItem('avatarRequestPending'); // 换上了，清除pending
-
-        // 异步上传Storage，完成后更新为正式URL并写入数据库
-        uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-          if (url) {
-            updateGhostAvatar(url); // 这里会自动调用saveAvatarUrlToProfile
-            localStorage.removeItem('ghostAvatarBase64'); // 上传成功，清除base64备份
-          }
-          // 上传失败：base64备份保留，restoreGhostAvatar 下次会重试
-        });
-      }
+      console.log('[avatar] 模型决定换头像，上传中...');
+      uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
+        if (url) {
+          updateGhostAvatar(url);
+          localStorage.removeItem('ghostAvatarBase64');
+          console.log('[avatar] 上传成功:', url.slice(0, 60));
+        }
+      });
     }
 
     // 8. 异步上传所有图片到Storage，完成后更新历史记录和气泡
     const photoUrls = new Array(base64List.length).fill(null);
+    const _uploadTs = Date.now(); // 用时间戳定位这批图片对应的历史消息
     const uploadPromises = base64List.map((b64, i) =>
-      uploadToStorage(b64, PHOTO_BUCKET, `photo_${Date.now()}_${i}.jpg`).then(url => {
+      uploadToStorage(b64, PHOTO_BUCKET, `photo_${_uploadTs}_${i}.jpg`).then(url => {
         if (url) {
           photoUrls[i] = url;
-          // 更新气泡里的img src
+          // 更新气泡里的img src（用URL替换base64，减少内存占用）
           const imgs = container ? container.querySelectorAll(`img[src^="data:image"]`) : [];
-          const targetImg = Array.from(imgs).find(img => img.src.includes(base64List[i].slice(0, 20)));
+          // 匹配方式：找src里包含这张图片base64前20字符的img
+          const targetImg = Array.from(imgs).find(img => {
+            try { return img.src.includes(base64List[i].slice(0, 20)); } catch(e) { return false; }
+          });
           if (targetImg) targetImg.src = url;
         }
       })
     );
     Promise.all(uploadPromises).then(() => {
-      // 存入历史记录，重建时可以显示图片
       const validUrls = photoUrls.filter(Boolean);
       if (validUrls.length > 0 && typeof chatHistory !== 'undefined') {
-        const msgIdx = chatHistory.findIndex(m => m.content && m.content.includes('[用户发了') && !m._photoUrls);
+        // 找到对应的历史消息（还没有_photoUrls的那条发图消息）
+        const msgIdx = chatHistory.findIndex(m =>
+          m.content && m.content.includes('[用户发了') && !m._photoUrls
+        );
         if (msgIdx !== -1) {
           chatHistory[msgIdx]._photoUrls = validUrls;
+          // 修复问题3：_photoBase64 上传成功后清除（太大，不存云端）
+          // _photoUrls 保留，cloud.js存档时需要包含它
+          delete chatHistory[msgIdx]._photoBase64;
           if (typeof saveHistory === 'function') saveHistory();
+          // 立刻存云端，确保 _photoUrls 被同步上去
+          if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
         }
       }
     });
@@ -510,7 +508,7 @@ async function checkAvatarReplace(userText) {
       if (url) updateGhostAvatar(url); // 自动调用saveAvatarUrlToProfile
     });
     reply = "changed.";
-    sessionStorage.removeItem('avatarRequestPending');
+    // avatarRequestPending 已废弃，换头像改由模型通过AVATAR_SET决定
   }
 
   if (typeof hideTyping === 'function') hideTyping();
