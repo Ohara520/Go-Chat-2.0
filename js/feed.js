@@ -196,6 +196,8 @@ const COUPLE_POSTS = [
 ];
 
 function initCoupleSpace() {
+  // 恢复自定义封面
+  if (typeof restoreCoupleCover === 'function') restoreCoupleCover();
   // 事件委托：在朋友圈容器上监听点赞，避免动态DOM的onclick失效问题
   const feedContainer = document.getElementById('couplePostsFeed');
   if (feedContainer && !feedContainer._likeListenerAdded) {

@@ -132,6 +132,9 @@ async function loadFromCloud() {
       if (p.userAvatarBase64 && !localStorage.getItem('userAvatarBase64')) {
         localStorage.setItem('userAvatarBase64', p.userAvatarBase64);
       }
+      if (p.coupleCoverBase64 && !localStorage.getItem('coupleCoverBase64')) {
+        localStorage.setItem('coupleCoverBase64', p.coupleCoverBase64);
+      }
       // 冷战状态：取最新
       if (p.coldWarMode != null && cloudIsNewer) localStorage.setItem('coldWarMode', String(p.coldWarMode));
       // 婚姻模式和Ghost档案
@@ -460,6 +463,7 @@ async function saveToCloud() {
       userFavColor: localStorage.getItem('userFavColor') || '',
       userBio: localStorage.getItem('userBio') || '',
       userAvatarBase64: localStorage.getItem('userAvatarBase64') || '',
+      coupleCoverBase64: localStorage.getItem('coupleCoverBase64') || '',
       marriageDate: localStorage.getItem('marriageDate') || '',
       ghostBirthday: localStorage.getItem('ghostBirthday') || '',
       ghostZodiac: localStorage.getItem('ghostZodiac') || '',
