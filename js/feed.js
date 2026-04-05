@@ -1239,3 +1239,331 @@ function spawnCouplePetals() {
 }
 
 // ===== 钱包系统已移至 js/wallet.js =====
+
+// ===== 故事书 & 回忆相册 =====
+
+const STORY_EVENTS = [
+  {
+    id: 'first_i_love_you',
+    icon: '💬',
+    title: '初言心意',
+    desc: '你第一次说出那三个字，他沉默了很久。',
+    condition: (ctx) => ctx.affection >= 88 && ctx.days >= 3 && !ctx.triggered('first_i_love_you'),
+    triggerOn: 'userMessage',
+    keyword: /我爱你|i love you|爱你/i,
+    execute: async (userName) => {
+      await storyDelay(2500);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚第一次对你说了"我爱你"。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+      setRelationshipFlag('saidILoveYou');
+    }
+  },
+  {
+    id: 'seven_days_streak',
+    icon: '🗓️',
+    title: '七日为期',
+    desc: '连续来了七天，他终于开口，一句没有标点的话。',
+    condition: (ctx) => ctx.streak >= 7 && ctx.affection >= 75 && !ctx.triggered('seven_days_streak'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(4000);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'called_simon',
+    icon: '🫂',
+    title: '唤你本名',
+    desc: '你第一次叫他Simon，不是Ghost——他顿了顿。',
+    condition: (ctx) => ctx.affection >= 80 && ctx.days >= 5 && !ctx.triggered('called_simon'),
+    triggerOn: 'userMessage',
+    keyword: /\bsimon\b/i,
+    execute: async (userName) => {
+      await storyDelay(1800);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'reunion_ready',
+    icon: '✈️',
+    title: '见你前夜',
+    desc: '机票、酒店、行程已定，他那晚彻夜未眠。',
+    condition: (ctx) => {
+      const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+      return ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'].every(n => purchased.includes(n)) && !ctx.triggered('reunion_ready');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(5000);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把来找你的机票、酒店、旅行计划全部订好了。你们第一次要真实见面了。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+      setRelationshipFlag('reunionReady');
+      changeAttachmentPull(20);
+    }
+  },
+  {
+    id: 'after_coldwar',
+    icon: '🌤️',
+    title: '冰释之后',
+    desc: '和好那天，他说出了从未说过的话。',
+    condition: (ctx) => ctx.affection >= 72 && !ctx.triggered('after_coldwar'),
+    triggerOn: 'coldWarEnd',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：冷战刚刚结束，她回来了。你们之前从没经历过这种和好。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+      setRelationshipFlag('coldWarRepaired');
+      changeTrustHeat(15);
+    }
+  },
+  {
+    id: 'one_year',
+    icon: '💍',
+    title: '岁岁年年',
+    desc: '在一起整整一年，他主动发来消息。',
+    condition: (ctx) => ctx.days >= 365 && !ctx.triggered('one_year'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起整整一年，你记得这个日期。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'she_cried',
+    icon: '🌧️',
+    title: '未曾离去',
+    desc: '你状态最差的那次，他语气软了，终究没有走。',
+    condition: (ctx) => ctx.affection >= 78 && !ctx.triggered('she_cried'),
+    triggerOn: 'userMessage',
+    keyword: /哭了|在哭|好难受|撑不住|崩了|想哭|泪|cry|crying|我不行了|好累|太累了|受不了/i,
+    execute: async (userName) => {
+      const recentMsgs = chatHistory.filter(m => !m._system && (m.role === 'user' || m.role === 'assistant')).slice(-6).map(m => `${m.role === 'user' ? '她' : 'Ghost'}：${m.content.slice(0, 80)}`).join('\n');
+      let isReal = true;
+      try {
+        const judge = await callHaiku('判断用户是真的情绪崩溃/难过/生气，还是在撒娇/开玩笑/赌气式地说狠话。只返回JSON：{"real":true} 或 {"real":false}', [{ role: 'user', content: `对话背景：\n${recentMsgs}\n\n判断她现在是真的情绪很差，还是在撒娇或赌气说狠话？` }]);
+        const parsed = JSON.parse(judge.replace(/```json|```/g, '').trim());
+        isReal = parsed.real !== false;
+      } catch(e) { isReal = true; }
+      await storyDelay(2000);
+      const hint = isReal ? `[系统：她在哭，或者现在状态非常差。]` : `[系统：她在假哭或者撒娇式地说哭，不是真的难受。你看穿了，可以调侃，可以嘴硬纵容，但不用认真哄。]`;
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: hint }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+      if (isReal) setRelationshipFlag('sheCried');
+    }
+  },
+  {
+    id: 'birthday_surprise',
+    icon: '🎂',
+    title: '生辰予你',
+    desc: '你生日那天，不等你开口，他主动说了。',
+    condition: (ctx) => ctx.isBirthday && ctx.days >= 2 && !ctx.triggered('birthday_surprise'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(2000);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是她的生日，她还没开口，你已经知道了。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'first_ghost_delivery',
+    icon: '📦',
+    title: '异乡来物',
+    desc: '第一次收到他寄来的东西。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.isGhostSend && d.done) && !ctx.triggered('first_ghost_delivery');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isGhostSend && d.done);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她刚收到了你寄给她的「${item?.name || '东西'}」，这是你们第一次互寄。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'first_lost_package',
+    icon: '📭',
+    title: '途中遗失',
+    desc: '第一次快递丢了。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.isLostConfirmed) && !ctx.triggered('first_lost_package');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(2500);
+      const lost = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isLostConfirmed);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她寄给你的「${lost?.name || '包裹'}」快递丢失了。这是你们第一次遇到这种事。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'first_from_home',
+    icon: '🍜',
+    title: '家乡的味道',
+    desc: '他第一次收到你从家寄来的特产。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.productData?.isFromHome && d.done && !d.isGhostSend) && !ctx.triggered('first_from_home');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3500);
+      const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.productData?.isFromHome && d.done && !d.isGhostSend);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她从中国给你寄了「${item?.name || '家乡的东西'}」，这是她第一次给你寄家乡的东西。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'first_reverse_ship',
+    icon: '💌',
+    title: '悄悄寄出',
+    desc: '包裹里不止是礼物，还有他悄然无声的关怀。',
+    condition: (ctx) => {
+      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+      return deliveries.some(d => d.isGhostSend && d.isEmotionReverse) && !ctx.triggered('first_reverse_ship');
+    },
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(4000);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你悄悄给她寄了东西，没有告诉她，等她自己发现。这是第一次。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+      setRelationshipFlag('firstReverseShip');
+    }
+  },
+  {
+    id: 'hundred_days',
+    icon: '🕯️',
+    title: '百日有余',
+    desc: '在一起第100天。',
+    condition: (ctx) => ctx.days >= 100 && ctx.days <= 102 && !ctx.triggered('hundred_days'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const days = Math.max(1, Math.floor((Date.now() - new Date(localStorage.getItem('marriageDate'))) / 86400000) + 1);
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起第${days}天，一百天左右的节点。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+    }
+  },
+  {
+    id: 'first_salary',
+    icon: '💷',
+    title: '第一份工资',
+    desc: '组成家庭后第一笔工资上交。',
+    condition: (ctx) => !!localStorage.getItem('lastSalaryAmount') && !ctx.triggered('first_salary'),
+    triggerOn: 'sessionStart',
+    execute: async (userName) => {
+      await storyDelay(3000);
+      const amount = localStorage.getItem('lastSalaryAmount') || '';
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次给她转了工资£${amount}，想附一句话。]` }]);
+      if (res) { await emitGhostNarrativeEvent(res); }
+      setRelationshipFlag('firstSalary');
+    }
+  },
+];
+
+function storyDelay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function switchAchievementTab(tab) {
+  const storyPanel = document.getElementById('storyBookPanel');
+  const albumPanel = document.getElementById('albumPanel');
+  const tabStory = document.getElementById('tabStory');
+  const tabAlbum = document.getElementById('tabAlbum');
+  const title = document.getElementById('achievementTitle');
+  const counter = document.getElementById('storyBookCounter');
+  if (tab === 'story') {
+    if (storyPanel) storyPanel.style.display = '';
+    if (albumPanel) albumPanel.style.display = 'none';
+    if (tabStory) tabStory.classList.add('active');
+    if (tabAlbum) tabAlbum.classList.remove('active');
+    if (title) title.textContent = '📖 我们的故事';
+    renderStoryBook();
+  } else {
+    if (storyPanel) storyPanel.style.display = 'none';
+    if (albumPanel) albumPanel.style.display = '';
+    if (tabStory) tabStory.classList.remove('active');
+    if (tabAlbum) tabAlbum.classList.add('active');
+    if (title) title.textContent = '📦 回忆相册';
+    if (counter) counter.textContent = '';
+    renderAlbum();
+  }
+}
+
+function renderAlbum() {
+  const container = document.getElementById('albumList');
+  if (!container) return;
+  const history = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const fromDeliveries = deliveries.filter(d => d.done && !history.find(h => h.id === d.id));
+  const done = [...history, ...fromDeliveries];
+  if (done.length === 0) {
+    container.innerHTML = `<div class="album-empty">还没有收到任何东西<br>去商城给他寄点什么吧</div>`;
+    return;
+  }
+  const sorted = [...done].sort((a, b) => (b.doneAt || b.addedAt || 0) - (a.doneAt || a.addedAt || 0));
+  container.innerHTML = sorted.map(d => {
+    const emoji = d.productData?.emoji || d.emoji || '📦';
+    const name = d.name || '神秘包裹';
+    const isFromGhost = d.isGhostSend || d.isLocationSpecial;
+    const isFromHome = d.productData?.isFromHome;
+    const from = isFromGhost ? '他寄来的' : isFromHome ? '你从家寄给他的' : '你寄给他的';
+    const dateStr = d.doneAt ? new Date(d.doneAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) :
+                    d.addedAt ? new Date(d.addedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+    const note = d.ghostNote || d.note || '';
+    return `<div class="album-card">
+      <div class="album-card-top">
+        <div class="album-card-emoji">${emoji}</div>
+        <div class="album-card-info">
+          <div class="album-card-name">${name}</div>
+          <div class="album-card-from">${from}</div>
+        </div>
+        <div class="album-card-date">${dateStr}</div>
+      </div>
+      ${note ? `<div class="album-card-note">"${note}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderStoryBook() {
+  const container = document.getElementById('storyBookList');
+  if (!container) return;
+  const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
+  const counterEl = document.getElementById('storyBookCounter');
+  if (counterEl) counterEl.textContent = `${book.length} / ${STORY_EVENTS.length}`;
+  if (book.length === 0) {
+    container.innerHTML = `<div class="story-empty">还没有解锁任何回忆<br><span>继续和他相处，故事会自然发生</span></div>`;
+    return;
+  }
+  const unlockedFilms = book.map(e => {
+    const event = STORY_EVENTS.find(ev => ev.id === e.id);
+    const icon = event?.icon || '📖';
+    const dateStr = new Date(e.unlockedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    return `
+    <div class="film-card unlocked">
+      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
+      <div class="film-img"><div class="film-img-icon">${icon}</div></div>
+      <div class="film-info">
+        <div class="film-title">${e.title}</div>
+        <div class="film-desc">${e.desc}</div>
+        <div class="film-date">${dateStr}</div>
+      </div>
+      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
+    </div>`;
+  }).join('');
+  const lockedItems = STORY_EVENTS.filter(e => !book.find(b => b.id === e.id)).map(() => `
+    <div class="locked-item">
+      <div class="locked-dot"></div>
+      <div class="locked-text">· · · 继续和他相处，也许有一天会发生</div>
+    </div>`).join('');
+  container.innerHTML = `
+    <div class="story-section-label">已解锁的回忆</div>
+    <div class="film-track">${unlockedFilms}</div>
+    <div class="swipe-hint">← 左右滑动 →</div>
+    <div class="story-section-label" style="margin-top:16px;">尚未发生的故事</div>
+    <div class="locked-list">${lockedItems}</div>
+  `;
+}
