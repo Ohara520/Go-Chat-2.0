@@ -241,6 +241,47 @@ async function callDeepSeek(prompt, maxTokens = 500) {
   }
 }
 
+// ===== Sonnet 主调用（支持prompt cache）=====
+
+/**
+ * fetchSonnetWithCache
+ * 主聊天回复调用，支持 Anthropic prompt caching
+ * @param {string} finalSystem        完整动态system（含状态/hint等）
+ * @param {{fixed:string, dynamic:string}} parts  buildSystemPromptParts的结果
+ * @param {Array}  messages           已处理好的消息数组
+ * @param {number} maxTokens          默认1000
+ * @param {AbortSignal|null} signal   外部abort信号
+ * @returns {Response} 原始fetch Response（调用方自己.json()）
+ */
+async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 1000, signal = null) {
+  // 构建system字段：尝试用cache_control分段，若parts无效则fallback到纯字符串
+  let systemField;
+  if (parts && parts.fixed && parts.dynamic) {
+    systemField = [
+      { type: 'text', text: parts.fixed, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: parts.dynamic + '\n' + finalSystem }
+    ];
+  } else {
+    systemField = finalSystem;
+  }
+
+  const body = {
+    model: MODEL_SONNET,
+    max_tokens: maxTokens,
+    system: systemField,
+    messages: messages,
+  };
+
+  const options = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  };
+  if (signal) options.signal = signal;
+
+  return await fetchWithRetry('/api/chat', options, 30000, 1);
+}
+
 // ===== 破防检测 =====
 // 与 sendMessage.js 的 BREAKOUT_PHRASES 保持一致
 // sendMessage.js 有自己完整的 isBreakout，这里是供其他模块（ui.js、innerThought.js 等）使用的版本

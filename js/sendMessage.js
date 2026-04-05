@@ -100,16 +100,8 @@ let _pendingMessages = [];
 let _mergeTimer = null;
 const MERGE_DELAY = 300;
 
-// ===== 补全函数：fetchDeepSeek / pickReadyPendingEvent / decideMainIntent / handlePostReplyActions =====
-// 这四个函数在拆分时遗漏，直接内嵌在此处确保可用
-
-async function fetchDeepSeek(system, userContent, maxTokens) {
-  return await callHaiku(
-    system,
-    [{ role: 'user', content: String(userContent) }],
-    maxTokens || 80
-  );
-}
+// ===== 补全函数：pickReadyPendingEvent / decideMainIntent / handlePostReplyActions =====
+// fetchDeepSeek 已在 api.js 定义，此处不重复
 
 function pickReadyPendingEvent() {
   try {
@@ -157,7 +149,7 @@ async function handlePostReplyActions(text, reply, intent) {
       if (lastBot) lastBot._intimate = true;
       if (typeof saveHistory === 'function') saveHistory();
     }
-  } catch(e) { console.warn('[sendMessage] handlePostReplyActions error:', e); }
+  } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
 }
 
 // ===== 破防短语库 =====
