@@ -1568,7 +1568,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script src="js/api.js"></script>
-<script src="js/helpers.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/wallet.js"></script>
@@ -1614,6 +1613,78 @@ window.addEventListener('load', function() {
 function showQQGroup() {
   const modal = document.getElementById('qqGroupModal');
   if (modal) modal.style.display = 'flex';
+}
+</script>
+
+<script>
+// ===== 加号面板 =====
+function togglePlusPanel() {
+  const panel = document.getElementById('plusPanel');
+  if (!panel) return;
+  const isVisible = panel.style.display !== 'none';
+  panel.style.display = isVisible ? 'none' : 'flex';
+}
+
+function closePlusPanel() {
+  const panel = document.getElementById('plusPanel');
+  if (panel) panel.style.display = 'none';
+}
+
+// ===== 表情包面板（从加号入口打开）=====
+function toggleStickerFromPlus() {
+  closePlusPanel();
+  // 找已有的表情包面板，或创建一个简单的emoji选择器
+  let panel = document.getElementById('stickerPanelFromPlus');
+  if (panel) {
+    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    return;
+  }
+
+  // 创建表情包面板
+  panel = document.createElement('div');
+  panel.id = 'stickerPanelFromPlus';
+  panel.style.cssText = [
+    'position:fixed;bottom:70px;left:0;right:0;z-index:1000',
+    'background:white;border-top:1px solid rgba(168,85,247,0.2)',
+    'padding:12px;display:flex;flex-wrap:wrap;gap:8px',
+    'max-height:200px;overflow-y:auto;box-shadow:0 -4px 20px rgba(0,0,0,0.1)'
+  ].join(';');
+
+  // 常用表情池
+  const stickerEmojis = [
+    '😂','🤣','😭','😅','🙄','💀','😏','😤','🥺','😳',
+    '😍','🥰','😘','💕','❤️','🫶','😎','🤭','😈','👻',
+    '🤔','😑','😒','🫠','💔','😡','🤬','😱','🤯','🥳'
+  ];
+
+  stickerEmojis.forEach(emoji => {
+    const btn = document.createElement('button');
+    btn.textContent = emoji;
+    btn.style.cssText = 'font-size:28px;background:none;border:none;cursor:pointer;padding:4px;border-radius:8px;';
+    btn.onclick = () => {
+      panel.style.display = 'none';
+      const input = document.getElementById('chatInput');
+      if (input) {
+        input.value += emoji;
+        input.focus();
+        if (typeof autoResizeInput === 'function') autoResizeInput(input);
+      }
+    };
+    panel.appendChild(btn);
+  });
+
+  // 点击外部关闭
+  const closeOnOutside = (e) => {
+    if (!panel.contains(e.target)) {
+      panel.style.display = 'none';
+      document.removeEventListener('click', closeOnOutside);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeOnOutside), 100);
+
+  const chatScreen = document.getElementById('chatScreen');
+  if (chatScreen) chatScreen.appendChild(panel);
+  else document.body.appendChild(panel);
 }
 </script>
 
