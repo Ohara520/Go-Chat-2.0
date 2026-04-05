@@ -1552,7 +1552,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    padding: 10px 12px 20px;
+    padding: 18px 12px 20px;
 }
 .product-card {
     background: rgba(255,255,255,0.72);
@@ -1563,7 +1563,7 @@
     display: flex; flex-direction: column; align-items: center;
     text-align: center; gap: 5px; cursor: pointer;
     transition: transform 0.15s, box-shadow 0.15s;
-    position: relative; overflow: hidden;
+    position: relative; overflow: visible;
 }
 .product-card:active { transform: scale(0.97); }
 .product-emoji { font-size: 36px; }
@@ -1586,10 +1586,11 @@
     background: linear-gradient(145deg, rgba(255,255,255,0.78), rgba(228,248,215,0.62)) !important;
 }
 .ghost-mentioned-tag {
-    position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
     background: linear-gradient(135deg, #3a7a2a, #6ab040);
     color: white; font-size: 9px; font-weight: 700;
     padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+    z-index: 2;
 }
 
 /* 已购/售罄 */
