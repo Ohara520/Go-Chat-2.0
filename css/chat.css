@@ -1072,7 +1072,7 @@
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     border-radius: 18px;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: 0 4px 18px rgba(80,140,55,0.08);
     border: 1px solid rgba(255,255,255,0.85);
 }
@@ -1087,7 +1087,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 0;
+    padding: 10px 16px;
     border-bottom: 0.5px solid rgba(100,160,80,0.1);
 }
 .transaction-item:last-child { border-bottom: none; }
@@ -1103,9 +1103,21 @@
 .transaction-info { flex: 1; min-width: 0; }
 .transaction-name { font-size: 13px; color: #2d5a30; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .transaction-time { font-size: 11px; color: rgba(50,100,45,0.45); margin-top: 1px; }
-.transaction-amount { font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.transaction-amount { font-size: 13px; font-weight: 600; flex-shrink: 0; padding-right: 2px; }
 .transaction-amount.in  { color: #3B6D11; }
 .transaction-amount.out { color: #712B13; }
+.transaction-toggle {
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px;
+    padding: 12px 0;
+    font-size: 12px; color: rgba(50,100,45,0.5);
+    cursor: pointer;
+    border-top: 0.5px solid rgba(100,160,80,0.1);
+    transition: color 0.2s;
+}
+.transaction-toggle:active { color: rgba(50,100,45,0.8); }
+.toggle-arrow { font-size: 11px; transition: transform 0.2s; }
+.toggle-arrow.open { transform: rotate(180deg); }
 
 /* 转账卡片 */
 .transfer-card {
