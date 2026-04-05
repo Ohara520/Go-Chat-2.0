@@ -832,3 +832,75 @@ async function triggerLuxuryMoment(product, poster) {
   }
   // Ghost 收到礼物 → 等快递签收后再触发，这里不操作
 }
+
+
+// ============================================================
+// 成就页 Tab 切换 + 相册渲染（从 chat.js 拆分补全）
+// ============================================================
+
+function switchAchievementTab(tab) {
+  const storyPanel = document.getElementById('storyBookPanel');
+  const albumPanel = document.getElementById('albumPanel');
+  const tabStory   = document.getElementById('tabStory');
+  const tabAlbum   = document.getElementById('tabAlbum');
+  const title      = document.getElementById('achievementTitle');
+  const counter    = document.getElementById('storyBookCounter');
+
+  if (tab === 'story') {
+    if (storyPanel) storyPanel.style.display = '';
+    if (albumPanel) albumPanel.style.display = 'none';
+    if (tabStory)   tabStory.classList.add('active');
+    if (tabAlbum)   tabAlbum.classList.remove('active');
+    if (title)      title.textContent = '📖 我们的故事';
+    if (typeof renderStoryBook === 'function') renderStoryBook();
+  } else {
+    if (storyPanel) storyPanel.style.display = 'none';
+    if (albumPanel) albumPanel.style.display = '';
+    if (tabStory)   tabStory.classList.remove('active');
+    if (tabAlbum)   tabAlbum.classList.add('active');
+    if (title)      title.textContent = '📦 回忆相册';
+    if (counter)    counter.textContent = '';
+    renderAlbum();
+  }
+}
+
+function renderAlbum() {
+  const container = document.getElementById('albumList');
+  if (!container) return;
+
+  const history      = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+  const deliveries   = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const fromDeliveries = deliveries.filter(d => d.done && !history.find(h => h.id === d.id));
+  const done         = [...history, ...fromDeliveries];
+
+  if (done.length === 0) {
+    container.innerHTML = `<div class="album-empty">还没有收到任何东西<br>去商城给他寄点什么吧</div>`;
+    return;
+  }
+
+  const sorted = [...done].sort((a, b) => (b.doneAt || b.addedAt || 0) - (a.doneAt || a.addedAt || 0));
+  container.innerHTML = sorted.map(d => {
+    const emoji      = d.productData?.emoji || d.emoji || '📦';
+    const name       = d.name || '神秘包裹';
+    const isFromGhost = d.isGhostSend || d.isLocationSpecial;
+    const isFromHome  = d.productData?.isFromHome;
+    const from       = isFromGhost ? '他寄来的' : isFromHome ? '你从家寄给他的' : '你寄给他的';
+    const dateStr    = d.doneAt
+      ? new Date(d.doneAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+      : d.addedAt
+        ? new Date(d.addedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '';
+    const note = d.ghostNote || d.note || '';
+    return `<div class="album-card">
+      <div class="album-card-top">
+        <div class="album-card-emoji">${emoji}</div>
+        <div class="album-card-info">
+          <div class="album-card-name">${name}</div>
+          <div class="album-card-from">${from}</div>
+        </div>
+        <div class="album-card-date">${dateStr}</div>
+      </div>
+      ${note ? `<div class="album-card-note">"${note}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
