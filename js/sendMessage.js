@@ -100,6 +100,66 @@ let _pendingMessages = [];
 let _mergeTimer = null;
 const MERGE_DELAY = 300;
 
+// ===== 补全函数：fetchDeepSeek / pickReadyPendingEvent / decideMainIntent / handlePostReplyActions =====
+// 这四个函数在拆分时遗漏，直接内嵌在此处确保可用
+
+async function fetchDeepSeek(system, userContent, maxTokens) {
+  return await callHaiku(
+    system,
+    [{ role: 'user', content: String(userContent) }],
+    maxTokens || 80
+  );
+}
+
+function pickReadyPendingEvent() {
+  try {
+    const raw = localStorage.getItem('pendingEvents');
+    if (!raw) return null;
+    const events = JSON.parse(raw);
+    if (!Array.isArray(events) || events.length === 0) return null;
+    const now = Date.now();
+    const idx = events.findIndex(e => !e.triggerAt || e.triggerAt <= now);
+    if (idx === -1) return null;
+    const [ready] = events.splice(idx, 1);
+    localStorage.setItem('pendingEvents', JSON.stringify(events));
+    return ready;
+  } catch(e) { return null; }
+}
+
+function decideMainIntent(text, pendingEvent) {
+  if (pendingEvent) return 'event';
+  const t = (text || '').toLowerCase();
+  if (/touch me|want you|naughty|tease me|摸摸|蹭蹭|贴贴|咬|舔|撩|涩涩|色色/.test(t)) return 'intimate';
+  if (/难过|伤心|哭|委屈|不开心|崩溃|hurt|sad|crying|upset|awful/.test(t)) return 'emotional';
+  if (/给我钱|转我|好穷|买不起|要钱|零花钱|缺钱|没钱/.test(t)) return 'money';
+  return 'routine';
+}
+
+async function handlePostReplyActions(text, reply, intent) {
+  try {
+    consumeQuota().catch(() => {});
+    localStorage.setItem('lastUserMessageAt', Date.now().toString());
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    const todayKey = 'dailyChatDone_' + new Date().toDateString();
+    if (!localStorage.getItem(todayKey)) {
+      localStorage.setItem(todayKey, '1');
+      const lastDay = localStorage.getItem('lastVisitDay');
+      const today = new Date().toDateString();
+      if (lastDay !== today) {
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        const streak = parseInt(localStorage.getItem('visitStreak') || '1');
+        localStorage.setItem('visitStreak', lastDay === yesterday ? streak + 1 : 1);
+        localStorage.setItem('lastVisitDay', today);
+      }
+    }
+    if (intent === 'intimate') {
+      const lastBot = [...chatHistory].reverse().find(m => m.role === 'assistant' && !m._recalled);
+      if (lastBot) lastBot._intimate = true;
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+  } catch(e) { console.warn('[sendMessage] handlePostReplyActions error:', e); }
+}
+
 // ===== 破防短语库 =====
 // 注意：Claude 4.5在调情/角色质疑场景下更容易说出部分身份暴露词
 // 关键修复：扩展了检测范围，加入4.5常见的新破防模式
