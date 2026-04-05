@@ -1036,8 +1036,17 @@ async function _processMergedMessage(text) {
       consumeQuota().catch(() => {});
     }
 
-    // ── 消息撤回（4%概率）───────────────────────────────────
-    if (lastBotResult?.msgDiv && !parsedMoney && Math.random() < 0.04) {
+    // ── 消息撤回（降低概率 + 有原因才触发）──────────────────
+    // 触发条件：调情余温期 / 他说了比较重的话 / 情绪高张场景
+    const _replyText = reply || '';
+    const _recallHasReason = (
+      getJealousyLevelCapped() === 'severe' ||    // 严重吃醋，说重了
+      getJealousyLevelCapped() === 'medium' ||    // 中度吃醋
+      getMoodLevel() >= 8 ||                      // 心情很好，说漏嘴了
+      getMoodLevel() <= 3 ||                      // 心情很差，说重了
+      _replyText.length > 120                     // 说太多了，不像他
+    );
+    if (lastBotResult?.msgDiv && !parsedMoney && _recallHasReason && Math.random() < 0.015) {
       const recallDelay = (Math.floor(Math.random() * 4) + 3) * 1000;
       _isSending = true;
       setTimeout(async () => {
@@ -1202,7 +1211,7 @@ async function _processMergedMessage(text) {
     // ── 副作用（fire-and-forget）────────────────────────────
     consumeLoveOverride();
     const mainReplyHasCareAction = transferSuccess || !!sendGift;
-    if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
+    if (!mainReplyHasCareAction) checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
 
     // SEND_GIFT处理
