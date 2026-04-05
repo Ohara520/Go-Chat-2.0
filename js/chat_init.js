@@ -192,6 +192,15 @@ async function initChat() {
     }
   }
 
+  // 开服补偿£200（每个用户只发一次）
+  if (!localStorage.getItem('openingCompensation_20260405')) {
+    localStorage.setItem('openingCompensation_20260405', '1');
+    if (typeof addTransaction === 'function') {
+      addTransaction({ icon: '💷', name: '开服补偿', amount: 200 });
+      if (typeof renderWallet === 'function') renderWallet();
+    }
+  }
+
   // 副作用初始化
   if (typeof ensureGhostBirthday === 'function') ensureGhostBirthday();
   if (typeof ensureGhostProfile === 'function') ensureGhostProfile();
