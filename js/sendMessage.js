@@ -738,9 +738,11 @@ async function _processMergedMessage(text) {
     // ── 调情检测 + 情绪识别（合并一次Haiku调用）────────────
     // 有图片时强制跳过——Grok看不到图，会破防说Kirk
     const INTIMATE_PATTERNS = [
+      /亲亲|亲你|亲一下|亲嘴|么么哒|么么/,
+      /抱抱|抱一下|抱我|让我抱/,
       /摸摸|蹭蹭|贴贴|咬|舔|撩你/,
       /你好坏|坏死了|流氓/,
-      /touch me|want you|naughty|tease me/i,
+      /kiss me|hug me|touch me|want you|naughty|tease me/i,
       /床|被窝|睡觉.*一起|一起.*睡/,
       /性感|诱惑|撩|勾引|暧昧|色色|涩涩/,
       /胸|腿|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
@@ -756,7 +758,7 @@ async function _processMergedMessage(text) {
           fetchDeepSeek(
             '判断用户消息。只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            'flirt判断标准：身体接触（亲亲/亲一下/抱抱/抱一下/摸摸/蹭蹭/kiss/hug）、露骨描述、刻意挑逗均为true。纯粹想念/日常问候为false。',
             `用户说：${text}`,
             80
           ),

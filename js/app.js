@@ -30,35 +30,48 @@ function goBack() {
 }
 
 // ===== 启动页 =====
-function startChat() {
+async function startChat() {
     const name = document.getElementById('userNameInput').value.trim();
     if (!name) {
         document.getElementById('userNameInput').placeholder = '先输入昵称哦～';
         return;
     }
 
-    // 内测码验证
-    const BETA_CODES = [
-        'GHOST-A1K9','GHOST-B2M7','GHOST-C3N5','GHOST-D4P8','GHOST-E5Q2',
-        'GHOST-F6R4','GHOST-G7S6','GHOST-H8T3','GHOST-I9U1','GHOST-J0V9',
-        'GHOST-K1W7','GHOST-L2X5','GHOST-M3Y8','GHOST-N4Z2','GHOST-O5A6',
-        'GHOST-P6B4','GHOST-Q7C3','GHOST-R8D1','GHOST-S9E7','GHOST-T0F5',
-        'GHOST-U1G9','GHOST-V2H3','GHOST-W3I6','GHOST-X4J8','GHOST-Y5K2',
-        'GHOST-Z6L4','GHOST-A7M1','GHOST-B8N9','GHOST-C9O5','GHOST-D0P7'
-    ];
-
     // 已验证过的用户直接进
     if (!localStorage.getItem('betaVerified')) {
         const codeInput = document.getElementById('betaCodeInput');
         const errorEl = document.getElementById('betaCodeError');
         const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
-        if (!BETA_CODES.includes(code)) {
-            if (errorEl) errorEl.style.display = 'block';
-            if (codeInput) codeInput.placeholder = '请输入正确的内测码';
+
+        if (!code) {
+            if (errorEl) { errorEl.textContent = '请输入邀请码'; errorEl.style.display = 'block'; }
             return;
         }
-        localStorage.setItem('betaVerified', '1');
-        localStorage.setItem('betaCode', code);
+
+        // 先本地校验格式，再调接口验证
+        try {
+            if (errorEl) { errorEl.textContent = '验证中…'; errorEl.style.display = 'block'; }
+            const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
+            const res = await fetch('/api/check-invite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, email }),
+            });
+            const data = await res.json();
+
+            if (!data.ok) {
+                const msg = data.reason === 'used' ? '该邀请码已被使用' : '邀请码无效，请检查后重试';
+                if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+                if (codeInput) codeInput.value = '';
+                return;
+            }
+
+            localStorage.setItem('betaVerified', '1');
+            localStorage.setItem('betaCode', code);
+        } catch(e) {
+            if (errorEl) { errorEl.textContent = '网络错误，请稍后重试'; errorEl.style.display = 'block'; }
+            return;
+        }
     }
 
     localStorage.setItem('userName', name);
