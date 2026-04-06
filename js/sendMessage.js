@@ -380,17 +380,26 @@ async function sendMessage() {
 // ===== 核心处理：_processMergedMessage =====
 async function _processMergedMessage(text) {
 
+  // ── 单次响应锁：防止并发多次触发 ───────────────────────
+  if (_isSending) {
+    console.warn('[sendMessage] 已在处理中，跳过重复触发');
+    return;
+  }
+  _isSending = true;
+
   // ── 条数/订阅检查 ────────────────────────────────────────
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (email) {
     const sub = await getSubscription();
-    if (!sub) { showSubscribePrompt(); return; }
+    if (!sub) { _isSending = false; showSubscribePrompt(); return; }
     if (sub.remaining <= 0) {
+      _isSending = false;
       appendMessage('bot', 'got called away. give me a bit.\n临时有任务，等我。');
       return;
     }
   } else {
     if (getTodayCount() >= DAILY_LIMIT) {
+      _isSending = false;
       appendMessage('bot', "that's enough for today. go do something else.\n今天就到这。去做点别的事。");
       chatHistory.push({
         role: 'user',
@@ -484,7 +493,7 @@ async function _processMergedMessage(text) {
   }
   _sendVersion++;
   const _myVersion = _sendVersion;
-  _isSending = true;
+  // _isSending 已在函数入口设置
   _currentAbortController = new AbortController();
 
   // 爱意抗拒值更新 + 剧情检测

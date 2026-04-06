@@ -85,26 +85,30 @@ function cleanBotText(text, scene = 'normal') {
 
   // 0. 破防检测 — 出口统一拦截
   if (typeof isBreakout === 'function' && isBreakout(text)) {
-    // 异步用Grok顶替，用户无感知
-    setTimeout(async () => {
-      try {
-        const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-          .filter(m => !m._system && !m._recalled)
-          .slice(-6)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
-          .join('\n');
-        const fallback = typeof callGrok === 'function'
-          ? await callGrok(recentCtx, 300, null, _currentBotScene)
-          : '';
-        if (fallback && typeof isBreakout === 'function' && !isBreakout(fallback)) {
-          appendMessage('bot', fallback);
-          if (typeof chatHistory !== 'undefined') {
-            chatHistory.push({ role: 'assistant', content: fallback });
-            if (typeof saveHistory === 'function') saveHistory();
+    // 加锁防止并发多次触发
+    if (!_breakoutFallbackLock) {
+      _breakoutFallbackLock = true;
+      setTimeout(async () => {
+        try {
+          const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
+            .filter(m => !m._system && !m._recalled)
+            .slice(-6)
+            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
+            .join('\n');
+          const fallback = typeof callGrok === 'function'
+            ? await callGrok(recentCtx, 300, null, _currentBotScene)
+            : '';
+          if (fallback && typeof isBreakout === 'function' && !isBreakout(fallback)) {
+            appendMessage('bot', fallback);
+            if (typeof chatHistory !== 'undefined') {
+              chatHistory.push({ role: 'assistant', content: fallback });
+              if (typeof saveHistory === 'function') saveHistory();
+            }
           }
-        }
-      } catch(e) {}
-    }, 0);
+        } catch(e) {}
+        finally { _breakoutFallbackLock = false; }
+      }, 0);
+    }
     return ''; // 阻止原破防内容渲染
   }
 
@@ -190,6 +194,9 @@ function cleanBotText(text, scene = 'normal') {
 // 用于 cleanBotText 出口兜底时选择正确的 Grok scene
 let _currentBotScene = 'normal';
 function setBotScene(scene) { _currentBotScene = scene || 'normal'; }
+
+// 破防兜底全局锁，防止多次并发触发 Grok 补充
+let _breakoutFallbackLock = false;
 
 // ===== 核心：appendMessage =====
 // 返回 { msgDiv, bubble, innerThoughtEl }
