@@ -6,7 +6,7 @@
 // ============================================================
 
 // ===== 模型常量 =====
-const MODEL_SONNET = 'claude-sonnet-4-5-20250929';
+const MODEL_SONNET = 'claude-sonnet-4-6';
 const MODEL_HAIKU  = 'claude-haiku-4-5-20251001';
 
 function getMainModel() {
@@ -172,9 +172,11 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
  * @param {string|null} imageBase64  可选图片
  * @returns {string} 回复文本，失败返回空字符串
  */
-async function callGrok(system, user, maxTokens = 300, imageBase64 = null) {
+async function callGrok(system, user, maxTokens = 300, imageBase64 = null, scene = 'normal') {
   try {
-    const body = { system, user, max_tokens: maxTokens };
+    // system 为空时传 scene，让后端用 GHOST_FALLBACK_CORE
+    const body = { user, max_tokens: maxTokens, scene };
+    if (system) body.system = system;
     if (imageBase64) body.image_base64 = imageBase64;
     const res = await fetchWithTimeout('/api/gemini', {
       method: 'POST',

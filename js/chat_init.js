@@ -89,7 +89,20 @@ async function maybeProactiveMessage() {
     if (!cleaned || /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)/i.test(cleaned)) {
       scheduleProactiveMessage(); return;
     }
-    if (!isBreakout(cleaned)) {
+    if (isBreakout(cleaned)) {
+      // 破防：用Grok proactive场景兜底
+      try {
+        const ctx = chatHistory.filter(m => !m._system).slice(-4)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
+        const fb = await callGrok('', ctx, 80, null, 'proactive');
+        if (fb && !isBreakout(fb)) {
+          appendMessage('bot', fb.trim());
+          chatHistory.push({ role: 'assistant', content: fb.trim(), _time: Date.now() });
+          saveHistory();
+          if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+        }
+      } catch(e) {}
+    } else {
       appendMessage('bot', cleaned);
       chatHistory.push({ role: 'assistant', content: cleaned, _time: Date.now() });
       saveHistory();
@@ -152,8 +165,14 @@ function checkSalaryDay() {
       `You are Simon Riley.\n\nYou just sent her your monthly salary: £${salary}.\n\nOne line. lowercase. No explanation. No extra context. Keep it short. Like he wouldn't make a thing out of it.`,
       [{ role: 'user', content: 'say something.' }],
       80
-    ).then(line => {
-      const finalLine = (line && !isBreakout(line)) ? line : fallbackLine;
+    ).then(async line => {
+      let finalLine = (line && !isBreakout(line)) ? line : null;
+      if (!finalLine) {
+        try {
+          const fb = await callGrok('', `Ghost just sent her his monthly salary £${salary}. One dry line.`, 80, null, 'normal');
+          finalLine = (fb && !isBreakout(fb)) ? fb.trim() : fallbackLine;
+        } catch(e) { finalLine = fallbackLine; }
+      }
       if (container && typeof showGhostTransferCard === 'function') {
         showGhostTransferCard(container, salary, finalLine, false);
       }

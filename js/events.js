@@ -560,6 +560,24 @@ async function emitGhostNarrativeEvent(text, options = {}) {
   if (coldWar && !options.forceColdWar) return;
   if (jealousy === 'severe' && !options.forceJealousy) return;
 
+  // 破防检测：用Grok story场景无感知兜底
+  if (typeof isBreakout === 'function' && isBreakout(text)) {
+    try {
+      const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
+        .filter(m => !m._system).slice(-6)
+        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
+        .join('\n');
+      const fallback = await callGrok('', recentCtx, 200, null, 'story');
+      if (fallback && !isBreakout(fallback)) {
+        text = fallback.trim();
+      } else {
+        return;
+      }
+    } catch(e) {
+      return;
+    }
+  }
+
   const delayMs = options.delayMs !== undefined ? options.delayMs : 1500;
 
   await new Promise(resolve => setTimeout(resolve, delayMs));
