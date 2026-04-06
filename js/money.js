@@ -504,9 +504,12 @@ function applyMoneyEffect(amount, options = {}) {
 
 function getWeekKey() {
   const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const week = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
-  return now.getFullYear() + '_w' + week;
+  // 以周一为一周起点，取本周周一的日期作为 key
+  const day = now.getDay(); // 0=周日 1=周一 ... 6=周六
+  const diff = (day === 0 ? -6 : 1 - day); // 周日往前推6天，其余往前推到周一
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return monday.toISOString().slice(0, 10); // 格式：2025-04-07
 }
 
 function getWeeklyGiven() {
