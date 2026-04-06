@@ -553,6 +553,7 @@ let _chatMenuTimer = null;
 
 function startChatMenuTimer(e) {
   _chatMenuTimer = setTimeout(() => {
+    if (e && e.preventDefault) e.preventDefault();
     showChatMenu(e);
   }, 600); // 长按600ms触发
 }
