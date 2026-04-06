@@ -444,8 +444,9 @@ async function _processMergedMessage(text) {
   // ── 用户回来检测（离开超过2小时）────────────────────────
   const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
   const _comebackMins = Math.floor(_comebackGap / 60000);
-  if (_comebackMins >= 120 && !sessionStorage.getItem('comebackReacted')) {
-    sessionStorage.setItem('comebackReacted', '1');
+  const _comebackKey = 'comebackReacted_' + new Date().toDateString();
+  if (_comebackMins >= 120 && !localStorage.getItem(_comebackKey)) {
+    localStorage.setItem(_comebackKey, '1');
     const _affection = getAffection();
     const _moodNow = getMoodLevel();
     const _coldWarNow = localStorage.getItem('coldWarMode') === 'true';
@@ -520,7 +521,7 @@ async function _processMergedMessage(text) {
   if (_currentAbortController) {
     _currentAbortController.abort();
     _currentAbortController = null;
-    _isSending = false;
+    // 不在这里解锁，保持 _isSending = true 让新请求正常进入
   }
   _sendVersion++;
   const _myVersion = _sendVersion;
