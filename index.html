@@ -561,6 +561,16 @@
         <div class="card-title">单词</div>
         <div class="card-desc" id="vocabCardDesc">跟Ghost学英语</div>
       </div>
+      <div class="card" onclick="openScreen('takeoutScreen')">
+        <div class="card-icon">🍜</div>
+        <div class="card-title">外卖</div>
+        <div class="card-desc">Ghost请客</div>
+      </div>
+      <div class="card" onclick="openScreen('petScreen')">
+        <div class="card-icon">🐾</div>
+        <div class="card-title">宠物</div>
+        <div class="card-desc">养一只小猫</div>
+      </div>
     </div>
 
     <!-- QQ群弹窗 -->
@@ -1649,6 +1659,22 @@ function toggleStickerFromPlus() {
   // plusPanel 保持打开，只切换子面板
 }
 </script>
+
+  <div class="screen" id="takeoutScreen">
+    <div class="screen-header">
+      <button class="back-button" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">🍜 外卖</div>
+    </div>
+    <div style="padding:40px 20px;text-align:center;color:#999;font-size:14px;">即将上线</div>
+  </div>
+
+  <div class="screen" id="petScreen">
+    <div class="screen-header">
+      <button class="back-button" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">🐾 宠物</div>
+    </div>
+    <div style="padding:40px 20px;text-align:center;color:#999;font-size:14px;">即将上线</div>
+  </div>
 
 </body>
 </html>
