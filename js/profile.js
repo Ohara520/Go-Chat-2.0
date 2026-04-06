@@ -221,6 +221,57 @@ function getUserCountry() {
 // 资料页
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 邀请码系统
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+async function loadMyInviteCode() {
+  const el = document.getElementById('myInviteCode');
+  if (!el) return;
+
+  // 先看本地有没有缓存
+  const cached = localStorage.getItem('myInviteCode');
+  if (cached) { el.textContent = cached; return; }
+
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
+  if (!email) { el.textContent = '请先登录'; return; }
+
+  try {
+    // 查是否已有未使用的邀请码
+    const res = await fetch('/api/get-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (data.code) {
+      localStorage.setItem('myInviteCode', data.code);
+      el.textContent = data.code;
+    } else {
+      el.textContent = '暂无邀请码';
+    }
+  } catch(e) {
+    el.textContent = '加载失败';
+  }
+}
+
+function copyInviteCode() {
+  const code = document.getElementById('myInviteCode')?.textContent || '';
+  if (!code || code === '加载中…' || code === '暂无邀请码') return;
+  navigator.clipboard.writeText(code).then(() => {
+    showToast('邀请码已复制 ✅');
+  }).catch(() => {
+    // 兜底方案
+    const ta = document.createElement('textarea');
+    ta.value = code;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('邀请码已复制 ✅');
+  });
+}
+
 function initProfile() {
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locationZH = {
@@ -267,6 +318,7 @@ function initProfile() {
   }
 
   renderGhostProfile();
+  loadMyInviteCode();
 }
 
 function renderGhostProfile() {
