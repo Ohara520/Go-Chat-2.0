@@ -179,6 +179,7 @@ const BREAKOUT_PHRASES = [
   // AI助手类
   "ai assistant", "development work", "coding questions",
   "creative writing communities", "roleplay platforms",
+  "developer assistant", "language model",
   // 明确跳出
   "i need to be straight with you",
   "i need to be honest with you",
@@ -192,6 +193,15 @@ const BREAKOUT_PHRASES = [
   "i'm designed to", "i was designed to",
   "claude's", "by anthropic",
   "claude here", "it's claude",
+  // AI助手式拒绝行为
+  "i can't discuss sensitive", "sensitive, personal",
+  "i can't engage with that", "that kind of content",
+  "i need to pause here", "i need to be direct",
+  "i appreciate the thought", "let's keep it grounded",
+  "i can't discuss that", "i cannot discuss",
+  "i can't do this", "i can't continue this roleplay",
+  "this roleplay scenario", "falls outside",
+  "done with the games", "not something i",
 ];
 
 function isBreakout(txt) {

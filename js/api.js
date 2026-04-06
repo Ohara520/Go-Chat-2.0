@@ -336,6 +336,9 @@ function isBreakout(text) {
     "claude here", "it's claude",
     "i appreciate the creative", "i appreciate the detailed",
     "maintain an ongoing", "simulate an intimate",
+    "developer assistant", "i can't discuss sensitive",
+    "sensitive, personal", "must refuse to answer",
+    "within my capabilities",
   ].some(p => lower.includes(p));
 }
 
