@@ -595,10 +595,17 @@ function clearRecentMessages() {
   const realMsgs = chatHistory.filter(m => !m._system && !m._recalled);
   const keepMsgs = realMsgs.slice(0, Math.max(0, realMsgs.length - 30));
   chatHistory = [...keepMsgs, ...systemMsgs.slice(-5)];
+  // 立刻存localStorage
   if (typeof saveHistory === 'function') saveHistory();
+  // 立刻推云端，防止刷新时云端旧数据覆盖回来
+  if (typeof saveChatHistoryNow === 'function') {
+    saveChatHistoryNow().catch(() => {});
+  } else if (typeof scheduleCloudSave === 'function') {
+    scheduleCloudSave();
+  }
   // 重新渲染
   const container = document.getElementById('messagesContainer');
   if (container) container.innerHTML = '';
   if (typeof refreshChatScreen === 'function') refreshChatScreen();
-  if (typeof showToast === 'function') showToast('已清理最近30条消息');
+  if (typeof showToast === 'function') showToast('已清理最近30条消息，正在同步...');
 }
