@@ -346,6 +346,24 @@ async function updateLongTermMemory() {
   } catch(e) {}
 }
 
+// ===== 历史记录破防内容清理 =====
+// 在页面加载时自动执行，清掉已污染的历史
+function cleanBreakoutHistory() {
+  if (typeof chatHistory === 'undefined' || !Array.isArray(chatHistory)) return;
+  const before = chatHistory.length;
+  chatHistory = chatHistory.map(m => {
+    if (m.role === 'assistant' && !m._recalled && typeof isBreakout === 'function' && isBreakout(m.content)) {
+      return { ...m, _recalled: true, content: '[recalled]' };
+    }
+    return m;
+  });
+  const cleaned = chatHistory.filter(m => m._recalled && m.content === '[recalled]').length;
+  if (cleaned > 0) {
+    console.log(`[cleanBreakoutHistory] 清理了 ${cleaned} 条破防记录`);
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+}
+
 // ===== 主入口：sendMessage =====
 async function sendMessage() {
   const input = document.getElementById('chatInput');
@@ -549,6 +567,7 @@ async function _processMergedMessage(text) {
     // rawHistory：Grok用（含调情内容，20条）
     const rawHistory = chatHistory
       .filter(m => !m._system && !m._recalled)
+      .filter(m => m.role !== 'assistant' || !isBreakout(m.content))
       .slice(-20)
       .map(m => ({ role: m.role, content: m.content }));
 
@@ -556,6 +575,7 @@ async function _processMergedMessage(text) {
     // 修复 #061: 确保 _recalled 消息完全不传给模型
     const cleanHistory = chatHistory
       .filter(m => (!m._system || m._imageDesc) && !m._recalled)
+      .filter(m => m.role !== 'assistant' || !isBreakout(m.content))
       .slice(-30)
       .map(m => ({
         role: m.role,
@@ -1117,11 +1137,14 @@ async function _processMergedMessage(text) {
 
     // ── 存档 ─────────────────────────────────────────────────
     _currentAbortController = null;
-    chatHistory.push({
-      role: 'assistant',
-      content: reply,
-      ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {})
-    });
+    // 破防内容不存入历史，防止污染上下文
+    if (reply && !isBreakout(reply)) {
+      chatHistory.push({
+        role: 'assistant',
+        content: reply,
+        ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {})
+      });
+    }
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
 

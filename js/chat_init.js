@@ -178,6 +178,19 @@ async function initChat() {
   // 清除所有残留定时器，防止多实例
   if (_silenceTimer) { clearTimeout(_silenceTimer); _silenceTimer = null; }
   if (_proactiveTimer) { clearTimeout(_proactiveTimer); _proactiveTimer = null; }
+  // 清理历史里的破防内容，防止上下文污染
+  if (typeof cleanBreakoutHistory === 'function') cleanBreakoutHistory();
+
+  // 清理历史里的破防内容，防止上下文污染
+  if (typeof isBreakout === 'function' && typeof chatHistory !== 'undefined') {
+    const before = chatHistory.length;
+    chatHistory = chatHistory.filter(m =>
+      !(m.role === 'assistant' && !m._recalled && isBreakout(m.content))
+    );
+    if (chatHistory.length < before && typeof saveHistory === 'function') {
+      saveHistory();
+    }
+  }
   // 好感度首次初始化
   if (!localStorage.getItem('affection')) setAffection(70);
 
