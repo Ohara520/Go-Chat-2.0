@@ -800,7 +800,7 @@ function confirmTransfer() {
     if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（网络错误）', amount });
     if (typeof renderWallet === 'function') renderWallet();
     updateUserTransferCard(cardId, false);
-    if (typeof appendMessage === 'function') appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+    // 网络错误静默处理，不显示出戏提示
   });
 }
 
