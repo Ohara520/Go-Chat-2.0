@@ -530,6 +530,12 @@ async function sendSticker(id) {
     if (!reply) throw new Error('EMPTY_REPLY');
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
 
+    if (typeof isBreakout === 'function' && isBreakout(reply)) {
+      console.warn('[sticker] 破防拦截');
+      _isSending = false;
+      hideTyping();
+      return;
+    }
     // Ghost偶尔也发表情包
     appendMessage('bot', reply);
     if (id === 'kiss' && Math.random() < 0.08) {
