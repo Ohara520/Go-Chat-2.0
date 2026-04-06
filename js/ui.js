@@ -499,3 +499,59 @@ function renderChatHistory(chatHistory) {
 
   scrollToBottom();
 }
+
+
+// ===== 气泡按钮长按菜单 =====
+let _chatMenuTimer = null;
+
+function startChatMenuTimer(e) {
+  _chatMenuTimer = setTimeout(() => {
+    showChatMenu(e);
+  }, 600); // 长按600ms触发
+}
+
+function clearChatMenuTimer() {
+  if (_chatMenuTimer) {
+    clearTimeout(_chatMenuTimer);
+    _chatMenuTimer = null;
+  }
+}
+
+function showChatMenu(e) {
+  e.preventDefault();
+  const menu = document.getElementById('chatContextMenu');
+  if (!menu) return;
+  const btn = document.getElementById('thoughtBtn');
+  const rect = btn ? btn.getBoundingClientRect() : { right: window.innerWidth - 10, top: 60 };
+  menu.style.display = 'block';
+  menu.style.right = (window.innerWidth - rect.right) + 'px';
+  menu.style.top = (rect.bottom + 8) + 'px';
+  setTimeout(() => document.addEventListener('click', hideChatMenuOnOutside), 10);
+}
+
+function hideChatMenu() {
+  const menu = document.getElementById('chatContextMenu');
+  if (menu) menu.style.display = 'none';
+  document.removeEventListener('click', hideChatMenuOnOutside);
+}
+
+function hideChatMenuOnOutside(e) {
+  const menu = document.getElementById('chatContextMenu');
+  if (menu && !menu.contains(e.target)) hideChatMenu();
+}
+
+function clearRecentMessages() {
+  if (!confirm('清理最近30条消息？这会让对话从这里重新开始。')) return;
+  if (typeof chatHistory === 'undefined') return;
+  // 保留系统消息和30条以前的历史
+  const systemMsgs = chatHistory.filter(m => m._system);
+  const realMsgs = chatHistory.filter(m => !m._system && !m._recalled);
+  const keepMsgs = realMsgs.slice(0, Math.max(0, realMsgs.length - 30));
+  chatHistory = [...keepMsgs, ...systemMsgs.slice(-5)];
+  if (typeof saveHistory === 'function') saveHistory();
+  // 重新渲染
+  const container = document.getElementById('messagesContainer');
+  if (container) container.innerHTML = '';
+  if (typeof refreshChatScreen === 'function') refreshChatScreen();
+  if (typeof showToast === 'function') showToast('已清理最近30条消息');
+}
