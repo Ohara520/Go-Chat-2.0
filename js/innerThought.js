@@ -213,7 +213,7 @@ One line. Lowercase. Private. Like it slipped out.`;
     if (_isIntimateThought) {
       // Grok生成调情心声
       try {
-        const grokRaw = await callGrok(thoughtPrompt, 'inner thought now.', 80);
+        const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 80);
         const matchG = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
         if (matchG) {
           const candidate = matchG[1].trim();

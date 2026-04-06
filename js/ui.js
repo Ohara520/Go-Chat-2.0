@@ -80,8 +80,33 @@ function updateToRead() {
 
 const _UNLOCK_VALID_FIELDS = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
 
-function cleanBotText(text) {
+function cleanBotText(text, scene = 'normal') {
   if (!text) return '';
+
+  // 0. 破防检测 — 出口统一拦截
+  if (typeof isBreakout === 'function' && isBreakout(text)) {
+    // 异步用Grok顶替，用户无感知
+    setTimeout(async () => {
+      try {
+        const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
+          .filter(m => !m._system && !m._recalled)
+          .slice(-6)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
+          .join('\n');
+        const fallback = typeof callGrok === 'function'
+          ? await callGrok(recentCtx, 300, null, _currentBotScene)
+          : '';
+        if (fallback && typeof isBreakout === 'function' && !isBreakout(fallback)) {
+          appendMessage('bot', fallback);
+          if (typeof chatHistory !== 'undefined') {
+            chatHistory.push({ role: 'assistant', content: fallback });
+            if (typeof saveHistory === 'function') saveHistory();
+          }
+        }
+      } catch(e) {}
+    }, 0);
+    return ''; // 阻止原破防内容渲染
+  }
 
   // 1. 去掉Ghost:前缀（Grok偶尔加）
   text = text.replace(/^ghost\s*:\s*/i, '').trim();
@@ -139,14 +164,32 @@ function cleanBotText(text) {
   // 7. 过滤【系统指令】全角括号
   text = text.replace(/【[^】]{0,400}】/g, '').trim();
 
-  // 8. *动作描述* → 「动作描述」
-  text = text.replace(/\*([^*]+)\*/g, '「$1」');
+  // 8. 删除 *动作描述*（异地设定，不应出现物理动作）
+  text = text.replace(/\*[^*]+\*/g, '').trim();
+
+  // 8.5 过滤物理接触/距离违规表达
+  const distancePatterns = [
+    /\bcome here\b/gi,
+    /\bcome to me\b/gi,
+    /\bcome back to me\b/gi,
+    /\bi'?ll hold (you|her)\b/gi,
+    /\blet me (pull|hold|touch|reach|grab|take)\b/gi,
+    /\bpull(s|ed)? (you|her) (close|in|near)\b/gi,
+    /\breach(es|ed)? (for|out|over)\b/gi,
+    /\b(sits|sat|stands|stood|moves|moved|steps|stepped) (beside|next to|closer|toward)\b/gi,
+  ];
+  distancePatterns.forEach(p => { text = text.replace(p, '').trim(); });
 
   // 9. 清理多余空行和空格
   text = text.replace(/\n{2,}/g, '\n').replace(/\s{2,}/g, ' ').trim();
 
   return text;
 }
+
+// ===== 破防场景提示（由各模块在 appendMessage 前设置）=====
+// 用于 cleanBotText 出口兜底时选择正确的 Grok scene
+let _currentBotScene = 'normal';
+function setBotScene(scene) { _currentBotScene = scene || 'normal'; }
 
 // ===== 核心：appendMessage =====
 // 返回 { msgDiv, bubble, innerThoughtEl }

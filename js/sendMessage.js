@@ -448,7 +448,7 @@ async function _processMergedMessage(text) {
           { role: 'user', content: _comebackPrompt }
         ], 80).then(r => {
           hideTyping();
-          if (r && !isBreakout(r) && r.length < 120) {
+          if (r && r.trim() && r.length < 120) {
             appendMessage('bot', r);
             chatHistory.push({ role: 'assistant', content: r });
             saveHistory();
@@ -875,46 +875,16 @@ async function _processMergedMessage(text) {
     let reply = data.content?.[0]?.text || '';
 
     // ── 破防检测 + 重试 ──────────────────────────────────────
-    // 修复 #054：破防后不再静默，强制重试
-    // 修复 Claude 4.5破防：先词库检测，再可疑内容语义判断
-    if (reply && !isBreakout(reply)) {
-      // 可疑关键词二次检查（Claude 4.5新增模式）
-      if (/i should mention|i want to be clear|as the ai|my guidelines|my training|i'm designed|claude's|by anthropic/i.test(reply)) {
-        try {
-          const breakCheck = await fetchDeepSeek(
-            'Is this reply breaking character by claiming to be an AI, Claude, or refusing to roleplay? Answer only YES or NO.',
-            `Reply: "${reply.slice(0, 300)}"`,
-            10
-          );
-          if (breakCheck.trim().toUpperCase().startsWith('YES')) reply = '';
-        } catch(e) {}
-      }
-    }
+    // 破防检测已在 cleanBotText 出口统一处理
 
-    if (!reply || isBreakout(reply)) {
-      // 直接用Grok兜底，用户无感知
-      await new Promise(r => setTimeout(r, 400));
-      try {
-        const recentCtx = cleanHistory.slice(-6)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
-          .join('\n');
-        const grokReply = await callGrok('', recentCtx, 300, null, 'normal');
-        if (grokReply && !isBreakout(grokReply)) {
-          reply = grokReply.trim();
-        } else {
-          reply = '___SILENT_FAIL___';
-        }
-      } catch(e) {
-        reply = '___SILENT_FAIL___';
-      }
-    }
-
-    updateToRead();
-
-    if (reply === '___SILENT_FAIL___') {
+    // 空回复静默处理
+    if (!reply || !reply.trim()) {
+      hideTyping();
       _isSending = false;
       return;
     }
+
+    updateToRead();
 
     // ── Step 4: 解析模型tag ──────────────────────────────────
     const { cleanedReply, giveMoney: parsedMoney, coldWarStart, sendGift } = parseAssistantTags(reply);
@@ -1042,7 +1012,7 @@ async function _processMergedMessage(text) {
             );
           }
           hideTyping();
-          if (reply2 && !isBreakout(reply2)) {
+          if (reply2 && reply2.trim()) {
             appendMessage('bot', reply2.trim());
             chatHistory.push({ role: 'assistant', content: reply2.trim() });
             saveHistory();
@@ -1231,7 +1201,7 @@ async function _processMergedMessage(text) {
     console.error('sendMessage error:', err?.name, err?.message);
     const _alreadyReplied = chatHistory.slice(-3).some(m => m.role === 'assistant' && !m._recalled);
     if (!_alreadyReplied) {
-      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+      // 静默失败，不显示出戏提示
     }
   } finally {
     // 保底：无论任何路径结束，都确保 _isSending 复位

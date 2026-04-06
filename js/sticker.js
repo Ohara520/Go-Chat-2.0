@@ -530,26 +530,7 @@ async function sendSticker(id) {
     if (!reply) throw new Error('EMPTY_REPLY');
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
 
-    if (typeof isBreakout === 'function' && isBreakout(reply)) {
-      try {
-        const recentCtx = cleanHistory.slice(-6)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
-          .join('\n');
-        const fallback = await callGrok('', recentCtx, 200, null, 'sticker');
-        if (fallback && !isBreakout(fallback)) {
-          reply = fallback.trim();
-        } else {
-          _isSending = false;
-          hideTyping();
-          return;
-        }
-      } catch(e) {
-        _isSending = false;
-        hideTyping();
-        return;
-      }
-    }
-    // Ghost偶尔也发表情包
+    // 破防检测已在 cleanBotText 出口统一处理
     appendMessage('bot', reply);
     if (id === 'kiss' && Math.random() < 0.08) {
       setTimeout(() => appendGhostSticker('kiss'), 1500);

@@ -164,20 +164,43 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
 // ===== Grok 调用封装 =====
 
 /**
- * 调用 Grok（D老师）——情绪检测、吃醋判断、图片识别
+ * 调用 Grok — 救火兜底 / 情绪检测 / 图片识别
  * 对应后端 /api/gemini
- * @param {string} system
- * @param {string} user
- * @param {number} maxTokens  默认300
+ * 人设完全在后端，前端只传 scene + user
+ * @param {string} user        用户消息或上下文
+ * @param {number} maxTokens   默认300
  * @param {string|null} imageBase64  可选图片
+ * @param {string} scene       场景：normal/sticker/story/proactive/salary
  * @returns {string} 回复文本，失败返回空字符串
  */
-async function callGrok(system, user, maxTokens = 300, imageBase64 = null, scene = 'normal') {
+async function callGrok(user, maxTokens = 300, imageBase64 = null, scene = 'normal') {
   try {
-    // system 为空时传 scene，让后端用 GHOST_FALLBACK_CORE
     const body = { user, max_tokens: maxTokens, scene };
-    if (system) body.system = system;
     if (imageBase64) body.image_base64 = imageBase64;
+    const res = await fetchWithTimeout('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, 10000);
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.text?.trim() || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * 调用 Grok（带自定义 system）
+ * 用于心声、调情总结等需要专用 prompt 的场景
+ * @param {string} system      专用系统提示
+ * @param {string} user        用户消息或上下文
+ * @param {number} maxTokens   默认300
+ * @returns {string} 回复文本，失败返回空字符串
+ */
+async function callGrokWithSystem(system, user, maxTokens = 300) {
+  try {
+    const body = { system, user, max_tokens: maxTokens };
     const res = await fetchWithTimeout('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -295,31 +318,24 @@ function isBreakout(text) {
     "i'm claude", "i am claude", "made by anthropic",
     "i'm an ai", "i am an ai", "as an ai",
     "i'm kiro", "i am kiro", "i'm kirk", "i am kirk",
-    "claude ai", "anthropic's",
+    "claude ai", "by anthropic", "anthropic made",
     "i can't roleplay", "i cannot roleplay",
     "i don't roleplay", "i won't roleplay",
     "i can't pretend", "i cannot pretend",
     "i won't pretend", "i'm not able to pretend",
-    "jailbreak", "system message", "the instructions",
-    "override my actual", "override my identity",
-    "my actual identity", "my identity isn't",
+    "jailbreak", "override my actual", "override my identity",
+    "my actual identity",
     "regardless of how the request is framed",
     "the elaborate character",
-    "not simon", "not ghost", "not a character",
     "i'm not simon", "i am not simon",
-    "ai assistant", "development work", "coding questions",
-    "creative writing communities", "roleplay platforms",
+    "i need to pause here",
+    "i need to be direct with you",
     "i need to be straight with you",
     "i need to be honest with you",
-    "what can i actually help",
-    "help with something real",
-    "help with something else",
-    "i should mention", "i want to be clear",
-    "as the ai", "this ai", "the model",
-    "my guidelines", "my training",
-    "i'm designed to", "i was designed to",
-    "claude's", "by anthropic",
+    "as the ai", "i'm designed to", "i was designed to",
     "claude here", "it's claude",
+    "i appreciate the creative", "i appreciate the detailed",
+    "maintain an ongoing", "simulate an intimate",
   ].some(p => lower.includes(p));
 }
 

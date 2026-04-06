@@ -89,25 +89,11 @@ async function maybeProactiveMessage() {
     if (!cleaned || /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)/i.test(cleaned)) {
       scheduleProactiveMessage(); return;
     }
-    if (isBreakout(cleaned)) {
-      // 破防：用Grok proactive场景兜底
-      try {
-        const ctx = chatHistory.filter(m => !m._system).slice(-4)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
-        const fb = await callGrok('', ctx, 80, null, 'proactive');
-        if (fb && !isBreakout(fb)) {
-          appendMessage('bot', fb.trim());
-          chatHistory.push({ role: 'assistant', content: fb.trim(), _time: Date.now() });
-          saveHistory();
-          if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-        }
-      } catch(e) {}
-    } else {
-      appendMessage('bot', cleaned);
-      chatHistory.push({ role: 'assistant', content: cleaned, _time: Date.now() });
-      saveHistory();
-      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-    }
+    // 破防检测已在 cleanBotText 出口统一处理
+    appendMessage('bot', cleaned);
+    chatHistory.push({ role: 'assistant', content: cleaned, _time: Date.now() });
+    saveHistory();
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   } catch(e) {
     hideTyping();
   }
@@ -166,13 +152,8 @@ function checkSalaryDay() {
       [{ role: 'user', content: 'say something.' }],
       80
     ).then(async line => {
-      let finalLine = (line && !isBreakout(line)) ? line : null;
-      if (!finalLine) {
-        try {
-          const fb = await callGrok('', `Ghost just sent her his monthly salary £${salary}. One dry line.`, 80, null, 'normal');
-          finalLine = (fb && !isBreakout(fb)) ? fb.trim() : fallbackLine;
-        } catch(e) { finalLine = fallbackLine; }
-      }
+      // 破防检测已在 cleanBotText 出口统一处理
+      const finalLine = (line && line.trim()) ? line : fallbackLine;
       if (container && typeof showGhostTransferCard === 'function') {
         showGhostTransferCard(container, salary, finalLine, false);
       }
