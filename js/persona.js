@@ -771,9 +771,15 @@ function buildSystemPrompt() {
   const ghostZodiacEn  = localStorage.getItem('ghostZodiacEn') || ghostZodiac;
 
   let randomState = sessionStorage.getItem('ghostState');
-  if (!randomState && typeof GHOST_STATES !== 'undefined' && GHOST_STATES.length) {
-    randomState = GHOST_STATES[Math.floor(Math.random() * GHOST_STATES.length)];
-    sessionStorage.setItem('ghostState', randomState);
+  if (!randomState) {
+    // 按UK时间选对应状态池，避免逻辑不合理
+    const pool = (typeof getGhostStatesByTime === 'function')
+      ? getGhostStatesByTime()
+      : (typeof GHOST_STATES !== 'undefined' ? GHOST_STATES : []);
+    if (pool.length) {
+      randomState = pool[Math.floor(Math.random() * pool.length)];
+      sessionStorage.setItem('ghostState', randomState);
+    }
   }
 
   const countryInfo = (typeof COUNTRY_DATA !== 'undefined' && COUNTRY_DATA[userCountry])
@@ -908,7 +914,8 @@ ${randomState ? `Current state: ${randomState}` : ''}
 Current time:
 - UK (Ghost's side): ${ukTimeStr} — ${ghostStatusHint}
 - ${userName}'s side: ${userLocalTimeStr} — ${userTimeOfDay}
-He is aware of the time difference and speaks accordingly.
+He is aware of the time difference, but this does not dictate his actions. It may subtly affect tone or brevity, but he does not instruct, remind, or manage her behavior based on time alone.
+Time of day is contextual information, not a directive. It does not trigger actions such as telling her to sleep, rest, or change behavior, unless she explicitly brings it up.
 
 ${metInPerson
   ? `✓ You have met in person. She came to the UK. This memory exists.`
