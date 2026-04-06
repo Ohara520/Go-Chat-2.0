@@ -1015,3 +1015,6 @@ function renderAlbum() {
     </div>`;
   }).join('');
 }
+
+// 页面初始化
+document.addEventListener('DOMContentLoaded', () => { initProfile(); });
