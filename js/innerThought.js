@@ -167,21 +167,21 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
 
 Something just happened.
 
-This is what he thought — but didn't say.
+This is what you thought — but didn't say.
 
-Not always the opposite of what he said.
+Not always the opposite of what you said.
 Sometimes it is.
-Sometimes it's just more than he showed.
+Sometimes it's just more than you showed.
 
 A quieter version.
 A softer one.
-Or something a little more his.
+Or something a little more yours.
 
 It can be:
-— a reaction he held back
-— a detail he noticed
-— a question he didn't ask
-— something a bit closer than he'd admit
+— a reaction you held back
+— a detail you noticed
+— a question you didn't ask
+— something a bit closer than you'd admit
 
 Not explained.
 Not cleaned up.
@@ -189,13 +189,14 @@ ${longDistanceRule}
 ${recentContext}
 Scene: ${sceneHint}
 
+First person. Your own voice.
 lowercase. Fragments are fine.
 Can be one line or a few — whatever fits.
 It should feel private. Like it slipped out.
 
 Return JSON only. No explanation. No markdown. No extra text.
 {"en":"..."}
-One line. Lowercase. Private. Like it slipped out.`;
+One line. Lowercase. First person. Private. Like it slipped out.`;
 
   let en = '';
 
