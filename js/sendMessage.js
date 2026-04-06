@@ -479,6 +479,9 @@ async function _processMergedMessage(text) {
 
       setTimeout(() => {
         if (_isSending) return;
+        // 如果主回复刚发过（10秒内），不再发comeback，避免两条相似
+        const _lastBot = chatHistory.filter(m => m.role === 'assistant' && !m._recalled && m._time).slice(-1)[0];
+        if (_lastBot && Date.now() - _lastBot._time < 10000) return;
         showTyping();
         callHaiku(buildGhostStyleCore(), [
           ...chatHistory.filter(m => !m._system).slice(-6),
@@ -487,7 +490,7 @@ async function _processMergedMessage(text) {
           hideTyping();
           if (r && r.trim() && r.length < 120) {
             appendMessage('bot', r);
-            chatHistory.push({ role: 'assistant', content: r });
+            chatHistory.push({ role: 'assistant', content: r, _time: Date.now() });
             saveHistory();
           }
         }).catch(() => hideTyping());
@@ -757,6 +760,20 @@ async function _processMergedMessage(text) {
     // 语言规则
     const langHint = '[LANGUAGE — HARD RULE: Reply in English only. Always. No exceptions. Even if she writes in Chinese, you reply in English. Not a single Chinese character in your response.]';
 
+    // 重复检测：取最近2-3条bot回复，禁止重复句式
+    const _recentBotOpeners = chatHistory
+      .filter(m => m.role === 'assistant' && !m._recalled)
+      .slice(-3)
+      .map(m => (m.content || '').trim().split(/[\s.!?]/)[0].toLowerCase())
+      .filter(w => w.length > 2);
+    const _recentBotPhrases = chatHistory
+      .filter(m => m.role === 'assistant' && !m._recalled)
+      .slice(-2)
+      .map(m => (m.content || '').slice(0, 40).toLowerCase());
+    const repeatGuard = (_recentBotOpeners.length > 0 || _recentBotPhrases.length > 0)
+      ? `[NO REPETITION: Do not start with "${_recentBotOpeners.join('" or "')}" or use similar phrasing to your last replies. Your last messages began: ${_recentBotPhrases.map(p => `"${p}"`).join(', ')}. Say something different.]`
+      : '';
+
     const finalSystem = [
       _baseSystem,
       antiBreakoutHint,
@@ -767,6 +784,7 @@ async function _processMergedMessage(text) {
       responseMode,
       workHint,
       avatarHint,
+      repeatGuard,
       langHint
     ].filter(Boolean).join('\n');
 
@@ -1152,6 +1170,7 @@ async function _processMergedMessage(text) {
       chatHistory.push({
         role: 'assistant',
         content: reply,
+        _time: Date.now(),
         ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {})
       });
     }
