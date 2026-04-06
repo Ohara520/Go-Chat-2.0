@@ -401,15 +401,21 @@ function renderChatHistory(chatHistory) {
       }
 
       // 用户发的图片
-      if (msg._photoUrls && msg._photoUrls.length > 0) {
+      const photoSrcs = (msg._photoUrls && msg._photoUrls.length > 0)
+        ? msg._photoUrls
+        : (msg._photoBase64 && msg._photoBase64.length > 0)
+          ? msg._photoBase64.map(b64 => `data:image/jpeg;base64,${b64}`)
+          : null;
+
+      if (photoSrcs) {
         const div = document.createElement('div');
         div.className = 'message user';
         div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
-        const maxW = msg._photoUrls.length > 1 ? '130px' : '220px';
+        const maxW = photoSrcs.length > 1 ? '130px' : '220px';
         div.innerHTML = `<div style="display:inline-flex;gap:6px;flex-wrap:wrap;max-width:280px;">
-          ${msg._photoUrls.map(url =>
-            `<img src="${url}" style="max-width:${maxW};border-radius:12px;display:block;cursor:pointer;"
-              onclick="if(typeof showPhotoPreview==='function')showPhotoPreview('${url}')" />`
+          ${photoSrcs.map(src =>
+            `<img src="${src}" style="max-width:${maxW};border-radius:12px;display:block;cursor:pointer;"
+              onclick="if(typeof showPhotoPreview==='function')showPhotoPreview('${src}')" />`
           ).join('')}
         </div>`;
         container.appendChild(div);

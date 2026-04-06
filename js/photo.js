@@ -13,7 +13,11 @@ function compressImageToBase64(dataUrl, maxWidth = 800, quality = 0.82) {
     img.onload = async () => {
       try {
         // 等待图片完全解码，防止canvas画出全黑（手机拍照/某些格式常见）
-        if (img.decode) await img.decode();
+        if (img.decode) {
+          try { await img.decode(); } catch(e) {}
+        }
+        // 额外等一帧，确保解码完全
+        await new Promise(r => requestAnimationFrame(r));
         const canvas = document.createElement('canvas');
         let w = img.naturalWidth || img.width;
         let h = img.naturalHeight || img.height;
