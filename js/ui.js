@@ -83,9 +83,10 @@ const _UNLOCK_VALID_FIELDS = ['birthday', 'zodiac', 'height', 'weight', 'blood_t
 function cleanBotText(text, scene = 'normal') {
   if (!text) return '';
 
-  // 0. 破防检测 — 出口统一拦截
-  if (typeof isBreakout === 'function' && isBreakout(text)) {
-    // 加锁防止并发多次触发
+  // 0. 破防检测 — 出口统一拦截（词库 + 异步语义双重检测）
+  const _quickBreakout = typeof isBreakout === 'function' && isBreakout(text);
+  if (_quickBreakout) {
+    // 词库命中：立刻拦截，异步Grok兜底
     if (!_breakoutFallbackLock) {
       _breakoutFallbackLock = true;
       setTimeout(async () => {
@@ -110,6 +111,46 @@ function cleanBotText(text, scene = 'normal') {
       }, 0);
     }
     return ''; // 阻止原破防内容渲染
+  }
+
+  // 0.5 可疑内容异步语义检测（词库没命中但可能出戏）
+  if (!_breakoutFallbackLock && typeof isBreakoutAsync === 'function') {
+    const _textSnapshot = text;
+    setTimeout(async () => {
+      try {
+        const _isOOC = await isBreakoutAsync(_textSnapshot);
+        if (_isOOC && !_breakoutFallbackLock) {
+          // 语义判断确认出戏，但内容已渲染——找到对应气泡删掉，再Grok补一条
+          _breakoutFallbackLock = true;
+          const container = document.getElementById('messagesContainer');
+          if (container) {
+            const bubbles = container.querySelectorAll('.message.bot');
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+              if (bubbles[i].textContent.includes(_textSnapshot.slice(0, 30))) {
+                bubbles[i].remove();
+                break;
+              }
+            }
+          }
+          const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
+            .filter(m => !m._system && !m._recalled)
+            .slice(-6)
+            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
+            .join('\n');
+          const fallback = typeof callGrok === 'function'
+            ? await callGrok(recentCtx, 300, null, _currentBotScene)
+            : '';
+          if (fallback && !isBreakout(fallback)) {
+            appendMessage('bot', fallback);
+            if (typeof chatHistory !== 'undefined') {
+              chatHistory.push({ role: 'assistant', content: fallback });
+              if (typeof saveHistory === 'function') saveHistory();
+            }
+          }
+          _breakoutFallbackLock = false;
+        }
+      } catch(e) {}
+    }, 0);
   }
 
   // 1. 去掉Ghost:前缀（Grok偶尔加）

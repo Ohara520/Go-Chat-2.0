@@ -339,6 +339,30 @@ function isBreakout(text) {
   ].some(p => lower.includes(p));
 }
 
+// ===== 异步语义破防检测 =====
+// 词库没命中时，用Haiku语义判断是否出戏
+// 只在可疑内容时才调用，减少额外费用
+
+async function isBreakoutAsync(text) {
+  if (!text) return false;
+  // 先词库快速判断
+  if (isBreakout(text)) return true;
+  // 可疑关键词预筛——没有这些词不调模型
+  const suspicious = /i appreciate|let's keep|keep it grounded|i can't engage|that kind of content|i need to clarify|i should note|acting as|pretending to be|as a language|my role is|i don't feel comfortable|not appropriate|inappropriate|i must be honest/i;
+  if (!suspicious.test(text)) return false;
+  // Haiku语义判断
+  try {
+    const result = await callHaiku(
+      'You are a character consistency checker. Is this reply breaking character by acting like an AI assistant, refusing to engage, claiming safety restrictions, or stepping outside a roleplay persona? Answer only YES or NO.',
+      [{ role: 'user', content: `Reply to check: "${text.slice(0, 300)}"` }],
+      5
+    );
+    return result.trim().toUpperCase().startsWith('YES');
+  } catch(e) {
+    return false;
+  }
+}
+
 // ===== JSON安全解析 =====
 
 /**
