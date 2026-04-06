@@ -29,10 +29,12 @@ async function onSilenceTimeout() {
   const chatScreen = document.getElementById('chatScreen');
   if (!chatScreen || !chatScreen.classList.contains('active')) return;
 
-  // 触发一次 Ghost 主动 check_in
+  // 触发一次 Ghost 主动 check_in（触发后不自动重置，等用户下次发消息才重置）
   try {
     await emitGhostEvent('check_in');
   } catch(e) {}
+  // 触发后重置，但间隔拉长到40分钟防止连续刷屏
+  _silenceTimer = setTimeout(onSilenceTimeout, 40 * 60 * 1000);
 }
 
 // ===== 主动发消息系统 =====
@@ -173,6 +175,9 @@ function checkSalaryDay() {
 
 // ===== 聊天页初始化 =====
 async function initChat() {
+  // 清除所有残留定时器，防止多实例
+  if (_silenceTimer) { clearTimeout(_silenceTimer); _silenceTimer = null; }
+  if (_proactiveTimer) { clearTimeout(_proactiveTimer); _proactiveTimer = null; }
   // 好感度首次初始化
   if (!localStorage.getItem('affection')) setAffection(70);
 
