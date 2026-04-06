@@ -75,7 +75,9 @@ async function maybeProactiveMessage() {
   localStorage.setItem(todayKey, todayCount + 1);
 
   const todayDetail = sessionStorage.getItem('todayDetail') || '';
-  const systemNote = `[PROACTIVE — something just crossed his mind. He sends one line without framing it as reaching out. No greeting. No "hey". No question to start. Just a statement, an observation, or a fragment — like he thought of something and sent it before deciding not to. Short. Self-contained. He doesn't explain why he sent it. He doesn't wait for a response. Not a check-in. Not asking how she is. Just something that happened or crossed his mind.${todayDetail ? ` Today's context: ${todayDetail}` : ''} English only, lowercase.]`;
+  const ghostState = sessionStorage.getItem('ghostState') || '';
+  const stateHint = ghostState ? ` He is currently: ${ghostState}. The message may naturally relate to what he's doing or thinking right now — or not. Let it feel unforced.` : '';
+  const systemNote = `[PROACTIVE — something just crossed his mind. He sends one line without framing it as reaching out. No greeting. No "hey". No question to start. Just a statement, an observation, or a fragment — like he thought of something and sent it before deciding not to. Short. Self-contained. He doesn't explain why he sent it. He doesn't wait for a response. Not a check-in. Not asking how she is. Just something that happened or crossed his mind.${stateHint}${todayDetail ? ` Today's context: ${todayDetail}` : ''} English only, lowercase.]`;
 
   try {
     showTyping();
@@ -353,9 +355,16 @@ async function initChat() {
 
   _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
 
-  // 渲染完立刻滚到底部，再延迟一次确保内容撑开后也在底部
-  if (typeof scrollToBottom === 'function') scrollToBottom();
-  setTimeout(() => { if (typeof scrollToBottom === 'function') scrollToBottom(); }, 300);
+  // 渲染完多次尝试滚到底部，确保内容完全撑开后到位
+  if (typeof scrollToBottom === 'function') {
+    scrollToBottom();
+    requestAnimationFrame(() => {
+      scrollToBottom();
+      setTimeout(() => scrollToBottom(), 100);
+      setTimeout(() => scrollToBottom(), 400);
+      setTimeout(() => scrollToBottom(), 800);
+    });
+  }
 
   // 启动定时器
   scheduleProactiveMessage();
