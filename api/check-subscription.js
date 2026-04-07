@@ -78,7 +78,45 @@ export default async function handler(req, res) {
     // 检查是否过期
     const now = new Date();
     const periodEnd = new Date(data.period_end);
-    if (periodEnd < now || data.status !== 'active') {
+    const isExpired = periodEnd < now || data.status !== 'active';
+
+    // 老套餐过期 → 自动继承50%转永久
+    const OLD_PLAN_IDS = [
+      '6c9cd46425d211f1964152540025c377',
+      '6e82f4a225d211f1b43e52540025c377',
+      '6f7c680225d211f19aca52540025c377',
+      '新婚', '蜜月', '金婚', 'topup',
+    ];
+    const isOldPlan = OLD_PLAN_IDS.includes(data.plan_id) || (data.plan_id && data.plan_id.length > 20);
+
+    if (isExpired && isOldPlan) {
+      const remaining = Math.max(0, data.monthly_quota - data.used_count);
+      const inherited = Math.floor(remaining * 0.5);
+      await supabase.from('subscriptions').update({
+        monthly_quota: inherited,
+        used_count: 0,
+        total_used: (data.total_used || 0) + (data.used_count || 0),
+        plan_id: 'permanent',
+        plan_name: '永久套餐（到期继承）',
+        period_end: '2099-12-31T23:59:59.000Z',
+        status: 'active',
+        updated_at: now.toISOString(),
+      }).eq('email', email.toLowerCase().trim());
+
+      return res.status(200).json({
+        subscribed: true,
+        plan_name: '永久套餐（到期继承）',
+        plan_id: 'permanent',
+        monthly_quota: inherited,
+        used_count: 0,
+        remaining: inherited,
+        memory_limit: data.memory_limit || 10,
+        period_end: '2099-12-31T23:59:59.000Z',
+      });
+    }
+
+    // 其他情况过期（free等）
+    if (isExpired) {
       return res.status(200).json({ subscribed: false, expired: true });
     }
 
