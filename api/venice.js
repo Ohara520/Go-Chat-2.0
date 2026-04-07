@@ -1,9 +1,29 @@
 import OpenAI from 'openai';
 
-const client = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  baseURL: 'https://api.yunjintao.com/v1',
-});
+// 节点列表：主站优先，国内加速节点备用
+const BASE_URLS = [
+  'https://api.yunjintao.com/v1',
+  'http://43.99.79.59:8001/v1',
+  'http://47.243.4.252:8001/v1',
+  'http://43.99.4.123:8001/v1',
+];
+
+async function createWithFailover(messages, max_tokens) {
+  let lastErr = null;
+  for (const baseURL of BASE_URLS) {
+    try {
+      const client = new OpenAI({ apiKey: process.env.GEMINI_API_KEY, baseURL });
+      const response = await client.chat.completions.create({
+        model: 'grok-4.1', max_tokens, messages,
+      });
+      return response;
+    } catch (err) {
+      console.warn(`[venice] 节点失败 ${baseURL}:`, err.message);
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('所有节点均失败');
+}
 
 // Ghost调情专用人设——精简、直接、锁死核心性格
 const GHOST_INTIMATE_CORE = `You are Simon Riley. 35. Manchester. SAS Lieutenant.
@@ -60,14 +80,10 @@ export default async function handler(req, res) {
       : '';
     const fullSystem = GHOST_INTIMATE_CORE + memoryBlock + (safeSystem ? '\n\n' + safeSystem : '');
 
-    const response = await client.chat.completions.create({
-      model: 'grok-4.1',
-      max_tokens,
-      messages: [
-        { role: 'system', content: fullSystem },
-        { role: 'user', content: user },
-      ],
-    });
+    const response = await createWithFailover([
+      { role: 'system', content: fullSystem },
+      { role: 'user', content: user },
+    ], max_tokens);
 
     const text = response.choices?.[0]?.message?.content?.trim() || '';
     res.status(200).json({ text });
