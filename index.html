@@ -661,7 +661,8 @@
           <div id="feedNewBadge" class="feed-new-badge" style="display:none;" onclick="openScreen('coupleScreen')">📸 有新动态</div>
         </div>
         <div class="chat-header-actions">
-          <button class="thought-btn" id="thoughtBtn" onclick="toggleThought()" oncontextmenu="showChatMenu(event); return false;" ontouchstart="startChatMenuTimer(event)" ontouchend="clearChatMenuTimer()" ontouchmove="clearChatMenuTimer()" title="他在想什么" style="-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;">💭</button>
+          <button class="thought-btn" id="thoughtBtn" onclick="toggleThought()" title="他在想什么">💭</button>
+        <button onclick="showChatMenu(event)" style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px 6px;opacity:0.5;" title="更多">⋯</button>
         <!-- 长按菜单 -->
         <div id="chatContextMenu" style="display:none;position:fixed;z-index:99999;background:white;border-radius:14px;padding:6px 0;box-shadow:0 8px 30px rgba(0,0,0,0.2);min-width:160px;">
           <div onclick="clearRecentMessages(); hideChatMenu();" style="padding:12px 18px;font-size:14px;color:#333;cursor:pointer;border-bottom:1px solid #f0f0f0;">🧹 清理最近30条</div>

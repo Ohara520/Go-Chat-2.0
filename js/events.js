@@ -1031,8 +1031,44 @@ const STORY_EVENTS = [
       return now.getMonth() + 1 === bm && now.getDate() === bd && !ctx.triggered('first_birthday');
     },
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是她的生日，她还没开口，你已经知道了。]` }]);
+      const level = typeof getMoneyComfortLevel === 'function' ? getMoneyComfortLevel() : 0;
+
+      // 第一步：Ghost 先说一句（他记得，但不大张旗鼓）
+      const birthdayPrompt = level >= 2
+        ? `[系统：今天是她的生日。你记得，但你不会大张旗鼓。说一句——短，有重量，是你的方式。不甜腻，不模板。然后你会给她一点钱，但先说这句话。]`
+        : `[系统：今天是她的生日，她还没开口，你已经知道了。一句话，干，有存在感。]`;
+
+      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: birthdayPrompt }]);
       if (res) await emitGhostNarrativeEvent(res);
+
+      // 第二步：Level >= 2 延迟给礼物（他决定给，不是系统触发）
+      if (level >= 2) {
+        setTimeout(async () => {
+          try {
+            const giftAmount = level >= 3 ? 50 : 30;
+            const given = typeof applyMoneyEffect === 'function'
+              ? applyMoneyEffect(giftAmount, {
+                  motive: 'care',
+                  label: '生日',
+                  note: '',
+                  bypassCooldown: true,
+                  bypassSessionLimit: true,
+                })
+              : false;
+
+            if (given) {
+              // 给了钱之后 Ghost 再说一句——不解释，不点明是生日礼物
+              const afterPrompt = `[系统：你刚给了她一点钱。不用解释是因为生日。一句话带过去，是你的语气——随意，带点控制感，不甜。]`;
+              const afterRes = await callHaiku(
+                buildSystemPrompt(),
+                [...chatHistory.slice(-4), { role: 'user', content: afterPrompt }],
+                60
+              );
+              if (afterRes) await emitGhostNarrativeEvent(afterRes.trim());
+            }
+          } catch(e) {}
+        }, 8000); // 延迟8秒，先让第一句落地
+      }
     }
   },
 
