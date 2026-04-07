@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     // 先查当前用量
     const { data, error } = await supabase
       .from('subscriptions')
-      .select('used_count, monthly_quota, status, period_end')
+      .select('used_count, monthly_quota, status, period_end, total_used')
       .eq('email', email.toLowerCase().trim())
       .single();
 
@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       .from('subscriptions')
       .update({
         used_count: data.used_count + 1,
+        total_used: (data.total_used || 0) + 1,
         updated_at: new Date().toISOString(),
       })
       .eq('email', email.toLowerCase().trim());

@@ -124,6 +124,7 @@ export default async function handler(req, res) {
           await supabase.from('subscriptions')
             .update({
               monthly_quota: existing.monthly_quota + topup.quota,
+              total_used: (existing.total_used || 0) + (existing.used_count || 0),
               updated_at: new Date().toISOString(),
             })
             .eq('email', email.toLowerCase().trim());
@@ -155,12 +156,13 @@ export default async function handler(req, res) {
         // 查询现有剩余条数，叠加而不是覆盖
         const { data: existing } = await supabase
           .from('subscriptions')
-          .select('monthly_quota, used_count')
+          .select('monthly_quota, used_count, total_used')
           .eq('email', email.toLowerCase().trim())
           .maybeSingle();
 
         const currentRemaining = existing ? Math.max(0, existing.monthly_quota - existing.used_count) : 0;
         const newQuota = currentRemaining + plan.monthly_quota;
+        const newTotalUsed = (existing?.total_used || 0) + (existing?.used_count || 0);
 
         await supabase.from('subscriptions').upsert({
           email: email.toLowerCase().trim(),
@@ -169,6 +171,7 @@ export default async function handler(req, res) {
           monthly_quota: newQuota,
           memory_limit: plan.memory_limit,
           used_count: 0,
+          total_used: newTotalUsed,
           period_start: now.toISOString(),
           period_end: periodEnd.toISOString(),
           status: 'active',

@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Go Chat · 后台</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #0f0f13; --surface: #1a1525; --surface2: #231830;
+  --border: #2d1f42; --purple: #7c3aed; --purple-light: #a78bfa;
+  --purple-dim: rgba(124,58,237,0.15); --text: #e8e0f0;
+  --text-muted: #9d7fc4; --text-dim: #6d5a8a;
+  --green: #059669; --amber: #d97706; --red: #dc2626;
+}
+html,body { height:100%; overflow-x:hidden; }
+body { font-family:-apple-system,'PingFang SC',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:calc(24px + env(safe-area-inset-bottom,0px)); }
+
+/* 密码锁 */
+#lockScreen { position:fixed; inset:0; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:999; padding:24px; }
+.lock-logo { font-size:52px; margin-bottom:4px; animation:float 3s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+.lock-title { font-size:20px; font-weight:700; color:var(--purple-light); }
+.lock-sub { font-size:13px; color:var(--text-dim); }
+#lockInput { width:100%; max-width:280px; padding:14px 18px; border-radius:14px; border:1.5px solid var(--border); background:var(--surface); color:var(--text); font-size:16px; text-align:center; outline:none; letter-spacing:3px; }
+#lockInput:focus { border-color:var(--purple); }
+#lockBtn { width:100%; max-width:280px; padding:14px; border-radius:14px; border:none; background:var(--purple); color:white; font-size:15px; font-weight:600; cursor:pointer; }
+#lockBtn:active { opacity:0.8; }
+#lockError { color:#f87171; font-size:13px; min-height:18px; }
+
+/* 主界面 */
+#mainPanel { display:none; }
+.page-header { background:var(--surface); border-bottom:1px solid var(--border); padding:16px; padding-top:calc(16px + env(safe-area-inset-top,0px)); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+.page-title { font-size:17px; font-weight:700; color:var(--purple-light); }
+.logout-btn { font-size:12px; color:var(--text-dim); cursor:pointer; padding:6px 12px; border-radius:8px; background:var(--surface2); border:1px solid var(--border); }
+
+.content { padding:16px; max-width:600px; margin:0 auto; }
+
+/* 卡片 */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:18px; margin-bottom:14px; }
+.card-title { font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:14px; }
+
+/* 输入 */
+.input-row { display:flex; gap:8px; }
+.input-field { flex:1; padding:12px 14px; border-radius:12px; border:1.5px solid var(--border); background:var(--bg); color:var(--text); font-size:14px; outline:none; -webkit-appearance:none; }
+.input-field:focus { border-color:var(--purple); }
+textarea.input-field { resize:none; height:56px; font-family:inherit; line-height:1.5; margin-top:10px; }
+
+/* 按钮 */
+.btn { padding:12px 16px; border-radius:12px; border:none; font-size:14px; font-weight:600; cursor:pointer; transition:opacity 0.15s; text-align:center; }
+.btn:active { opacity:0.75; transform:scale(0.97); }
+.btn:disabled { opacity:0.35; cursor:not-allowed; }
+.btn-primary { background:var(--purple); color:white; }
+.btn-success { background:var(--green); color:white; }
+.btn-warning { background:var(--amber); color:white; }
+.btn-ghost { background:var(--surface2); color:var(--text-muted); border:1px solid var(--border); }
+.btn-full { width:100%; }
+
+/* 用户面板 */
+#userInfo { display:none; }
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.info-item { background:var(--bg); border-radius:12px; padding:12px; text-align:center; }
+.info-label { font-size:10px; color:var(--text-dim); margin-bottom:4px; }
+.info-value { font-size:18px; font-weight:700; color:var(--purple-light); line-height:1.2; }
+.info-sub { font-size:11px; color:var(--text-dim); margin-top:3px; }
+.tag { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+.tag-old { background:rgba(251,191,36,0.12); color:#fbbf24; }
+.tag-new { background:rgba(167,139,250,0.12); color:#a78bfa; }
+.tag-free { background:rgba(75,85,99,0.2); color:#9ca3af; }
+
+/* 继承 */
+.inherit-box { background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2); border-radius:12px; padding:14px; margin-bottom:14px; }
+.inherit-title { font-size:12px; color:#fbbf24; font-weight:600; margin-bottom:6px; }
+.inherit-calc { font-size:14px; color:var(--text); line-height:1.7; }
+.inherit-calc strong { color:#fbbf24; }
+
+/* 套餐 */
+.plan-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
+.plan-item { border:1.5px solid var(--border); border-radius:14px; padding:12px 8px; text-align:center; cursor:pointer; transition:all 0.15s; background:var(--bg); }
+.plan-item:active { transform:scale(0.94); }
+.plan-item.selected { border-color:var(--purple-light); background:var(--purple-dim); }
+.plan-name { font-size:11px; color:var(--text-muted); margin-bottom:4px; }
+.plan-quota { font-size:17px; font-weight:700; color:var(--text); }
+.plan-price { font-size:11px; color:var(--text-dim); margin-top:2px; }
+
+/* 结果 */
+.result-msg { margin-top:10px; padding:10px 14px; border-radius:10px; font-size:13px; line-height:1.5; display:none; }
+.result-msg.ok { background:rgba(5,150,105,0.12); color:#34d399; }
+.result-msg.err { background:rgba(220,38,38,0.12); color:#f87171; }
+
+/* 操作记录 */
+.log-list { display:flex; flex-direction:column; gap:8px; }
+.log-item { background:var(--bg); border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; }
+.log-quota { background:var(--purple-dim); color:var(--purple-light); font-weight:700; font-size:14px; padding:6px 10px; border-radius:10px; min-width:52px; text-align:center; flex-shrink:0; }
+.log-info { flex:1; min-width:0; }
+.log-email { font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.log-meta { font-size:11px; color:var(--text-dim); margin-top:2px; }
+.log-time { font-size:11px; color:var(--text-dim); flex-shrink:0; }
+.log-empty { text-align:center; color:var(--text-dim); padding:24px; font-size:13px; }
+
+/* Toast */
+.toast { position:fixed; bottom:calc(24px + env(safe-area-inset-bottom,0px)); left:50%; transform:translateX(-50%) translateY(20px); background:var(--surface2); border:1px solid var(--border); color:var(--text); font-size:13px; padding:10px 20px; border-radius:20px; opacity:0; transition:all 0.3s; pointer-events:none; white-space:nowrap; z-index:999; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* 底部固定操作栏（手机端充值按钮） */
+.bottom-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  display: none; gap: 8px; z-index: 20;
+}
+.bottom-bar.visible { display: flex; }
+.bottom-bar-info { flex: 1; min-width: 0; }
+.bottom-bar-plan { font-size: 13px; font-weight: 600; color: var(--purple-light); }
+.bottom-bar-price { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+#mainPanel.has-bottom .content { padding-bottom: 90px; }
+
+@media(max-width:360px) { .plan-grid{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div class="lock-logo">👻</div>
+  <div class="lock-title">Go Chat 后台</div>
+  <div class="lock-sub">仅限管理员访问</div>
+  <input type="password" id="lockInput" placeholder="输入密码" onkeydown="if(event.key==='Enter')unlock()">
+  <button class="btn btn-primary" id="lockBtn" onclick="unlock()">进入</button>
+  <div id="lockError"></div>
+</div>
+
+<div id="mainPanel">
+  <div class="page-header">
+    <div class="page-title">⚡ 充值后台</div>
+    <div class="logout-btn" onclick="logout()">退出</div>
+  </div>
+
+  <div class="content">
+
+    <div class="card">
+      <div class="card-title">查询用户</div>
+      <div class="input-row">
+        <input class="input-field" type="email" id="emailInput" placeholder="输入用户邮箱..." onkeydown="if(event.key==='Enter')queryUser()" autocomplete="off" autocapitalize="none">
+        <button class="btn btn-primary" onclick="queryUser()" id="queryBtn">查询</button>
+      </div>
+    </div>
+
+    <div id="userInfo">
+
+      <div class="card">
+        <div class="card-title">当前状态</div>
+        <div class="info-grid">
+          <div class="info-item" style="grid-column:1/-1;">
+            <div class="info-label">邮箱</div>
+            <div class="info-value" id="dispEmail" style="font-size:13px;word-break:break-all;"></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">套餐</div>
+            <div class="info-value" id="dispPlan" style="font-size:13px;"></div>
+            <div class="info-sub" id="dispPlanTag"></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">剩余条数</div>
+            <div class="info-value" id="dispRemaining"></div>
+            <div class="info-sub" id="dispExpiry"></div>
+          </div>
+          <div class="info-item" style="grid-column:1/-1;">
+            <div class="info-label">累计消耗（历史总计）</div>
+            <div class="info-value" id="dispTotalUsed" style="font-size:18px;color:var(--text-muted);">0</div>
+            <div class="info-sub">包含所有充值周期内的使用量</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="inheritCard" style="display:none;">
+        <div class="card-title">老套餐 → 50% 继承</div>
+        <div class="inherit-box">
+          <div class="inherit-title">⚠️ 该用户为老套餐，建议先执行继承</div>
+          <div class="inherit-calc" id="inheritCalc"></div>
+        </div>
+        <button class="btn btn-warning btn-full" onclick="doInherit()" id="inheritBtn">执行继承（保留50%，转永久套餐）</button>
+        <div class="result-msg" id="inheritResult"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">充值新套餐（永久叠加）</div>
+        <div class="plan-grid">
+          <div class="plan-item" onclick="selectPlan(this,150,'轻聊包','8.8')">
+            <div class="plan-name">轻聊包</div>
+            <div class="plan-quota">150条</div>
+            <div class="plan-price">¥8.8</div>
+          </div>
+          <div class="plan-item" onclick="selectPlan(this,400,'日常包','19.9')">
+            <div class="plan-name">日常包</div>
+            <div class="plan-quota">400条</div>
+            <div class="plan-price">¥19.9</div>
+          </div>
+          <div class="plan-item" onclick="selectPlan(this,900,'沉浸包','42.9')">
+            <div class="plan-name">沉浸包</div>
+            <div class="plan-quota">900条</div>
+            <div class="plan-price">¥42.9</div>
+          </div>
+          <div class="plan-item" onclick="selectPlan(this,1800,'陪伴包','79.9')">
+            <div class="plan-name">陪伴包</div>
+            <div class="plan-quota">1800条</div>
+            <div class="plan-price">¥79.9</div>
+          </div>
+          <div class="plan-item" onclick="selectPlan(this,3000,'深度陪伴','129')">
+            <div class="plan-name">深度陪伴</div>
+            <div class="plan-quota">3000条</div>
+            <div class="plan-price">¥129</div>
+          </div>
+          <div class="plan-item" onclick="selectPlan(this,4500,'长期陪伴','168')">
+            <div class="plan-name">长期陪伴</div>
+            <div class="plan-quota">4500条</div>
+            <div class="plan-price">¥168</div>
+          </div>
+        </div>
+        <textarea class="input-field" id="noteInput" placeholder="备注（可选，如：微信转账已核对）"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-success" onclick="doTopup()" id="topupBtn" disabled style="flex:1;">确认充值</button>
+          <button class="btn btn-ghost" onclick="doCustom()">自定义</button>
+        </div>
+        <div class="result-msg" id="topupResult"></div>
+      </div>
+
+    </div>
+
+    <div class="card">
+      <div class="card-title">操作记录（最近30条）</div>
+      <div id="logContainer"><div class="log-empty">加载中...</div></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 底部固定充值栏 -->
+<div class="bottom-bar" id="bottomBar">
+  <div class="bottom-bar-info">
+    <div class="bottom-bar-plan" id="bottomBarPlan">选择套餐后确认</div>
+    <div class="bottom-bar-price" id="bottomBarPrice"></div>
+  </div>
+  <button class="btn btn-success" onclick="doTopup()" id="topupBtnBar" disabled style="min-width:90px;">确认充值</button>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://siahkenfoofkjrgevgma.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== 密码（SHA-256哈希，不存明文）=====
+// 当前密码：noah2024admin（需要改密码就重新算哈希替换这里）
+const ADMIN_HASH = '9d56f2a7473fc26a07b3fbbc154fc48beeee2141c76dc4a168427f8be1c06263';
+const SESSION_KEY = 'gochat_admin_v1';
+
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function checkSession() {
+  try {
+    const { expiry } = JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}');
+    return Date.now() < (expiry || 0);
+  } catch { return false; }
+}
+function setSession() {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ expiry: Date.now() + 12 * 3600 * 1000 }));
+}
+function logout() { sessionStorage.removeItem(SESSION_KEY); location.reload(); }
+
+async function unlock() {
+  const pw = document.getElementById('lockInput').value;
+  const hash = await hashPassword(pw);
+  if (hash === ADMIN_HASH) {
+    setSession(); showMain();
+  } else {
+    document.getElementById('lockError').textContent = '密码错误';
+    document.getElementById('lockInput').value = '';
+    document.getElementById('lockInput').focus();
+  }
+}
+function showMain() {
+  document.getElementById('lockScreen').style.display = 'none';
+  document.getElementById('mainPanel').style.display = 'block';
+  loadLogs();
+}
+
+window.addEventListener('load', () => {
+  if (checkSession()) showMain();
+  else setTimeout(() => document.getElementById('lockInput').focus(), 100);
+});
+
+let currentUser = null, selectedQuota = 0, selectedPlanName = '', selectedPrice = '';
+
+const OLD_PLAN_IDS = [
+  '6c9cd46425d211f1964152540025c377',
+  '6e82f4a225d211f1b43e52540025c377',
+  '6f7c680225d211f19aca52540025c377',
+  '新婚', '蜜月', '金婚'
+];
+function isOldPlan(id) { return OLD_PLAN_IDS.includes(id); }
+
+async function queryUser() {
+  const email = document.getElementById('emailInput').value.trim().toLowerCase();
+  if (!email) { showToast('请输入邮箱'); return; }
+  const btn = document.getElementById('queryBtn');
+  btn.disabled = true; btn.textContent = '查询中';
+  const { data } = await sb.from('subscriptions').select('*').eq('email', email).maybeSingle();
+  btn.disabled = false; btn.textContent = '查询';
+  currentUser = data || { email, isNew: true };
+  renderPanel(data, email);
+}
+
+function renderPanel(data, email) {
+  document.getElementById('userInfo').style.display = 'block';
+  document.getElementById('dispEmail').textContent = email;
+  if (!data) {
+    document.getElementById('dispPlan').textContent = '未注册';
+    document.getElementById('dispPlanTag').innerHTML = '<span class="tag tag-free">新用户</span>';
+    document.getElementById('dispRemaining').textContent = '0';
+    document.getElementById('dispExpiry').textContent = '充值后生效';
+    document.getElementById('dispTotalUsed').textContent = '0';
+    document.getElementById('inheritCard').style.display = 'none';
+    return;
+  }
+  const rem = Math.max(0, data.monthly_quota - data.used_count);
+  const old = isOldPlan(data.plan_id);
+  const expired = data.period_end && new Date(data.period_end) < new Date();
+  const expStr = data.period_end ? new Date(data.period_end).toLocaleDateString('zh-CN',{month:'numeric',day:'numeric'}) : '永久';
+  document.getElementById('dispPlan').textContent = data.plan_name || data.plan_id || '未知';
+  document.getElementById('dispPlanTag').innerHTML = old
+    ? `<span class="tag tag-old">老套餐${expired?'·已到期':''}</span>`
+    : `<span class="tag tag-new">永久套餐</span>`;
+  document.getElementById('dispRemaining').textContent = rem;
+  document.getElementById('dispExpiry').textContent = old ? `到期 ${expStr}` : '永久有效';
+  document.getElementById('dispTotalUsed').textContent = (data.total_used || 0) + (data.used_count || 0);
+  if (old) {
+    const inh = Math.floor(rem * 0.5);
+    document.getElementById('inheritCalc').innerHTML =
+      `剩余 <strong>${rem}</strong> 条 × 50% = 继承 <strong>${inh}</strong> 条<br><span style="font-size:11px;color:var(--text-dim)">转为永久套餐，清除到期时间</span>`;
+    document.getElementById('inheritCard').style.display = 'block';
+  } else {
+    document.getElementById('inheritCard').style.display = 'none';
+  }
+}
+
+async function doInherit() {
+  if (!currentUser || currentUser.isNew) return;
+  const rem = Math.max(0, currentUser.monthly_quota - currentUser.used_count);
+  const inh = Math.floor(rem * 0.5);
+  if (!confirm(`确认继承？\n${currentUser.email}\n${rem}条 × 50% = ${inh}条（永久）`)) return;
+  const btn = document.getElementById('inheritBtn');
+  btn.disabled = true; btn.textContent = '处理中...';
+  const { error } = await sb.from('subscriptions').update({
+    monthly_quota: inh, used_count: 0,
+    total_used: (currentUser.total_used || 0) + (currentUser.used_count || 0),
+    plan_id: 'permanent',
+    plan_name: '永久套餐（继承）', period_end: '2099-12-31T23:59:59.000Z',
+    status: 'active', updated_at: new Date().toISOString(),
+  }).eq('email', currentUser.email);
+  btn.disabled = false; btn.textContent = '执行继承（保留50%，转永久套餐）';
+  if (error) { showResult('inheritResult', false, '失败：' + error.message); return; }
+  await writeLog(currentUser.email, '老套餐继承50%', inh, `原${rem}条`);
+  showResult('inheritResult', true, `✅ 继承成功，永久套餐 ${inh} 条`);
+  queryUser(); loadLogs();
+}
+
+function selectPlan(el, quota, name, price) {
+  document.querySelectorAll('.plan-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedQuota = quota; selectedPlanName = name; selectedPrice = price;
+  // 卡片内按钮
+  const btn = document.getElementById('topupBtn');
+  btn.disabled = false;
+  btn.textContent = `充值 ${quota} 条（¥${price}）`;
+  // 底部固定栏
+  const bar = document.getElementById('bottomBar');
+  bar.classList.add('visible');
+  document.getElementById('mainPanel').classList.add('has-bottom');
+  document.getElementById('bottomBarPlan').textContent = `${name} · ${quota}条`;
+  document.getElementById('bottomBarPrice').textContent = `¥${price}`;
+  document.getElementById('topupBtnBar').disabled = false;
+}
+
+async function doTopup() {
+  if (!selectedQuota) return;
+  const email = currentUser?.email || document.getElementById('emailInput').value.trim().toLowerCase();
+  if (!email) { showToast('请先查询用户'); return; }
+  const note = document.getElementById('noteInput').value.trim();
+  if (!confirm(`确认充值？\n${email}\n+${selectedQuota}条 ${selectedPlanName} ¥${selectedPrice}`)) return;
+  const btn = document.getElementById('topupBtn');
+  btn.disabled = true; btn.textContent = '充值中...';
+  const { data: ex } = await sb.from('subscriptions').select('monthly_quota,used_count,total_used').eq('email', email).maybeSingle();
+  const curRem = ex ? Math.max(0, ex.monthly_quota - ex.used_count) : 0;
+  const newQ = curRem + selectedQuota;
+  const newTotalUsed = (ex?.total_used || 0) + (ex?.used_count || 0);
+  const { error } = await sb.from('subscriptions').upsert({
+    email, plan_id: 'permanent', plan_name: selectedPlanName,
+    monthly_quota: newQ, used_count: 0, total_used: newTotalUsed, memory_limit: 20,
+    period_start: new Date().toISOString(), period_end: '2099-12-31T23:59:59.000Z',
+    status: 'active', updated_at: new Date().toISOString(),
+  }, { onConflict: 'email' });
+  btn.disabled = false; btn.textContent = `充值 ${selectedQuota} 条（¥${selectedPrice}）`;
+  if (error) { showResult('topupResult', false, '失败：' + error.message); return; }
+  await writeLog(email, selectedPlanName, selectedQuota, note || '手动充值');
+  showResult('topupResult', true, `✅ 成功！原余 ${curRem} + ${selectedQuota} = ${newQ} 条`);
+  document.querySelectorAll('.plan-item').forEach(i => i.classList.remove('selected'));
+  selectedQuota = 0;
+  document.getElementById('topupBtn').disabled = true;
+  document.getElementById('topupBtn').textContent = '确认充值';
+  document.getElementById('noteInput').value = '';
+  document.getElementById('bottomBar').classList.remove('visible');
+  document.getElementById('mainPanel').classList.remove('has-bottom');
+  document.getElementById('topupBtnBar').disabled = true;
+  queryUser(); loadLogs();
+}
+
+async function doCustom() {
+  const email = currentUser?.email || document.getElementById('emailInput').value.trim().toLowerCase();
+  if (!email) { showToast('请先查询用户'); return; }
+  const input = prompt(`给 ${email} 自定义充值条数：`);
+  const quota = parseInt(input);
+  if (!quota || quota <= 0) { showToast('条数无效'); return; }
+  const note = document.getElementById('noteInput').value.trim() || '自定义充值';
+  const { data: ex } = await sb.from('subscriptions').select('monthly_quota,used_count,total_used').eq('email', email).maybeSingle();
+  const curRem = ex ? Math.max(0, ex.monthly_quota - ex.used_count) : 0;
+  const newQ = curRem + quota;
+  const newTotalUsed = (ex?.total_used || 0) + (ex?.used_count || 0);
+  const { error } = await sb.from('subscriptions').upsert({
+    email, plan_id: 'permanent', plan_name: '自定义', monthly_quota: newQ, used_count: 0,
+    total_used: newTotalUsed, memory_limit: 20,
+    period_start: new Date().toISOString(), period_end: '2099-12-31T23:59:59.000Z',
+    status: 'active', updated_at: new Date().toISOString(),
+  }, { onConflict: 'email' });
+  if (error) { showToast('充值失败'); return; }
+  await writeLog(email, '自定义', quota, note);
+  showToast(`✅ 已充值 ${quota} 条，余额 ${newQ} 条`);
+  queryUser(); loadLogs();
+}
+
+async function writeLog(email, planName, quota, note) {
+  try { await sb.from('topup_logs').insert({ email, plan_name: planName, quota_added: quota, note: note||'', created_at: new Date().toISOString() }); } catch(e){}
+}
+
+async function loadLogs() {
+  const { data } = await sb.from('topup_logs').select('*').order('created_at',{ascending:false}).limit(30);
+  const c = document.getElementById('logContainer');
+  if (!data || !data.length) { c.innerHTML = '<div class="log-empty">暂无记录</div>'; return; }
+  c.innerHTML = `<div class="log-list">${data.map(r=>`
+    <div class="log-item">
+      <div class="log-quota">+${r.quota_added}</div>
+      <div class="log-info">
+        <div class="log-email">${r.email}</div>
+        <div class="log-meta">${r.plan_name}${r.note?' · '+r.note:''}</div>
+      </div>
+      <div class="log-time">${fmtTime(r.created_at)}</div>
+    </div>`).join('')}</div>`;
+}
+
+function fmtTime(s) {
+  if (!s) return '';
+  const d = new Date(s), now = new Date();
+  const hm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return d.toDateString()===now.toDateString() ? hm : `${d.getMonth()+1}/${d.getDate()} ${hm}`;
+}
+function showResult(id, ok, msg) {
+  const el = document.getElementById(id);
+  el.className = 'result-msg '+(ok?'ok':'err');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 6000);
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
