@@ -810,18 +810,29 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
+    // 正则没命中：DeepSeek结合上下文判断调情+情绪（有图片时跳过）
     if (!isIntimate && !isRecentPhoto) {
       try {
+        // 带最近5条对话历史，让DeepSeek判断语境暗示，不只看单句
+        const _recentCtxForFlirt = rawHistory
+          .filter(m => !m._system && !m._recalled)
+          .slice(-5)
+          .map(m => `${m.role === 'user' ? '她' : 'Ghost'}: ${(m.content || '').slice(0, 100)}`)
+          .join('\n');
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
-            '判断用户消息。只返回JSON，不要其他文字。\n' +
+            '判断用户最新消息。只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：身体接触（亲亲/亲一下/抱抱/抱一下/摸摸/蹭蹭/kiss/hug）、露骨描述、刻意挑逗均为true。纯粹想念/日常问候为false。',
-            `用户说：${text}`,
+            'flirt判断标准（结合上下文）：\n' +
+            '- 身体接触（亲亲/抱抱/摸摸/蹭蹭/kiss/hug）→ true\n' +
+            '- 露骨或情色描述 → true\n' +
+            '- 基于当前对话语境的暗示、挑逗、要求描述亲密场景 → true\n' +
+            '- 即使单句不露骨，但结合上下文明显是在推进亲密互动 → true\n' +
+            '- 纯粹想念/日常问候/普通聊天 → false',
+            `最近对话：\n${_recentCtxForFlirt}\n\n用户最新说：${text}`,
             80
           ),
-          new Promise(resolve => setTimeout(() => resolve(''), 2500))
+          new Promise(resolve => setTimeout(() => resolve(''), 3000))
         ]);
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
