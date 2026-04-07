@@ -1656,7 +1656,7 @@ function togglePlusPanel() {
   const panel = document.getElementById('plusPanel');
   if (!panel) return;
   const isVisible = panel.style.display !== 'none';
-  panel.style.display = isVisible ? 'none' : 'flex';
+  panel.style.display = isVisible ? 'none' : 'block';
   // 每次开关都重置子面板到关闭状态
   const sub = document.getElementById('stickerSubPanel');
   if (sub) sub.style.display = 'none';
