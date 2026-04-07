@@ -81,9 +81,11 @@ async function maybeProactiveMessage() {
 
   try {
     showTyping();
-    const reply = await callHaiku(
-      buildSystemPrompt(),
-      [...chatHistory.filter(m => !m._system).slice(-6), { role: 'user', content: systemNote }],
+    const recentCtx = chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
+      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n');
+    const reply = await callGrokWithSystem(
+      buildGhostStyleCore(),
+      recentCtx ? `Recent chat:\n${recentCtx}\n\n${systemNote}` : systemNote,
       80
     );
     hideTyping();
@@ -151,9 +153,9 @@ function checkSalaryDay() {
     ];
     const fallbackLine = salaryFallbacks[Math.floor(Math.random() * salaryFallbacks.length)];
 
-    callHaiku(
+    callGrokWithSystem(
       `You are Simon Riley.\n\nYou just sent her your monthly salary: £${salary}.\n\nOne line. lowercase. No explanation. No extra context. Keep it short. Like he wouldn't make a thing out of it.`,
-      [{ role: 'user', content: 'say something.' }],
+      'say something.',
       80
     ).then(async line => {
       // 破防检测已在 cleanBotText 出口统一处理

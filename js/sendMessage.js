@@ -480,9 +480,10 @@ async function _processMergedMessage(text) {
 
       setTimeout(() => {
         if (_isSending) return;
-        // 如果主回复刚发过（10秒内），不再发comeback，避免两条相似
-        const _lastBot = chatHistory.filter(m => m.role === 'assistant' && !m._recalled && m._time).slice(-1)[0];
-        if (_lastBot && Date.now() - _lastBot._time < 10000) return;
+        // 防重复：检查最近10秒内是否有任何bot回复（有_time或无_time都算）
+        const _lastBotAny = chatHistory.filter(m => m.role === 'assistant' && !m._recalled).slice(-1)[0];
+        const _lastBotTime = _lastBotAny?._time || 0;
+        if (_lastBotAny && Date.now() - _lastBotTime < 20000) return;
         showTyping();
         callHaiku(buildGhostStyleCore(), [
           ...chatHistory.filter(m => !m._system).slice(-6),
@@ -994,7 +995,26 @@ async function _processMergedMessage(text) {
     reply = reply.replace(/\s*—\s*/g, '\n').trim();
 
     // ── Step 6: 渲染消息 ─────────────────────────────────────
-    const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2);
+    // --- 分割：只在两段内容明显不同时才拆成两条气泡
+    // 防止模型随手写---导致两条意思相近的消息
+    const rawParts = reply.split('\n---\n').filter(p => p.trim());
+    let finalParts;
+    if (rawParts.length > 1) {
+      // 两段相似度检测：开头词一样或长度都很短则合并
+      const p0 = rawParts[0].trim().toLowerCase();
+      const p1 = rawParts[1].trim().toLowerCase();
+      const firstWord0 = p0.split(/\s+/)[0];
+      const firstWord1 = p1.split(/\s+/)[0];
+      const tooShort = p0.length < 15 || p1.length < 15;
+      const sameOpener = firstWord0 === firstWord1;
+      if (tooShort || sameOpener) {
+        finalParts = [rawParts.join('\n')]; // 合并成一条
+      } else {
+        finalParts = rawParts.slice(0, 2);
+      }
+    } else {
+      finalParts = rawParts;
+    }
     if (finalParts.length === 0) finalParts.push('...');
 
     let lastBotResult = null;
@@ -1178,6 +1198,11 @@ async function _processMergedMessage(text) {
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
 
+    // 同步已渲染消息数，防止切页回来时重复渲染
+    if (typeof _renderedMsgCount !== 'undefined') {
+      _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
+    }
+
     // ── 承诺检测 ─────────────────────────────────────────────
     try {
       const commitPatterns = [
@@ -1334,6 +1359,10 @@ One or two lines. English only. lowercase.`;
       }
       chatHistory.push({ role: 'assistant', content: geminiReply.trim(), _intimate: true });
       saveHistory();
+      // 同步已渲染消息数，防止切页回来时重复渲染
+      if (typeof _renderedMsgCount !== 'undefined') {
+        _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
+      }
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
       if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
       incrementTodayCount();
@@ -1357,6 +1386,10 @@ One or two lines. English only. lowercase.`;
       appendMessage('bot', haiku2.trim());
       chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true });
       saveHistory();
+      // 同步已渲染消息数
+      if (typeof _renderedMsgCount !== 'undefined') {
+        _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
+      }
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
     }

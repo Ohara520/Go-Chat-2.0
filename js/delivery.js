@@ -187,9 +187,10 @@ function addGhostReverseDelivery(item, emotionType) {
     const hintDelay = [2000, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
     setTimeout(async () => {
       try {
-        const line = await callHaiku(
+        const line = await callGrokWithSystem(
           buildGhostStyleCore(),
-          [{ role: 'user', content: `[You sent her something. She doesn't know yet. Drop one vague line — not what it is, not when. Something that could mean anything. One line. Do not announce it like a delivery update.]` }]
+          `[You sent her something. She doesn't know yet. Drop one vague line — not what it is, not when. Something that could mean anything. One line. Do not announce it like a delivery update.]`,
+          80
         );
         if (line && line.trim()) {
           appendMessage('bot', line.trim().split('\n')[0]);
@@ -211,9 +212,10 @@ function addGhostReverseDelivery(item, emotionType) {
     const directDelay = [2000, 2 * 60 * 1000][Math.floor(Math.random() * 2)];
     setTimeout(async () => {
       try {
-        const line = await callHaiku(
+        const line = await callGrokWithSystem(
           buildGhostStyleCore(),
-          [{ role: 'user', content: `[You sent her 「${item.name}」. Say one line — low-key, no details. Like it's not a big deal.${item.tip ? ' ' + item.tip : ''}]` }]
+          `[You sent her 「${item.name}」. Say one line — low-key, no details. Like it's not a big deal.${item.tip ? ' ' + item.tip : ''}]`,
+          80
         );
         if (line && line.trim()) {
           appendMessage('bot', line.trim().split('\n')[0]);
@@ -344,12 +346,15 @@ One or two lines. Lowercase. English only.]`;
       }
     } catch(e) {}
 
-    // Haiku 兜底
+    // Grok 兜底
     if (!replyI) {
       try {
-        const line = await callHaiku(
+        const ctx = chatHistory.filter(m => !m._system && !m._recalled).slice(-8)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n');
+        const line = await callGrokWithSystem(
           buildDeliverySystem(),
-          [...chatHistory.slice(-8), { role: 'user', content: prompt }]
+          ctx ? `${ctx}\n\n${prompt}` : prompt,
+          150
         );
         if (line && !_isDeliveryBreakout(line)) replyI = line.trim();
       } catch(e) {}
@@ -409,15 +414,9 @@ One or two lines. Lowercase. English only.]`;
 
     setTimeout(async () => {
       try {
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: pd.isLuxury && typeof getMainModel === 'function' ? getMainModel() : 'claude-haiku-4-5-20251001',
-            max_tokens: 150,
-            system: buildDeliverySystem(),
-            messages: [...chatHistory.slice(-10), {
-              role: 'user',
-              content: `[She sent something. It just arrived — 「${delivery.name}」.${fromHomeHint ? ' ' + fromHomeHint : ''}
+        const ctx = chatHistory.filter(m => !m._system && !m._recalled).slice(-10)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n');
+        const deliveryPrompt = `[She sent something. It just arrived — 「${delivery.name}」.${fromHomeHint ? ' ' + fromHomeHint : ''}
 
 He doesn't react the same way every time.
 
@@ -425,12 +424,28 @@ Sometimes it's simple. A short line. Real. No effort to dress it up.
 Sometimes he plays it down. Says less than he feels. But lingers on it.
 Sometimes he gives her a hard time about it. A comment, a complaint, something dry.
 
-He doesn't make a show of it. But he keeps it.]`
-            }]
-          })
-        });
-        const data  = await res.json();
-        const reply = data.content?.[0]?.text?.trim() || '';
+He doesn't make a show of it. But he keeps it.]`;
+
+        let reply = '';
+        if (pd.isLuxury && typeof getMainModel === 'function') {
+          const res = await fetchWithTimeout('/api/chat', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: getMainModel(), max_tokens: 150,
+              system: buildDeliverySystem(),
+              messages: [...chatHistory.filter(m => !m._system && !m._recalled).slice(-10),
+                { role: 'user', content: deliveryPrompt }]
+            })
+          }, 20000);
+          const data = await res.json();
+          reply = data.content?.[0]?.text?.trim() || '';
+        } else {
+          reply = await callGrokWithSystem(
+            buildDeliverySystem(),
+            ctx ? `${ctx}\n\n${deliveryPrompt}` : deliveryPrompt,
+            150
+          );
+        }
         if (reply && !_isDeliveryBreakout(reply)) {
           appendMessage('bot', reply);
           chatHistory.push({ role: 'assistant', content: reply });
@@ -496,15 +511,10 @@ Item received: 「${delivery.name}」]`
       const afterthoughtDelay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
       setTimeout(async () => {
         try {
-          const line = await callHaiku(
-            buildDeliverySystem(),
-            [...chatHistory.slice(-6), {
-              role: 'user',
-              content: isFromHome
-                ? `[A few days later, something she sent from home crosses his mind. Just a line. Use what you know about it: ${pd.desc || delivery.name}. Write in English — describe how it tasted, felt, or what he did with it. Specific. Offhand. No explanation.]`
-                : `[A few days later, something she sent crosses his mind. Just a line. What it is: ${pd.desc || delivery.name}. Write in English — one concrete detail about it. Not "it" alone — say what it actually is or what he did with it. Dry. Offhand.]`
-            }]
-          );
+          const afterPrompt = isFromHome
+            ? `[A few days later, something she sent from home crosses his mind. Just a line. Use what you know about it: ${pd.desc || delivery.name}. Write in English — describe how it tasted, felt, or what he did with it. Specific. Offhand. No explanation.]`
+            : `[A few days later, something she sent crosses his mind. Just a line. What it is: ${pd.desc || delivery.name}. Write in English — one concrete detail about it. Not "it" alone — say what it actually is or what he did with it. Dry. Offhand.]`;
+          const line = await callGrokWithSystem(buildDeliverySystem(), afterPrompt, 80);
           if (line && line.trim()) {
             appendMessage('bot', line.trim().split('\n')[0]);
             chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
@@ -566,15 +576,9 @@ function showMysteryPackage(delivery) {
   const replyDelay = [2000, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
   setTimeout(async () => {
     try {
-      const res = await fetchWithTimeout('/api/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 300,
-          system: buildDeliverySystem(),
-          messages: [...chatHistory.slice(-10), {
-            role: 'user',
-            content: `[He sent something — 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''}
+      const ctx = chatHistory.filter(m => !m._system && !m._recalled).slice(-10)
+        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n');
+      const mysteryPrompt = `[He sent something — 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''}
 
 He doesn't always say it was him.
 
@@ -583,12 +587,12 @@ Sometimes he doesn't. Lets it sit.
 
 If she asks, he goes with whatever feels right.
 
-He's paying attention. But he acts like it's nothing.]`
-          }]
-        })
-      });
-      const data  = await res.json();
-      const reply = data.content?.[0]?.text?.trim() || '';
+He's paying attention. But he acts like it's nothing.]`;
+      const reply = await callGrokWithSystem(
+        buildDeliverySystem(),
+        ctx ? `${ctx}\n\n${mysteryPrompt}` : mysteryPrompt,
+        200
+      );
       if (reply && !_isDeliveryBreakout(reply)) {
         appendMessage('bot', reply);
         chatHistory.push({ role: 'assistant', content: reply });
@@ -660,21 +664,15 @@ A short pause. Then it shifts.
 
 He doesn't make a thing out of it. But there's a slight edge — not at her, at the situation. Keeps it simple. Doesn't let her sit with it. Closes it himself.]`;
 
-    chatHistory.push({ role: 'user', content: contextPrompt, _system: true });
+    const ctx = chatHistory.filter(m => !m._system && !m._recalled).slice(-20)
+      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n');
     if (typeof showTyping === 'function') showTyping();
-
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        system: buildDeliverySystem(),
-        messages: chatHistory.slice(-20)
-      })
-    });
-    const data  = await res.json();
+    const reply = await callGrokWithSystem(
+      buildDeliverySystem(),
+      ctx ? `${ctx}\n\n${contextPrompt}` : contextPrompt,
+      250
+    );
     if (typeof hideTyping === 'function') hideTyping();
-    const reply = data.content?.[0]?.text?.trim() || '';
     if (reply) {
       appendMessage('bot', reply);
       chatHistory.push({ role: 'assistant', content: reply });

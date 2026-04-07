@@ -407,9 +407,14 @@ English only.`;
 
 async function generateMoneyRefuseLine(pattern) {
   try {
-    const res = await callHaiku(
+    const ctx = typeof chatHistory !== 'undefined'
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-4)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n')
+      : '';
+    const res = await callGrokWithSystem(
       buildGhostStyleCore() + '\n' + buildMoneyAskReactionPrompt(pattern),
-      typeof chatHistory !== 'undefined' ? chatHistory.slice(-4) : []
+      ctx || 'Write his line.',
+      80
     );
     if (res && res.trim()) return res.trim();
   } catch(e) {}
@@ -730,23 +735,20 @@ function confirmTransfer() {
   if (typeof showTyping === 'function') showTyping();
   if (typeof _isSending !== 'undefined') _isSending = true;
 
-  fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
-      system: buildGhostStyleCore() + '\n' + judgePrompt,
-      messages: typeof cleanMessages === 'function' && typeof chatHistory !== 'undefined'
+  const ctx = typeof chatHistory !== 'undefined'
+    ? (typeof cleanMessages === 'function'
         ? cleanMessages(chatHistory.filter(m => !m._system).slice(-6))
-        : []
-    })
-  }).then(r => r.json()).then(data => {
-    if (typeof hideTyping === 'function') hideTyping();
-    let reply = data.content?.[0]?.text || '...';
-    if (typeof updateToRead === 'function') updateToRead();
+        : chatHistory.filter(m => !m._system).slice(-6))
+        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n')
+    : '';
 
-    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '')
+  callGrokWithSystem(
+    buildGhostStyleCore() + '\n' + judgePrompt,
+    ctx || 'Respond.',
+    200
+  ).then(reply => {
+    if (typeof hideTyping === 'function') hideTyping();
+    reply = (reply || '...').replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '')
                  .replace(/\s{2,}/g, ' ').trim();
 
     if (typeof incrementTodayCount === 'function') incrementTodayCount();
@@ -797,13 +799,11 @@ function confirmTransfer() {
   }).catch(() => {
     if (typeof hideTyping === 'function') hideTyping();
     if (typeof _isSending !== 'undefined') _isSending = false;
-    // 网络错误：全退
     const bal = typeof getBalance === 'function' ? getBalance() : 0;
     if (typeof setBalance === 'function') setBalance(bal + amount);
     if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（网络错误）', amount });
     if (typeof renderWallet === 'function') renderWallet();
     updateUserTransferCard(cardId, false);
-    // 网络错误静默处理，不显示出戏提示
   });
 }
 
@@ -930,26 +930,22 @@ async function ghostSendInitMessage(offlineHours) {
   const hint = hintMap.find(h => offlineHours >= h.min && offlineHours < h.max)?.hint || '';
   try {
     if (typeof showTyping === 'function') showTyping();
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        ...(() => { const s = buildSystemPrompt(); return { system: s, systemParts: buildSystemPromptParts(s) }; })(),
-        messages: [...(typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []),
-          { role: 'user', content: `[System: ${hint} Ghost noticed. Say something — could be a pointed question, a casual remark, or just checking in. lowercase, English only.]` }
-        ]
-      })
-    });
-    const data = await res.json();
+    const ctx = typeof chatHistory !== 'undefined'
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n')
+      : '';
+    const offlinePrompt = `[System: ${hint} Ghost noticed. Say something — could be a pointed question, a casual remark, or just checking in. lowercase, English only.]`;
+    const reply = await callGrokWithSystem(
+      buildGhostStyleCore(),
+      ctx ? `${ctx}\n\n${offlinePrompt}` : offlinePrompt,
+      150
+    );
     if (typeof hideTyping === 'function') hideTyping();
-    let reply = data.content?.[0]?.text?.trim() || '';
     if (reply) {
-      reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
-      if (typeof appendMessage === 'function') appendMessage('bot', reply);
+      const cleaned = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
+      if (cleaned && typeof appendMessage === 'function') appendMessage('bot', cleaned);
       if (typeof chatHistory !== 'undefined') {
-        chatHistory.push({ role: 'assistant', content: reply });
+        chatHistory.push({ role: 'assistant', content: cleaned });
         if (typeof saveHistory === 'function') saveHistory();
       }
     }

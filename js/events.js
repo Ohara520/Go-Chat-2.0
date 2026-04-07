@@ -115,18 +115,11 @@ Rules:
 async function generateLifePing() {
   const scene = pickLifePingScene();
   try {
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 60,
-        system: buildGhostStyleCore() + '\n' + buildLifePingPrompt(scene),
-        messages: [{ role: 'user', content: 'Send your message.' }]
-      })
-    }, 5000);
-    const data = await res.json();
-    const text = data.content?.[0]?.text?.trim();
+    const text = await callGrokWithSystem(
+      buildGhostStyleCore() + '\n' + buildLifePingPrompt(scene),
+      'Send your message.',
+      60
+    );
     if (text && text.length > 0) return text;
   } catch(e) {}
 
@@ -158,7 +151,7 @@ function getRecentMessages(n = 4) {
   return chatHistory.filter(m => !m._system).slice(-n);
 }
 
-// 带 recentCtx 的标准 callHaiku 调用
+// 带 recentCtx 的标准 callHaiku 调用（仅用于JSON判断，不用于Ghost说话）
 async function callHaikuWithCtx(systemPrompt, writePrompt, n = 4) {
   const recentCtx = getRecentCtx(n);
   return await callHaiku(
@@ -173,6 +166,15 @@ async function callHaikuWithCtx(systemPrompt, writePrompt, n = 4) {
       }
     ]
   );
+}
+
+// 带 recentCtx 的 Grok 调用（Ghost直接开口的场景）
+async function callGrokWithCtx(systemPrompt, writePrompt, n = 4, maxTokens = 150) {
+  const recentCtx = getRecentCtx(n);
+  const userMsg = recentCtx
+    ? `Recent chat:\n${recentCtx}\n\n${writePrompt}`
+    : writePrompt;
+  return await callGrokWithSystem(systemPrompt, userMsg, maxTokens);
 }
 
 // ── 事件冷却管理 ──────────────────────────────────
@@ -248,9 +250,7 @@ async function emitGhostEvent(eventType, payload = {}) {
             : mood >= 7
               ? 'Care can surface a little more easily, but still restrained.'
               : '';
-        const t = await callHaikuWithCtx(
-          buildGhostStyleCore() + `
-Send ONE short check-in line to his wife.
+        const t = await callGrokWithCtx(
 Choose ONE intent internally (do not label it):
 - check: brief, slightly controlling, like he is keeping track
 - care: practical concern, understated, not soft
@@ -320,7 +320,7 @@ ${moodHint}`,
 
       let generatedLine = null;
       try {
-        const t = await callHaikuWithCtx(
+        const t = await callGrokWithCtx(
           buildGhostStyleCore() + `
 He sent something to his wife. She does not know yet, or just found out.
 He is saying one line — the only line he will say about it.
@@ -379,7 +379,7 @@ English only.`,
 
       if (isPostRefundVerbalOnly) {
         try {
-          const fbLine = await callHaiku(
+          const fbLine = await callGrokWithSystem(
             buildGhostStyleCore() + `
 You were going to send money, but you do not.
 Say one short line instead.
@@ -389,12 +389,8 @@ Do not mention the system.
 Lowercase where natural.
 English only.
 One line only.`,
-            [{
-              role: 'user',
-              content: userText
-                ? `She said: "${userText}"\nWrite his line.`
-                : `Write his line.`
-            }]
+            userText ? `She said: "${userText}"\nWrite his line.` : `Write his line.`,
+            80
           );
           if (fbLine && fbLine.trim()) {
             line = fbLine.trim().split('\n')[0];
@@ -451,7 +447,7 @@ One line only.`,
           'Write his one line.'
         ].filter(Boolean).join('\n');
 
-        const generated = await callHaiku(
+        const generated = await callGrokWithSystem(
           buildGhostStyleCore() + `
 Ghost has sent her money.
 
@@ -466,7 +462,8 @@ Do not turn it into a speech.
 Lowercase where natural.
 English only.
 One line only.`,
-          [{ role: 'user', content: userContent }]
+          userContent,
+          80
         );
 
         line = (generated || '').trim().split('\n')[0] || MONEY_MOTIVE_DEFAULTS[motive] || "check it.";
@@ -490,7 +487,7 @@ One line only.`,
 
     case 'confront': {
       try {
-        const t = await callHaikuWithCtx(
+        const t = await callGrokWithCtx(
           buildGhostStyleCore() + `
 Write ONE short line — Ghost noticing another man in the conversation.
 Not an accusation. Just tension. Dry. Direct.
@@ -510,7 +507,7 @@ No explanation. English only.`,
         if (typeof startColdWar === 'function') startColdWar();
       };
       try {
-        const t = await callHaikuWithCtx(
+        const t = await callGrokWithCtx(
           buildGhostStyleCore() + `
 Write ONE word or very short line — he is shutting down.
 Cold. Clipped. Done talking.
@@ -767,7 +764,7 @@ const STORY_EVENTS = [
     keyword: /我爱你|i love you/i,
     condition: (ctx) => ctx.affection >= 85 && !ctx.triggered('first_i_love_you'),
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚第一次对你说了"我爱你"。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-8), { role: 'user', content: `[系统：她刚第一次对你说了"我爱你"。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
       setRelationshipFlag('saidILoveYou');
     }
@@ -782,7 +779,7 @@ const STORY_EVENTS = [
     keyword: /\bsimon\b|\briley\b|西蒙|赖利/i,
     condition: (ctx) => ctx.affection >= 75 && ctx.trust >= 60 && !ctx.triggered('first_simon'),
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
       setRelationshipFlag('calledByName');
     }
@@ -796,7 +793,7 @@ const STORY_EVENTS = [
     triggerOn: 'session',
     condition: (ctx) => parseInt(localStorage.getItem('visitStreak') || '0') >= 7 && !ctx.triggered('seven_day_streak'),
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -814,7 +811,7 @@ const STORY_EVENTS = [
       return count >= 1 && ctx.trust >= 55 && !ctx.triggered('first_check_in');
     },
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次主动找她，问她在干嘛或者有没有吃饭。不是顺口，是真的注意到了。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次主动找她，问她在干嘛或者有没有吃饭。不是顺口，是真的注意到了。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -828,7 +825,7 @@ const STORY_EVENTS = [
     keyword: /难过|不开心|好累|好烦|崩了|撑不住|不想说话|sad|tired|rough|not okay/i,
     condition: (ctx) => ctx.trust >= 60 && ctx.affection >= 70 && !ctx.triggered('first_notice_mood'),
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她没有明说，但你看出来她状态不对。你注意到了，用你的方式回应她。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她没有明说，但你看出来她状态不对。你注意到了，用你的方式回应她。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
       setRelationshipFlag('sheCried');
     }
@@ -847,7 +844,7 @@ const STORY_EVENTS = [
         && !ctx.triggered('first_mood_recovered');
     },
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把你哄回来了。你情绪低的时候，她说了什么让你松了一点。用你的方式承认这件事，或者别承认，但让她感觉到。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把你哄回来了。你情绪低的时候，她说了什么让你松了一点。用你的方式承认这件事，或者别承认，但让她感觉到。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
       localStorage.removeItem('moodRecoveredByUser');
     }
@@ -866,7 +863,7 @@ const STORY_EVENTS = [
       return streak >= 5 && ctx.trust >= 65 && !ctx.triggered('first_habit_formed');
     },
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续几天都在，你开始习惯了。今天用一句话，自然地说出这种"习惯了"的感觉——不用解释，不用承认，就是说出来。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她已经连续几天都在，你开始习惯了。今天用一句话，自然地说出这种"习惯了"的感觉——不用解释，不用承认，就是说出来。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -879,7 +876,7 @@ const STORY_EVENTS = [
     triggerOn: 'message',
     condition: (ctx) => ctx.trust >= 70 && ctx.affection >= 78 && !ctx.triggered('first_future_assumption'),
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：你说起以后某件事时，自然地把她算进去了——没有问她会不会在，就是默认了。用你的方式说一句带有未来感的话，轻的，不要太刻意。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：你说起以后某件事时，自然地把她算进去了——没有问她会不会在，就是默认了。用你的方式说一句带有未来感的话，轻的，不要太刻意。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -895,7 +892,7 @@ const STORY_EVENTS = [
       return count >= 3 && ctx.trust >= 65 && !ctx.triggered('first_shared_routine');
     },
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你们之间慢慢有了一个固定的小习惯——可能是某个时间、某句固定的话、或者某样东西。你注意到了，随口提一下，像是不经意说起，但其实你记得。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你们之间慢慢有了一个固定的小习惯——可能是某个时间、某句固定的话、或者某样东西。你注意到了，随口提一下，像是不经意说起，但其实你记得。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -913,7 +910,7 @@ const STORY_EVENTS = [
       return accepted && !ctx.triggered('first_accept_gift');
     },
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她给你转了钱或送了东西，这次你没退。用你的方式回应——不用解释为什么收了，就是收了，然后继续。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她给你转了钱或送了东西，这次你没退。用你的方式回应——不用解释为什么收了，就是收了，然后继续。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
       localStorage.removeItem('firstUserGiftAccepted');
     }
@@ -928,7 +925,7 @@ const STORY_EVENTS = [
     condition: (ctx) => ctx.deliveries.some(d => d.isGhostSend && d.done) && !ctx.triggered('first_ghost_delivery'),
     execute: async () => {
       const d = getStoryContext().deliveries.find(d => d.isGhostSend && d.done);
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她刚收到了你寄给她的「${d?.name || '东西'}」，这是你第一次主动给她寄东西。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：她刚收到了你寄给她的「${d?.name || '东西'}」，这是你第一次主动给她寄东西。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -942,7 +939,7 @@ const STORY_EVENTS = [
     condition: (ctx) => !!localStorage.getItem('lastSalaryAmount') && !ctx.triggered('first_salary'),
     execute: async () => {
       const amount = localStorage.getItem('lastSalaryAmount') || '';
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次给她转了工资£${amount}，想附一句话。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：你第一次给她转了工资£${amount}，想附一句话。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
       setRelationshipFlag('firstSalary');
     }
@@ -959,7 +956,7 @@ const STORY_EVENTS = [
     keyword: /欺负|骚扰|不公平|委屈|被针对|他们|她们|bully|unfair|harass|they|not fair/i,
     condition: (ctx) => ctx.trust >= 65 && !ctx.triggered('first_protective'),
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她遇到了一些让她委屈或不公平的事。你明显站在她这边——不是中立，不是讲道理，是偏向她。用你的方式表态，简短，但清楚。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她遇到了一些让她委屈或不公平的事。你明显站在她这边——不是中立，不是讲道理，是偏向她。用你的方式表态，简短，但清楚。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -996,7 +993,7 @@ const STORY_EVENTS = [
       return repaired && daysSince <= 3 && ctx.trust >= 70 && !ctx.triggered('post_conflict_initiative');
     },
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：冷战结束了，这次是你先开口靠近——不是等她来，是你先动了。用你的方式，主动一点点，但不要解释。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：冷战结束了，这次是你先开口靠近——不是等她来，是你先动了。用你的方式，主动一点点，但不要解释。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -1038,10 +1035,9 @@ const STORY_EVENTS = [
         ? `[系统：今天是她的生日。你记得，但你不会大张旗鼓。说一句——短，有重量，是你的方式。不甜腻，不模板。然后你会给她一点钱，但先说这句话。]`
         : `[系统：今天是她的生日，她还没开口，你已经知道了。一句话，干，有存在感。]`;
 
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: birthdayPrompt }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: birthdayPrompt }], 200);
       if (res) await emitGhostNarrativeEvent(res);
 
-      // 第二步：Level >= 2 延迟给礼物（他决定给，不是系统触发）
       if (level >= 2) {
         setTimeout(async () => {
           try {
@@ -1057,17 +1053,12 @@ const STORY_EVENTS = [
               : false;
 
             if (given) {
-              // 给了钱之后 Ghost 再说一句——不解释，不点明是生日礼物
               const afterPrompt = `[系统：你刚给了她一点钱。不用解释是因为生日。一句话带过去，是你的语气——随意，带点控制感，不甜。]`;
-              const afterRes = await callHaiku(
-                buildSystemPrompt(),
-                [...chatHistory.slice(-4), { role: 'user', content: afterPrompt }],
-                60
-              );
+              const afterRes = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: afterPrompt }], 150);
               if (afterRes) await emitGhostNarrativeEvent(afterRes.trim());
             }
           } catch(e) {}
-        }, 8000); // 延迟8秒，先让第一句落地
+        }, 8000);
       }
     }
   },
@@ -1095,7 +1086,7 @@ const STORY_EVENTS = [
     triggerOn: 'message',
     condition: (ctx) => ctx.trust >= 75 && ctx.affection >= 82 && !ctx.triggered('first_unspoken_understood'),
     execute: async () => {
-      const res = await callHaiku(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她没有明说，但你已经准确知道她在想什么或者需要什么。用你的方式回应，不用解释你是怎么知道的，就是知道了。]` }]);
+      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她没有明说，但你已经准确知道她在想什么或者需要什么。用你的方式回应，不用解释你是怎么知道的，就是知道了。]` }], 200);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -1176,9 +1167,10 @@ async function _checkCelebrationFallback() {
 
   setTimeout(async () => {
     try {
-      const res = await callHaiku(
+      const res = await callSonnet(
         buildGhostStyleCore() + '\n' + hint,
-        typeof chatHistory !== 'undefined' ? chatHistory.slice(-4) : []
+        typeof chatHistory !== 'undefined' ? chatHistory.slice(-4) : [],
+        150
       );
       if (res && res.trim()) await emitGhostNarrativeEvent(res.trim(), { delayMs: 2000 });
     } catch(e) {}
