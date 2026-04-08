@@ -7,7 +7,7 @@ const client = new OpenAI({
 
 export default async function handler(req, res) {
   try {
-    const { system, user, max_tokens = 300, image_base64 } = req.body;
+    const { system, user, max_tokens = 300, image_base64, model: reqModel } = req.body;
 
     // 支持图片输入
     let userContent;
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     }
 
     const response = await client.chat.completions.create({
-      model: image_base64 ? 'grok-4.1' : 'grok-4.1',
+      model: reqModel || (image_base64 ? 'grok-4.1' : 'grok-4.1'),
       max_tokens,
       messages: [
         { role: 'system', content: system },

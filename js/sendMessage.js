@@ -833,19 +833,24 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 正则没命中：调情判断和情绪判断分开——原版做法，调情单独一次调用，简单prompt不会破防
+    // 正则没命中：用 grok-3-mini 做调情判断（Haiku会破防，不能用）
     if (!isIntimate && !isRecentPhoto) {
       try {
-        const flirtRaw = await Promise.race([
-          fetchDeepSeek(
-            '判断这句话是否带有调情/身体暗示/性相关/露骨撩拨意图。注意：单纯撒娇、表达想念、日常问候不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
-            text,
-            20
-          ),
-          new Promise(resolve => setTimeout(() => resolve(''), 3000))
+        const flirtRes = await Promise.race([
+          fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system: '判断这句话是否带有调情/身体暗示/性相关/露骨撩拨意图。单纯撒娇、想念、日常问候不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+              user: text,
+              max_tokens: 20,
+              model: 'grok-3-mini'
+            })
+          }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
+          new Promise(resolve => setTimeout(() => resolve(''), 5000))
         ]);
-        if (flirtRaw) {
-          const flirtResult = safeParseJSON(flirtRaw);
+        if (flirtRes) {
+          const flirtResult = safeParseJSON(flirtRes);
           if (flirtResult && flirtResult.flirt === true) isIntimate = true;
         }
       } catch(e) {}
