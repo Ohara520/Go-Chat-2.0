@@ -407,15 +407,11 @@ English only.`;
 
 async function generateMoneyRefuseLine(pattern) {
   try {
-    const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-      .filter(m => !m._system && !m._recalled).slice(-4)
-      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
-    const res = await callGrokWithSystem(
+    const res = await callHaiku(
       buildGhostStyleCore() + '\n' + buildMoneyAskReactionPrompt(pattern),
-      recentCtx || 'she asked for money again.',
-      100
+      typeof chatHistory !== 'undefined' ? chatHistory.slice(-4) : []
     );
-    if (res && res.trim() && !isBreakout(res)) return res.trim();
+    if (res && res.trim()) return res.trim();
   } catch(e) {}
 
   const fallbacks = {
@@ -585,71 +581,71 @@ function closeTransfer() {
 
 // 纯函数：判断用户转账后 Ghost 应该收还是退
 // 返回 { shouldRefund: bool, reason: string, acceptAmount: number }
-// context.reason：最近一条用户消息内容，用来判断有没有明确理由
+// context.reason：上下文内容（最近几条对话 + 用户说的理由）
 function judgeUserTransfer(amount, context = {}) {
-  const coldWar   = localStorage.getItem('coldWarMode') === 'true';
-  const level     = getMoneyComfortLevel();
-  const maxSingle = getMaxSingleTransfer();
-  const mood      = getMoodLevel();
-  const trust     = getTrustHeat();
-  const aff       = getAffection();
+  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  const level   = getMoneyComfortLevel();
+  const mood    = getMoodLevel();
+  const trust   = getTrustHeat();
+  const aff     = getAffection();
 
-  const reason     = (context.reason || '').toLowerCase();
-  const hasReason  = !!reason.trim();
-  const isGift     = /礼物|送你|给你的|gift|present|for you/.test(reason);
-  const isComp     = /补偿|赔你|我错了|补给你|make it up|compensation|my fault/.test(reason);
-  const isPractical = /帮你|拿去用|买东西|use it|for this|for that/.test(reason);
+  // 软上限：单次最多 £1000，超过直接退（防止异常数字）
+  const SOFT_CAP = 1000;
 
-  // 1. 硬拒绝
-  if (coldWar)             return { shouldRefund: true, reason: 'coldWar',      acceptAmount: 0 };
-  if (isMoneyRefuseActive()) return { shouldRefund: true, reason: 'refuseActive', acceptAmount: 0 };
-  if (level === 0)         return { shouldRefund: true, reason: 'comfortLevel', acceptAmount: 0 };
-  if (mood <= 3)           return { shouldRefund: true, reason: 'mood',         acceptAmount: 0 };
+  const reason      = (context.reason || '').toLowerCase();
+  const hasReason   = !!reason.trim();
+  const isGift      = /礼物|送你|给你的|520|1314|生日|情人节|纪念|gift|present|for you|birthday|anniversary/.test(reason);
+  const isComp      = /补偿|赔你|我错了|补给你|对不起|抱歉|make it up|compensation|my fault|sorry|apologize/.test(reason);
+  const isPractical = /帮你|拿去用|买东西|用吧|花吧|use it|for this|for that|spend it/.test(reason);
+  const isGoodReason = isGift || isComp || isPractical;
 
-  // 2. level 3 + gift/comp 大额：部分收，超出退（放在整笔退之前）
-  if (level >= 3 && amount > maxSingle && (isGift || isComp)) {
-    return { shouldRefund: false, reason: 'overMaxPartial', acceptAmount: maxSingle };
+  // 硬拒绝
+  if (coldWar)              return { shouldRefund: true,  reason: 'coldWar',      acceptAmount: 0, needsReason: false };
+  if (isMoneyRefuseActive()) return { shouldRefund: true,  reason: 'refuseActive', acceptAmount: 0, needsReason: false };
+  if (level === 0)          return { shouldRefund: true,  reason: 'comfortLevel', acceptAmount: 0, needsReason: false };
+  if (mood <= 3)            return { shouldRefund: true,  reason: 'mood',         acceptAmount: 0, needsReason: false };
+  if (amount > SOFT_CAP)    return { shouldRefund: true,  reason: 'overMax',      acceptAmount: 0, needsReason: false };
+
+  // 没有理由且金额不小：先问
+  if (!hasReason && amount > 20) {
+    return { shouldRefund: false, reason: 'noReason', acceptAmount: 0, needsReason: true };
   }
 
-  // 3. 其他大额：整笔退
-  if (amount > maxSingle) {
-    return { shouldRefund: true, reason: 'overMax', acceptAmount: 0 };
-  }
-
-  // 4. Level 1：只收明确合理的小额
+  // Level 1：关系还浅，只收小额好理由
   if (level === 1) {
-    if (amount <= 25 && (isGift || isPractical || isComp) && mood >= 5) {
-      return { shouldRefund: false, reason: 'ok', acceptAmount: amount };
-    }
-    return { shouldRefund: true, reason: hasReason ? 'tooMuchForLevel' : 'noReason', acceptAmount: 0 };
+    if (isGoodReason && amount <= 50 && mood >= 5)
+      return { shouldRefund: false, reason: 'ok',           acceptAmount: amount, needsReason: false };
+    if (isGoodReason && amount > 50)
+      return { shouldRefund: false, reason: 'overMaxPartial', acceptAmount: 50,   needsReason: false };
+    return { shouldRefund: true, reason: hasReason ? 'tooMuchForLevel' : 'noReason', acceptAmount: 0, needsReason: false };
   }
 
-  // 5. Level 2：可收有理由的小中额
+  // Level 2：可以收有理由的中等金额
   if (level === 2) {
-    if ((isGift || isPractical || isComp) && amount <= 60) {
-      return { shouldRefund: false, reason: 'ok', acceptAmount: amount };
-    }
-    if (!hasReason && amount <= 15 && mood >= 8 && trust >= 70) {
-      return { shouldRefund: false, reason: 'smallNoReason', acceptAmount: amount };
-    }
-    return { shouldRefund: true, reason: hasReason ? 'notThis' : 'noReason', acceptAmount: 0 };
+    if (isGoodReason && amount <= 200)
+      return { shouldRefund: false, reason: 'ok',           acceptAmount: amount, needsReason: false };
+    if (isGoodReason && amount > 200)
+      return { shouldRefund: false, reason: 'overMaxPartial', acceptAmount: 200,  needsReason: false };
+    if (!hasReason && amount <= 20 && mood >= 7 && trust >= 65)
+      return { shouldRefund: false, reason: 'smallNoReason', acceptAmount: amount, needsReason: false };
+    return { shouldRefund: true, reason: hasReason ? 'notThis' : 'noReason', acceptAmount: 0, needsReason: false };
   }
 
-  // 6. Level 3：更自然，但仍不是乱收
+  // Level 3：关系深，有好理由基本都收，金额大会收一部分
   if (level >= 3) {
-    if ((isGift || isPractical || isComp) && amount <= maxSingle) {
-      return { shouldRefund: false, reason: 'ok', acceptAmount: amount };
-    }
-    if (!hasReason && amount <= 20 && mood >= 8 && aff >= 75 && trust >= 75) {
-      return { shouldRefund: false, reason: 'smallNoReason', acceptAmount: amount };
-    }
-    return { shouldRefund: true, reason: hasReason ? 'guarded' : 'noReason', acceptAmount: 0 };
+    if (isGoodReason && amount <= 500)
+      return { shouldRefund: false, reason: 'ok',           acceptAmount: amount, needsReason: false };
+    if (isGoodReason && amount > 500)
+      return { shouldRefund: false, reason: 'overMaxPartial', acceptAmount: 500,  needsReason: false };
+    if (!hasReason && amount <= 30 && mood >= 7 && aff >= 70 && trust >= 75)
+      return { shouldRefund: false, reason: 'smallNoReason', acceptAmount: amount, needsReason: false };
+    return { shouldRefund: true, reason: hasReason ? 'guarded' : 'noReason', acceptAmount: 0, needsReason: false };
   }
 
-  return { shouldRefund: true, reason: 'fallback', acceptAmount: 0 };
+  return { shouldRefund: true, reason: 'fallback', acceptAmount: 0, needsReason: false };
 }
 
-function confirmTransfer() {
+async function confirmTransfer() {
   const amount  = parseInt(document.getElementById('transferAmount').value);
   const balance = typeof getBalance === 'function' ? getBalance() : 0;
   if (!amount || amount <= 0) return;
@@ -679,19 +675,60 @@ function confirmTransfer() {
   closeTransfer();
 
   // 先扣余额，后面退款再加回来
-  // 用 addTransaction 真正记账，setBalance 只更新 UI 不写 localStorage
+  if (typeof setBalance === 'function') setBalance(balance - amount);
   if (typeof addTransaction === 'function') addTransaction({ icon: '💸', name: '转账给 Ghost', amount: -amount });
   if (typeof renderWallet === 'function') renderWallet();
 
-  // 读最近一条用户消息作为转账理由上下文
-  const lastUserMessage = (() => {
+  // 读最近几条对话作为理由上下文（不只是最后一条）
+  const _recentContext = (() => {
     if (typeof chatHistory === 'undefined') return '';
-    const last = [...chatHistory].reverse().find(m => m.role === 'user' && !m._system && !m._recalled);
-    return last?.content || '';
+    return chatHistory
+      .filter(m => !m._system && !m._recalled)
+      .slice(-6)
+      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`)
+      .join('\n');
   })();
 
-  // 判断收/退（接入新系统）
-  const judgeContext = { reason: lastUserMessage };
+  // 检测上下文里有没有明确理由
+  const _ctxLower = _recentContext.toLowerCase();
+  const _hasContextReason =
+    /礼物|送你|给你的|520|1314|生日|情人节|纪念|gift|present|for you|birthday|anniversary/.test(_ctxLower) ||
+    /补偿|赔你|我错了|补给你|对不起|抱歉|make it up|compensation|my fault|sorry|apologize/.test(_ctxLower) ||
+    /帮你|拿去用|买东西|用吧|花吧|use it|for this|for that|spend it/.test(_ctxLower);
+
+  // 没有理由 → G 先问一句，存 pendingTransfer，等用户回答
+  if (!_hasContextReason) {
+    sessionStorage.setItem('pendingTransfer', JSON.stringify({ amount, deducted: true }));
+
+    // G 问一句
+    const _askLine = await (async () => {
+      try {
+        const res = await callGrokWithSystem(
+          buildGhostStyleCore() + '\nShe just transferred money to you without explanation. Ask what it is for — one short line, dry, lowercase. Do not mention the amount.',
+          _recentContext || 'she just sent money.',
+          60
+        );
+        if (res && !isBreakout(res)) return res.trim();
+      } catch(e) {}
+      // 静态兜底
+      const opts = ['what\'s it for.', 'reason.', 'why.', 'what\'s this for.'];
+      return opts[Math.floor(Math.random() * opts.length)];
+    })();
+
+    if (typeof showTyping === 'function') showTyping();
+    await new Promise(r => setTimeout(r, 800));
+    if (typeof hideTyping === 'function') hideTyping();
+    if (typeof appendMessage === 'function') appendMessage('bot', _askLine);
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'assistant', content: _askLine });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    if (typeof _isSending !== 'undefined') _isSending = false;
+    return;
+  }
+
+  // 有理由 → 判断收/退
+  const judgeContext = { reason: _recentContext };
   const { shouldRefund, reason, acceptAmount } = judgeUserTransfer(amount, judgeContext);
   const refundAmount = amount - acceptAmount;
 
@@ -731,28 +768,30 @@ function confirmTransfer() {
   if (typeof showTyping === 'function') showTyping();
   if (typeof _isSending !== 'undefined') _isSending = true;
 
-  // 转账回复用 Grok：结合上下文生成台词，不破防
-  const _recentCtxForTransfer = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-    .filter(m => !m._system && !m._recalled).slice(-6)
-    .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
+  // 用 Grok 生成台词：结合上下文，不破防
+  try {
+    let reply = await (async () => {
+      try {
+        const res = await fetchWithTimeout('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system: buildGhostStyleCore(),
+            user: _recentContext + '\n\n' + judgePrompt,
+            max_tokens: 200,
+          })
+        }, 15000);
+        if (!res.ok) return '';
+        const d = await res.json();
+        const t = d.text?.trim() || '';
+        return (typeof isBreakout === 'function' && isBreakout(t)) ? '' : t;
+      } catch(e) { return ''; }
+    })();
 
-  fetchWithTimeout('/api/gemini', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system: buildGhostStyleCore(),
-      user: _recentCtxForTransfer + '\n\n' + judgePrompt,
-      max_tokens: 200,
-    })
-  }, 15000).then(r => r.json()).then(data => {
+    if (!reply) reply = shouldRefund ? 'sent it back.' : 'noted.';
+
     if (typeof hideTyping === 'function') hideTyping();
-    let reply = data.text?.trim() || '...';
     if (typeof updateToRead === 'function') updateToRead();
-
-    // 破防检测
-    if (typeof isBreakout === 'function' && isBreakout(reply)) {
-      reply = shouldRefund ? 'sent it back.' : 'noted.';
-    }
 
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '')
                  .replace(/\s{2,}/g, ' ').trim();
@@ -802,17 +841,16 @@ function confirmTransfer() {
     if (typeof saveHistory === 'function') saveHistory();
     if (typeof _isSending !== 'undefined') _isSending = false;
 
-  }).catch(() => {
+  } catch(e) {
     if (typeof hideTyping === 'function') hideTyping();
     if (typeof _isSending !== 'undefined') _isSending = false;
     // 网络错误：全退
     const bal = typeof getBalance === 'function' ? getBalance() : 0;
-    if (typeof setBalance === 'function') setBalance(bal + amount);
     if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（网络错误）', amount });
     if (typeof renderWallet === 'function') renderWallet();
     updateUserTransferCard(cardId, false);
     if (typeof appendMessage === 'function') appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
-  });
+  }
 }
 
 
@@ -938,22 +976,22 @@ async function ghostSendInitMessage(offlineHours) {
   const hint = hintMap.find(h => offlineHours >= h.min && offlineHours < h.max)?.hint || '';
   try {
     if (typeof showTyping === 'function') showTyping();
-    const _offlineCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-      .filter(m => !m._system && !m._recalled).slice(-4)
-      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
-    const res = await fetchWithTimeout('/api/gemini', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system: buildGhostStyleCore(),
-        user: (_offlineCtx ? _offlineCtx + '\n\n' : '') + `[System: ${hint} Ghost noticed. Say something — could be a pointed question, a casual remark, or just checking in. lowercase, English only.]`,
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
+        ...(() => { const s = buildSystemPrompt(); return { system: s, systemParts: buildSystemPromptParts(s) }; })(),
+        messages: [...(typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []),
+          { role: 'user', content: `[System: ${hint} Ghost noticed. Say something — could be a pointed question, a casual remark, or just checking in. lowercase, English only.]` }
+        ]
       })
-    }, 12000);
+    });
     const data = await res.json();
     if (typeof hideTyping === 'function') hideTyping();
-    let reply = data.text?.trim() || '';
-    if (reply && !(typeof isBreakout === 'function' && isBreakout(reply))) {
+    let reply = data.content?.[0]?.text?.trim() || '';
+    if (reply) {
       reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
       if (typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {

@@ -404,6 +404,86 @@ async function _processMergedMessage(text) {
 
   resetSilenceTimer();
 
+  // ── 待处理转账：用户回答了理由，现在判断收/退 ──────────
+  const _pendingTransfer = (() => {
+    try { return JSON.parse(sessionStorage.getItem('pendingTransfer') || 'null'); } catch(e) { return null; }
+  })();
+  if (_pendingTransfer && _pendingTransfer.amount) {
+    sessionStorage.removeItem('pendingTransfer');
+    const _ptAmount = _pendingTransfer.amount;
+
+    // 把用户刚说的话作为理由，重新判断
+    const _ptContext = chatHistory
+      .filter(m => !m._system && !m._recalled).slice(-6)
+      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
+
+    const { shouldRefund: _ptRefund, reason: _ptReason, acceptAmount: _ptAccept } =
+      (typeof judgeUserTransfer === 'function')
+        ? judgeUserTransfer(_ptAmount, { reason: _ptContext })
+        : { shouldRefund: true, reason: 'fallback', acceptAmount: 0 };
+
+    const _ptRefundAmount = _ptAmount - _ptAccept;
+    const _ptMood = getMoodLevel ? getMoodLevel() : 5;
+
+    let _ptPrompt = '';
+    if (_ptRefund) {
+      _ptPrompt = `[System: She transferred £${_ptAmount} and explained why. Ghost considered it but is sending it back. ${_ptReason === 'guarded' ? 'He is wary.' : 'Not this time.'} One line, dry. Write REFUND on its own line at the end.]`;
+    } else if (_ptReason === 'overMaxPartial') {
+      _ptPrompt = `[System: She transferred £${_ptAmount}. He kept £${_ptAccept} and returned £${_ptRefundAmount}. Natural, no mention of limits. Write KEEP on its own line at the end.]`;
+    } else {
+      _ptPrompt = `[System: She transferred £${_ptAmount} and Ghost accepted it. Mood ${_ptMood}/10. Brief, natural response. Write KEEP on its own line at the end.]`;
+    }
+
+    chatHistory.push({ role: 'user', content: _ptPrompt, _system: true });
+    if (typeof saveHistory === 'function') saveHistory();
+
+    showTyping();
+    try {
+      const _ptRecentCtx = chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
+        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
+      const _ptRes = await fetchWithTimeout('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system: buildGhostStyleCore(),
+          user: _ptRecentCtx + '\n\n' + _ptPrompt,
+          max_tokens: 200,
+        })
+      }, 15000);
+      const _ptData = await _ptRes.json();
+      let _ptReply = _ptData.text?.trim() || '';
+      if (isBreakout(_ptReply)) _ptReply = _ptRefund ? 'sent it back.' : 'noted.';
+      _ptReply = _ptReply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z]))\n?/g, '').trim();
+
+      hideTyping();
+
+      // 处理退款或收款
+      const _container = document.getElementById('messagesContainer');
+      if (_ptRefund) {
+        if (typeof setBalance === 'function') setBalance((typeof getBalance === 'function' ? getBalance() : 0) + _ptAmount);
+        if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: _ptAmount });
+        if (typeof renderWallet === 'function') renderWallet();
+        if (_container && typeof showGhostTransferCard === 'function') showGhostTransferCard(_container, _ptAmount, _ptReply, true);
+      } else {
+        if (_ptRefundAmount > 0) {
+          if (typeof setBalance === 'function') setBalance((typeof getBalance === 'function' ? getBalance() : 0) + _ptRefundAmount);
+          if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退回超额部分', amount: _ptRefundAmount });
+          if (typeof renderWallet === 'function') renderWallet();
+        }
+        if (_container && typeof showGhostTransferCard === 'function') showGhostTransferCard(_container, _ptAccept, _ptReply, false);
+        if (typeof changeAffection === 'function') changeAffection(1);
+      }
+
+      if (_ptReply) appendMessage('bot', _ptReply);
+      chatHistory.push({ role: 'assistant', content: _ptReply });
+      if (typeof saveHistory === 'function') saveHistory();
+    } catch(e) {
+      hideTyping();
+    }
+    _isSending = false;
+    return;
+  }
+
   // ── 用户回来检测（离开超过2小时）────────────────────────
   const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
   const _comebackMins = Math.floor(_comebackGap / 60000);
@@ -567,8 +647,7 @@ async function _processMergedMessage(text) {
       const _affNow = getAffection();
       if (_affNow < 30) return false;
       if (_affNow < 40) {
-        // 统一用 ISO 格式，和 applyMoneyEffect 保持一致
-        const _todayLowAffKey = 'lowAffGiven_' + new Date().toISOString().slice(0, 10);
+        const _todayLowAffKey = 'lowAffGiven_' + new Date().toDateString();
         if (localStorage.getItem(_todayLowAffKey)) return false;
         if (sessionStorage.getItem('moneyReasonType') !== 'care') return false;
         if (Math.random() > 0.3) return false;
@@ -582,9 +661,6 @@ async function _processMergedMessage(text) {
         const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
         if (Date.now() - _lastGiven < _cooldown) return false;
-        // 退款冷却：和 applyMoneyEffect 保持一致，退款2小时内不再给
-        const _lastRefund = parseInt(localStorage.getItem('lastRefundAt') || '0');
-        if (Date.now() - _lastRefund < 2 * 3600 * 1000) return false;
         if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
       }
       return true;
