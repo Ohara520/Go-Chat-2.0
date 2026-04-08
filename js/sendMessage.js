@@ -185,13 +185,6 @@ const BREAKOUT_PHRASES = [
   "what can i actually help",
   "help with something real",
   "help with something else",
-  // 新增：Claude 4.5 常见拒绝模式
-  "i can't engage with that",
-  "i won't engage with that",
-  "we're done here",
-  "not going to engage",
-  "can't continue this",
-  "i need to step back",
   // Claude 4.5新增破防模式
   "i should mention", "i want to be clear",
   "as the ai", "this ai", "the model",
@@ -1398,21 +1391,17 @@ One or two lines. English only. lowercase.`;
       return;
     }
 
-    // Venice失败，Haiku兜底（同样过滤图片消息）
-    const _haiku2History = rawHistory.slice(-6).map(m => {
+    // Venice失败 → Grok兜底（不走Haiku，Haiku比Sonnet更容易破防）
+    const _grokFallbackCtx = rawHistory.slice(-6).map(m => {
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return { role: m.role, content: '[sent a photo]' };
-      return { role: m.role, content: m.content };
-    });
-    const haiku2 = await callHaiku(
-      buildGhostStyleCore() + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.',
-      [..._haiku2History, { role: 'user', content: text }],
-      100
-    );
+      if (hasPhoto) return (m.role === 'user' ? 'Her' : 'Ghost') + ': [sent a photo]';
+      return (m.role === 'user' ? 'Her' : 'Ghost') + ': ' + (m.content || '').slice(0, 150);
+    }).join('\n') + '\nHer: ' + text;
+    const grokFallback = await callGrok(_grokFallbackCtx, 200, null, 'normal');
     hideTyping();
-    if (haiku2 && !_intimateBreakout(haiku2)) {
-      appendMessage('bot', haiku2.trim());
-      chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true });
+    if (grokFallback && !_intimateBreakout(grokFallback)) {
+      appendMessage('bot', grokFallback.trim());
+      chatHistory.push({ role: 'assistant', content: grokFallback.trim(), _intimate: true });
       saveHistory();
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
