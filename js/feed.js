@@ -131,18 +131,7 @@ function renderMemoryCard(m, isHighlight) {
 }
 
 // ===== 切换到聊天页时的轻量刷新（不清空重渲，防止闪屏）=====
-function refreshChatScreen() {
-  // 第一次进入才做完整初始化
-  if (!_chatInited) {
-    initChat();
-    checkOnlineGreeting();
-    resetSilenceTimer();
-    return;
-  }
-  // 已初始化过——只滚到底部，不重渲
-  scrollToBottom();
-  resetSilenceTimer();
-}
+// refreshChatScreen 已移至 chat_init.js，此处删除避免覆盖
 
 // ===== 页面加载时初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
