@@ -856,8 +856,8 @@ async function _processMergedMessage(text) {
       } catch(e) {}
     }
 
-    // 情绪判断单独跑（不影响调情判断）
-    if (!isRecentPhoto) {
+    // 情绪判断单独跑（调情场景跳过，避免Haiku看到调情内容破防）
+    if (!isRecentPhoto && !isIntimate) {
       try {
         const emotionRaw = await Promise.race([
           fetchDeepSeek(
