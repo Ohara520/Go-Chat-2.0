@@ -227,9 +227,15 @@ One line. Lowercase. First person. Private. Like it slipped out.`;
         }
       } catch(e) {}
 
-      // Grok 失败：不用 Haiku 兜底（Haiku 会破防），让静态兜底处理
+      // Grok失败，Haiku兜底
+      if (!en) {
+        const raw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 80);
+        const match = raw.match(/"en"\s*:\s*"([^"]+)"/);
+        if (match) en = match[1].trim();
+      }
+
     } else {
-      // 普通场景：Grok
+      // 普通场景：Grok（比 Sonnet 便宜，不破防，基于上下文氛围生成）
       try {
         const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 100);
         const matchG = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
@@ -238,7 +244,15 @@ One line. Lowercase. First person. Private. Like it slipped out.`;
           if (!isBreakout(candidate)) en = candidate;
         }
       } catch(e) {}
-      // Grok 失败：不用 Haiku 兜底（Haiku 会破防），让静态兜底处理
+
+      // Grok 失败，Haiku 兜底
+      if (!en) {
+        try {
+          const raw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 100);
+          const match = raw.match(/"en"\s*:\s*"([^"]+)"/);
+          if (match && !isBreakout(match[1].trim())) en = match[1].trim();
+        } catch(e) {}
+      }
     }
   } catch(e) {
     console.warn('[心声] 生成失败:', e);
