@@ -269,11 +269,12 @@ function checkDeliveryUpdates() {
           if (d.isGhostSend) {
             showMysteryPackage(d);
           } else {
-            // 普通消息（无_system，云同步不过滤，自然随历史滚动消失）
+            // 【改】系统私信改成英文简化版
             if (typeof chatHistory !== 'undefined') {
               chatHistory.push({
                 role: 'user',
                 content: `[the item she sent — 「${d.name}」— just arrived. you have it now. if she asks, confirm it naturally.]`,
+                _system: true
               });
               if (typeof saveHistory === 'function') saveHistory();
             }

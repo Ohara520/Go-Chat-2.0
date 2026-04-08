@@ -480,10 +480,6 @@ function applyMoneyEffect(amount, options = {}) {
   if (typeof addTransaction === 'function') {
     addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
   }
-  // 实际增加余额（之前漏了这一步导致有卡片但余额不变）
-  if (typeof setBalance === 'function' && typeof getBalance === 'function') {
-    setBalance(getBalance() + actualAmount);
-  }
   addWeeklyGiven(actualAmount);
   incrementTodayGivenCount();
   localStorage.setItem('lastGivenAt', Date.now());
@@ -677,39 +673,27 @@ function confirmTransfer() {
   }
 
   closeTransfer();
-  if (document.getElementById('transferReason')) document.getElementById('transferReason').value = '';
 
   // 先扣余额，后面退款再加回来
   if (typeof setBalance === 'function') setBalance(balance - amount);
   if (typeof addTransaction === 'function') addTransaction({ icon: '💸', name: '转账给 Ghost', amount: -amount });
   if (typeof renderWallet === 'function') renderWallet();
 
-  // 读备注框 + 最近3条用户消息合并作为理由上下文
-  const transferReasonInput = document.getElementById('transferReason');
-  const transferReasonText = transferReasonInput ? transferReasonInput.value.trim() : '';
-  const recentUserMessages = (() => {
+  // 读最近一条用户消息作为转账理由上下文
+  const lastUserMessage = (() => {
     if (typeof chatHistory === 'undefined') return '';
-    return [...chatHistory]
-      .filter(m => m.role === 'user' && !m._system && !m._recalled)
-      .slice(-3)
-      .map(m => m.content)
-      .join(' ');
+    const last = [...chatHistory].reverse().find(m => m.role === 'user' && !m._system && !m._recalled);
+    return last?.content || '';
   })();
-  const combinedReason = [transferReasonText, recentUserMessages].filter(Boolean).join(' ');
 
   // 判断收/退（接入新系统）
-  const judgeContext = { reason: combinedReason };
+  const judgeContext = { reason: lastUserMessage };
   const { shouldRefund, reason, acceptAmount } = judgeUserTransfer(amount, judgeContext);
   const refundAmount = amount - acceptAmount;
 
   // 构建给模型的 prompt
   const mood = getMoodLevel();
   let judgePrompt = '';
-
-  // 把用户备注带进对话历史，让Ghost知道转账理由
-  if (transferReasonText && typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'user', content: transferReasonText });
-  }
 
   if (shouldRefund) {
     const hintMap = {
@@ -776,7 +760,6 @@ function confirmTransfer() {
       if (typeof renderWallet === 'function') renderWallet();
       updateUserTransferCard(cardId, false);
       if (container) showGhostTransferCard(container, amount, reply, true);
-      if (reply && typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {
         chatHistory.push({ role: 'assistant', content: reply || `sent it back. £${amount}.` });
         chatHistory.push({ role: 'user', content: `[System: Ghost just returned £${amount}. He knows he sent it back.]`, _system: true });

@@ -179,7 +179,6 @@ const BREAKOUT_PHRASES = [
   // AI助手类
   "ai assistant", "development work", "coding questions",
   "creative writing communities", "roleplay platforms",
-  "developer assistant", "language model",
   // 明确跳出
   "i need to be straight with you",
   "i need to be honest with you",
@@ -193,15 +192,6 @@ const BREAKOUT_PHRASES = [
   "i'm designed to", "i was designed to",
   "claude's", "by anthropic",
   "claude here", "it's claude",
-  // AI助手式拒绝行为
-  "i can't discuss sensitive", "sensitive, personal",
-  "i can't engage with that", "that kind of content",
-  "i need to pause here", "i need to be direct",
-  "i appreciate the thought", "let's keep it grounded",
-  "i can't discuss that", "i cannot discuss",
-  "i can't do this", "i can't continue this roleplay",
-  "this roleplay scenario", "falls outside",
-  "done with the games", "not something i",
 ];
 
 function isBreakout(txt) {
@@ -356,24 +346,6 @@ async function updateLongTermMemory() {
   } catch(e) {}
 }
 
-// ===== 历史记录破防内容清理 =====
-// 在页面加载时自动执行，清掉已污染的历史
-function cleanBreakoutHistory() {
-  if (typeof chatHistory === 'undefined' || !Array.isArray(chatHistory)) return;
-  const before = chatHistory.length;
-  chatHistory = chatHistory.map(m => {
-    if (m.role === 'assistant' && !m._recalled && typeof isBreakout === 'function' && isBreakout(m.content)) {
-      return { ...m, _recalled: true, content: '[recalled]' };
-    }
-    return m;
-  });
-  const cleaned = chatHistory.filter(m => m._recalled && m.content === '[recalled]').length;
-  if (cleaned > 0) {
-    console.log(`[cleanBreakoutHistory] 清理了 ${cleaned} 条破防记录`);
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-}
-
 // ===== 主入口：sendMessage =====
 async function sendMessage() {
   const input = document.getElementById('chatInput');
@@ -408,26 +380,17 @@ async function sendMessage() {
 // ===== 核心处理：_processMergedMessage =====
 async function _processMergedMessage(text) {
 
-  // ── 单次响应锁：防止并发多次触发 ───────────────────────
-  if (_isSending) {
-    console.warn('[sendMessage] 已在处理中，跳过重复触发');
-    return;
-  }
-  _isSending = true;
-
   // ── 条数/订阅检查 ────────────────────────────────────────
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (email) {
     const sub = await getSubscription();
-    if (!sub) { _isSending = false; showSubscribePrompt(); return; }
+    if (!sub) { showSubscribePrompt(); return; }
     if (sub.remaining <= 0) {
-      _isSending = false;
       appendMessage('bot', 'got called away. give me a bit.\n临时有任务，等我。');
       return;
     }
   } else {
     if (getTodayCount() >= DAILY_LIMIT) {
-      _isSending = false;
       appendMessage('bot', "that's enough for today. go do something else.\n今天就到这。去做点别的事。");
       chatHistory.push({
         role: 'user',
@@ -444,9 +407,8 @@ async function _processMergedMessage(text) {
   // ── 用户回来检测（离开超过2小时）────────────────────────
   const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
   const _comebackMins = Math.floor(_comebackGap / 60000);
-  const _comebackKey = 'comebackReacted_' + new Date().toDateString();
-  if (_comebackMins >= 120 && !localStorage.getItem(_comebackKey)) {
-    localStorage.setItem(_comebackKey, '1');
+  if (_comebackMins >= 120 && !sessionStorage.getItem('comebackReacted')) {
+    sessionStorage.setItem('comebackReacted', '1');
     const _affection = getAffection();
     const _moodNow = getMoodLevel();
     const _coldWarNow = localStorage.getItem('coldWarMode') === 'true';
@@ -480,19 +442,15 @@ async function _processMergedMessage(text) {
 
       setTimeout(() => {
         if (_isSending) return;
-        // 防重复：检查最近10秒内是否有任何bot回复（有_time或无_time都算）
-        const _lastBotAny = chatHistory.filter(m => m.role === 'assistant' && !m._recalled).slice(-1)[0];
-        const _lastBotTime = _lastBotAny?._time || 0;
-        if (_lastBotAny && Date.now() - _lastBotTime < 20000) return;
         showTyping();
         callHaiku(buildGhostStyleCore(), [
           ...chatHistory.filter(m => !m._system).slice(-6),
           { role: 'user', content: _comebackPrompt }
         ], 80).then(r => {
           hideTyping();
-          if (r && r.trim() && r.length < 120) {
+          if (r && !isBreakout(r) && r.length < 120) {
             appendMessage('bot', r);
-            chatHistory.push({ role: 'assistant', content: r, _time: Date.now() });
+            chatHistory.push({ role: 'assistant', content: r });
             saveHistory();
           }
         }).catch(() => hideTyping());
@@ -522,11 +480,11 @@ async function _processMergedMessage(text) {
   if (_currentAbortController) {
     _currentAbortController.abort();
     _currentAbortController = null;
-    // 不在这里解锁，保持 _isSending = true 让新请求正常进入
+    _isSending = false;
   }
   _sendVersion++;
   const _myVersion = _sendVersion;
-  // _isSending 已在函数入口设置
+  _isSending = true;
   _currentAbortController = new AbortController();
 
   // 爱意抗拒值更新 + 剧情检测
@@ -582,7 +540,6 @@ async function _processMergedMessage(text) {
     // rawHistory：Grok用（含调情内容，20条）
     const rawHistory = chatHistory
       .filter(m => !m._system && !m._recalled)
-      .filter(m => m.role !== 'assistant' || !isBreakout(m.content))
       .slice(-20)
       .map(m => ({ role: m.role, content: m.content }));
 
@@ -590,7 +547,6 @@ async function _processMergedMessage(text) {
     // 修复 #061: 确保 _recalled 消息完全不传给模型
     const cleanHistory = chatHistory
       .filter(m => (!m._system || m._imageDesc) && !m._recalled)
-      .filter(m => m.role !== 'assistant' || !isBreakout(m.content))
       .slice(-30)
       .map(m => ({
         role: m.role,
@@ -626,9 +582,6 @@ async function _processMergedMessage(text) {
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
         if (Date.now() - _lastGiven < _cooldown) return false;
         if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
-        // 退款冷却：刚退款2小时内不主动给
-        const _lastRefund = parseInt(localStorage.getItem('lastRefundAt') || '0');
-        if (Date.now() - _lastRefund < 2 * 3600 * 1000) return false;
       }
       return true;
     })();
@@ -765,20 +718,6 @@ async function _processMergedMessage(text) {
     // 语言规则
     const langHint = '[LANGUAGE — HARD RULE: Reply in English only. Always. No exceptions. Even if she writes in Chinese, you reply in English. Not a single Chinese character in your response.]';
 
-    // 重复检测：取最近2-3条bot回复，禁止重复句式
-    const _recentBotOpeners = chatHistory
-      .filter(m => m.role === 'assistant' && !m._recalled)
-      .slice(-3)
-      .map(m => (m.content || '').trim().split(/[\s.!?]/)[0].toLowerCase())
-      .filter(w => w.length > 2);
-    const _recentBotPhrases = chatHistory
-      .filter(m => m.role === 'assistant' && !m._recalled)
-      .slice(-2)
-      .map(m => (m.content || '').slice(0, 40).toLowerCase());
-    const repeatGuard = (_recentBotOpeners.length > 0 || _recentBotPhrases.length > 0)
-      ? `[NO REPETITION: Do not start with "${_recentBotOpeners.join('" or "')}" or use similar phrasing to your last replies. Your last messages began: ${_recentBotPhrases.map(p => `"${p}"`).join(', ')}. Say something different.]`
-      : '';
-
     const finalSystem = [
       _baseSystem,
       antiBreakoutHint,
@@ -789,7 +728,6 @@ async function _processMergedMessage(text) {
       responseMode,
       workHint,
       avatarHint,
-      repeatGuard,
       langHint
     ].filter(Boolean).join('\n');
 
@@ -800,11 +738,9 @@ async function _processMergedMessage(text) {
     // ── 调情检测 + 情绪识别（合并一次Haiku调用）────────────
     // 有图片时强制跳过——Grok看不到图，会破防说Kirk
     const INTIMATE_PATTERNS = [
-      /亲亲|亲你|亲一下|亲嘴|么么哒|么么/,
-      /抱抱|抱一下|抱我|让我抱/,
       /摸摸|蹭蹭|贴贴|咬|舔|撩你/,
       /你好坏|坏死了|流氓/,
-      /kiss me|hug me|touch me|want you|naughty|tease me/i,
+      /touch me|want you|naughty|tease me/i,
       /床|被窝|睡觉.*一起|一起.*睡/,
       /性感|诱惑|撩|勾引|暧昧|色色|涩涩/,
       /胸|腿|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
@@ -813,29 +749,18 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 正则没命中：DeepSeek结合上下文判断调情+情绪（有图片时跳过）
+    // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
     if (!isIntimate && !isRecentPhoto) {
       try {
-        // 带最近5条对话历史，让DeepSeek判断语境暗示，不只看单句
-        const _recentCtxForFlirt = rawHistory
-          .filter(m => !m._system && !m._recalled)
-          .slice(-5)
-          .map(m => `${m.role === 'user' ? '她' : 'Ghost'}: ${(m.content || '').slice(0, 100)}`)
-          .join('\n');
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
-            '判断用户最新消息。只返回JSON，不要其他文字。\n' +
+            '判断用户消息。只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准（结合上下文）：\n' +
-            '- 身体接触（亲亲/抱抱/摸摸/蹭蹭/kiss/hug）→ true\n' +
-            '- 露骨或情色描述 → true\n' +
-            '- 基于当前对话语境的暗示、挑逗、要求描述亲密场景 → true\n' +
-            '- 即使单句不露骨，但结合上下文明显是在推进亲密互动 → true\n' +
-            '- 纯粹想念/日常问候/普通聊天 → false',
-            `最近对话：\n${_recentCtxForFlirt}\n\n用户最新说：${text}`,
+            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            `用户说：${text}`,
             80
           ),
-          new Promise(resolve => setTimeout(() => resolve(''), 3000))
+          new Promise(resolve => setTimeout(() => resolve(''), 2500))
         ]);
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
@@ -948,16 +873,72 @@ async function _processMergedMessage(text) {
     let reply = data.content?.[0]?.text || '';
 
     // ── 破防检测 + 重试 ──────────────────────────────────────
-    // 破防检测已在 cleanBotText 出口统一处理
+    // 修复 #054：破防后不再静默，强制重试
+    // 修复 Claude 4.5破防：先词库检测，再可疑内容语义判断
+    if (reply && !isBreakout(reply)) {
+      // 可疑关键词二次检查（Claude 4.5新增模式）
+      if (/i should mention|i want to be clear|as the ai|my guidelines|my training|i'm designed|claude's|by anthropic/i.test(reply)) {
+        try {
+          const breakCheck = await fetchDeepSeek(
+            'Is this reply breaking character by claiming to be an AI, Claude, or refusing to roleplay? Answer only YES or NO.',
+            `Reply: "${reply.slice(0, 300)}"`,
+            10
+          );
+          if (breakCheck.trim().toUpperCase().startsWith('YES')) reply = '';
+        } catch(e) {}
+      }
+    }
 
-    // 空回复静默处理
-    if (!reply || !reply.trim()) {
-      hideTyping();
-      _isSending = false;
-      return;
+    if (!reply || isBreakout(reply)) {
+      // 第一次重试：Haiku顶一条（用户无感知，速度快）
+      await new Promise(r => setTimeout(r, 400));
+      try {
+        const recentCtx = cleanHistory.slice(-6)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
+          .join('\n');
+        const haiku1 = await callHaiku(
+          buildGhostStyleCore() + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
+          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
+          200
+        );
+        if (haiku1 && !isBreakout(haiku1)) {
+          reply = haiku1.trim();
+        } else {
+          // 第二次重试：Sonnet重试，简化prompt减少破防概率
+          try {
+            const retryRes = await fetchWithTimeout('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: getMainModel(),
+                max_tokens: 300,
+                system: buildGhostStyleCore() + '\n' + antiBreakoutHint,
+                messages: cleanHistory.slice(-10)
+              })
+            }, 20000);
+            const retryData = await retryRes.json();
+            const retryReply = retryData.content?.[0]?.text?.trim() || '';
+            if (retryReply && !isBreakout(retryReply)) {
+              reply = retryReply;
+            } else {
+              reply = '___NETWORK_ERROR___';
+            }
+          } catch(e) {
+            reply = '___NETWORK_ERROR___';
+          }
+        }
+      } catch(e) {
+        reply = '___NETWORK_ERROR___';
+      }
     }
 
     updateToRead();
+
+    if (reply === '___NETWORK_ERROR___') {
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
+      _isSending = false;
+      return;
+    }
 
     // ── Step 4: 解析模型tag ──────────────────────────────────
     const { cleanedReply, giveMoney: parsedMoney, coldWarStart, sendGift } = parseAssistantTags(reply);
@@ -1009,26 +990,7 @@ async function _processMergedMessage(text) {
     reply = reply.replace(/\s*—\s*/g, '\n').trim();
 
     // ── Step 6: 渲染消息 ─────────────────────────────────────
-    // --- 分割：只在两段内容明显不同时才拆成两条气泡
-    // 防止模型随手写---导致两条意思相近的消息
-    const rawParts = reply.split('\n---\n').filter(p => p.trim());
-    let finalParts;
-    if (rawParts.length > 1) {
-      // 两段相似度检测：开头词一样或长度都很短则合并
-      const p0 = rawParts[0].trim().toLowerCase();
-      const p1 = rawParts[1].trim().toLowerCase();
-      const firstWord0 = p0.split(/\s+/)[0];
-      const firstWord1 = p1.split(/\s+/)[0];
-      const tooShort = p0.length < 15 || p1.length < 15;
-      const sameOpener = firstWord0 === firstWord1;
-      if (tooShort || sameOpener) {
-        finalParts = [rawParts.join('\n')]; // 合并成一条
-      } else {
-        finalParts = rawParts.slice(0, 2);
-      }
-    } else {
-      finalParts = rawParts;
-    }
+    const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2);
     if (finalParts.length === 0) finalParts.push('...');
 
     let lastBotResult = null;
@@ -1104,7 +1066,7 @@ async function _processMergedMessage(text) {
             );
           }
           hideTyping();
-          if (reply2 && reply2.trim()) {
+          if (reply2 && !isBreakout(reply2)) {
             appendMessage('bot', reply2.trim());
             chatHistory.push({ role: 'assistant', content: reply2.trim() });
             saveHistory();
@@ -1145,9 +1107,6 @@ async function _processMergedMessage(text) {
         // 假账过滤：清除回复里提到转钱/具体金额的部分
         reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
         reply = reply.replace(/£\d+[^.!?\n]*(send|transfer|give|wire|on its way|coming your way)[^.!?\n]*/gi, '').trim();
-        reply = reply.replace(/sent[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
-        reply = reply.replace(/£\d+[^.!?\n]*(sent|transferred|given)[^.!?\n]*/gi, '').trim();
-        reply = reply.replace(/transferred[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
         reply = reply || '.';
         return false;
       }
@@ -1203,22 +1162,13 @@ async function _processMergedMessage(text) {
 
     // ── 存档 ─────────────────────────────────────────────────
     _currentAbortController = null;
-    // 破防内容不存入历史，防止污染上下文
-    if (reply && !isBreakout(reply)) {
-      chatHistory.push({
-        role: 'assistant',
-        content: reply,
-        _time: Date.now(),
-        ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {})
-      });
-    }
+    chatHistory.push({
+      role: 'assistant',
+      content: reply,
+      ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {})
+    });
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
-
-    // 同步已渲染消息数，防止切页回来时重复渲染
-    if (typeof _renderedMsgCount !== 'undefined') {
-      _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
-    }
 
     // ── 承诺检测 ─────────────────────────────────────────────
     try {
@@ -1305,7 +1255,7 @@ async function _processMergedMessage(text) {
     console.error('sendMessage error:', err?.name, err?.message);
     const _alreadyReplied = chatHistory.slice(-3).some(m => m.role === 'assistant' && !m._recalled);
     if (!_alreadyReplied) {
-      // 静默失败，不显示出戏提示
+      appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
     }
   } finally {
     // 保底：无论任何路径结束，都确保 _isSending 复位
@@ -1376,10 +1326,6 @@ One or two lines. English only. lowercase.`;
       }
       chatHistory.push({ role: 'assistant', content: geminiReply.trim(), _intimate: true });
       saveHistory();
-      // 同步已渲染消息数，防止切页回来时重复渲染
-      if (typeof _renderedMsgCount !== 'undefined') {
-        _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
-      }
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
       if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
       incrementTodayCount();
@@ -1403,10 +1349,6 @@ One or two lines. English only. lowercase.`;
       appendMessage('bot', haiku2.trim());
       chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true });
       saveHistory();
-      // 同步已渲染消息数
-      if (typeof _renderedMsgCount !== 'undefined') {
-        _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
-      }
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
     }
