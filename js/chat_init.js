@@ -191,22 +191,23 @@ async function initChat() {
     chatHistory = chatHistory.filter(m =>
       !(m.role === 'assistant' && !m._recalled && isBreakout(m.content))
     );
-    if (chatHistory.length < before && typeof saveHistory === 'function') {
-      saveHistory();
-    }
+    if (typeof saveHistory === 'function') saveHistory(); // 无论是否删除都保存，防止云端覆盖
   }
   // 好感度首次初始化
   if (!localStorage.getItem('affection')) setAffection(70);
 
-  // 老用户补偿：established模式下trust/affection低于新默认值的，一次性升上来
-  if (!localStorage.getItem('trustAffectionUpgrade_20260405')) {
-    localStorage.setItem('trustAffectionUpgrade_20260405', '1');
-    const _mode = localStorage.getItem('marriageType') || 'established';
-    if (_mode === 'established') {
-      if (getTrustHeat() < 75) setTrustHeat(75);
-      if (getAffection() < 70) setAffection(70);
+  // 老用户补偿：延迟执行，避免立刻拉高数值触发剧情条件导致进页面破防
+  // （trust/affection 升高会让 checkStoryOnSessionStart 触发 Haiku，Haiku 容易崩）
+  setTimeout(() => {
+    if (!localStorage.getItem('trustAffectionUpgrade_20260405')) {
+      localStorage.setItem('trustAffectionUpgrade_20260405', '1');
+      const _mode = localStorage.getItem('marriageType') || 'established';
+      if (_mode === 'established') {
+        if (getTrustHeat() < 75) setTrustHeat(75);
+        if (getAffection() < 70) setAffection(70);
+      }
     }
-  }
+  }, 10000); // 10秒后执行，确保页面已稳定，且剧情检测已过
 
   // 补偿逻辑延迟执行——必须等云端数据完全加载后再写入，防止覆盖云端数据
   setTimeout(() => {
