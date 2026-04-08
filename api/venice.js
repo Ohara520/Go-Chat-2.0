@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     const fullSystem = GHOST_INTIMATE_CORE + memoryBlock + (safeSystem ? '\n\n' + safeSystem : '');
 
     const response = await client.chat.completions.create({
-      model: 'grok-4.1',
+      model: 'grok-4.1-fast',
       max_tokens,
       messages: [
         { role: 'system', content: fullSystem },
