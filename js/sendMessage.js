@@ -897,42 +897,17 @@ async function _processMergedMessage(text) {
     }
 
     if (!reply || isBreakout(reply)) {
-      // 第一次重试：Haiku顶一条（用户无感知，速度快）
+      // S 破防：直接用 G 顶一条，比 Haiku 更稳、更便宜、基本不破防
       await new Promise(r => setTimeout(r, 400));
       try {
         const recentCtx = cleanHistory.slice(-6)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
           .join('\n');
-        const haiku1 = await callHaiku(
-          buildGhostStyleCore() + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
-          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
-          200
-        );
-        if (haiku1 && !isBreakout(haiku1)) {
-          reply = haiku1.trim();
+        const grokReply = await callGrok(recentCtx, 250, null, 'normal');
+        if (grokReply && !isBreakout(grokReply)) {
+          reply = grokReply.trim();
         } else {
-          // 第二次重试：Sonnet重试，简化prompt减少破防概率
-          try {
-            const retryRes = await fetchWithTimeout('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: getMainModel(),
-                max_tokens: 300,
-                system: buildGhostStyleCore() + '\n' + antiBreakoutHint,
-                messages: cleanHistory.slice(-10)
-              })
-            }, 20000);
-            const retryData = await retryRes.json();
-            const retryReply = retryData.content?.[0]?.text?.trim() || '';
-            if (retryReply && !isBreakout(retryReply)) {
-              reply = retryReply;
-            } else {
-              reply = '___NETWORK_ERROR___';
-            }
-          } catch(e) {
-            reply = '___NETWORK_ERROR___';
-          }
+          reply = '___NETWORK_ERROR___';
         }
       } catch(e) {
         reply = '___NETWORK_ERROR___';

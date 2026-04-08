@@ -83,75 +83,8 @@ const _UNLOCK_VALID_FIELDS = ['birthday', 'zodiac', 'height', 'weight', 'blood_t
 function cleanBotText(text, scene = 'normal') {
   if (!text) return '';
 
-  // 0. 破防检测 — 出口统一拦截（词库 + 异步语义双重检测）
-  const _quickBreakout = typeof isBreakout === 'function' && isBreakout(text);
-  if (_quickBreakout) {
-    // 词库命中：立刻拦截，异步Grok兜底
-    if (!_breakoutFallbackLock) {
-      _breakoutFallbackLock = true;
-      setTimeout(async () => {
-        try {
-          const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-            .filter(m => !m._system && !m._recalled)
-            .slice(-6)
-            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
-            .join('\n');
-          const fallback = typeof callGrok === 'function'
-            ? await callGrok(recentCtx, 300, null, _currentBotScene)
-            : '';
-          if (fallback && typeof isBreakout === 'function' && !isBreakout(fallback)) {
-            appendMessage('bot', fallback);
-            if (typeof chatHistory !== 'undefined') {
-              chatHistory.push({ role: 'assistant', content: fallback });
-              if (typeof saveHistory === 'function') saveHistory();
-            }
-          }
-        } catch(e) {}
-        finally { _breakoutFallbackLock = false; }
-      }, 0);
-    }
-    return ''; // 阻止原破防内容渲染
-  }
-
-  // 0.5 可疑内容异步语义检测（词库没命中但可能出戏）
-  if (!_breakoutFallbackLock && typeof isBreakoutAsync === 'function') {
-    const _textSnapshot = text;
-    setTimeout(async () => {
-      try {
-        const _isOOC = await isBreakoutAsync(_textSnapshot);
-        if (_isOOC && !_breakoutFallbackLock) {
-          // 语义判断确认出戏，但内容已渲染——找到对应气泡删掉，再Grok补一条
-          _breakoutFallbackLock = true;
-          const container = document.getElementById('messagesContainer');
-          if (container) {
-            const bubbles = container.querySelectorAll('.message.bot');
-            for (let i = bubbles.length - 1; i >= 0; i--) {
-              if (bubbles[i].textContent.includes(_textSnapshot.slice(0, 30))) {
-                bubbles[i].remove();
-                break;
-              }
-            }
-          }
-          const recentCtx = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-            .filter(m => !m._system && !m._recalled)
-            .slice(-6)
-            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
-            .join('\n');
-          const fallback = typeof callGrok === 'function'
-            ? await callGrok(recentCtx, 300, null, _currentBotScene)
-            : '';
-          if (fallback && !isBreakout(fallback)) {
-            appendMessage('bot', fallback);
-            if (typeof chatHistory !== 'undefined') {
-              chatHistory.push({ role: 'assistant', content: fallback });
-              if (typeof saveHistory === 'function') saveHistory();
-            }
-          }
-          _breakoutFallbackLock = false;
-        }
-      } catch(e) {}
-    }, 0);
-  }
+  // 破防检测由各调用方（sendMessage/sticker/photo/money）同步处理
+  // cleanBotText 只负责文本清洗，不做破防兜底
 
   // 1. 去掉Ghost:前缀（Grok偶尔加）
   text = text.replace(/^ghost\s*:\s*/i, '').trim();
@@ -231,13 +164,8 @@ function cleanBotText(text, scene = 'normal') {
   return text;
 }
 
-// ===== 破防场景提示（由各模块在 appendMessage 前设置）=====
-// 用于 cleanBotText 出口兜底时选择正确的 Grok scene
-let _currentBotScene = 'normal';
-function setBotScene(scene) { _currentBotScene = scene || 'normal'; }
-
-// 破防兜底全局锁，防止多次并发触发 Grok 补充
-let _breakoutFallbackLock = false;
+// 破防检测已移至各调用方同步处理（sendMessage/sticker/photo/money）
+// cleanBotText 只负责文本清洗
 
 // ===== 核心：appendMessage =====
 // 返回 { msgDiv, bubble, innerThoughtEl }

@@ -530,7 +530,23 @@ async function sendSticker(id) {
     if (!reply) throw new Error('EMPTY_REPLY');
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
 
-    // 破防检测已在 cleanBotText 出口统一处理
+    // 破防检测：同步处理，Haiku 顶一条，不依赖 cleanBotText 异步兜底
+    if (isBreakout(reply)) {
+      try {
+        const recentCtx = chatHistory
+          .filter(m => !m._system && !m._recalled).slice(-6)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`).join('\n');
+        const haikuFallback = await callHaiku(
+          buildGhostStyleCore() + '\nRespond as Ghost to the last message. One short reply, English only, stay in character.',
+          [...chatHistory.filter(m => !m._system).slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
+          150
+        );
+        reply = (haikuFallback && !isBreakout(haikuFallback)) ? haikuFallback.trim() : 'noted.';
+      } catch(e) {
+        reply = 'noted.';
+      }
+    }
+
     appendMessage('bot', reply);
     if (id === 'kiss' && Math.random() < 0.08) {
       setTimeout(() => appendGhostSticker('kiss'), 1500);
