@@ -173,6 +173,7 @@ async function callHaikuWithCtx(systemPrompt, writePrompt, n = 4) {
       }
     ]
   );
+}
 
 // 带 recentCtx 的 Grok 调用（用于生成 Ghost 台词，不破防）
 async function callGrokWithCtx(systemPrompt, writePrompt, n = 4, maxTokens = 100) {
