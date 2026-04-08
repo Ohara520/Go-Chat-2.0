@@ -185,6 +185,13 @@ const BREAKOUT_PHRASES = [
   "what can i actually help",
   "help with something real",
   "help with something else",
+  // 新增：Claude 4.5 常见拒绝模式
+  "i can't engage with that",
+  "i won't engage with that",
+  "we're done here",
+  "not going to engage",
+  "can't continue this",
+  "i need to step back",
   // Claude 4.5新增破防模式
   "i should mention", "i want to be clear",
   "as the ai", "this ai", "the model",
