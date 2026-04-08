@@ -756,7 +756,7 @@ async function _processMergedMessage(text) {
           fetchDeepSeek(
             '判断用户消息。只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            'flirt判断标准：有亲密意图、撩拨语气、身体接触暗示、想靠近的情绪、或暧昧升温的语境都算true。只有纯粹日常聊天、问问题、分享事情才为false。拿不准时倾向true。',
             `用户说：${text}`,
             80
           ),
@@ -815,6 +815,13 @@ async function _processMergedMessage(text) {
     }
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
+    // level 3/4 时强制走 venice，即使正则和 Haiku 没判断为 intimate
+    // 这样 S 只接触 level 0-2 的日常调情，保持深度；升温后交给 G 保证不破防
+    if (!isIntimate && !isRecentPhoto) {
+      const _currentLevel = (typeof getIntimacyLevel === 'function') ? getIntimacyLevel() : 0;
+      if (_currentLevel >= 3) isIntimate = true;
+    }
+
     if (isIntimate) {
       sessionStorage.removeItem('intimateSummarized');
       await _handleIntimateReply(text, rawHistory, _isSending);
