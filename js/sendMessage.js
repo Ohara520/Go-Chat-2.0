@@ -856,16 +856,21 @@ async function _processMergedMessage(text) {
       } catch(e) {}
     }
 
-    // 情绪判断单独跑（调情场景跳过，避免Haiku看到调情内容破防）
-    if (!isRecentPhoto && !isIntimate) {
+    // 情绪判断单独跑（用grok-3-mini，不会破防）
+    if (!isRecentPhoto) {
       try {
         const emotionRaw = await Promise.race([
-          fetchDeepSeek(
-            '判断用户消息的情绪和需求。只返回JSON。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
-            `用户说：${text}`,
-            60
-          ),
-          new Promise(resolve => setTimeout(() => resolve(''), 2000))
+          fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system: '判断用户消息的情绪和需求。只返回JSON。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
+              user: `用户说：${text}`,
+              max_tokens: 60,
+              model: 'grok-3-mini'
+            })
+          }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
+          new Promise(resolve => setTimeout(() => resolve(''), 3000))
         ]);
         if (emotionRaw) {
           const emotionResult = safeParseJSON(emotionRaw);
