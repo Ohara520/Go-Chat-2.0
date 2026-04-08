@@ -661,32 +661,32 @@ async function _processMergedMessage(text) {
     const _userMoneyKws = ['给我钱','转我','好穷','买不起','能不能给','要钱','零花钱','缺钱','没钱'];
     const _userAskedMoney = _userMoneyKws.some(k => text.includes(k));
 
+    // _canGiveNow：同时记录 blocked 原因，用于 moneyHint
+    let _blockedReason = '';
     const _canGiveNow = (() => {
-      if (sessionStorage.getItem('hintMoneyPending') === '1') return false;
-      if (localStorage.getItem('coldWarMode') === 'true') return false;
-      if (localStorage.getItem('userDislikesMoney') === 'true' && !_userAskedMoney) return false;
+      if (sessionStorage.getItem('hintMoneyPending') === '1') { _blockedReason = 'pending'; return false; }
+      if (localStorage.getItem('coldWarMode') === 'true') { _blockedReason = 'coldwar'; return false; }
+      if (localStorage.getItem('userDislikesMoney') === 'true' && !_userAskedMoney) { _blockedReason = 'dislikes'; return false; }
       const _affNow = getAffection();
-      if (_affNow < 30) return false;
+      if (_affNow < 30) { _blockedReason = 'affection'; return false; }
       if (_affNow < 40) {
-        // 统一用 ISO 格式，和 applyMoneyEffect 保持一致
         const _todayLowAffKey = 'lowAffGiven_' + new Date().toISOString().slice(0, 10);
-        if (localStorage.getItem(_todayLowAffKey)) return false;
-        if (sessionStorage.getItem('moneyReasonType') !== 'care') return false;
-        if (Math.random() > 0.3) return false;
+        if (localStorage.getItem(_todayLowAffKey)) { _blockedReason = 'affection'; return false; }
+        if (sessionStorage.getItem('moneyReasonType') !== 'care') { _blockedReason = 'affection'; return false; }
+        if (Math.random() > 0.3) { _blockedReason = 'affection'; return false; }
         localStorage.setItem(_todayLowAffKey, '1');
       }
       const _todayCount = getTodayGivenCount();
       const _dailyLimit = _userAskedMoney ? 5 : 3;
-      if (_todayCount >= _dailyLimit) return false;
-      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 500)) return false;
+      if (_todayCount >= _dailyLimit) { _blockedReason = 'daily'; return false; }
+      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 500)) { _blockedReason = 'weekly'; return false; }
       if (!_userAskedMoney) {
         const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
-        if (Date.now() - _lastGiven < _cooldown) return false;
-        // 退款冷却：退款2小时内不再给，和 applyMoneyEffect 保持一致
+        if (Date.now() - _lastGiven < _cooldown) { _blockedReason = 'cooldown'; return false; }
         const _lastRefund = parseInt(localStorage.getItem('lastRefundAt') || '0');
-        if (Date.now() - _lastRefund < 2 * 3600 * 1000) return false;
-        if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
+        if (Date.now() - _lastRefund < 2 * 3600 * 1000) { _blockedReason = 'refund_cooldown'; return false; }
+        if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) { _blockedReason = 'session'; return false; }
       }
       return true;
     })();
@@ -731,7 +731,17 @@ async function _processMergedMessage(text) {
     } else {
       const _testingExtra = _moneyStyle === 'testing' ? ' She seems to be testing you. Do not give just because she pushed.' : '';
       const _reunionExtra = _moneyStyle === 'reunion' ? ' She wants money to come see you. Do NOT give money for this — react to the idea of her coming instead.' : '';
-      moneyHint = `[Transfer blocked this reply — do NOT mention sending money or use GIVE_MONEY tag.${_testingExtra}${_reunionExtra}]`;
+      const _blockedReasonHint = {
+        weekly:         ' You have already given enough money this week — you are aware of this. Do not offer or mention money.',
+        daily:          ' You have already transferred money today — you are aware of this. Do not offer or mention money.',
+        cooldown:       ' You gave money not long ago — it is too soon to give again. Do not offer or mention money.',
+        session:        ' You already gave once in this conversation. Do not offer or mention money.',
+        refund_cooldown:' You recently returned a transfer — it is too soon to give again. Do not offer or mention money.',
+        affection:      ' You are not close enough to give money freely. Do not offer or mention money.',
+        coldwar:        ' Cold war is active. Do not offer or mention money.',
+        dislikes:       ' She has shown she dislikes being given money. Do not offer or mention money.',
+      }[_blockedReason] || ' Do not mention sending money or use GIVE_MONEY tag.';
+      moneyHint = `[Transfer blocked this reply —${_blockedReasonHint} If she asks, deflect naturally — do not explain limits.${_testingExtra}${_reunionExtra}]`;
     }
 
     // 场景提示

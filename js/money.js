@@ -525,7 +525,7 @@ function _getTransferCooldownMs() {
 
 function _getWeeklyTransferLimit() {
   const level  = getMoneyComfortLevel();
-  const limits = { 0: 0, 1: 75, 2: 200, 3: 350 };
+  const limits = { 0: 0, 1: 100, 2: 200, 3: 300 };
   return limits[level] || 0;
 }
 
@@ -776,9 +776,9 @@ async function confirmTransfer() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            system: buildGhostStyleCore(),
             user: _recentContext + '\n\n' + judgePrompt,
             max_tokens: 200,
+            scene: 'normal',
           })
         }, 15000);
         if (!res.ok) return '';
