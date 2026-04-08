@@ -702,14 +702,16 @@ async function checkLocationSpecialTrigger(userText) {
     // 放宽到：食物 / 文化 / 小物件 / 地方生活感，不限"吃的"
     let triggered = false;
     try {
-      const raw = await callHaiku(
+      const raw = await callGrok(
         `判断用户的消息是否包含以下任意一种意图：
 1. 提到想吃、馋、好奇当地食物或特产
 2. 对当地文化、天气、生活习惯、小店表现出兴趣
 3. 提到想要某件当地小物件（围巾、明信片、茶、小挂件等）
 4. 问"你那边是不是有这种…""当地会不会有…"之类
-只返回JSON：{"triggered":true} 或 {"triggered":false}，不要其他文字。`,
-        [{ role: 'user', content: userText }]
+只返回JSON：{"triggered":true} 或 {"triggered":false}，不要其他文字。
+
+用户说：${userText}`,
+        60, null, 'normal'
       );
       const result = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
       triggered = result.triggered === true;
@@ -1211,10 +1213,8 @@ async function _checkCelebrationFallback() {
 
   setTimeout(async () => {
     try {
-      const res = await callHaiku(
-        buildGhostStyleCore() + '\n' + hint,
-        typeof chatHistory !== 'undefined' ? chatHistory.slice(-4) : []
-      );
+      const _anniversaryCtx = (typeof chatHistory !== 'undefined' ? chatHistory.filter(m => !m._system && !m._recalled).slice(-4).map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content||'').slice(0,100)}`).join('\n') : '') + '\n\n' + hint;
+      const res = await callGrok(_anniversaryCtx, 80, null, 'normal');
       if (res && res.trim()) await emitGhostNarrativeEvent(res.trim(), { delayMs: 2000 });
     } catch(e) {}
   }, 5000);
