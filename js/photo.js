@@ -282,14 +282,13 @@ English only. No translation. Do not mention "profile picture" or "avatar" unles
       if (sRes.ok) {
         const sData = await sRes.json();
         const text = sData.content?.[0]?.text?.trim() || '';
-        const isBreakout = /I'm Claude, made by|I cannot continue|I need to stop/i.test(text);
-        if (!isBreakout && text) reply = text;
+        // 使用全局 isBreakout，不用局部变量（局部变量会遮蔽全局函数）
+        if (!isBreakout(text) && text) reply = text;
       }
     } catch(e) {}
 
     // 主模型失败或破防，走Grok兜底（支持识图）
-    const _photoBreakout = reply && /I'm Claude|I cannot|I need to stop|I'm not able/i.test(reply);
-    if (!reply || _photoBreakout) {
+    if (!reply || isBreakout(reply)) {
       try {
         const core = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
         const grokPhotoRes = await fetchWithTimeout('/api/gemini', {
@@ -305,7 +304,8 @@ English only. No translation. Do not mention "profile picture" or "avatar" unles
         if (grokPhotoRes.ok) {
           const grokData = await grokPhotoRes.json();
           const grokText = grokData.text?.trim();
-          if (grokText) reply = grokText;
+          // Grok 兜底也需要破防检测
+          if (grokText && !isBreakout(grokText)) reply = grokText;
         }
       } catch(e) {}
     }

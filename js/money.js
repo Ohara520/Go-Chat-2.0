@@ -746,6 +746,11 @@ function confirmTransfer() {
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '')
                  .replace(/\s{2,}/g, ' ').trim();
 
+    // 破防检测：破防时用安全兜底
+    if (typeof isBreakout === 'function' && isBreakout(reply)) {
+      reply = shouldRefund ? 'sent it back.' : 'noted.';
+    }
+
     if (typeof incrementTodayCount === 'function') incrementTodayCount();
     const _em = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email');
     if (_em && typeof consumeQuota === 'function') consumeQuota().catch(() => {});

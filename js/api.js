@@ -231,7 +231,7 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }, 12000);
+    }, 22000);  // 延长超时：Grok响应慢，12s经常silent fail
     if (!res.ok) return '';
     const data = await res.json();
     return data.text?.trim() || '';

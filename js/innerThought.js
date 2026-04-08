@@ -188,6 +188,7 @@ Not cleaned up.
 ${longDistanceRule}
 ${recentContext}
 Scene: ${sceneHint}
+Let the atmosphere of the exchange above shape this — not just the last line.
 
 First person. Your own voice.
 lowercase. Fragments are fine.
@@ -219,8 +220,8 @@ One line. Lowercase. First person. Private. Like it slipped out.`;
         if (matchG) {
           const candidate = matchG[1].trim();
           // Kirk检测
-          const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","development work","coding questions","step out of character","can't roleplay"];
-          if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
+          // 统一使用全局 isBreakout，不再维护单独词表
+          if (!isBreakout(candidate)) {
             en = candidate;
           }
         }
@@ -234,29 +235,23 @@ One line. Lowercase. First person. Private. Like it slipped out.`;
       }
 
     } else {
-      // 普通场景：Sonnet（人设更稳定）
+      // 普通场景：Grok（比 Sonnet 便宜，不破防，基于上下文氛围生成）
       try {
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: getMainModel(),
-            max_tokens: 150,
-            system: thoughtPrompt,
-            messages: [{ role: 'user', content: 'inner thought now.' }]
-          })
-        }, 10000);
-        if (res.ok) {
-          const data = await res.json();
-          const raw = data.content?.[0]?.text?.trim() || '';
-          // 破防检测
-          if (!isBreakout(raw) && raw) {
-            const match = raw.match(/"en"\s*:\s*"([^"]+)"/);
-            if (match) en = match[1].trim();
-          }
+        const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 100);
+        const matchG = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
+        if (matchG) {
+          const candidate = matchG[1].trim();
+          if (!isBreakout(candidate)) en = candidate;
         }
-      } catch(e) {
-        console.warn('[心声] Sonnet调用失败:', e);
+      } catch(e) {}
+
+      // Grok 失败，Haiku 兜底
+      if (!en) {
+        try {
+          const raw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 100);
+          const match = raw.match(/"en"\s*:\s*"([^"]+)"/);
+          if (match && !isBreakout(match[1].trim())) en = match[1].trim();
+        } catch(e) {}
       }
     }
   } catch(e) {
