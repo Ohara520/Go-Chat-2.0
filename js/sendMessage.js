@@ -986,10 +986,6 @@ async function _processMergedMessage(text) {
           reply = '___NETWORK_ERROR___';
         }
       } catch(e) {
-            reply = '___NETWORK_ERROR___';
-          }
-        }
-      } catch(e) {
         reply = '___NETWORK_ERROR___';
       }
     }
