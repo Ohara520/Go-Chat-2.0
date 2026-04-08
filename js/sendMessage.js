@@ -194,6 +194,26 @@ const BREAKOUT_PHRASES = [
   "claude here", "it's claude",
 ];
 
+
+// ===== Grok 状态注入 =====
+function buildStateHint() {
+  try {
+    const mood = typeof getMoodLevel === 'function' ? getMoodLevel() : '?';
+    const affection = typeof getAffection === 'function' ? getAffection() : '?';
+    const trust = typeof getTrustHeat === 'function' ? getTrustHeat() : '?';
+    const coldWar = localStorage.getItem('coldWarMode') === 'true';
+    const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+    const ghostState = sessionStorage.getItem('ghostState') || '';
+    return `[Current state: mood ${mood}/10, affection ${affection}/100, trust ${trust}/100${coldWar ? ', COLD WAR active' : ''}. Location: ${location}.${ghostState ? ' ' + ghostState : ''}]`;
+  } catch(e) { return ''; }
+}
+
+function getGrokIntimacyLevel() {
+  try {
+    return typeof getIntimacyLevel === 'function' ? getIntimacyLevel() : 1;
+  } catch(e) { return 1; }
+}
+
 function isBreakout(txt) {
   if (!txt) return true;
   const lower = txt.toLowerCase();
@@ -445,9 +465,11 @@ async function _processMergedMessage(text) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: buildGhostStyleCore(),
           user: _ptRecentCtx + '\n\n' + _ptPrompt,
           max_tokens: 200,
+          scene: 'normal',
+          stateHint: buildStateHint(),
+          intimacyLevel: getGrokIntimacyLevel(),
         })
       }, 15000);
       const _ptData = await _ptRes.json();
@@ -523,10 +545,9 @@ async function _processMergedMessage(text) {
       setTimeout(() => {
         if (_isSending) return;
         showTyping();
-        callHaiku(buildGhostStyleCore(), [
-          ...chatHistory.filter(m => !m._system).slice(-6),
-          { role: 'user', content: _comebackPrompt }
-        ], 80).then(r => {
+        const _cbCtx = chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content||'').slice(0,100)}`).join('\n');
+        callGrok(_cbCtx + '\n' + buildStateHint() + '\n' + _comebackPrompt, 80, null, 'normal').then(r => {
           hideTyping();
           if (r && !isBreakout(r) && r.length < 120) {
             appendMessage('bot', r);
@@ -997,19 +1018,17 @@ async function _processMergedMessage(text) {
     }
 
     if (!reply || isBreakout(reply)) {
-      // 第一次重试：Haiku顶一条（用户无感知，速度快）
+      // 破防：Grok直接顶上（Haiku也会破防，不能用）
       await new Promise(r => setTimeout(r, 400));
       try {
         const recentCtx = cleanHistory.slice(-6)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
           .join('\n');
-        const haiku1 = await callHaiku(
-          buildGhostStyleCore() + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
-          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
-          200
-        );
-        if (haiku1 && !isBreakout(haiku1)) {
-          reply = haiku1.trim();
+        const _grokState = buildStateHint();
+        const _grokLevel = getGrokIntimacyLevel();
+        const grokReply = await callGrok(recentCtx, 250, null, 'normal', _grokState, _grokLevel);
+        if (grokReply && !isBreakout(grokReply)) {
+          reply = grokReply.trim();
         } else {
           // 第二次重试：Sonnet重试，简化prompt减少破防概率
           try {
@@ -1019,7 +1038,7 @@ async function _processMergedMessage(text) {
               body: JSON.stringify({
                 model: getMainModel(),
                 max_tokens: 300,
-                system: buildGhostStyleCore() + '\n' + antiBreakoutHint,
+                system: buildSystemPrompt() + '\n' + antiBreakoutHint,
                 messages: cleanHistory.slice(-10)
               })
             }, 20000);
@@ -1163,13 +1182,11 @@ async function _processMergedMessage(text) {
               recentMsgs2, 150
             );
           } else {
-            reply2 = await callHaiku(
-              buildSystemPrompt(),
-              [...cleanHistory.slice(-8), {
-                role: 'user',
-                content: '[System: You just sent a message and took it back. Send another — different angle, rephrased, or shorter. lowercase, English only.]'
-              }],
-              150
+            const _recallCtx = cleanHistory.slice(-8)
+              .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
+            reply2 = await callGrok(
+              _recallCtx + '\n' + buildStateHint() + '\n[You just sent a message and took it back. Send another — different angle, rephrased, or shorter. lowercase, English only.]',
+              150, null, 'normal'
             );
           }
           hideTyping();
@@ -1454,10 +1471,12 @@ One or two lines. English only. lowercase.`;
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            system: buildGhostStyleCore() + _allowAdult + '\n' + _intimateBase,
             user: _fallbackCtx,
             max_tokens: 150,
-            model: 'grok-4.1-fast'
+            model: 'grok-4.1-fast',
+            scene: 'normal',
+            stateHint: buildStateHint(),
+            intimacyLevel: getGrokIntimacyLevel(),
           })
         }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
         new Promise(resolve => setTimeout(() => resolve(''), 12000))

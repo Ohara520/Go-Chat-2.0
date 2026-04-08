@@ -173,10 +173,12 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
  * @param {string} scene       场景：normal/sticker/story/proactive/salary
  * @returns {string} 回复文本，失败返回空字符串
  */
-async function callGrok(user, maxTokens = 300, imageBase64 = null, scene = 'normal') {
+async function callGrok(user, maxTokens = 300, imageBase64 = null, scene = 'normal', stateHint = '', intimacyLevel = 1) {
   try {
     const body = { user, max_tokens: maxTokens, scene };
     if (imageBase64) body.image_base64 = imageBase64;
+    if (stateHint) body.stateHint = stateHint;
+    if (intimacyLevel !== undefined) body.intimacyLevel = intimacyLevel;
     const res = await fetchWithTimeout('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
