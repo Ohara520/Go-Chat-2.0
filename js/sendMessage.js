@@ -833,33 +833,46 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
+    // 正则没命中：调情判断和情绪判断分开——原版做法，调情单独一次调用，简单prompt不会破防
     if (!isIntimate && !isRecentPhoto) {
       try {
-        const combinedRaw = await Promise.race([
+        const flirtRaw = await Promise.race([
           fetchDeepSeek(
-            '判断用户消息。只返回JSON，不要其他文字。\n' +
-            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：有明确调情意图、身体暗示、露骨描述、性相关话题都算true。拿不准时倾向true。单纯撒娇/想念/日常问候为false。',
-            `用户说：${text}`,
-            80
+            '判断这句话是否带有调情/身体暗示/性相关/露骨撩拨意图。注意：单纯撒娇、表达想念、日常问候不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+            text,
+            20
           ),
-          new Promise(resolve => setTimeout(() => resolve(''), 2500))
+          new Promise(resolve => setTimeout(() => resolve(''), 3000))
         ]);
-        if (combinedRaw) {
-          const combinedResult = safeParseJSON(combinedRaw);
-          if (combinedResult) {
-            // 调情结果
-            if (combinedResult.flirt === true) isIntimate = true;
-            // 情绪结果
-            if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
-              if (combinedResult.target === '外人') {
-                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
-              } else if (combinedResult.need === '安慰') {
-                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
+        if (flirtRaw) {
+          const flirtResult = safeParseJSON(flirtRaw);
+          if (flirtResult && flirtResult.flirt === true) isIntimate = true;
+        }
+      } catch(e) {}
+    }
+
+    // 情绪判断单独跑（不影响调情判断）
+    if (!isRecentPhoto) {
+      try {
+        const emotionRaw = await Promise.race([
+          fetchDeepSeek(
+            '判断用户消息的情绪和需求。只返回JSON。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
+            `用户说：${text}`,
+            60
+          ),
+          new Promise(resolve => setTimeout(() => resolve(''), 2000))
+        ]);
+        if (emotionRaw) {
+          const emotionResult = safeParseJSON(emotionRaw);
+          if (emotionResult) {
+            if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
+              if (emotionResult.target === '外人') {
+                emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
+              } else if (emotionResult.need === '安慰') {
+                emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
               }
             }
-            if (combinedResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
+            if (emotionResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
           }
         }
       } catch(e) {}
