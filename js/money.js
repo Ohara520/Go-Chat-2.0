@@ -675,7 +675,7 @@ async function confirmTransfer() {
   closeTransfer();
 
   // 先扣余额，后面退款再加回来
-  if (typeof setBalance === 'function') setBalance(balance - amount);
+  // setBalance 只更新 UI 不写账本，用 addTransaction 真正记账
   if (typeof addTransaction === 'function') addTransaction({ icon: '💸', name: '转账给 Ghost', amount: -amount });
   if (typeof renderWallet === 'function') renderWallet();
 

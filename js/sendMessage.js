@@ -647,7 +647,8 @@ async function _processMergedMessage(text) {
       const _affNow = getAffection();
       if (_affNow < 30) return false;
       if (_affNow < 40) {
-        const _todayLowAffKey = 'lowAffGiven_' + new Date().toDateString();
+        // 统一用 ISO 格式，和 applyMoneyEffect 保持一致
+        const _todayLowAffKey = 'lowAffGiven_' + new Date().toISOString().slice(0, 10);
         if (localStorage.getItem(_todayLowAffKey)) return false;
         if (sessionStorage.getItem('moneyReasonType') !== 'care') return false;
         if (Math.random() > 0.3) return false;
@@ -661,6 +662,9 @@ async function _processMergedMessage(text) {
         const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
         if (Date.now() - _lastGiven < _cooldown) return false;
+        // 退款冷却：退款2小时内不再给，和 applyMoneyEffect 保持一致
+        const _lastRefund = parseInt(localStorage.getItem('lastRefundAt') || '0');
+        if (Date.now() - _lastRefund < 2 * 3600 * 1000) return false;
         if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
       }
       return true;
