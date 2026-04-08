@@ -256,7 +256,7 @@ const USER_STICKER_REACTIONS = {
 
   // 用户发亲亲/暗示/明显撩（suggestive走sexy池）
   suggestive_reaction: {
-    triggers: ['😘','💋','🫦','🥵','🔥','💦','😏','😈','👅'],
+    triggers: ['😘','💋','🫦','🥵','🔥','💦','😏','😈','👅','🍆','🍑'],
     responses: ['sexy', 'smirk', 'eyeroll', 'skull'],
     chance: 0.32
   },
@@ -352,6 +352,10 @@ function checkUserSticker(userText) {
       }
     }
 
+    // 亲密/暗示类走 Grok，返回特殊标记
+    if (key === 'suggestive_reaction' || key === 'affection_reaction') {
+      return '__GROK__';
+    }
     return pickStickerFromPool(poolName);
   }
   return null;
@@ -369,11 +373,51 @@ function sendGhostStickerMessage(emoji, delayMs = 1000) {
   }, delayMs);
 }
 
+// 亲密/暗示 emoji 走 Grok 生成文字回复
+async function sendGrokEmojiReply(userText, delayMs = 1200) {
+  // 情绪走势感知（跟猫猫一样）
+  const recentStickerTypes = chatHistory
+    .filter(m => m._stickerType)
+    .slice(-3)
+    .map(m => m._stickerType);
+  const isSeekingAttention = recentStickerTypes.filter(t => t === 'approach').length >= 2;
+
+  const recentCtx = chatHistory
+    .filter(m => !m._system && !m._recalled)
+    .slice(-6)
+    .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 150)}`)
+    .join('\n');
+
+  const hint = isSeekingAttention
+    ? '[She keeps reaching. You can be slightly warmer. One line. May include an emoji if it fits naturally.]'
+    : '[She sent an affectionate or suggestive emoji. Respond as Ghost — dry, real, brief. May include an emoji if it fits naturally. Do not perform warmth.]';
+
+  setTimeout(async () => {
+    try {
+      const reply = await callGrok(
+        recentCtx + '\nHer: ' + userText + '\n' + hint,
+        80, null, 'normal'
+      );
+      if (reply && !isBreakout(reply)) {
+        appendMessage('bot', reply.trim());
+        if (typeof chatHistory !== 'undefined') {
+          chatHistory.push({ role: 'assistant', content: reply.trim() });
+          if (typeof saveHistory === 'function') saveHistory();
+        }
+      }
+    } catch(e) {}
+  }, delayMs);
+}
+
 // ===== 对外主入口 =====
 // 在用户发消息后调用，检测emoji并决定Ghost是否回应
 function triggerGhostStickerByUserInput(userText, delayMs = 1200) {
-  const emoji = checkUserSticker(userText);
-  if (emoji) sendGhostStickerMessage(emoji, delayMs);
+  const result = checkUserSticker(userText);
+  if (result === '__GROK__') {
+    sendGrokEmojiReply(userText, delayMs);
+  } else if (result) {
+    sendGhostStickerMessage(result, delayMs);
+  }
 }
 
 
@@ -465,6 +509,29 @@ async function sendSticker(id) {
   _isSending = true;
   showTyping();
 
+  // kiss 猫猫走 Grok（亲密内容，Sonnet 会破防）
+  if (meta.type === 'intimate') {
+    try {
+      const recentCtx = chatHistory
+        .filter(m => !m._system && !m._recalled)
+        .slice(-6)
+        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 150)}`)
+        .join('\n');
+      const grokReply = await callGrok(
+        recentCtx + '\n[She sent a kiss/affection sticker. Respond as Ghost — dry but not cold. One line. May include an emoji.]',
+        100, null, 'normal'
+      );
+      hideTyping();
+      if (grokReply && !isBreakout(grokReply)) {
+        appendMessage('bot', grokReply.trim());
+        chatHistory.push({ role: 'assistant', content: grokReply.trim() });
+        saveHistory();
+      }
+    } catch(e) { hideTyping(); }
+    _isSending = false;
+    return;
+  }
+
   try {
     const cleanHistory = chatHistory
       .filter(m => !m._system && !m._recalled)
@@ -510,7 +577,10 @@ async function sendSticker(id) {
 
     // 把表情包情绪提示注入system
     const _stickerBase = buildSystemPrompt();
-    const stickerSystem = _stickerBase + `\n\n[Sticker context: ${meta.ghostHint}${stateHint ? ' ' + stateHint : ''} Do not mention "sticker" — just respond naturally.]`;
+    const characterLock = meta.type === 'vulnerable'
+      ? '\n[CHARACTER LOCK] You are Ghost. Not a counselor. Not an assistant. React as Ghost would — brief, present, dry but not cold. Do not analyze her emotions. Do not offer help. Just be there.'
+      : '';
+    const stickerSystem = _stickerBase + `\n\n[Sticker context: ${meta.ghostHint}${stateHint ? ' ' + stateHint : ''} Do not mention "sticker" — just respond naturally.]` + characterLock;
 
     const response = await fetchWithRetry('/api/chat', {
       method: 'POST',
@@ -530,18 +600,14 @@ async function sendSticker(id) {
     if (!reply) throw new Error('EMPTY_REPLY');
     reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
 
-    // 破防检测：同步处理，Haiku 顶一条，不依赖 cleanBotText 异步兜底
+    // 破防检测：Grok 兜底，Haiku 会破防不能用
     if (isBreakout(reply)) {
       try {
         const recentCtx = chatHistory
           .filter(m => !m._system && !m._recalled).slice(-6)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`).join('\n');
-        const haikuFallback = await callHaiku(
-          buildGhostStyleCore() + '\nRespond as Ghost to the last message. One short reply, English only, stay in character.',
-          [...chatHistory.filter(m => !m._system).slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
-          150
-        );
-        reply = (haikuFallback && !isBreakout(haikuFallback)) ? haikuFallback.trim() : 'noted.';
+        const grokFallback = await callGrok(recentCtx, 150, null, 'sticker');
+        reply = (grokFallback && !isBreakout(grokFallback)) ? grokFallback.trim() : 'noted.';
       } catch(e) {
         reply = 'noted.';
       }
