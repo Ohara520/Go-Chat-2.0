@@ -840,7 +840,7 @@ async function _processMergedMessage(text) {
           fetchDeepSeek(
             '判断用户消息。只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            'flirt判断标准：有明确调情意图、身体暗示、露骨描述、性相关话题都算true。拿不准时倾向true。单纯撒娇/想念/日常问候为false。',
             `用户说：${text}`,
             80
           ),
