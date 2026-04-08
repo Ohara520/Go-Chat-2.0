@@ -844,7 +844,7 @@ async function _processMergedMessage(text) {
               system: '判断这句话是否带有调情/身体暗示/性相关/露骨撩拨意图。单纯撒娇、想念、日常问候不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
               user: text,
               max_tokens: 20,
-              model: 'grok-3-mini'
+              model: 'grok-4.1-fast'
             })
           }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
           new Promise(resolve => setTimeout(() => resolve(''), 5000))
@@ -867,7 +867,7 @@ async function _processMergedMessage(text) {
               system: '判断用户消息的情绪和需求。只返回JSON。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
               user: `用户说：${text}`,
               max_tokens: 60,
-              model: 'grok-3-mini'
+              model: 'grok-4.1-fast'
             })
           }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
           new Promise(resolve => setTimeout(() => resolve(''), 3000))
