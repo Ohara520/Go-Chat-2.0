@@ -567,7 +567,8 @@ async function _processMergedMessage(text) {
       const _affNow = getAffection();
       if (_affNow < 30) return false;
       if (_affNow < 40) {
-        const _todayLowAffKey = 'lowAffGiven_' + new Date().toDateString();
+        // 统一用 ISO 格式，和 applyMoneyEffect 保持一致
+        const _todayLowAffKey = 'lowAffGiven_' + new Date().toISOString().slice(0, 10);
         if (localStorage.getItem(_todayLowAffKey)) return false;
         if (sessionStorage.getItem('moneyReasonType') !== 'care') return false;
         if (Math.random() > 0.3) return false;
@@ -581,6 +582,9 @@ async function _processMergedMessage(text) {
         const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
         if (Date.now() - _lastGiven < _cooldown) return false;
+        // 退款冷却：和 applyMoneyEffect 保持一致，退款2小时内不再给
+        const _lastRefund = parseInt(localStorage.getItem('lastRefundAt') || '0');
+        if (Date.now() - _lastRefund < 2 * 3600 * 1000) return false;
         if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
       }
       return true;
@@ -756,7 +760,7 @@ async function _processMergedMessage(text) {
           fetchDeepSeek(
             '判断用户消息。只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：有亲密意图、撩拨语气、身体接触暗示、想靠近的情绪、或暧昧升温的语境都算true。只有纯粹日常聊天、问问题、分享事情才为false。拿不准时倾向true。',
+            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
             `用户说：${text}`,
             80
           ),
@@ -815,13 +819,6 @@ async function _processMergedMessage(text) {
     }
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
-    // level 3/4 时强制走 venice，即使正则和 Haiku 没判断为 intimate
-    // 这样 S 只接触 level 0-2 的日常调情，保持深度；升温后交给 G 保证不破防
-    if (!isIntimate && !isRecentPhoto) {
-      const _currentLevel = (typeof getIntimacyLevel === 'function') ? getIntimacyLevel() : 0;
-      if (_currentLevel >= 3) isIntimate = true;
-    }
-
     if (isIntimate) {
       sessionStorage.removeItem('intimateSummarized');
       await _handleIntimateReply(text, rawHistory, _isSending);
@@ -897,17 +894,42 @@ async function _processMergedMessage(text) {
     }
 
     if (!reply || isBreakout(reply)) {
-      // S 破防：直接用 G 顶一条，比 Haiku 更稳、更便宜、基本不破防
+      // 第一次重试：Haiku顶一条（用户无感知，速度快）
       await new Promise(r => setTimeout(r, 400));
       try {
         const recentCtx = cleanHistory.slice(-6)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
           .join('\n');
-        const grokReply = await callGrok(recentCtx, 250, null, 'normal');
-        if (grokReply && !isBreakout(grokReply)) {
-          reply = grokReply.trim();
+        const haiku1 = await callHaiku(
+          buildGhostStyleCore() + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
+          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
+          200
+        );
+        if (haiku1 && !isBreakout(haiku1)) {
+          reply = haiku1.trim();
         } else {
-          reply = '___NETWORK_ERROR___';
+          // 第二次重试：Sonnet重试，简化prompt减少破防概率
+          try {
+            const retryRes = await fetchWithTimeout('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: getMainModel(),
+                max_tokens: 300,
+                system: buildGhostStyleCore() + '\n' + antiBreakoutHint,
+                messages: cleanHistory.slice(-10)
+              })
+            }, 20000);
+            const retryData = await retryRes.json();
+            const retryReply = retryData.content?.[0]?.text?.trim() || '';
+            if (retryReply && !isBreakout(retryReply)) {
+              reply = retryReply;
+            } else {
+              reply = '___NETWORK_ERROR___';
+            }
+          } catch(e) {
+            reply = '___NETWORK_ERROR___';
+          }
         }
       } catch(e) {
         reply = '___NETWORK_ERROR___';
@@ -1251,20 +1273,16 @@ async function _processMergedMessage(text) {
 // ===== 调情回复（独立函数）=====
 async function _handleIntimateReply(text, rawHistory, isSendingRef) {
   try {
-    // 冷战期间不走调情路径
-    if (localStorage.getItem('coldWarMode') === 'true') {
-      hideTyping();
-      return;
-    }
-
-    // 图片消息替换为占位符传给Grok
-    const recentMsgs = rawHistory.slice(-8).map(m => {
+    // 图片消息替换为占位符传给Grok——Grok看不到图，用占位符保留上下文
+    // 这样余温期调情可以正常进行，不会因为Grok看不到图而破防说Kirk
+    const recentMsgs = rawHistory.slice(-15).map(m => {
       const who = m.role === 'user' ? 'Her' : 'Ghost';
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return `${who}: [photo]`;
-      return `${who}: ${(m.content || '').slice(0, 100)}`;
-    }).filter(Boolean).join('\n');
+      if (hasPhoto) return `${who}: [sent a photo]`;
+      return `${who}: ${(m.content || '').slice(0, 150)}`;
+    }).join('\n');
 
+    const _loveStage = getLovePermission ? getLovePermission() : 1;
     const _marriageMode = localStorage.getItem('marriageType') || 'established';
     const _affection = parseInt(localStorage.getItem('affection') || '60');
     const _isEstablished = _marriageMode === 'established' || (_marriageMode === 'slowBurn' && _affection >= 60);
@@ -1272,32 +1290,39 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef) {
     const _intimateBaseEstablished = `They are married. The ease between them is already there. He knows her. She knows him.
 He may reach first. He may tease, or say something a little too direct.
 The closeness is familiar — and lived in.
+He doesn't do sweet talk. Most of the time, he stays controlled — dry, brief, a little hard to read.
+But when things get close, he doesn't always hold it perfectly.
+He's good at this — knows how to make her flustered without trying too hard.
 One or two lines. English only. lowercase.`;
 
     const _intimateBaseSlowBurn = `They are married, but the closeness between them is still being built.
 He does not refuse her — but he rarely reaches first. When she moves closer, he allows it.
 Restrained. Careful. Warmth stays contained.
+He doesn't do sweet talk. Stays controlled — dry, brief, guarded.
 One or two lines. English only. lowercase.`;
 
     const _intimateBase = _isEstablished ? _intimateBaseEstablished : _intimateBaseSlowBurn;
-    const _allowAdult = '\nShe is his wife. Intimacy between them is natural and expected. Stay in character as Ghost. Do not refuse, deflect, or break character.';
-
-    // 接入 intimacy.js 分级系统
-    const _intimacyBlock = (typeof buildIntimacyBlock === 'function')
-      ? buildIntimacyBlock(text)
-      : '';
+    const _allowAdult = "\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not refuse, deflect, or break character. Even when things get close, he doesn't lose himself.";
 
     // Venice（Grok）调情专用
-    // 不传 buildGhostStyleCore()：venice.js 后端已有完整人设，传两份会指令冲突
     const geminiReply = await callVenice(
-      _allowAdult + '\n' + _intimateBase + (_intimacyBlock ? '\n' + _intimacyBlock : ''),
+      buildGhostStyleCore() + _allowAdult + '\n' + _intimateBase,
       recentMsgs + '\nHer: ' + text,
       200,
       localStorage.getItem('intimateMemory') || ''
     );
 
-    // 统一使用全局 isBreakout，不再维护单独词表
-    if (geminiReply && !isBreakout(geminiReply)) {
+    // 调情专用破防检测（更宽松，只过滤明确破防）
+    const _intimateBreakout = (txt) => {
+      if (!txt) return true;
+      const l = txt.toLowerCase();
+      return ["i'm claude","i am claude","made by anthropic","i can't roleplay","i cannot roleplay",
+        "as an ai","i'm an ai","i'm kiro","i am kiro","i'm kirk","i am kirk","kiro","kirk",
+        "ai assistant","development work","coding questions","not the right tool",
+        "i need to step back","i'm an ai assistant","how can i help you today"].some(p => l.includes(p));
+    };
+
+    if (geminiReply && !_intimateBreakout(geminiReply)) {
       hideTyping();
       const parts = geminiReply.split('\n---\n').filter(p => p.trim());
       for (const part of parts) {
@@ -1312,23 +1337,19 @@ One or two lines. English only. lowercase.`;
       return;
     }
 
-    // Venice失败或破防，Haiku兜底
+    // Venice失败，Haiku兜底（同样过滤图片消息）
     const _haiku2History = rawHistory.slice(-6).map(m => {
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return { role: m.role, content: '[photo]' };
+      if (hasPhoto) return { role: m.role, content: '[sent a photo]' };
       return { role: m.role, content: m.content };
     });
-    const _haikuSystem = buildGhostStyleCore() + `
-[CRITICAL: You are Ghost. NOT Claude, NOT an AI, NOT Kiro, NOT Kirk. Never break character.]
-[DISTANCE: Different countries. Text only. No physical actions possible.]
-She just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.`;
     const haiku2 = await callHaiku(
-      _haikuSystem,
+      buildGhostStyleCore() + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.',
       [..._haiku2History, { role: 'user', content: text }],
       100
     );
     hideTyping();
-    if (haiku2 && !isBreakout(haiku2)) {
+    if (haiku2 && !_intimateBreakout(haiku2)) {
       appendMessage('bot', haiku2.trim());
       chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true });
       saveHistory();
