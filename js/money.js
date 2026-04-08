@@ -407,14 +407,9 @@ English only.`;
 
 async function generateMoneyRefuseLine(pattern) {
   try {
-    const ctx = typeof chatHistory !== 'undefined'
-      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-4)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n')
-      : '';
-    const res = await callGrokWithSystem(
+    const res = await callHaiku(
       buildGhostStyleCore() + '\n' + buildMoneyAskReactionPrompt(pattern),
-      ctx || 'Write his line.',
-      80
+      typeof chatHistory !== 'undefined' ? chatHistory.slice(-4) : []
     );
     if (res && res.trim()) return res.trim();
   } catch(e) {}
@@ -485,6 +480,10 @@ function applyMoneyEffect(amount, options = {}) {
   if (typeof addTransaction === 'function') {
     addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
   }
+  // 实际增加余额（之前漏了这一步导致有卡片但余额不变）
+  if (typeof setBalance === 'function' && typeof getBalance === 'function') {
+    setBalance(getBalance() + actualAmount);
+  }
   addWeeklyGiven(actualAmount);
   incrementTodayGivenCount();
   localStorage.setItem('lastGivenAt', Date.now());
@@ -509,12 +508,9 @@ function applyMoneyEffect(amount, options = {}) {
 
 function getWeekKey() {
   const now = new Date();
-  // 以周一为一周起点，取本周周一的日期作为 key
-  const day = now.getDay(); // 0=周日 1=周一 ... 6=周六
-  const diff = (day === 0 ? -6 : 1 - day); // 周日往前推6天，其余往前推到周一
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diff);
-  return monday.toISOString().slice(0, 10); // 格式：2025-04-07
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const week = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+  return now.getFullYear() + '_w' + week;
 }
 
 function getWeeklyGiven() {
@@ -681,27 +677,39 @@ function confirmTransfer() {
   }
 
   closeTransfer();
+  if (document.getElementById('transferReason')) document.getElementById('transferReason').value = '';
 
   // 先扣余额，后面退款再加回来
   if (typeof setBalance === 'function') setBalance(balance - amount);
   if (typeof addTransaction === 'function') addTransaction({ icon: '💸', name: '转账给 Ghost', amount: -amount });
   if (typeof renderWallet === 'function') renderWallet();
 
-  // 读最近一条用户消息作为转账理由上下文
-  const lastUserMessage = (() => {
+  // 读备注框 + 最近3条用户消息合并作为理由上下文
+  const transferReasonInput = document.getElementById('transferReason');
+  const transferReasonText = transferReasonInput ? transferReasonInput.value.trim() : '';
+  const recentUserMessages = (() => {
     if (typeof chatHistory === 'undefined') return '';
-    const last = [...chatHistory].reverse().find(m => m.role === 'user' && !m._system && !m._recalled);
-    return last?.content || '';
+    return [...chatHistory]
+      .filter(m => m.role === 'user' && !m._system && !m._recalled)
+      .slice(-3)
+      .map(m => m.content)
+      .join(' ');
   })();
+  const combinedReason = [transferReasonText, recentUserMessages].filter(Boolean).join(' ');
 
   // 判断收/退（接入新系统）
-  const judgeContext = { reason: lastUserMessage };
+  const judgeContext = { reason: combinedReason };
   const { shouldRefund, reason, acceptAmount } = judgeUserTransfer(amount, judgeContext);
   const refundAmount = amount - acceptAmount;
 
   // 构建给模型的 prompt
   const mood = getMoodLevel();
   let judgePrompt = '';
+
+  // 把用户备注带进对话历史，让Ghost知道转账理由
+  if (transferReasonText && typeof chatHistory !== 'undefined') {
+    chatHistory.push({ role: 'user', content: transferReasonText });
+  }
 
   if (shouldRefund) {
     const hintMap = {
@@ -735,20 +743,23 @@ function confirmTransfer() {
   if (typeof showTyping === 'function') showTyping();
   if (typeof _isSending !== 'undefined') _isSending = true;
 
-  const ctx = typeof chatHistory !== 'undefined'
-    ? (typeof cleanMessages === 'function'
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      system: buildGhostStyleCore() + '\n' + judgePrompt,
+      messages: typeof cleanMessages === 'function' && typeof chatHistory !== 'undefined'
         ? cleanMessages(chatHistory.filter(m => !m._system).slice(-6))
-        : chatHistory.filter(m => !m._system).slice(-6))
-        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n')
-    : '';
-
-  callGrokWithSystem(
-    buildGhostStyleCore() + '\n' + judgePrompt,
-    ctx || 'Respond.',
-    200
-  ).then(reply => {
+        : []
+    })
+  }).then(r => r.json()).then(data => {
     if (typeof hideTyping === 'function') hideTyping();
-    reply = (reply || '...').replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '')
+    let reply = data.content?.[0]?.text || '...';
+    if (typeof updateToRead === 'function') updateToRead();
+
+    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '')
                  .replace(/\s{2,}/g, ' ').trim();
 
     if (typeof incrementTodayCount === 'function') incrementTodayCount();
@@ -765,6 +776,7 @@ function confirmTransfer() {
       if (typeof renderWallet === 'function') renderWallet();
       updateUserTransferCard(cardId, false);
       if (container) showGhostTransferCard(container, amount, reply, true);
+      if (reply && typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {
         chatHistory.push({ role: 'assistant', content: reply || `sent it back. £${amount}.` });
         chatHistory.push({ role: 'user', content: `[System: Ghost just returned £${amount}. He knows he sent it back.]`, _system: true });
@@ -799,11 +811,13 @@ function confirmTransfer() {
   }).catch(() => {
     if (typeof hideTyping === 'function') hideTyping();
     if (typeof _isSending !== 'undefined') _isSending = false;
+    // 网络错误：全退
     const bal = typeof getBalance === 'function' ? getBalance() : 0;
     if (typeof setBalance === 'function') setBalance(bal + amount);
     if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（网络错误）', amount });
     if (typeof renderWallet === 'function') renderWallet();
     updateUserTransferCard(cardId, false);
+    if (typeof appendMessage === 'function') appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
   });
 }
 
@@ -828,7 +842,7 @@ function showUserTransferCard(container, amount) {
       <div class="transfer-amount">£${amount}</div>
     </div>
     <div class="transfer-footer">
-      <div class="transfer-status" id="${cardId}_status">待确认</div>
+      <div class="transfer-status" id="${cardId}_status">🌸 待确认</div>
       <div class="transfer-time">${timeStr}</div>
     </div></div>`;
   container.appendChild(div);
@@ -839,8 +853,8 @@ function showUserTransferCard(container, amount) {
 function updateUserTransferCard(cardId, kept) {
   const el = document.getElementById(cardId + '_status');
   if (!el) return;
-  el.textContent = kept ? '已收到' : '已退回';
-  el.style.color = kept ? '' : '#bbb';
+  el.textContent = kept ? '✅ 已收到' : '↩️ 已退回';
+  el.style.color = kept ? '#4a8a30' : '#9ca3af';
 }
 
 function showGhostTransferCard(container, amount, noteText, isRefund) {
@@ -872,7 +886,7 @@ function showGhostTransferCard(container, amount, noteText, isRefund) {
         <div class="transfer-amount">£${amount}</div>
       </div>
       <div class="transfer-footer">
-        <div class="transfer-status">${isRefund ? '退款中' : '转账中'}</div>
+        <div class="transfer-status ${isRefund ? 'refund-status' : ''}">${isRefund ? '退款中' : '转账中'}</div>
         <div class="transfer-time">${timeStr}</div>
       </div></div>`;
     c.appendChild(divOut);
@@ -930,22 +944,26 @@ async function ghostSendInitMessage(offlineHours) {
   const hint = hintMap.find(h => offlineHours >= h.min && offlineHours < h.max)?.hint || '';
   try {
     if (typeof showTyping === 'function') showTyping();
-    const ctx = typeof chatHistory !== 'undefined'
-      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n')
-      : '';
-    const offlinePrompt = `[System: ${hint} Ghost noticed. Say something — could be a pointed question, a casual remark, or just checking in. lowercase, English only.]`;
-    const reply = await callGrokWithSystem(
-      buildGhostStyleCore(),
-      ctx ? `${ctx}\n\n${offlinePrompt}` : offlinePrompt,
-      150
-    );
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        ...(() => { const s = buildSystemPrompt(); return { system: s, systemParts: buildSystemPromptParts(s) }; })(),
+        messages: [...(typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []),
+          { role: 'user', content: `[System: ${hint} Ghost noticed. Say something — could be a pointed question, a casual remark, or just checking in. lowercase, English only.]` }
+        ]
+      })
+    });
+    const data = await res.json();
     if (typeof hideTyping === 'function') hideTyping();
+    let reply = data.content?.[0]?.text?.trim() || '';
     if (reply) {
-      const cleaned = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
-      if (cleaned && typeof appendMessage === 'function') appendMessage('bot', cleaned);
+      reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
+      if (typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {
-        chatHistory.push({ role: 'assistant', content: cleaned });
+        chatHistory.push({ role: 'assistant', content: reply });
         if (typeof saveHistory === 'function') saveHistory();
       }
     }

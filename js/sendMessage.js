@@ -626,6 +626,9 @@ async function _processMergedMessage(text) {
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
         if (Date.now() - _lastGiven < _cooldown) return false;
         if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
+        // 退款冷却：刚退款2小时内不主动给
+        const _lastRefund = parseInt(localStorage.getItem('lastRefundAt') || '0');
+        if (Date.now() - _lastRefund < 2 * 3600 * 1000) return false;
       }
       return true;
     })();
@@ -1142,6 +1145,9 @@ async function _processMergedMessage(text) {
         // 假账过滤：清除回复里提到转钱/具体金额的部分
         reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
         reply = reply.replace(/£\d+[^.!?\n]*(send|transfer|give|wire|on its way|coming your way)[^.!?\n]*/gi, '').trim();
+        reply = reply.replace(/sent[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
+        reply = reply.replace(/£\d+[^.!?\n]*(sent|transferred|given)[^.!?\n]*/gi, '').trim();
+        reply = reply.replace(/transferred[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
         reply = reply || '.';
         return false;
       }
