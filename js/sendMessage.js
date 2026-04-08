@@ -840,7 +840,7 @@ async function _processMergedMessage(text) {
           fetchDeepSeek(
             '判断用户消息。只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            'flirt判断标准：有亲密意图、撩拨语气、身体接触暗示、想靠近的情绪、或暧昧升温的语境都算true。只有纯粹日常聊天、问问题、分享事情才为false。拿不准时倾向true。',
             `用户说：${text}`,
             80
           ),
@@ -899,6 +899,12 @@ async function _processMergedMessage(text) {
     }
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
+    // level 3/4 时强制走 venice，保证升温后不破防
+    if (!isIntimate && !isRecentPhoto) {
+      const _currentLevel = (typeof getIntimacyLevel === 'function') ? getIntimacyLevel() : 0;
+      if (_currentLevel >= 3) isIntimate = true;
+    }
+
     if (isIntimate) {
       sessionStorage.removeItem('intimateSummarized');
       await _handleIntimateReply(text, rawHistory, _isSending);
@@ -957,57 +963,29 @@ async function _processMergedMessage(text) {
     let reply = data.content?.[0]?.text || '';
 
     // ── 破防检测 + 重试 ──────────────────────────────────────
-    // 修复 #054：破防后不再静默，强制重试
-    // 修复 Claude 4.5破防：先词库检测，再可疑内容语义判断
+    // 第一层：词表快速检测
+    // 第二层：isBreakoutAsync 语义检测（覆盖词表漏网的新变种，如 "I can't discuss that"）
     if (reply && !isBreakout(reply)) {
-      // 可疑关键词二次检查（Claude 4.5新增模式）
-      if (/i should mention|i want to be clear|as the ai|my guidelines|my training|i'm designed|claude's|by anthropic/i.test(reply)) {
-        try {
-          const breakCheck = await fetchDeepSeek(
-            'Is this reply breaking character by claiming to be an AI, Claude, or refusing to roleplay? Answer only YES or NO.',
-            `Reply: "${reply.slice(0, 300)}"`,
-            10
-          );
-          if (breakCheck.trim().toUpperCase().startsWith('YES')) reply = '';
-        } catch(e) {}
-      }
+      try {
+        const _ooc = await isBreakoutAsync(reply);
+        if (_ooc) reply = '';
+      } catch(e) {}
     }
 
     if (!reply || isBreakout(reply)) {
-      // 第一次重试：Haiku顶一条（用户无感知，速度快）
+      // 破防：G 直接顶上，不破防、不贵、快
       await new Promise(r => setTimeout(r, 400));
       try {
         const recentCtx = cleanHistory.slice(-6)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
           .join('\n');
-        const haiku1 = await callHaiku(
-          buildGhostStyleCore() + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
-          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
-          200
-        );
-        if (haiku1 && !isBreakout(haiku1)) {
-          reply = haiku1.trim();
+        const grokReply = await callGrok(recentCtx, 250, null, 'normal');
+        if (grokReply && !isBreakout(grokReply)) {
+          reply = grokReply.trim();
         } else {
-          // 第二次重试：Sonnet重试，简化prompt减少破防概率
-          try {
-            const retryRes = await fetchWithTimeout('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: getMainModel(),
-                max_tokens: 300,
-                system: buildGhostStyleCore() + '\n' + antiBreakoutHint,
-                messages: cleanHistory.slice(-10)
-              })
-            }, 20000);
-            const retryData = await retryRes.json();
-            const retryReply = retryData.content?.[0]?.text?.trim() || '';
-            if (retryReply && !isBreakout(retryReply)) {
-              reply = retryReply;
-            } else {
-              reply = '___NETWORK_ERROR___';
-            }
-          } catch(e) {
+          reply = '___NETWORK_ERROR___';
+        }
+      } catch(e) {
             reply = '___NETWORK_ERROR___';
           }
         }
