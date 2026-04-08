@@ -1391,21 +1391,45 @@ One or two lines. English only. lowercase.`;
       return;
     }
 
-    // Venice失败 → Grok兜底（不走Haiku，Haiku比Sonnet更容易破防）
-    const _grokFallbackCtx = rawHistory.slice(-6).map(m => {
+    // Venice失败 → Haiku快速兜底（普通Ghost回复，不带调情内容，保证有回复）→ Venice再试一次
+    const _recentCtxFallback = rawHistory.slice(-6).map(m => {
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
       if (hasPhoto) return (m.role === 'user' ? 'Her' : 'Ghost') + ': [sent a photo]';
       return (m.role === 'user' ? 'Her' : 'Ghost') + ': ' + (m.content || '').slice(0, 150);
     }).join('\n') + '\nHer: ' + text;
-    const grokFallback = await callGrok(_grokFallbackCtx, 200, null, 'normal');
-    hideTyping();
-    if (grokFallback && !_intimateBreakout(grokFallback)) {
-      appendMessage('bot', grokFallback.trim());
-      chatHistory.push({ role: 'assistant', content: grokFallback.trim(), _intimate: true });
+
+    const haikuFallback = await callHaiku(
+      buildGhostStyleCore() + '\nShe just said something to him. Respond as Ghost — one line, dry, English only.',
+      [{ role: 'user', content: _recentCtxFallback }],
+      100
+    );
+    if (haikuFallback && !_intimateBreakout(haikuFallback)) {
+      hideTyping();
+      appendMessage('bot', haikuFallback.trim());
+      chatHistory.push({ role: 'assistant', content: haikuFallback.trim(), _intimate: true });
       saveHistory();
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+      return;
     }
+
+    // Haiku也失败 → Venice再试一次（10秒）
+    try {
+      const veniceRetry = await callVenice(
+        buildGhostStyleCore() + _allowAdult + '\n' + _intimateBase,
+        _recentCtxFallback,
+        200,
+        localStorage.getItem('intimateMemory') || ''
+      );
+      hideTyping();
+      if (veniceRetry && !_intimateBreakout(veniceRetry)) {
+        appendMessage('bot', veniceRetry.trim());
+        chatHistory.push({ role: 'assistant', content: veniceRetry.trim(), _intimate: true });
+        saveHistory();
+        incrementTodayCount();
+        if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+      }
+    } catch(e2) { hideTyping(); }
   } catch(e) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
