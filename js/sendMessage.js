@@ -1440,21 +1440,35 @@ One or two lines. English only. lowercase.`;
       return;
     }
 
-    // Venice失败，Haiku兜底（同样过滤图片消息）
-    const _haiku2History = rawHistory.slice(-6).map(m => {
+    // Venice失败 → grok-4.1-fast兜底（快、不破防）
+    const _fallbackCtx = rawHistory.slice(-6).map(m => {
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return { role: m.role, content: '[sent a photo]' };
-      return { role: m.role, content: m.content };
-    });
-    const haiku2 = await callHaiku(
-      buildGhostStyleCore() + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.',
-      [..._haiku2History, { role: 'user', content: text }],
-      100
-    );
+      if (hasPhoto) return (m.role === 'user' ? 'Her' : 'Ghost') + ': [sent a photo]';
+      return (m.role === 'user' ? 'Her' : 'Ghost') + ': ' + (m.content || '').slice(0, 150);
+    }).join('\n') + '\nHer: ' + text;
+
+    let fallbackReply = '';
+    try {
+      const fbRes = await Promise.race([
+        fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system: buildGhostStyleCore() + _allowAdult + '\n' + _intimateBase,
+            user: _fallbackCtx,
+            max_tokens: 150,
+            model: 'grok-4.1-fast'
+          })
+        }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
+        new Promise(resolve => setTimeout(() => resolve(''), 12000))
+      ]);
+      fallbackReply = fbRes || '';
+    } catch(e) {}
+
     hideTyping();
-    if (haiku2 && !_intimateBreakout(haiku2)) {
-      appendMessage('bot', haiku2.trim());
-      chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true });
+    if (fallbackReply && !_intimateBreakout(fallbackReply)) {
+      appendMessage('bot', fallbackReply.trim());
+      chatHistory.push({ role: 'assistant', content: fallbackReply.trim(), _intimate: true });
       saveHistory();
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
