@@ -281,21 +281,12 @@ async function callDeepSeek(prompt, maxTokens = 500) {
  * @returns {Response} 原始fetch Response（调用方自己.json()）
  */
 async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 1000, signal = null) {
-  // 构建system字段：尝试用cache_control分段，若parts无效则fallback到纯字符串
-  let systemField;
-  if (parts && parts.fixed && parts.dynamic) {
-    systemField = [
-      { type: 'text', text: parts.fixed, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: finalSystem }
-    ];
-  } else {
-    systemField = finalSystem;
-  }
-
+  // 中转节点不透传 anthropic-beta header，暂时不用 cache_control
+  // 等中转支持透传后再开启缓存
   const body = {
     model: MODEL_SONNET,
     max_tokens: maxTokens,
-    system: systemField,
+    system: finalSystem,
     messages: messages,
   };
 
