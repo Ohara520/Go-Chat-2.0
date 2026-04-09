@@ -883,7 +883,7 @@ async function _processMergedMessage(text) {
           body: JSON.stringify({
             model: MODEL_HAIKU,
             max_tokens: 20,
-            system: '判断这句话是否带有明确的调情/身体暗示/露骨撩拨意图。注意：单纯的撒娇、表达想念、日常亲昵、怀孕、生病、家庭、情感分享等生活话题不算调情。只有明显的身体接触暗示、露骨描述、或刻意挑逗才算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+            system: '你是文本分类器。判断这句话是否带有明确的调情/身体暗示/露骨撩拨意图。注意：单纯的撒娇、表达想念、日常亲昵、怀孕、生病、家庭、情感分享等生活话题不算调情。只有明显的身体接触暗示、露骨描述、或刻意挑逗才算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
             messages: [{ role: 'user', content: text }]
           })
         }, 3000).then(r => r.ok ? r.json() : null).then(d => d?.content?.[0]?.text?.trim() || ''),
