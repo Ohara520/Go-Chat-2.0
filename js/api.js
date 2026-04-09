@@ -286,7 +286,7 @@ async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 10
   if (parts && parts.fixed && parts.dynamic) {
     systemField = [
       { type: 'text', text: parts.fixed, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: parts.dynamic + '\n' + finalSystem }
+      { type: 'text', text: finalSystem }
     ];
   } else {
     systemField = finalSystem;
