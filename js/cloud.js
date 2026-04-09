@@ -204,6 +204,12 @@ async function loadFromCloud() {
     if (data.profile?.maintenanceComp_20260409) {
       localStorage.setItem('maintenanceComp_20260409', data.profile.maintenanceComp_20260409);
     }
+    // 恢复今日打工次数（防止换设备后次数重置但钱已到账）
+    if (data.profile?.todayWorkKey && data.profile?.todayWorkData) {
+      if (!localStorage.getItem(data.profile.todayWorkKey)) {
+        localStorage.setItem(data.profile.todayWorkKey, data.profile.todayWorkData);
+      }
+    }
     if (!data.profile?.walletMigrated_v3) {
       if (data.chat_history?.length > 0 || data.state_snapshot?.transactions?.length > 0) {
       // 云端有聊天记录或交易记录 → 一定是老用户，直接标记已迁移防止清空
@@ -504,6 +510,8 @@ async function saveToCloud() {
       walletMigrated_v3: localStorage.getItem('walletMigrated_v3') || '',
       weddingGift_v1: localStorage.getItem('weddingGift_v1') || '',
       maintenanceComp_20260409: localStorage.getItem('maintenanceComp_20260409') || '',
+      todayWorkKey: 'work_' + new Date().toDateString(),
+      todayWorkData: localStorage.getItem('work_' + new Date().toDateString()) || '',
       // 签到记录：存最近60天的签到key + 本月里程碑计数
       checkinKeys: (() => {
         const keys = {};

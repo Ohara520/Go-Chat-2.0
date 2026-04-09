@@ -58,6 +58,13 @@ function startPomodoro() {
   pomodoroTotalSeconds = selectedJob.minutes * 60;
   pomodoroSecondsLeft = pomodoroTotalSeconds;
 
+  // 保存进度到 sessionStorage，用于页面切换后恢复
+  sessionStorage.setItem('pomodoroProgress', JSON.stringify({
+    startTime: Date.now(),
+    totalSeconds: pomodoroTotalSeconds,
+    job: selectedJob,
+  }));
+
   document.getElementById('jobSelector').style.display = 'none';
   document.getElementById('startBtn').style.display = 'none';
   document.getElementById('pomodoroDone').style.display = 'none';
@@ -93,6 +100,7 @@ function updatePomodoroRing() {
 function cancelPomodoro() {
   clearInterval(pomodoroTimer);
   pomodoroTimer = null;
+  sessionStorage.removeItem('pomodoroProgress');
   document.getElementById('timerWrap').style.display = 'none';
   document.getElementById('jobSelector').style.display = 'grid';
   document.getElementById('startBtn').style.display = 'block';
@@ -102,6 +110,9 @@ function cancelPomodoro() {
 function finishPomodoro() {
   const pay = selectedJob.pay;
   const jobInfo = JOB_INFO[selectedJob.job];
+
+  // 清除进度记录
+  sessionStorage.removeItem('pomodoroProgress');
 
   // 更新今日数据
   const dayKey = getTodayWorkKey();
@@ -562,3 +573,52 @@ function renderCollectionScreen(page = 0) {
 }
 
 // ===== 节日映射（2026年版）=====
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 页面切换后恢复计时器
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function resumePomodoroIfNeeded() {
+  const raw = sessionStorage.getItem('pomodoroProgress');
+  if (!raw) return;
+  try {
+    const progress = JSON.parse(raw);
+    const elapsed = Math.floor((Date.now() - progress.startTime) / 1000);
+    const remaining = progress.totalSeconds - elapsed;
+
+    if (remaining <= 0) {
+      // 计时结束了，直接结算
+      sessionStorage.removeItem('pomodoroProgress');
+      selectedJob = progress.job;
+      pomodoroTotalSeconds = progress.totalSeconds;
+      pomodoroSecondsLeft = 0;
+      finishPomodoro();
+      return;
+    }
+
+    // 恢复计时状态
+    selectedJob = progress.job;
+    pomodoroTotalSeconds = progress.totalSeconds;
+    pomodoroSecondsLeft = remaining;
+
+    document.getElementById('jobSelector').style.display = 'none';
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('pomodoroDone').style.display = 'none';
+    document.getElementById('timerWrap').style.display = 'flex';
+    document.getElementById('timerJobLabel').textContent = progress.job.emoji + ' ' + progress.job.name + '中（已恢复）';
+
+    updatePomodoroRing();
+    if (pomodoroTimer) clearInterval(pomodoroTimer);
+    pomodoroTimer = setInterval(tickPomodoro, 1000);
+    showToast('计时已恢复 ⏱️');
+  } catch(e) {
+    sessionStorage.removeItem('pomodoroProgress');
+  }
+}
+
+// 页面加载时自动恢复
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', resumePomodoroIfNeeded);
+} else {
+  resumePomodoroIfNeeded();
+}
