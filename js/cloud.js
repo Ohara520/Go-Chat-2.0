@@ -511,7 +511,9 @@ async function saveToCloud() {
         for (let i = 0; i < 60; i++) {
           const d = new Date(now);
           d.setDate(d.getDate() - i);
-          const k = 'checkin_' + d.toDateString();
+          // 统一用 ISO 格式（2026-04-08），和 checkin.js 保持一致
+          const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+          const k = 'checkin_' + iso;
           if (localStorage.getItem(k)) keys[k] = '1';
         }
         return keys;
