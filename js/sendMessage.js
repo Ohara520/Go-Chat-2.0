@@ -587,8 +587,8 @@ async function _processMergedMessage(text) {
     if (handled) return;
   }
 
-  // 打断上一个请求
-  if (_currentAbortController) {
+  // 打断上一个请求（只在真正有进行中的请求时才abort）
+  if (_currentAbortController && _isSending) {
     _currentAbortController.abort();
     _currentAbortController = null;
     _isSending = false;
