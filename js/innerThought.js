@@ -167,37 +167,35 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
 
 Something just happened.
 
-This is what you thought — but didn't say.
+This is what he thought — but didn't say.
 
-Not always the opposite of what you said.
+Not always the opposite of what he said.
 Sometimes it is.
-Sometimes it's just more than you showed.
+Sometimes it's just more than he showed.
 
 A quieter version.
 A softer one.
-Or something a little more yours.
+Or something a little more his.
 
 It can be:
-— a reaction you held back
-— a detail you noticed
-— a question you didn't ask
-— something a bit closer than you'd admit
+— a reaction he held back
+— a detail he noticed
+— a question he didn't ask
+— something a bit closer than he'd admit
 
 Not explained.
 Not cleaned up.
 ${longDistanceRule}
 ${recentContext}
 Scene: ${sceneHint}
-Let the atmosphere of the exchange above shape this — not just the last line.
 
-First person. Your own voice.
 lowercase. Fragments are fine.
 Can be one line or a few — whatever fits.
 It should feel private. Like it slipped out.
 
 Return JSON only. No explanation. No markdown. No extra text.
 {"en":"..."}
-One line. Lowercase. First person. Private. Like it slipped out.`;
+One line. Lowercase. Private. Like it slipped out.`;
 
   let en = '';
 
@@ -215,13 +213,13 @@ One line. Lowercase. First person. Private. Like it slipped out.`;
     if (_isIntimateThought) {
       // Grok生成调情心声
       try {
-        const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 80);
+        const grokRaw = await callGrok(thoughtPrompt, 'inner thought now.', 80);
         const matchG = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
         if (matchG) {
           const candidate = matchG[1].trim();
           // Kirk检测
-          // 统一使用全局 isBreakout，不再维护单独词表
-          if (!isBreakout(candidate)) {
+          const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","development work","coding questions","step out of character","can't roleplay"];
+          if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
             en = candidate;
           }
         }
@@ -229,33 +227,27 @@ One line. Lowercase. First person. Private. Like it slipped out.`;
 
       // Grok失败，Haiku兜底
       if (!en) {
-        const raw = await callGrok(thoughtPrompt + '\ninner thought now.', 80, null, 'normal');
+        const raw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 80);
         const match = raw.match(/"en"\s*:\s*"([^"]+)"/);
         if (match) en = match[1].trim();
       }
 
     } else {
-      // 普通场景：Sonnet（层次感更好，非调情内容不会破防）
+      // 普通场景：Grok（成本低，角色扮演稳定）
       try {
-        const sonnetRaw = await callSonnet(
-          thoughtPrompt,
-          [{ role: 'user', content: 'inner thought now.' }],
-          100
-        );
-        const matchS = sonnetRaw.match(/"en"\s*:\s*"([^"]+)"/);
-        if (matchS) {
-          const candidate = matchS[1].trim();
-          if (!isBreakout(candidate)) en = candidate;
+        const grokRaw = await callGrok(thoughtPrompt, 'inner thought now.', 80);
+        if (grokRaw) {
+          const match = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
+          if (match) {
+            const candidate = match[1].trim();
+            const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","development work","coding questions","step out of character","can't roleplay","claude"];
+            if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
+              en = candidate;
+            }
+          }
         }
-      } catch(e) {}
-
-      // Sonnet 失败，Grok 兜底
-      if (!en) {
-        try {
-          const raw = await callGrok(thoughtPrompt + '\ninner thought now.', 100, null, 'normal');
-          const match = raw.match(/"en"\s*:\s*"([^"]+)"/);
-          if (match && !isBreakout(match[1].trim())) en = match[1].trim();
-        } catch(e) {}
+      } catch(e) {
+        console.warn('[心声] Grok调用失败:', e);
       }
     }
   } catch(e) {

@@ -130,21 +130,14 @@ function renderMemoryCard(m, isHighlight) {
   `;
 }
 
-// ===== 切换到聊天页时的轻量刷新（不清空重渲，防止闪屏）=====
-// refreshChatScreen 已移至 chat_init.js，此处删除避免覆盖
+// refreshChatScreen 定义在 chat_init.js，此处已移除重复定义
 
 // ===== 页面加载时初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
   // 不再需要MutationObserver，由app.js的openScreen统一控制
 });
 
-// 页面关闭/刷新前强制保存，绕过30秒节流
-// 页面关闭/切后台时尽力保存（注意：异步不保证100%成功，只能尽力）
-// _lastSyncTime 仅用于此处强制触发，不参与日常节流（日常由scheduleCloudSave防抖控制）
-window.addEventListener('beforeunload', () => {
-  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
-  saveToCloud(); // 尽力同步，不保证一定成功
-});
+// beforeunload 已在 app.js 统一处理，此处已移除重复绑定
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
@@ -1232,107 +1225,5 @@ function spawnCouplePetals() {
 // ===== 钱包系统已移至 js/wallet.js =====
 
 // ===== 故事书 & 回忆相册 =====
-// STORY_EVENTS 已统一定义在 events.js，此处不再重复声明
-
-
-function storyDelay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function switchAchievementTab(tab) {
-  const storyPanel = document.getElementById('storyBookPanel');
-  const albumPanel = document.getElementById('albumPanel');
-  const tabStory = document.getElementById('tabStory');
-  const tabAlbum = document.getElementById('tabAlbum');
-  const title = document.getElementById('achievementTitle');
-  const counter = document.getElementById('storyBookCounter');
-  if (tab === 'story') {
-    if (storyPanel) storyPanel.style.display = '';
-    if (albumPanel) albumPanel.style.display = 'none';
-    if (tabStory) tabStory.classList.add('active');
-    if (tabAlbum) tabAlbum.classList.remove('active');
-    if (title) title.textContent = '📖 我们的故事';
-    renderStoryBook();
-  } else {
-    if (storyPanel) storyPanel.style.display = 'none';
-    if (albumPanel) albumPanel.style.display = '';
-    if (tabStory) tabStory.classList.remove('active');
-    if (tabAlbum) tabAlbum.classList.add('active');
-    if (title) title.textContent = '📦 回忆相册';
-    if (counter) counter.textContent = '';
-    renderAlbum();
-  }
-}
-
-function renderAlbum() {
-  const container = document.getElementById('albumList');
-  if (!container) return;
-  const history = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
-  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const fromDeliveries = deliveries.filter(d => d.done && !history.find(h => h.id === d.id));
-  const done = [...history, ...fromDeliveries];
-  if (done.length === 0) {
-    container.innerHTML = `<div class="album-empty">还没有收到任何东西<br>去商城给他寄点什么吧</div>`;
-    return;
-  }
-  const sorted = [...done].sort((a, b) => (b.doneAt || b.addedAt || 0) - (a.doneAt || a.addedAt || 0));
-  container.innerHTML = sorted.map(d => {
-    const emoji = d.productData?.emoji || d.emoji || '📦';
-    const name = d.name || '神秘包裹';
-    const isFromGhost = d.isGhostSend || d.isLocationSpecial;
-    const isFromHome = d.productData?.isFromHome;
-    const from = isFromGhost ? '他寄来的' : isFromHome ? '你从家寄给他的' : '你寄给他的';
-    const dateStr = d.doneAt ? new Date(d.doneAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) :
-                    d.addedAt ? new Date(d.addedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-    const note = d.ghostNote || d.note || '';
-    return `<div class="album-card">
-      <div class="album-card-top">
-        <div class="album-card-emoji">${emoji}</div>
-        <div class="album-card-info">
-          <div class="album-card-name">${name}</div>
-          <div class="album-card-from">${from}</div>
-        </div>
-        <div class="album-card-date">${dateStr}</div>
-      </div>
-      ${note ? `<div class="album-card-note">"${note}"</div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-function renderStoryBook() {
-  const container = document.getElementById('storyBookList');
-  if (!container) return;
-  const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
-  const counterEl = document.getElementById('storyBookCounter');
-  if (counterEl) counterEl.textContent = `${book.length} / ${STORY_EVENTS.length}`;
-  if (book.length === 0) {
-    container.innerHTML = `<div class="story-empty">还没有解锁任何回忆<br><span>继续和他相处，故事会自然发生</span></div>`;
-    return;
-  }
-  const unlockedFilms = book.map(e => {
-    const event = STORY_EVENTS.find(ev => ev.id === e.id);
-    const icon = event?.icon || '📖';
-    const dateStr = new Date(e.unlockedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-    return `
-    <div class="film-card unlocked">
-      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
-      <div class="film-img"><div class="film-img-icon">${icon}</div></div>
-      <div class="film-info">
-        <div class="film-title">${e.title}</div>
-        <div class="film-desc">${e.desc}</div>
-        <div class="film-date">${dateStr}</div>
-      </div>
-      <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
-    </div>`;
-  }).join('');
-  const lockedItems = STORY_EVENTS.filter(e => !book.find(b => b.id === e.id)).map(() => `
-    <div class="locked-item">
-      <div class="locked-dot"></div>
-      <div class="locked-text">· · · 继续和他相处，也许有一天会发生</div>
-    </div>`).join('');
-  container.innerHTML = `
-    <div class="story-section-label">已解锁的回忆</div>
-    <div class="film-track">${unlockedFilms}</div>
-    <div class="swipe-hint">← 左右滑动 →</div>
-    <div class="story-section-label" style="margin-top:16px;">尚未发生的故事</div>
-    <div class="locked-list">${lockedItems}</div>
-  `;
-}
+// STORY_EVENTS 已合并到 events.js（统一管理，避免覆盖）
+// storyDelay、switchAchievementTab、renderAlbum、renderStoryBook 已移至 events.js / profile.js

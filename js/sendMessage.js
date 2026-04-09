@@ -105,18 +105,28 @@ const MERGE_DELAY = 300;
 // fetchSonnetWithCache 定义在 api.js，此处不重复
 
 function pickReadyPendingEvent() {
-  try {
-    const raw = localStorage.getItem('pendingEvents');
-    if (!raw) return null;
-    const events = JSON.parse(raw);
-    if (!Array.isArray(events) || events.length === 0) return null;
-    const now = Date.now();
-    const idx = events.findIndex(e => !e.triggerAt || e.triggerAt <= now);
-    if (idx === -1) return null;
-    const [ready] = events.splice(idx, 1);
-    localStorage.setItem('pendingEvents', JSON.stringify(events));
-    return ready;
-  } catch(e) { return null; }
+  const pending = getPendingReversePackages();
+  if (!pending.length) return null;
+  const ready = pending.find(p => p.triggerAtTurn <= _globalTurnCount);
+  if (!ready) return null;
+
+  const remaining = pending.filter(p => p !== ready);
+  savePendingReversePackages(remaining);
+
+  // 上下文失效检查
+  if (ready.contextSnapshot && ready.contextSnapshot.length > 0) {
+    const originalKws = ready.contextSnapshot.map(m => m.content || '').join(' ').toLowerCase();
+    const currentCtx  = (typeof chatHistory !== 'undefined'
+      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-3)
+      : []).map(m => m.content || '').join(' ').toLowerCase();
+
+    const emotionWords = ['sad','hurt','miss','tired','sick','cold','hungry','need','want','lonely','难过','想你','累','冷','饿','病','需要','孤单'];
+    const topicShifted = emotionWords.some(w => originalKws.includes(w)) &&
+      !emotionWords.some(w => currentCtx.includes(w));
+    if (topicShifted) return null;
+  }
+
+  return { type: 'reverse_package', motive: ready.motive, contextSnapshot: ready.contextSnapshot || [] };
 }
 
 function decideMainIntent(text, pendingEvent) {
@@ -192,37 +202,7 @@ const BREAKOUT_PHRASES = [
   "i'm designed to", "i was designed to",
   "claude's", "by anthropic",
   "claude here", "it's claude",
-  // 新增：常见拒绝模式
-  "i can't discuss that",
-  "i won't discuss that",
-  "i'm not able to discuss",
-  "can't engage with that topic",
-  "not something i can discuss",
-  "i'm not going to discuss",
-  "i'm not doing this",
-  "we're done here",
-  "not going to engage",
 ];
-
-
-// ===== Grok 状态注入 =====
-function buildStateHint() {
-  try {
-    const mood = typeof getMoodLevel === 'function' ? getMoodLevel() : '?';
-    const affection = typeof getAffection === 'function' ? getAffection() : '?';
-    const trust = typeof getTrustHeat === 'function' ? getTrustHeat() : '?';
-    const coldWar = localStorage.getItem('coldWarMode') === 'true';
-    const location = localStorage.getItem('currentLocation') || 'Hereford Base';
-    const ghostState = sessionStorage.getItem('ghostState') || '';
-    return `[Current state: mood ${mood}/10, affection ${affection}/100, trust ${trust}/100${coldWar ? ', COLD WAR active' : ''}. Location: ${location}.${ghostState ? ' ' + ghostState : ''}]`;
-  } catch(e) { return ''; }
-}
-
-function getGrokIntimacyLevel() {
-  try {
-    return typeof getIntimacyLevel === 'function' ? getIntimacyLevel() : 1;
-  } catch(e) { return 1; }
-}
 
 function isBreakout(txt) {
   if (!txt) return true;
@@ -321,16 +301,7 @@ function saveHistory() {
     chatHistory = [...sysMsgs, ...realMsgs.slice(-140)];
   }
   try {
-    // 安全序列化：捕获栈溢出，避免整个流程崩溃
-    let serialized;
-    try {
-      serialized = JSON.stringify(chatHistory);
-    } catch(serErr) {
-      console.warn('[saveHistory] 序列化失败，截断后重试:', serErr.message);
-      chatHistory = chatHistory.slice(-50); // 紧急截断到50条
-      serialized = JSON.stringify(chatHistory);
-    }
-    localStorage.setItem('chatHistory', serialized);
+    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
     if (typeof touchLocalState === 'function') touchLocalState();
   } catch(e) {
     console.warn('[saveHistory] 存储失败:', e);
@@ -347,9 +318,9 @@ function saveLongTermMemory(memory) {
 }
 
 async function updateLongTermMemory() {
-  // 每6轮触发一次
+  // 每4轮触发一次
   const _tc = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
-  if (_tc % 6 !== 0) return;
+  if (_tc % 4 !== 0) return;
 
   const existingMemory = getLongTermMemory();
   const recentMessages = chatHistory
@@ -361,7 +332,7 @@ async function updateLongTermMemory() {
 
   const _memLimit = (() => {
     if (typeof _subCache !== 'undefined' && _subCache?.memory_limit) return _subCache.memory_limit;
-    return 10;
+    return 20;
   })();
 
   const memorySystemPrompt = `你是Ghost的记忆提取器。从对话中提取需要记住的信息，分类列出，每条不超过20字，总计最多${_memLimit}条。只返回列表，不要其他文字。格式：- xxx
@@ -390,8 +361,6 @@ async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
-  // 正在等回复时不允许重复发送，防止请求堆积导致栈溢出
-  if (_isSending) return;
 
   // 用户发消息时收起心声气泡
   const _bubble = document.getElementById('thoughtBubble');
@@ -420,8 +389,6 @@ async function sendMessage() {
 
 // ===== 核心处理：_processMergedMessage =====
 async function _processMergedMessage(text) {
-  // 防止并发：同时只允许一个请求在处理
-  if (_isSending) return;
 
   // ── 条数/订阅检查 ────────────────────────────────────────
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
@@ -446,88 +413,6 @@ async function _processMergedMessage(text) {
   }
 
   resetSilenceTimer();
-
-  // ── 待处理转账：用户回答了理由，现在判断收/退 ──────────
-  const _pendingTransfer = (() => {
-    try { return JSON.parse(sessionStorage.getItem('pendingTransfer') || 'null'); } catch(e) { return null; }
-  })();
-  if (_pendingTransfer && _pendingTransfer.amount) {
-    sessionStorage.removeItem('pendingTransfer');
-    const _ptAmount = _pendingTransfer.amount;
-
-    // 把用户刚说的话作为理由，重新判断
-    const _ptContext = chatHistory
-      .filter(m => !m._system && !m._recalled).slice(-6)
-      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
-
-    const { shouldRefund: _ptRefund, reason: _ptReason, acceptAmount: _ptAccept } =
-      (typeof judgeUserTransfer === 'function')
-        ? judgeUserTransfer(_ptAmount, { reason: _ptContext })
-        : { shouldRefund: true, reason: 'fallback', acceptAmount: 0 };
-
-    const _ptRefundAmount = _ptAmount - _ptAccept;
-    const _ptMood = getMoodLevel ? getMoodLevel() : 5;
-
-    let _ptPrompt = '';
-    if (_ptRefund) {
-      _ptPrompt = `[System: She transferred £${_ptAmount} and explained why. Ghost considered it but is sending it back. ${_ptReason === 'guarded' ? 'He is wary.' : 'Not this time.'} One line, dry. Write REFUND on its own line at the end.]`;
-    } else if (_ptReason === 'overMaxPartial') {
-      _ptPrompt = `[System: She transferred £${_ptAmount}. He kept £${_ptAccept} and returned £${_ptRefundAmount}. Natural, no mention of limits. Write KEEP on its own line at the end.]`;
-    } else {
-      _ptPrompt = `[System: She transferred £${_ptAmount} and Ghost accepted it. Mood ${_ptMood}/10. Brief, natural response. Write KEEP on its own line at the end.]`;
-    }
-
-    chatHistory.push({ role: 'user', content: _ptPrompt, _system: true });
-    if (typeof saveHistory === 'function') saveHistory();
-
-    showTyping();
-    try {
-      const _ptRecentCtx = chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
-        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
-      const _ptRes = await fetchWithTimeout('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user: _ptRecentCtx + '\n\n' + _ptPrompt,
-          max_tokens: 200,
-          scene: 'normal',
-          stateHint: buildStateHint(),
-          intimacyLevel: getGrokIntimacyLevel(),
-        })
-      }, 15000);
-      const _ptData = await _ptRes.json();
-      let _ptReply = _ptData.text?.trim() || '';
-      if (isBreakout(_ptReply)) _ptReply = _ptRefund ? 'sent it back.' : 'noted.';
-      _ptReply = _ptReply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z]))\n?/g, '').trim();
-
-      hideTyping();
-
-      // 处理退款或收款
-      const _container = document.getElementById('messagesContainer');
-      if (_ptRefund) {
-        if (typeof setBalance === 'function') setBalance((typeof getBalance === 'function' ? getBalance() : 0) + _ptAmount);
-        if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount: _ptAmount });
-        if (typeof renderWallet === 'function') renderWallet();
-        if (_container && typeof showGhostTransferCard === 'function') showGhostTransferCard(_container, _ptAmount, _ptReply, true);
-      } else {
-        if (_ptRefundAmount > 0) {
-          if (typeof setBalance === 'function') setBalance((typeof getBalance === 'function' ? getBalance() : 0) + _ptRefundAmount);
-          if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退回超额部分', amount: _ptRefundAmount });
-          if (typeof renderWallet === 'function') renderWallet();
-        }
-        if (_container && typeof showGhostTransferCard === 'function') showGhostTransferCard(_container, _ptAccept, _ptReply, false);
-        if (typeof changeAffection === 'function') changeAffection(1);
-      }
-
-      if (_ptReply) appendMessage('bot', _ptReply);
-      chatHistory.push({ role: 'assistant', content: _ptReply });
-      if (typeof saveHistory === 'function') saveHistory();
-    } catch(e) {
-      hideTyping();
-    }
-    _isSending = false;
-    return;
-  }
 
   // ── 用户回来检测（离开超过2小时）────────────────────────
   const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
@@ -568,9 +453,10 @@ async function _processMergedMessage(text) {
       setTimeout(() => {
         if (_isSending) return;
         showTyping();
-        const _cbCtx = chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content||'').slice(0,100)}`).join('\n');
-        callGrok(_cbCtx + '\n' + buildStateHint() + '\n' + _comebackPrompt, 80, null, 'normal').then(r => {
+        callHaiku(buildGhostStyleCore(), [
+          ...chatHistory.filter(m => !m._system).slice(-6),
+          { role: 'user', content: _comebackPrompt }
+        ], 80).then(r => {
           hideTyping();
           if (r && !isBreakout(r) && r.length < 120) {
             appendMessage('bot', r);
@@ -600,8 +486,8 @@ async function _processMergedMessage(text) {
     if (handled) return;
   }
 
-  // 打断上一个请求（只在真正有进行中的请求时才abort）
-  if (_currentAbortController && _isSending) {
+  // 打断上一个请求
+  if (_currentAbortController) {
     _currentAbortController.abort();
     _currentAbortController = null;
     _isSending = false;
@@ -667,11 +553,11 @@ async function _processMergedMessage(text) {
       .slice(-20)
       .map(m => ({ role: m.role, content: m.content }));
 
-    // cleanHistory：Sonnet用（调情内容替换为占位符，30条，防破防）
+    // cleanHistory：Sonnet用（调情内容替换为占位符，20条，防破防）
     // 修复 #061: 确保 _recalled 消息完全不传给模型
     const cleanHistory = chatHistory
       .filter(m => (!m._system || m._imageDesc) && !m._recalled)
-      .slice(-30)
+      .slice(-20)
       .map(m => ({
         role: m.role,
         content: m._intimate ? '[ they were close for a moment. ]' : m.content
@@ -684,32 +570,28 @@ async function _processMergedMessage(text) {
     const _userMoneyKws = ['给我钱','转我','好穷','买不起','能不能给','要钱','零花钱','缺钱','没钱'];
     const _userAskedMoney = _userMoneyKws.some(k => text.includes(k));
 
-    // _canGiveNow：同时记录 blocked 原因，用于 moneyHint
-    let _blockedReason = '';
     const _canGiveNow = (() => {
-      if (sessionStorage.getItem('hintMoneyPending') === '1') { _blockedReason = 'pending'; return false; }
-      if (localStorage.getItem('coldWarMode') === 'true') { _blockedReason = 'coldwar'; return false; }
-      if (localStorage.getItem('userDislikesMoney') === 'true' && !_userAskedMoney) { _blockedReason = 'dislikes'; return false; }
+      if (sessionStorage.getItem('hintMoneyPending') === '1') return false;
+      if (localStorage.getItem('coldWarMode') === 'true') return false;
+      if (localStorage.getItem('userDislikesMoney') === 'true' && !_userAskedMoney) return false;
       const _affNow = getAffection();
-      if (_affNow < 30) { _blockedReason = 'affection'; return false; }
+      if (_affNow < 30) return false;
       if (_affNow < 40) {
-        const _todayLowAffKey = 'lowAffGiven_' + new Date().toISOString().slice(0, 10);
-        if (localStorage.getItem(_todayLowAffKey)) { _blockedReason = 'affection'; return false; }
-        if (sessionStorage.getItem('moneyReasonType') !== 'care') { _blockedReason = 'affection'; return false; }
-        if (Math.random() > 0.3) { _blockedReason = 'affection'; return false; }
+        const _todayLowAffKey = 'lowAffGiven_' + new Date().toDateString();
+        if (localStorage.getItem(_todayLowAffKey)) return false;
+        if (sessionStorage.getItem('moneyReasonType') !== 'care') return false;
+        if (Math.random() > 0.3) return false;
         localStorage.setItem(_todayLowAffKey, '1');
       }
       const _todayCount = getTodayGivenCount();
       const _dailyLimit = _userAskedMoney ? 5 : 3;
-      if (_todayCount >= _dailyLimit) { _blockedReason = 'daily'; return false; }
-      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 500)) { _blockedReason = 'weekly'; return false; }
+      if (_todayCount >= _dailyLimit) return false;
+      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 500)) return false;
       if (!_userAskedMoney) {
         const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
-        if (Date.now() - _lastGiven < _cooldown) { _blockedReason = 'cooldown'; return false; }
-        const _lastRefund = parseInt(localStorage.getItem('lastRefundAt') || '0');
-        if (Date.now() - _lastRefund < 2 * 3600 * 1000) { _blockedReason = 'refund_cooldown'; return false; }
-        if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) { _blockedReason = 'session'; return false; }
+        if (Date.now() - _lastGiven < _cooldown) return false;
+        if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
       }
       return true;
     })();
@@ -754,17 +636,7 @@ async function _processMergedMessage(text) {
     } else {
       const _testingExtra = _moneyStyle === 'testing' ? ' She seems to be testing you. Do not give just because she pushed.' : '';
       const _reunionExtra = _moneyStyle === 'reunion' ? ' She wants money to come see you. Do NOT give money for this — react to the idea of her coming instead.' : '';
-      const _blockedReasonHint = {
-        weekly:         ' You have already given enough money this week — you are aware of this. Do not offer or mention money.',
-        daily:          ' You have already transferred money today — you are aware of this. Do not offer or mention money.',
-        cooldown:       ' You gave money not long ago — it is too soon to give again. Do not offer or mention money.',
-        session:        ' You already gave once in this conversation. Do not offer or mention money.',
-        refund_cooldown:' You recently returned a transfer — it is too soon to give again. Do not offer or mention money.',
-        affection:      ' You are not close enough to give money freely. Do not offer or mention money.',
-        coldwar:        ' Cold war is active. Do not offer or mention money.',
-        dislikes:       ' She has shown she dislikes being given money. Do not offer or mention money.',
-      }[_blockedReason] || ' Do not mention sending money or use GIVE_MONEY tag.';
-      moneyHint = `[Transfer blocked this reply —${_blockedReasonHint} If she asks, deflect naturally — do not explain limits.${_testingExtra}${_reunionExtra}]`;
+      moneyHint = `[Transfer blocked this reply — do NOT mention sending money or use GIVE_MONEY tag.${_testingExtra}${_reunionExtra}]`;
     }
 
     // 场景提示
@@ -887,59 +759,36 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 调情判断 + 情绪判断并行跑，换回 Haiku（纯分类任务，不扮演角色，不破防）
-    if (!isRecentPhoto) {
-      const _flirtPromise = !isIntimate ? Promise.race([
-        fetchWithTimeout('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: MODEL_HAIKU,
-            max_tokens: 20,
-            system: '你是文本分类器。判断这句话是否带有明确的调情/身体暗示/露骨撩拨意图。注意：单纯的撒娇、表达想念、日常亲昵、怀孕、生病、家庭、情感分享等生活话题不算调情。只有明显的身体接触暗示、露骨描述、或刻意挑逗才算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
-            messages: [{ role: 'user', content: text }]
-          })
-        }, 3000).then(r => r.ok ? r.json() : null).then(d => d?.content?.[0]?.text?.trim() || ''),
-        new Promise(resolve => setTimeout(() => resolve(''), 3000))
-      ]).catch(() => '') : Promise.resolve('');
-
-      const _emotionPromise = Promise.race([
-        fetchWithTimeout('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: MODEL_HAIKU,
-            max_tokens: 60,
-            system: '你是情绪分类器。判断用户消息的情绪和需求。只返回JSON，不要其他文字。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
-            messages: [{ role: 'user', content: `用户说：${text}` }]
-          })
-        }, 3000).then(r => r.ok ? r.json() : null).then(d => d?.content?.[0]?.text?.trim() || ''),
-        new Promise(resolve => setTimeout(() => resolve(''), 3000))
-      ]).catch(() => '');
-
-      // 等两个同时完成
-      const [flirtRes, emotionRaw] = await Promise.all([_flirtPromise, _emotionPromise]);
-
-      // 处理调情结果
-      if (!isIntimate && flirtRes) {
-        const flirtResult = safeParseJSON(flirtRes);
-        if (flirtResult && flirtResult.flirt === true) isIntimate = true;
-      }
-
-      // 处理情绪结果
-      if (emotionRaw) {
-        const emotionResult = safeParseJSON(emotionRaw);
-        if (emotionResult) {
-          if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
-            if (emotionResult.target === '外人') {
-              emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
-            } else if (emotionResult.need === '安慰') {
-              emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
+    // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
+    if (!isIntimate && !isRecentPhoto) {
+      try {
+        const combinedRaw = await Promise.race([
+          fetchDeepSeek(
+            '判断用户消息。只返回JSON，不要其他文字。\n' +
+            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
+            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            `用户说：${text}`,
+            80
+          ),
+          new Promise(resolve => setTimeout(() => resolve(''), 2500))
+        ]);
+        if (combinedRaw) {
+          const combinedResult = safeParseJSON(combinedRaw);
+          if (combinedResult) {
+            // 调情结果
+            if (combinedResult.flirt === true) isIntimate = true;
+            // 情绪结果
+            if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
+              if (combinedResult.target === '外人') {
+                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
+              } else if (combinedResult.need === '安慰') {
+                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
+              }
             }
+            if (combinedResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
           }
-          if (emotionResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
         }
-      }
+      } catch(e) {}
     }
 
     // ── 余温状态判断 ─────────────────────────────────────────
@@ -1051,17 +900,19 @@ async function _processMergedMessage(text) {
     }
 
     if (!reply || isBreakout(reply)) {
-      // 破防：Grok直接顶上（Haiku也会破防，不能用）
+      // 第一次重试：Haiku顶一条（用户无感知，速度快）
       await new Promise(r => setTimeout(r, 400));
       try {
         const recentCtx = cleanHistory.slice(-6)
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
           .join('\n');
-        const _grokState = buildStateHint();
-        const _grokLevel = getGrokIntimacyLevel();
-        const grokReply = await callGrok(recentCtx, 250, null, 'normal', _grokState, _grokLevel);
-        if (grokReply && !isBreakout(grokReply)) {
-          reply = grokReply.trim();
+        const haiku1 = await callHaiku(
+          buildGhostStyleCore() + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
+          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
+          200
+        );
+        if (haiku1 && !isBreakout(haiku1)) {
+          reply = haiku1.trim();
         } else {
           // 第二次重试：Sonnet重试，简化prompt减少破防概率
           try {
@@ -1071,7 +922,7 @@ async function _processMergedMessage(text) {
               body: JSON.stringify({
                 model: getMainModel(),
                 max_tokens: 300,
-                system: buildSystemPrompt() + '\n' + antiBreakoutHint,
+                system: buildGhostStyleCore() + '\n' + antiBreakoutHint,
                 messages: cleanHistory.slice(-10)
               })
             }, 20000);
@@ -1215,11 +1066,13 @@ async function _processMergedMessage(text) {
               recentMsgs2, 150
             );
           } else {
-            const _recallCtx = cleanHistory.slice(-8)
-              .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
-            reply2 = await callGrok(
-              _recallCtx + '\n' + buildStateHint() + '\n[You just sent a message and took it back. Send another — different angle, rephrased, or shorter. lowercase, English only.]',
-              150, null, 'normal'
+            reply2 = await callHaiku(
+              buildSystemPrompt(),
+              [...cleanHistory.slice(-8), {
+                role: 'user',
+                content: '[System: You just sent a message and took it back. Send another — different angle, rephrased, or shorter. lowercase, English only.]'
+              }],
+              150
             );
           }
           hideTyping();
@@ -1391,7 +1244,7 @@ async function _processMergedMessage(text) {
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
     const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
-    if (_currentTurn % 8 === 0) try { updateLongTermMemory(); } catch(e) {}
+    if (_currentTurn % 4 === 0) try { updateLongTermMemory(); } catch(e) {}
 
     // 心声生成（修复 #055: innerThoughtEl来自appendMessage返回值，不会混入主气泡）
     const itEl = firstBotResult?.innerThoughtEl || null;
@@ -1490,37 +1343,21 @@ One or two lines. English only. lowercase.`;
       return;
     }
 
-    // Venice失败 → grok-4.1-fast兜底（快、不破防）
-    const _fallbackCtx = rawHistory.slice(-6).map(m => {
+    // Venice失败，Haiku兜底（同样过滤图片消息）
+    const _haiku2History = rawHistory.slice(-6).map(m => {
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return (m.role === 'user' ? 'Her' : 'Ghost') + ': [sent a photo]';
-      return (m.role === 'user' ? 'Her' : 'Ghost') + ': ' + (m.content || '').slice(0, 150);
-    }).join('\n') + '\nHer: ' + text;
-
-    let fallbackReply = '';
-    try {
-      const fbRes = await Promise.race([
-        fetch('/api/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user: _fallbackCtx,
-            max_tokens: 150,
-            model: 'grok-4.1-fast',
-            scene: 'normal',
-            stateHint: buildStateHint(),
-            intimacyLevel: getGrokIntimacyLevel(),
-          })
-        }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
-        new Promise(resolve => setTimeout(() => resolve(''), 12000))
-      ]);
-      fallbackReply = fbRes || '';
-    } catch(e) {}
-
+      if (hasPhoto) return { role: m.role, content: '[sent a photo]' };
+      return { role: m.role, content: m.content };
+    });
+    const haiku2 = await callHaiku(
+      buildGhostStyleCore() + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.',
+      [..._haiku2History, { role: 'user', content: text }],
+      100
+    );
     hideTyping();
-    if (fallbackReply && !_intimateBreakout(fallbackReply)) {
-      appendMessage('bot', fallbackReply.trim());
-      chatHistory.push({ role: 'assistant', content: fallbackReply.trim(), _intimate: true });
+    if (haiku2 && !_intimateBreakout(haiku2)) {
+      appendMessage('bot', haiku2.trim());
+      chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true });
       saveHistory();
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});

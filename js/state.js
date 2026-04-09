@@ -911,9 +911,7 @@ function updateStateFromUserInput(userText) {
   return updateRelationshipStatsFromUserInput(userText);
 }
 
-function checkOfflinePenalty() {
-  checkAffectionDecay();
-}
+// checkOfflinePenalty 定义在 money.js，此处已移除重复定义
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -995,7 +993,7 @@ async function ghostApologize() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250929',
+        model: getMainModel(),
         max_tokens: 500,
         system: sys,
         messages: typeof chatHistory !== 'undefined' ? chatHistory.slice(-20) : []
@@ -1028,7 +1026,7 @@ async function ghostSendMakeupMoney() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250929',
+        model: getMainModel(),
         max_tokens: 300,
         system: sys,
         messages: typeof chatHistory !== 'undefined' ? chatHistory.slice(-20) : []

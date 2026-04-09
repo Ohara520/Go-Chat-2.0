@@ -329,7 +329,7 @@ One or two lines. Lowercase. English only.]`;
 
     let replyI = '';
     try {
-      const resDS = await fetchWithTimeout('/api/deepseek', {
+      const resDS = await fetchWithTimeout('/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
