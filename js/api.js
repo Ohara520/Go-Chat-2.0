@@ -297,7 +297,7 @@ async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 10
   };
   if (signal) options.signal = signal;
 
-  return await fetchWithRetry('/api/chat', options, 30000, 1);
+  return await fetchWithRetry('/api/chat', options, 60000, 1);
 }
 
 // ===== 破防检测 =====
