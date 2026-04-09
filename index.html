@@ -1425,31 +1425,6 @@
     </div>
   </div>
 
-  <!-- ===== 维护弹窗 ===== -->
-  <div id="maintenanceOverlay" style="
-    display:none; position:fixed; inset:0; z-index:99999;
-    background:linear-gradient(160deg,#d8edd8,#f0f8e8);
-    flex-direction:column; align-items:center; justify-content:center;
-    padding:32px 24px; text-align:center;
-  ">
-    <div style="font-size:56px;margin-bottom:20px;">🛠️</div>
-    <div style="font-size:20px;font-weight:700;color:#1e4020;margin-bottom:10px;">系统维护中</div>
-    <div style="font-size:14px;color:rgba(40,90,30,0.65);line-height:1.7;margin-bottom:32px;">
-      Ghost 正在整理行装，马上回来<br>请稍后再试 💚
-    </div>
-    <input id="maintPwd" type="password" placeholder="开发者密码"
-      style="padding:11px 16px;border-radius:12px;border:1.5px solid rgba(90,160,70,0.4);
-             background:rgba(255,255,255,0.8);font-size:14px;width:200px;
-             outline:none;color:#1e4020;margin-bottom:10px;display:block;"
-      onkeydown="if(event.key==='Enter')maintEnter()"
-    />
-    <div id="maintErr" style="display:none;font-size:12px;color:#c0392b;margin-bottom:8px;">密码错误</div>
-    <button onclick="maintEnter()" style="
-      padding:11px 28px;border-radius:12px;border:none;
-      background:linear-gradient(135deg,#5a9a46,#7dba5a);
-      color:white;font-size:14px;font-weight:600;cursor:pointer;
-    ">进入</button>
-  </div>
 
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1472,13 +1447,6 @@ const sbClient = window.sbClient;
     const mainEmailEl = document.getElementById('main-account-email');
     if (mainEmailEl) mainEmailEl.textContent = session.user.email;
 
-    // 一次性补偿发放（2026年3月21日系统故障）
-    const compensationKey = 'compensation_20260321_v3';
-    if (!localStorage.getItem(compensationKey)) {
-      const currentBalance = parseFloat(localStorage.getItem('wallet') || '0');
-      localStorage.setItem('wallet', (currentBalance + 200).toFixed(2));
-      localStorage.setItem(compensationKey, '1');
-    }
   }
 })();
 
@@ -1614,28 +1582,6 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/sticker.js"></script>
 <script src="js/chat_init.js"></script>
 <script src="js/app.js"></script>
-<script>
-// ===== 维护模式 =====
-// 开启：改成 true；关闭：改成 false
-const MAINTENANCE_MODE = true;
-const DEV_PASSWORD = 'ghostdev';
-
-window.addEventListener('load', function() {
-  if (!MAINTENANCE_MODE) return;
-  document.getElementById('maintenanceOverlay').style.display = 'flex';
-});
-
-function maintEnter() {
-  const val = document.getElementById('maintPwd').value.trim();
-  if (val === DEV_PASSWORD) {
-    document.getElementById('maintenanceOverlay').style.display = 'none';
-  } else {
-    document.getElementById('maintErr').style.display = 'block';
-    document.getElementById('maintPwd').value = '';
-  }
-}
-</script>
-
 <script>
 function checkAgeWarning() {
   if (!localStorage.getItem('ageConfirmed')) {

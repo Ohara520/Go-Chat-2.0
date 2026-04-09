@@ -197,7 +197,15 @@ async function loadFromCloud() {
     // 4a. 恢复迁移标记
     if (data.profile?.walletMigrated_v3) {
       localStorage.setItem('walletMigrated_v3', data.profile.walletMigrated_v3);
-    } else if (data.chat_history?.length > 0 || data.state_snapshot?.transactions?.length > 0) {
+    }
+    if (data.profile?.weddingGift_v1) {
+      localStorage.setItem('weddingGift_v1', data.profile.weddingGift_v1);
+    }
+    if (data.profile?.maintenanceComp_20260409) {
+      localStorage.setItem('maintenanceComp_20260409', data.profile.maintenanceComp_20260409);
+    }
+    if (!data.profile?.walletMigrated_v3) {
+      if (data.chat_history?.length > 0 || data.state_snapshot?.transactions?.length > 0) {
       // 云端有聊天记录或交易记录 → 一定是老用户，直接标记已迁移防止清空
       localStorage.setItem('walletMigrated_v3', '1');
     } else if (!localStorage.getItem('walletMigrated_v3')) {
@@ -206,6 +214,7 @@ async function loadFromCloud() {
       if (typeof addTransaction === 'function') {
         addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
       }
+    }
     }
 
     // 4b. 优先从 state_snapshot.transactions 恢复交易记录
@@ -493,6 +502,8 @@ async function saveToCloud() {
       currentLocationReason: localStorage.getItem('currentLocationReason') || '',
       intimateMemory: localStorage.getItem('intimateMemory') || '',
       walletMigrated_v3: localStorage.getItem('walletMigrated_v3') || '',
+      weddingGift_v1: localStorage.getItem('weddingGift_v1') || '',
+      maintenanceComp_20260409: localStorage.getItem('maintenanceComp_20260409') || '',
       // 签到记录：存最近60天的签到key + 本月里程碑计数
       checkinKeys: (() => {
         const keys = {};

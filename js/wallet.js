@@ -1,15 +1,26 @@
 // ===== 钱包系统 (wallet.js) =====
 // ===== 钱包系统 =====
 function getBalance() {
-  // 迁移v2：清空旧transactions，统一发£500补偿
+  // 迁移v3：清空旧数据，发新婚礼金（云端标记，换浏览器不重复领）
   if (!localStorage.getItem('walletMigrated_v3')) {
     localStorage.setItem('walletMigrated_v3', '1');
     localStorage.removeItem('walletMigrated_v2');
     localStorage.removeItem('walletMigrated');
     localStorage.removeItem('transactions');
     localStorage.removeItem('wallet');
-    addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
+    // 新婚礼金：只在没有云端标记时发放
+    if (!localStorage.getItem('weddingGift_v1')) {
+      localStorage.setItem('weddingGift_v1', '1');
+      addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
+    }
   }
+
+  // 开服补偿（2026年4月）：云端标记控制，换浏览器不重复领
+  if (!localStorage.getItem('maintenanceComp_20260409')) {
+    localStorage.setItem('maintenanceComp_20260409', '1');
+    addTransaction({ icon: '🎁', name: '开服补偿', amount: 200 });
+  }
+
   // 从transactions算余额
   const txs = getTransactions();
   return Math.max(0, txs.reduce((sum, t) => sum + (t.amount || 0), 0));

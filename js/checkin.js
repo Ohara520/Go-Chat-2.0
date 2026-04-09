@@ -40,7 +40,7 @@ function getMonthlyCheckinCount() {
   return parseInt(localStorage.getItem('monthlyCheckin_' + getCheckinMonthStr()) || '0');
 }
 
-// 连续签到天数（修复：断签时重置为1）
+// 连续签到天数（修复：断签时重置为1，且不超过婚期天数）
 function getCheckinStreak() {
   const raw = parseInt(localStorage.getItem('visitStreak') || '0');
   if (!isCheckedInToday()) {
@@ -50,7 +50,14 @@ function getCheckinStreak() {
       return 1;
     }
   }
-  return raw || 1;
+  const streak = raw || 1;
+  // 签到天数不能超过婚期天数
+  const marriageDate = localStorage.getItem('marriageDate');
+  if (marriageDate) {
+    const marriageDays = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
+    return Math.min(streak, marriageDays);
+  }
+  return streak;
 }
 
 // 欧气概率：基础5%，每连续7天+1%，最高12%
