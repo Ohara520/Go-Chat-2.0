@@ -192,6 +192,16 @@ const BREAKOUT_PHRASES = [
   "i'm designed to", "i was designed to",
   "claude's", "by anthropic",
   "claude here", "it's claude",
+  // 新增：常见拒绝模式
+  "i can't discuss that",
+  "i won't discuss that",
+  "i'm not able to discuss",
+  "can't engage with that topic",
+  "not something i can discuss",
+  "i'm not going to discuss",
+  "i'm not doing this",
+  "we're done here",
+  "not going to engage",
 ];
 
 
@@ -864,59 +874,59 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 正则没命中：用 grok-3-mini 做调情判断（Haiku会破防，不能用）
-    if (!isIntimate && !isRecentPhoto) {
-      try {
-        const flirtRes = await Promise.race([
-          fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              system: '判断这句话是否带有调情/身体暗示/性相关/露骨撩拨意图。单纯撒娇、想念、日常问候不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
-              user: text,
-              max_tokens: 20,
-              model: 'grok-4.1-fast'
-            })
-          }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
-          new Promise(resolve => setTimeout(() => resolve(''), 5000))
-        ]);
-        if (flirtRes) {
-          const flirtResult = safeParseJSON(flirtRes);
-          if (flirtResult && flirtResult.flirt === true) isIntimate = true;
-        }
-      } catch(e) {}
-    }
-
-    // 情绪判断单独跑（用grok-3-mini，不会破防）
+    // 调情判断 + 情绪判断并行跑，节省等待时间
     if (!isRecentPhoto) {
-      try {
-        const emotionRaw = await Promise.race([
-          fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              system: '判断用户消息的情绪和需求。只返回JSON。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
-              user: `用户说：${text}`,
-              max_tokens: 60,
-              model: 'grok-4.1-fast'
-            })
-          }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
-          new Promise(resolve => setTimeout(() => resolve(''), 3000))
-        ]);
-        if (emotionRaw) {
-          const emotionResult = safeParseJSON(emotionRaw);
-          if (emotionResult) {
-            if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
-              if (emotionResult.target === '外人') {
-                emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
-              } else if (emotionResult.need === '安慰') {
-                emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
-              }
+      const _flirtPromise = !isIntimate ? Promise.race([
+        fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system: '判断这句话是否带有调情/身体暗示/性相关/露骨撩拨意图。怀孕、生病、家庭、情感分享等生活话题不算调情。单纯撒娇、想念、日常问候不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+            user: text,
+            max_tokens: 20,
+            model: 'grok-4.1-fast'
+          })
+        }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
+        new Promise(resolve => setTimeout(() => resolve(''), 4000))
+      ]).catch(() => '') : Promise.resolve('');
+
+      const _emotionPromise = Promise.race([
+        fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system: '判断用户消息的情绪和需求。只返回JSON。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
+            user: `用户说：${text}`,
+            max_tokens: 60,
+            model: 'grok-4.1-fast'
+          })
+        }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
+        new Promise(resolve => setTimeout(() => resolve(''), 3000))
+      ]).catch(() => '');
+
+      // 等两个同时完成
+      const [flirtRes, emotionRaw] = await Promise.all([_flirtPromise, _emotionPromise]);
+
+      // 处理调情结果
+      if (!isIntimate && flirtRes) {
+        const flirtResult = safeParseJSON(flirtRes);
+        if (flirtResult && flirtResult.flirt === true) isIntimate = true;
+      }
+
+      // 处理情绪结果
+      if (emotionRaw) {
+        const emotionResult = safeParseJSON(emotionRaw);
+        if (emotionResult) {
+          if (emotionResult.need === '安慰' || emotionResult.need === '保护') {
+            if (emotionResult.target === '外人') {
+              emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
+            } else if (emotionResult.need === '安慰') {
+              emotionHint = `[本条消息：用户情绪=${emotionResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
             }
-            if (emotionResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
           }
+          if (emotionResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
         }
-      } catch(e) {}
+      }
     }
 
     // ── 余温状态判断 ─────────────────────────────────────────
