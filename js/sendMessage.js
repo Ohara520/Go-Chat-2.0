@@ -874,33 +874,33 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
-    // 调情判断 + 情绪判断并行跑，节省等待时间
+    // 调情判断 + 情绪判断并行跑，换回 Haiku（纯分类任务，不扮演角色，不破防）
     if (!isRecentPhoto) {
       const _flirtPromise = !isIntimate ? Promise.race([
-        fetch('/api/gemini', {
+        fetchWithTimeout('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            system: '判断这句话是否带有调情/身体暗示/性相关/露骨撩拨意图。怀孕、生病、家庭、情感分享等生活话题不算调情。单纯撒娇、想念、日常问候不算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
-            user: text,
+            model: MODEL_HAIKU,
             max_tokens: 20,
-            model: 'grok-4.1-fast'
+            system: '判断这句话是否带有明确的调情/身体暗示/露骨撩拨意图。注意：单纯的撒娇、表达想念、日常亲昵、怀孕、生病、家庭、情感分享等生活话题不算调情。只有明显的身体接触暗示、露骨描述、或刻意挑逗才算。只返回JSON：{"flirt":true}或{"flirt":false}，不要其他文字。',
+            messages: [{ role: 'user', content: text }]
           })
-        }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
-        new Promise(resolve => setTimeout(() => resolve(''), 4000))
+        }, 3000).then(r => r.ok ? r.json() : null).then(d => d?.content?.[0]?.text?.trim() || ''),
+        new Promise(resolve => setTimeout(() => resolve(''), 3000))
       ]).catch(() => '') : Promise.resolve('');
 
       const _emotionPromise = Promise.race([
-        fetch('/api/gemini', {
+        fetchWithTimeout('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            system: '判断用户消息的情绪和需求。只返回JSON。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
-            user: `用户说：${text}`,
+            model: MODEL_HAIKU,
             max_tokens: 60,
-            model: 'grok-4.1-fast'
+            system: '你是情绪分类器。判断用户消息的情绪和需求。只返回JSON，不要其他文字。格式：{"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}',
+            messages: [{ role: 'user', content: `用户说：${text}` }]
           })
-        }).then(r => r.ok ? r.json() : null).then(d => d?.text || ''),
+        }, 3000).then(r => r.ok ? r.json() : null).then(d => d?.content?.[0]?.text?.trim() || ''),
         new Promise(resolve => setTimeout(() => resolve(''), 3000))
       ]).catch(() => '');
 
