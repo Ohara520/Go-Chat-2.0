@@ -321,7 +321,16 @@ function saveHistory() {
     chatHistory = [...sysMsgs, ...realMsgs.slice(-140)];
   }
   try {
-    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    // 安全序列化：捕获栈溢出，避免整个流程崩溃
+    let serialized;
+    try {
+      serialized = JSON.stringify(chatHistory);
+    } catch(serErr) {
+      console.warn('[saveHistory] 序列化失败，截断后重试:', serErr.message);
+      chatHistory = chatHistory.slice(-50); // 紧急截断到50条
+      serialized = JSON.stringify(chatHistory);
+    }
+    localStorage.setItem('chatHistory', serialized);
     if (typeof touchLocalState === 'function') touchLocalState();
   } catch(e) {
     console.warn('[saveHistory] 存储失败:', e);
@@ -381,6 +390,8 @@ async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
+  // 正在等回复时不允许重复发送，防止请求堆积导致栈溢出
+  if (_isSending) return;
 
   // 用户发消息时收起心声气泡
   const _bubble = document.getElementById('thoughtBubble');
@@ -409,6 +420,8 @@ async function sendMessage() {
 
 // ===== 核心处理：_processMergedMessage =====
 async function _processMergedMessage(text) {
+  // 防止并发：同时只允许一个请求在处理
+  if (_isSending) return;
 
   // ── 条数/订阅检查 ────────────────────────────────────────
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
