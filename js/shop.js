@@ -182,6 +182,31 @@ const LOCATION_SPECIALS = {
     { emoji: '🍵', name: '苹果茶礼盒', desc: 'Hereford苹果产区出的茶，清甜。', tip: '基地附近买的。' },
     { emoji: '🍎', name: '苹果酒礼盒', desc: 'Hereford本地苹果酒，这边著名。', tip: 'Hereford苹果酒产区。别喝太多。' },
   ],
+  'London': [
+    { emoji: '🎶', name: '百年唱片店黑胶', desc: '伦敦老店，随手挑的，不知道你喜不喜欢。', tip: '伦敦那边的老店，随手买的。' },
+    { emoji: '🧁', name: 'Fortnum & Mason 饼干礼盒', desc: '百年老铺出品，精装铁盒。', tip: '百年老铺，随便挑了一个。' },
+    { emoji: '☕', name: 'Monmouth 精品咖啡豆', desc: '科芬园老字号，本地人喝这个。', tip: 'Monmouth的，本地人喝这个。' },
+  ],
+  'Amsterdam': [
+    { emoji: '🧀', name: '荷兰老熟高达奶酪', desc: '阿姆斯特丹市场直买，切片配面包。', tip: '这边市场买的，切片配面包。' },
+    { emoji: '🌷', name: '郁金香球根礼盒', desc: '阿姆斯特丹到处卖这个，真的种得出来。', tip: '阿姆斯特丹就是到处卖这个。' },
+    { emoji: '🍪', name: 'Stroopwafel 礼盒', desc: '荷兰国民饼干，放热咖啡上先烤一下再吃。', tip: '荷兰饼干，放热咖啡上先烤一下。' },
+  ],
+  'Paris': [
+    { emoji: '🥐', name: 'Pierre Hermé 马卡龙礼盒', desc: '巴黎最好的那家，没什么别的原因。', tip: '巴黎最好的那家，没什么别的原因。' },
+    { emoji: '🍷', name: '波尔多红酒小样', desc: '随便选了一瓶，喝不喝随你。', tip: '随便选了一瓶，喝不喝随你。' },
+    { emoji: '🧴', name: "L'Occitane 护手霜套装", desc: '法国本地买的，比免税店便宜。', tip: '法国本地买的比免税店便宜。' },
+  ],
+  'Dublin': [
+    { emoji: '🍺', name: '健力士周边杯套装', desc: '发源地的纪念品，他们自己也觉得好笑。', tip: '发源地的纪念品，他们自己也觉得好笑。' },
+    { emoji: '🧶', name: '爱尔兰羊毛毯', desc: 'Aran岛手织的，重得很，暖。', tip: 'Aran岛手织的，重得很。' },
+    { emoji: '🥃', name: '爱尔兰单一麦芽威士忌', desc: '和苏格兰的不一样，试试看。', tip: '和苏格兰的不一样，试试。' },
+  ],
+  'Tokyo': [
+    { emoji: '🍡', name: '虎屋和菓子礼盒', desc: '东京老字号，甜但不腻，精致。', tip: '虎屋的，老字号，甜但不腻。' },
+    { emoji: '🍵', name: '宇治抹茶礼盒', desc: '产地直送，不是超市那种，认真做的。', tip: '产地直送，不是超市那种。' },
+    { emoji: '📦', name: '东京限定零食礼盒', desc: '逛了几家随手买的，日本这边什么都精致。', tip: '随便逛逛买的，日本这边什么都精致。' },
+  ],
 };
 
 // 地点key映射（location字段可能有多种写法）
@@ -192,6 +217,11 @@ const LOCATION_KEY_MAP = {
   'Manchester': 'Manchester',
   'Poland': 'Poland',
   'Hereford Base': 'Hereford Base', 'Hereford': 'Hereford Base',
+  'London': 'London', 'london': 'London',
+  'Amsterdam': 'Amsterdam', 'amsterdam': 'Amsterdam', 'Netherlands': 'Amsterdam',
+  'Paris': 'Paris', 'paris': 'Paris', 'France': 'Paris',
+  'Dublin': 'Dublin', 'dublin': 'Dublin', 'Ireland': 'Dublin',
+  'Tokyo': 'Tokyo', 'tokyo': 'Tokyo', 'Japan': 'Tokyo',
 };
 
 const GHOST_REVERSE_POOL = {

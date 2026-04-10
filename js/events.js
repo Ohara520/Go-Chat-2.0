@@ -646,34 +646,42 @@ async function checkLocationSpecialTrigger(userText) {
     const specials = LOCATION_SPECIALS?.[locationKey];
     if (!specials || specials.length === 0) return;
 
-    // ── 同一地点只触发一次（低优先级：后续改成带周期）
-    const sentKey = 'locationSpecialSent_' + locationKey;
-    if (localStorage.getItem(sentKey)) return;
+    // ── 30天周期冷却（同地点每30天最多触发一次）────
+    const sentKey  = 'locationSpecialSent_' + locationKey;
+    const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
+    if (lastSent && Date.now() - lastSent < 30 * 24 * 3600 * 1000) return;
 
-    // ── 关键词前筛：命中再调模型，省掉不必要的 API 调用 ──
+    // ── 关系门槛检查 ─────────────────────────────
+    const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
+    const attach    = typeof getAttachmentPull === 'function' ? getAttachmentPull() : 45;
+    const affection = typeof getAffection      === 'function' ? getAffection()      : 60;
+    const mode      = localStorage.getItem('marriageType') || 'established';
+    // slowBurn 阶段不触发对话版（克制期不主动寄东西）
+    if (mode === 'slowBurn') return;
+    if (trust < 50 || affection < 60) return;
+
+    // ── 关键词前筛（改为 OR，命中其一即可）────────
     const input = (userText || '').toLowerCase();
 
     const locationWords = [
       '当地','英国','曼城','伦敦','苏格兰','那边','你们那边',
-      'local','manchester','uk','british','edinburgh','norway','germany','poland','hereford',
+      'local','manchester','uk','british','edinburgh','norway','germany',
+      'poland','hereford','london','amsterdam','paris','dublin','tokyo',
+      'japan','france','ireland','netherlands',
     ];
     const interestWords = [
       '想要','喜欢','好奇','想看','想试试','好吃','有意思','特产','带回来',
       '吃','馋','羡慕','茶','巧克力','围巾','明信片','小物','挂件','香薰',
-      'curious','want','like','bring back','local thing','food','chocolate','scarf','souvenir',
+      'curious','want','like','bring back','local thing','food','chocolate',
+      'scarf','souvenir','miss','try','taste',
     ];
 
     const hasLocation = locationWords.some(w => input.includes(w));
     const hasInterest = interestWords.some(w => input.includes(w));
+    // 改为 OR：命中其一就进入语义判断
     if (!hasLocation && !hasInterest) return;
 
-    // ── 关系门槛检查（先过门槛，再标 sentKey，防止标了没寄）──
-    const trust  = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
-    const attach = typeof getAttachmentPull === 'function' ? getAttachmentPull() : 45;
-    if (trust < 40 || attach < 50) return;
-
-    // ── Haiku 语义判断：用户是否对当地某样东西表现出兴趣 ──
-    // 放宽到：食物 / 文化 / 小物件 / 地方生活感，不限"吃的"
+    // ── Haiku 语义判断 ───────────────────────────
     let triggered = false;
     try {
       const raw = await callHaiku(
@@ -688,7 +696,7 @@ async function checkLocationSpecialTrigger(userText) {
       const result = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
       triggered = result.triggered === true;
     } catch(e) {
-      // 模型判断失败：前筛已命中，保守触发
+      // 模型失败：前筛两个都命中才保守触发
       triggered = hasLocation && hasInterest;
     }
     if (!triggered) return;
@@ -696,11 +704,66 @@ async function checkLocationSpecialTrigger(userText) {
     // ── 随机抽一件特产 ────────────────────────────
     const item = specials[Math.floor(Math.random() * specials.length)];
 
-    // ── 标记已触发（关系门槛之后再写，防止"没寄成但永久标记"）──
-    localStorage.setItem(sentKey, '1');
+    // ── 写入冷却时间戳 ────────────────────────────
+    localStorage.setItem(sentKey, Date.now().toString());
 
-    // ── 2-4天后出现包裹，记忆注入统一交给 addGhostReverseDelivery ──
-    // 不在这里 push 系统私信，避免和 delivery 系统双重记忆
+    // ── 2-4天后出现包裹 ──────────────────────────
+    const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+    setTimeout(() => {
+      if (typeof addGhostReverseDelivery === 'function') {
+        addGhostReverseDelivery({ ...item, isLocationSpecial: true }, 'location_special');
+      }
+    }, delay);
+
+  } catch(e) {}
+}
+
+
+// ── 主动触发：Ghost在某地点待够3天自动反寄 ──────────────
+// 在 initChat 或每日签到后调用
+function checkLocationSpecialAutoTrigger() {
+  try {
+    const rawLocation = localStorage.getItem('currentLocation') || '';
+    if (!rawLocation) return;
+
+    const locationKey = LOCATION_KEY_MAP?.[rawLocation]
+      || LOCATION_KEY_MAP?.[Object.keys(LOCATION_KEY_MAP || {}).find(k => rawLocation.includes(k))]
+      || null;
+    if (!locationKey) return;
+
+    const specials = LOCATION_SPECIALS?.[locationKey];
+    if (!specials || specials.length === 0) return;
+
+    // 同地点30天冷却
+    const sentKey  = 'locationSpecialSent_' + locationKey;
+    const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
+    if (lastSent && Date.now() - lastSent < 30 * 24 * 3600 * 1000) return;
+
+    // 关系门槛（主动寄比对话触发更亲密，门槛更高）
+    const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
+    const affection = typeof getAffection      === 'function' ? getAffection()      : 60;
+    const mode      = localStorage.getItem('marriageType') || 'established';
+    // slowBurn 阶段绝对不主动寄，太出戏
+    if (mode === 'slowBurn') return;
+    if (trust < 65 || affection < 70) return;
+
+    // Ghost在此地点待够3天才主动触发
+    const arrivedKey = 'locationArrivedAt_' + locationKey;
+    const arrivedAt  = parseInt(localStorage.getItem(arrivedKey) || '0');
+    if (!arrivedAt) {
+      // 第一次记录到达时间
+      localStorage.setItem(arrivedKey, Date.now().toString());
+      return;
+    }
+    const daysHere = (Date.now() - arrivedAt) / (24 * 3600 * 1000);
+    if (daysHere < 3) return;
+
+    // 40%概率主动触发（不是每次都触发，保留随机感）
+    if (Math.random() > 0.4) return;
+
+    const item = specials[Math.floor(Math.random() * specials.length)];
+    localStorage.setItem(sentKey, Date.now().toString());
+
     const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
     setTimeout(() => {
       if (typeof addGhostReverseDelivery === 'function') {

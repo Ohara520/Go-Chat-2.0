@@ -225,6 +225,11 @@ async function initChat() {
     try { if (typeof checkPendingTakeoutReactions === 'function') checkPendingTakeoutReactions(); } catch(e) {}
   }, 2000);
 
+  // 地点特产主动触发（Ghost在某地点待够3天自动反寄）
+  setTimeout(() => {
+    try { if (typeof checkLocationSpecialAutoTrigger === 'function') checkLocationSpecialAutoTrigger(); } catch(e) {}
+  }, 5000);
+
   // 补触发离线签收的 Ghost 反应
   setTimeout(() => {
     try {
