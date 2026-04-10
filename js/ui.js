@@ -133,8 +133,9 @@ function cleanBotText(text, scene = 'normal') {
   // 6. 过滤系统指令方括号（保留 [silence] [He looks away] 等动作描写）
   text = text.replace(/\[(?:系统|System|SYSTEM|Tone|tone|Scene|scene|Context|context|Note|note|Hint|hint|Override|override|RULE|Rule|Weekly|Daily|Transfer|transfer|GIVE_MONEY|COLD_WAR|limit|blocked|available)[^\]]{0,400}\]/g, '').trim();
 
-  // 6.1 过滤 HTML 标签（模型偶尔输出 <b> <i> 等）
-  text = text.replace(/<[^>]{0,50}>/g, '').trim();
+  // 6.1 过滤 HTML 标签（含未闭合标签如 <b 开头但没有 > 的情况）
+  text = text.replace(/<[^>]{0,50}>/g, '').trim();  // 闭合标签 <b> <i> 等
+  text = text.replace(/<[a-zA-Z][a-zA-Z0-9]{0,10}\s[^<\n]{0,200}/g, '').trim(); // 未闭合标签 <b text...
 
   // 6.5 过滤第三人称旁白方括号（[She told him...] [He already knew...] 等模型滑落成叙事者的内容）
   text = text.replace(/\[(?:She|He|she|he|Ghost|They|they)[^\]]{0,600}\]/g, '').trim();
