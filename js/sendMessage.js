@@ -760,6 +760,12 @@ async function _processMergedMessage(text) {
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
+    // 用户明显切换到日常话题时，强制退出调情状态
+    const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|where are you|how was your day|work|mission|training|so tired|good night|good morning/i;
+    if (_clearIntimateKws.test(text) && chatHistory.slice(-6).some(m => m._intimate)) {
+      isIntimate = false;
+    }
+
     // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
     if (!isIntimate && !isRecentPhoto) {
       try {
@@ -808,12 +814,15 @@ async function _processMergedMessage(text) {
 
     if (!isIntimate && _recentIntimate && !_hasRecentPhoto) {
       const _dailyAfterIntimate = _lastIntimateIdx;
-      const _dailyKws = /吃饭|睡觉|今天|训练|任务|怎么样|好了|行了|不说了|换个话题|算了|随便|what.*day|how.*day|ate|sleep|training|mission|anyway/i;
+      const _dailyKws = /吃饭|睡觉|今天|训练|任务|怎么样|好了|行了|不说了|换个话题|算了|随便|工作|上班|下班|累了|饿了|喝水|天气|无聊|在干嘛|在哪|几点|时间|回来了|出门|到了|好冷|好热|what.*day|how.*day|ate|sleep|training|mission|anyway|work|tired|hungry|weather|boring|where are you|what time|got home|heading out/i;
       const _isShiftingAway = _dailyKws.test(text) && _dailyAfterIntimate >= 1;
+
+      // 用户发了两条以上非调情消息，强制退出余温
+      const _forceExit = _dailyAfterIntimate >= 3;
 
       if (_dailyAfterIntimate === 0) {
         sceneHint = '[Context: they were just close a moment ago. The atmosphere has not fully reset. He is slightly more present than usual — not performed, just lingering.]';
-      } else if (_isShiftingAway || _dailyAfterIntimate >= 2) {
+      } else if (_isShiftingAway || _dailyAfterIntimate >= 2 || _forceExit) {
         sceneHint = '[Context: something passed between them not long ago. It has settled. He is back to himself — dry, present, normal. Does not bring it up. Just answers what she said.]';
         // 总结本次调情记忆（只在还没总结时）
         if (!sessionStorage.getItem('intimateSummarized')) {
