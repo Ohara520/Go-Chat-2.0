@@ -790,14 +790,14 @@ async function _processMergedMessage(text) {
     // ── 调情检测 + 情绪识别（合并一次Haiku调用）────────────
     // 有图片时强制跳过——Grok看不到图，会破防说Kirk
     const INTIMATE_PATTERNS = [
-      /摸摸|蹭蹭|贴贴|咬|舔|撩你/,
+      /摸摸|蹭蹭|贴贴|咬我|舔我|撩你/,
       /你好坏|坏死了|流氓/,
       /touch me|want you|naughty|tease me/i,
-      /床|被窝|睡觉.*一起|一起.*睡/,
-      /性感|诱惑|撩|勾引|暧昧|色色|涩涩/,
-      /胸|腿|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
+      /床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|一起.*床/,
+      /性感|色色|涩涩|勾引/,
+      /胸|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
       /intimate|turn.*on|turned.*on/i,
-      /🍆|🍑|💦|😏|👅|🫦|🥵/,
+      /🍆|🍑|💦|👅|🫦|🥵/,
     ];
     let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
 
@@ -830,7 +830,15 @@ async function _processMergedMessage(text) {
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
-            if (combinedResult.flirt === true && !_intimacyForceCleared) isIntimate = true;
+            if (combinedResult.flirt === true && !_intimacyForceCleared) {
+              // 加门槛：防止 Haiku 无缘由把 G 拉进来
+              const _hasRecentIntimateCtx = chatHistory.slice(-6).some(m => m._intimate);
+              const _warmCtx = chatHistory
+                .filter(m => !m._system && !m._recalled).slice(-4)
+                .map(m => m.content || '').join(' ');
+              const _isWarmingUp = /kiss|抱|亲|摸|靠近|想你|miss you|love you|爱你|贴|蹭|咬|撩/.test(_warmCtx);
+              if (_hasRecentIntimateCtx || _isWarmingUp) isIntimate = true;
+            }
             _emotionLabel = combinedResult.emotion || '平淡';
             // wantsMoney 判断：用 Haiku 语义结果覆盖关键词匹配
             if (combinedResult.wantsMoney === true) {
@@ -926,16 +934,17 @@ async function _processMergedMessage(text) {
       const _forceExit = _dailyAfterIntimate >= 3;
 
       if (_dailyAfterIntimate === 0) {
-        sceneHint = '[Context: they were just close a moment ago. The atmosphere has not fully reset. He is slightly more present than usual — not performed, just lingering.]';
+        sceneHint = '[He is slightly quieter than usual. More present. Not performing anything — just here. Respond to what she says, naturally.]';
+      } else if (_dailyAfterIntimate === 1) {
+        sceneHint = '[He is settled. Responding normally. There is a slight ease between them — unspoken, not referenced. Just answer what she said.]';
       } else if (_isShiftingAway || _dailyAfterIntimate >= 2 || _forceExit) {
-        sceneHint = '[Context: something passed between them not long ago. It has settled. He is back to himself — dry, present, normal. Does not bring it up. Just answers what she said.]';
-        // 总结本次调情记忆（只在还没总结时）
+        sceneHint = '[Back to normal. Dry, present, brief. Just answer what she said — nothing to carry forward.]';
         if (!sessionStorage.getItem('intimateSummarized')) {
           sessionStorage.setItem('intimateSummarized', '1');
           _summarizeIntimateMemory();
         }
       } else {
-        sceneHint = '[Context: the mood has shifted back toward normal, but not entirely. He is quieter — has not fully reset yet.]';
+        sceneHint = '[Slightly quieter. Not fully reset. Just respond to her directly.]';
       }
 
       // 余温期冷却：_dailyAfterIntimate 在 1-2 之间时，阻止 Haiku 把 isIntimate 拉回 true
