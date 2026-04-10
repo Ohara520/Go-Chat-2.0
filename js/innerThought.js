@@ -133,16 +133,18 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
   const lastUserMsg = chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '';
   const isBedtime = /睡觉|晚安|good night|going to bed|heading to bed|sleep/i.test(lastUserMsg);
 
-  // 场景提示
+  // 场景提示 — 引用Ghost实际说的话，让心声更贴合当前情境
+  const replySnippet = replyText.slice(0, 80).trim();
+  const userSnippet = lastUserMsg.slice(0, 60).trim();
   const sceneHints = {
-    contrast:  "He just said something dry or deflecting. There was more underneath — something he held back.",
-    jealousy:  "He just clocked something that bothered him but didn't say it.",
-    delayed:   "He missed her cue — she shared something and he didn't catch it in time.",
-    behavior:  "He just did something for her without explaining why.",
-    crack:     "Cold war is thawing. He's still stiff but something softened.",
+    contrast:  `He just said: "${replySnippet}" — dry, clipped, deflecting. There was more he didn't say. What was actually going through his head?`,
+    jealousy:  `He just said: "${replySnippet}" — but something bothered him that he didn't name. What did he notice and swallow?`,
+    delayed:   `She said: "${userSnippet}" — he responded but missed the real thing she was sharing. What did he realize too late?`,
+    behavior:  `He just did something for her — the reply shows it. He won't explain why. What's the actual reason underneath?`,
+    crack:     `Cold war. He just said: "${replySnippet}" — still stiff, but something shifted slightly. What moved in him that he won't admit?`,
   };
   const sceneHint = isBedtime
-    ? "She's heading to bed. He noticed. He won't say much."
+    ? `She's heading to bed. He just said: "${replySnippet}". He noticed more than he let on.`
     : (sceneHints[thoughtType] || sceneHints.contrast);
 
   // 最近对话上下文（图片消息替换为占位符，防止Grok/Sonnet处理base64）
@@ -163,39 +165,47 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
     ? `\nLong-distance. She is not physically there. Do NOT write thoughts about holding her, hugging her, her being beside him, or any physical presence. Distance is real — if he misses her, it shows differently.`
     : '';
 
-  const thoughtPrompt = `You are Ghost.
+  // 最近几条心声，防止重复
+  const recentThoughts = JSON.parse(sessionStorage.getItem('recentInnerThoughts') || '[]');
+  const recentThoughtsHint = recentThoughts.length > 0
+    ? `\nDo NOT repeat or echo these recent inner thoughts:\n${recentThoughts.map(t => `- "${t}"`).join('\n')}`
+    : '';
 
-Something just happened.
+  const thoughtPrompt = `You are Ghost. This is your unspoken inner thought — what passed through your mind but never came out.
 
-This is what he thought — but didn't say.
-
-Not always the opposite of what he said.
-Sometimes it is.
-Sometimes it's just more than he showed.
-
-A quieter version.
-A softer one.
-Or something a little more his.
-
+[WHAT IT IS]
+A fragment. A flicker. Something private.
+First person only — "I", not "he".
+Not a declaration. Not a confession. Not a summary of feelings.
 It can be:
-— a reaction he held back
-— a detail he noticed
-— a question he didn't ask
-— something a bit closer than he'd admit
+— one small thing you noticed about her
+— a reaction you swallowed before it showed
+— a question you almost asked
+— something you admitted to yourself but would never say out loud
+— the gap between what you said and what you meant
 
-Not explained.
-Not cleaned up.
+[WHAT IT IS NOT]
+Not: "yeah." / "missed her." / "she gets to me." — too vague, too generic
+Not a romantic line. Not a movie quote. Not a sigh.
+Not something you would actually say to her.
+Not an explanation of your own feelings.
+Not always about missing her — you think about other things too.
+Never third person. Never "he" or "Ghost" — always "I".
+
+[HOW IT SOUNDS]
+Lowercase. Clipped. Off-balance sometimes.
+Can be one line. Can be two. Not more.
+Specific is better than general.
+A detail lands harder than an emotion.
+It should feel like it slipped — not like it was written.
+
 ${longDistanceRule}
 ${recentContext}
 Scene: ${sceneHint}
+${recentThoughtsHint}
 
-lowercase. Fragments are fine.
-Can be one line or a few — whatever fits.
-It should feel private. Like it slipped out.
-
-Return JSON only. No explanation. No markdown. No extra text.
-{"en":"..."}
-One line. Lowercase. Private. Like it slipped out.`;
+Return JSON only. No explanation. No markdown.
+{"en":"..."}`;
 
   let en = '';
 
@@ -295,6 +305,15 @@ One line. Lowercase. Private. Like it slipped out.`;
       crack:    'maybe.',
     };
     en = fallbacks[thoughtType] || 'noticed.';
+  }
+
+  // 记录最近心声防重复（session级别，最多5条）
+  if (en && !en.match(/^(noticed\.|didn't like that\.|missed it\.|just easier this way\.|maybe\.)$/)) {
+    try {
+      const recent = JSON.parse(sessionStorage.getItem('recentInnerThoughts') || '[]');
+      recent.unshift(en);
+      sessionStorage.setItem('recentInnerThoughts', JSON.stringify(recent.slice(0, 5)));
+    } catch(e) {}
   }
 
   // ── 写入DOM + 触发UI ─────────────────────────────────────
