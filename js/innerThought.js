@@ -213,7 +213,7 @@ One line. Lowercase. Private. Like it slipped out.`;
     if (_isIntimateThought) {
       // Grok生成调情心声
       try {
-        const grokRaw = await callGrok(thoughtPrompt, 'inner thought now.', 80);
+        const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 80);
         const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","development work","coding questions","step out of character","can't roleplay"];
         if (grokRaw) {
           // 先尝试JSON格式
@@ -250,7 +250,7 @@ One line. Lowercase. Private. Like it slipped out.`;
     } else {
       // 普通场景：Grok（成本低，角色扮演稳定）
       try {
-        const grokRaw = await callGrok(thoughtPrompt, 'inner thought now.', 80);
+        const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 80);
         if (grokRaw) {
           const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","development work","coding questions","step out of character","can't roleplay","claude"];
           // 先尝试JSON格式解析
