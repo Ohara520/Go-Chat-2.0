@@ -528,6 +528,59 @@ function loadSecretScreen() {
       `<div class="secret-color-dot ${color.split('、').includes(c.name) ? 'selected' : ''}" style="background:${c.hex}" title="${c.name}" onclick="selectColor('${c.name}', this)"></div>`
     ).join('');
   }
+
+  // 邀请码
+  loadMyInviteCodes();
+}
+
+async function loadMyInviteCodes() {
+  const container = document.getElementById('inviteCodeList');
+  if (!container) return;
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
+  if (!email) {
+    container.innerHTML = '<div style="font-size:12px;color:#9aba88;">登录后可查看邀请码</div>';
+    return;
+  }
+  try {
+    const sb = window._sbClient || (typeof createClient !== 'undefined' && createClient);
+    if (!sb) { container.innerHTML = '<div style="font-size:12px;color:#9aba88;">加载失败</div>'; return; }
+    const { data, error } = await sb
+      .from('invite_codes')
+      .select('code, is_used, used_at')
+      .eq('created_by', email.toLowerCase().trim())
+      .order('created_at', { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      container.innerHTML = '<div style="font-size:12px;color:#9aba88;">暂无邀请码，联系管理员获取</div>';
+      return;
+    }
+
+    container.innerHTML = data.map(item => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);border-radius:12px;">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:${item.is_used ? '#9aba88' : '#2d6028'};letter-spacing:1px;">${item.code}</div>
+          <div style="font-size:11px;color:#9aba88;margin-top:2px;">${item.is_used ? '✓ 已使用' : '✦ 未使用'}</div>
+        </div>
+        ${!item.is_used ? `<button onclick="copyInviteCode('${item.code}')" style="padding:6px 12px;background:rgba(90,160,70,0.15);border:1px solid rgba(90,160,70,0.3);border-radius:8px;color:#2d6028;font-size:12px;cursor:pointer;">复制</button>` : ''}
+      </div>
+    `).join('');
+  } catch(e) {
+    container.innerHTML = '<div style="font-size:12px;color:#9aba88;">加载失败，请稍后重试</div>';
+  }
+}
+
+function copyInviteCode(code) {
+  navigator.clipboard.writeText(code).then(() => {
+    if (typeof showToast === 'function') showToast('邀请码已复制 🔗');
+  }).catch(() => {
+    const el = document.createElement('textarea');
+    el.value = code;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    if (typeof showToast === 'function') showToast('邀请码已复制 🔗');
+  });
 }
 
 function selectZodiac(label, el) {
