@@ -675,7 +675,15 @@ async function _processMergedMessage(text) {
     // 场景提示
     const t = text.toLowerCase();
     let sceneHint = '';
-    if (/时差|几点|时间|time zone|what time|your time/.test(t)) {
+
+    // 外卖场景：用户问到外卖/吃饭 且 longTermMemory 有外卖记录 → 带英文菜名提醒 Ghost 确认
+    const _ltmNow = localStorage.getItem('longTermMemory') || '';
+    const _hasTakeoutMemory = /takeout showed up|she ordered takeout|you have it/i.test(_ltmNow);
+    if (_hasTakeoutMemory && /外卖|收到了吗|到了吗|吃了吗|好吃吗|怎么样|did.*arrive|did.*get|receiv|takeout|food.*arrive/i.test(t)) {
+      const _tkMatches = [..._ltmNow.matchAll(/「(.+?)」/g)];
+      const _tkName = _tkMatches.length > 0 ? _tkMatches[_tkMatches.length - 1][1] : '';
+      sceneHint = `[She is asking about the takeout she ordered for you${_tkName ? ` — 「${_tkName}」` : ''}. You received it. Confirm naturally and react to the specific food — do not deny.]`;
+    } else if (/时差|几点|时间|time zone|what time|your time/.test(t)) {
       sceneHint = `[Time zone awareness: She mentioned time or time difference. Acknowledge it naturally if it fits.]`;
     } else if (/今天|干嘛|在做|在忙|最近|怎么样|how.*day|what.*up|what.*doing|been up to/.test(t)) {
       const detail = sessionStorage.getItem('todayDetail') || '';

@@ -552,6 +552,7 @@ function addTakeoutOrder(city, item) {
   const order = {
     id:        now,
     name:      item.name,
+    nameEn:    item.nameEn || item.name,
     emoji:     item.emoji,
     price:     item.price,
     fee:       fee.fee,
@@ -627,7 +628,7 @@ async function onGhostReceivedTakeout(order) {
   if (typeof showToast === 'function') showToast(`✅ ${order.emoji} ${order.name} 已送到 Ghost！`);
 
   // 判断用户有没有提前说过
-  const kw = [order.name.toLowerCase(), 'takeout', 'food', 'ordered', '外卖', '点了', '送'];
+  const kw = [order.name.toLowerCase(), (order.nameEn || '').toLowerCase(), 'takeout', 'food', 'ordered', '外卖', '点了', '送'];
   const told = (chatHistory || []).filter(m => m.role === 'user' && !m._system).slice(-20)
     .some(m => kw.some(k => (m.content || '').toLowerCase().includes(k)));
 
@@ -635,8 +636,8 @@ async function onGhostReceivedTakeout(order) {
     chatHistory.push({
       role: 'user',
       content: told
-        ? `[The food she told you about just arrived — 「${order.name}」. You have it now.]`
-        : `[A delivery just showed up. 「${order.name}」. You didn't know it was coming. She ordered it without telling you.]`,
+        ? `[Her takeout just arrived — 「${order.nameEn || order.name}」. You have it. If she asks, confirm you received it.]`
+        : `[A takeout delivery just showed up — 「${order.nameEn || order.name}」. You didn't know she was ordering. You have it now. If she asks, confirm you received it.]`,
       _system: true,
     });
     // 只在有真实聊天记录时才保存，防止空 chatHistory 覆盖本地历史
@@ -675,9 +676,9 @@ async function onGhostReceivedTakeout(order) {
       try {
         const _ltm  = localStorage.getItem('longTermMemory') || '';
         const _note = told
-          ? `The food she mentioned — 「${order.name}」 — arrived. He has it now.`
-          : `A delivery showed up — 「${order.name}」. She ordered it without telling him.`;
-        if (!_ltm.includes(order.name)) {
+          ? `She ordered takeout for you — 「${order.nameEn || order.name}」. It arrived. You have it. Confirm if she asks.`
+          : `Takeout showed up — 「${order.nameEn || order.name}」. You didn't know she ordered it. You have it now. Confirm if she asks.`;
+        if (!_ltm.includes(order.nameEn || order.name)) {
           localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
           if (typeof touchLocalState === 'function') touchLocalState();
         }
