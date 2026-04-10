@@ -679,7 +679,7 @@ async function confirmTransfer() {
   if (typeof addTransaction === 'function') addTransaction({ icon: '💸', name: '转账给 Ghost', amount: -amount });
   if (typeof renderWallet === 'function') renderWallet();
 
-  // 读最近几条对话作为理由上下文（不只是最后一条）
+  // 读最近几条对话作为理由上下文
   const _recentContext = (() => {
     if (typeof chatHistory === 'undefined') return '';
     return chatHistory
@@ -689,45 +689,8 @@ async function confirmTransfer() {
       .join('\n');
   })();
 
-  // 检测上下文里有没有明确理由
-  const _ctxLower = _recentContext.toLowerCase();
-  const _hasContextReason =
-    /礼物|送你|给你的|520|1314|生日|情人节|纪念|gift|present|for you|birthday|anniversary/.test(_ctxLower) ||
-    /补偿|赔你|我错了|补给你|对不起|抱歉|make it up|compensation|my fault|sorry|apologize/.test(_ctxLower) ||
-    /帮你|拿去用|买东西|用吧|花吧|use it|for this|for that|spend it/.test(_ctxLower);
-
-  // 没有理由 → G 先问一句，存 pendingTransfer，等用户回答
-  if (!_hasContextReason) {
-    sessionStorage.setItem('pendingTransfer', JSON.stringify({ amount, deducted: true }));
-
-    // G 问一句
-    const _askLine = await (async () => {
-      try {
-        const res = await callGrokWithSystem(
-          buildGhostStyleCore() + '\nShe just transferred money to you without explanation. Ask what it is for — one short line, dry, lowercase. Do not mention the amount.',
-          _recentContext || 'she just sent money.',
-          60
-        );
-        if (res && !isBreakout(res)) return res.trim();
-      } catch(e) {}
-      // 静态兜底
-      const opts = ['what\'s it for.', 'reason.', 'why.', 'what\'s this for.'];
-      return opts[Math.floor(Math.random() * opts.length)];
-    })();
-
-    if (typeof showTyping === 'function') showTyping();
-    await new Promise(r => setTimeout(r, 800));
-    if (typeof hideTyping === 'function') hideTyping();
-    if (typeof appendMessage === 'function') appendMessage('bot', _askLine);
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({ role: 'assistant', content: _askLine });
-      if (typeof saveHistory === 'function') saveHistory();
-    }
-    if (typeof _isSending !== 'undefined') _isSending = false;
-    return;
-  }
-
-  // 有理由 → 判断收/退
+  // 有理由或没理由都直接走判断收/退
+  // 没有理由时judgeUserTransfer会返回noReason，Ghost退钱并问一句
   const judgeContext = { reason: _recentContext };
   const { shouldRefund, reason, acceptAmount } = judgeUserTransfer(amount, judgeContext);
   const refundAmount = amount - acceptAmount;

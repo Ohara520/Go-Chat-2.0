@@ -591,8 +591,9 @@ async function _processMergedMessage(text) {
         const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
         if (Date.now() - _lastGiven < _cooldown) return false;
-        if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
       }
+      // 本轮已转过一次，不论用户是否主动要钱都不再给
+      if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
       return true;
     })();
 
@@ -1117,6 +1118,9 @@ async function _processMergedMessage(text) {
         // 假账过滤：清除回复里提到转钱/具体金额的部分
         reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
         reply = reply.replace(/£\d+[^.!?\n]*(send|transfer|give|wire|on its way|coming your way)[^.!?\n]*/gi, '').trim();
+        // 清理Ghost转账语气词（check it / sort it / should be there等）
+        reply = reply.replace(/\b(check it|sort it|check your account|should be there( now)?|on its way|coming your way|use it|take it|it's there|it's sent|sent it)\b[.,]?/gi, '').trim();
+        reply = reply.replace(/\s{2,}/g, ' ').trim();
         reply = reply || '.';
         return false;
       }
