@@ -523,7 +523,7 @@ function _confirmTakeout(city, itemId) {
       <div style="display:flex;gap:8px;">
         <button onclick="document.getElementById('_takeoutConfirm').remove()"
           style="flex:1;padding:11px;border-radius:12px;border:1px solid #e8c97a;background:transparent;color:#a07020;font-size:13px;cursor:pointer;">取消</button>
-        <button onclick="_doOrder('${city}','${itemId}')"
+        <button onclick="_doTakeoutOrder('${city}','${itemId}')"
           style="flex:1;padding:11px;border-radius:12px;border:none;background:#c47010;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">确认点单</button>
       </div>
     </div>`;
@@ -531,7 +531,7 @@ function _confirmTakeout(city, itemId) {
   conf.addEventListener('click', e => { if (e.target === conf) conf.remove(); });
 }
 
-function _doOrder(city, itemId) {
+function _doTakeoutOrder(city, itemId) {
   document.getElementById('_takeoutConfirm')?.remove();
   const item = (TAKEOUT_MENUS[city] || []).find(m => m.id === itemId);
   if (item) addTakeoutOrder(city, item);
@@ -656,8 +656,12 @@ async function onGhostReceivedTakeout(order) {
     return;
   }
 
-  const delay = [0, 30000, 120000][Math.floor(Math.random() * 3)];
+  // 如果正在发消息，延迟到空闲后再触发
+  const _baseDelay = (typeof _isSending !== 'undefined' && _isSending) ? 8000 : 0;
+  const delay = _baseDelay + [0, 30000, 120000][Math.floor(Math.random() * 3)];
   setTimeout(async () => {
+    // 二次检查，确保不在发消息中
+    if (typeof _isSending !== 'undefined' && _isSending) return;
     try {
       const prompt = told
         ? `[The food she told you about just arrived — 「${order.name}」. You have it now. React naturally.${order.desc ? ` (${order.desc})` : ''}]`
@@ -698,10 +702,9 @@ async function onGhostReceivedTakeout(order) {
 function _detectMealStatus() {
   if (typeof chatHistory === 'undefined') return null;
 
-  const threeHoursAgo = Date.now() - 3 * 60 * 60 * 1000;
+  // 只取最近10条bot消息，_time字段不稳定不做时间过滤
   const recentBot = (chatHistory || [])
     .filter(m => m.role === 'assistant' && !m._system && !m._recalled)
-    .filter(m => !m._time || m._time > threeHoursAgo)
     .slice(-10);
 
   if (!recentBot.length) return null;

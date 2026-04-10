@@ -373,6 +373,13 @@ async function loadFromCloud() {
         localStorage.setItem('takeoutOrders', JSON.stringify(mergedTk.slice(0, 10)));
       }
 
+      // 外卖每日次数：取较大值，防止换设备重置后绕过限制
+      if (s.takeoutCountKey && s.takeoutCountVal) {
+        const localCount = parseInt(localStorage.getItem(s.takeoutCountKey) || '0');
+        const cloudCount = parseInt(s.takeoutCountVal || '0');
+        if (cloudCount > localCount) localStorage.setItem(s.takeoutCountKey, String(cloudCount));
+      }
+
       // feedEventPool：合并去重
       if (Array.isArray(s.feedEventPool)) {
         const localPool = (typeof getFeedEventPool === 'function') ? getFeedEventPool() : [];
@@ -576,6 +583,8 @@ async function saveToCloud() {
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
       takeoutOrders:   JSON.parse(localStorage.getItem('takeoutOrders')   || '[]').slice(0, 10),
       takeoutHistory:  JSON.parse(localStorage.getItem('takeoutHistory')  || '[]').slice(0, 50),
+      takeoutCountKey: 'takeoutCount_' + new Date().toDateString(),
+      takeoutCountVal: localStorage.getItem('takeoutCount_' + new Date().toDateString()) || '0',
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
       purchaseCounts: JSON.parse(localStorage.getItem('purchaseCounts') || '{}'),
       intimateTriggered: JSON.parse(localStorage.getItem('intimateTriggered') || '{}'),
