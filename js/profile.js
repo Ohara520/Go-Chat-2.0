@@ -542,7 +542,7 @@ async function loadMyInviteCodes() {
     return;
   }
   try {
-    const sb = window._sbClient || (typeof createClient !== 'undefined' && createClient);
+    const sb = window.sbClient || window._sbClient;
     if (!sb) { container.innerHTML = '<div style="font-size:12px;color:#9aba88;">加载失败</div>'; return; }
     const { data, error } = await sb
       .from('invite_codes')
