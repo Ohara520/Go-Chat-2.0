@@ -206,27 +206,6 @@ async function initChat() {
     }
   }, 10000); // 10秒后执行，确保页面已稳定，且剧情检测已过
 
-  // 补偿逻辑延迟执行——必须等云端数据完全加载后再写入，防止覆盖云端数据
-  setTimeout(() => {
-    // 维护补偿（每个用户只发一次）
-    if (!localStorage.getItem('maintenanceCompensation_20260402')) {
-      localStorage.setItem('maintenanceCompensation_20260402', '1');
-      if (typeof addTransaction === 'function') {
-        addTransaction({ icon: '🎁', name: '维护补偿', amount: 100 });
-        if (typeof renderWallet === 'function') renderWallet();
-      }
-    }
-
-    // 开服补偿£200（每个用户只发一次）
-    if (!localStorage.getItem('openingCompensation_20260405')) {
-      localStorage.setItem('openingCompensation_20260405', '1');
-      if (typeof addTransaction === 'function') {
-        addTransaction({ icon: '💷', name: '开服补偿', amount: 200 });
-        if (typeof renderWallet === 'function') renderWallet();
-      }
-    }
-  }, 5000); // 5秒后执行，确保云端数据已完全加载完毕
-
   // 副作用初始化
   if (typeof ensureGhostBirthday === 'function') ensureGhostBirthday();
   if (typeof ensureGhostProfile === 'function') ensureGhostProfile();
