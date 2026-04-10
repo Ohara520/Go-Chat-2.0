@@ -131,13 +131,18 @@ function checkSalaryDay() {
   const _total     = (_locDays.deployed || 0) + (_locDays.base || 0) + (_locDays.leave || 0) || 30;
   const _deployRatio = (_locDays.deployed || 0) / _total;
 
+  // 无记录时（老用户首次/数据缺失）走正常档
+  const _noRecord = !localStorage.getItem(_monthKey);
   let _salaryMin, _salaryMax;
-  if (_deployRatio >= 0.6) {
+  if (_noRecord || (_deployRatio < 0.3 && _locDays.leave < 1)) {
+    // 无记录 或 主要在基地 → 正常档
+    _salaryMin = 15; _salaryMax = 25;
+  } else if (_deployRatio >= 0.6) {
     _salaryMin = 22; _salaryMax = 32; // 出差多：任务津贴拉满 £2200-£3200
-  } else if (_deployRatio >= 0.3) {
-    _salaryMin = 15; _salaryMax = 25; // 混合 £1500-£2500
+  } else if ((_locDays.leave || 0) / _total >= 0.5) {
+    _salaryMin = 15; _salaryMax = 18; // 休假为主 £1500-£1800
   } else {
-    _salaryMin = 10; _salaryMax = 18; // 基地/休假为主 £1000-£1800
+    _salaryMin = 15; _salaryMax = 25; // 正常月 £1500-£2500
   }
   const salary = (Math.floor(Math.random() * (_salaryMax - _salaryMin + 1)) + _salaryMin) * 100;
   localStorage.setItem('lastSalaryAmount', salary);
