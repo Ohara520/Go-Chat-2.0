@@ -69,7 +69,7 @@ const TAKEOUT_MENUS = {
     { id: 'mcr3', cat: 'main',  emoji: '🍜', name: '星洲炒米',      nameEn: 'Singapore Noodles',         price: 11, desc: '唐人街出品，咖喱粉炒细米粉，虾仁叉烧，辣度偏高' },
     { id: 'mcr4', cat: 'main',  emoji: '🌯', name: '烤肉卷饼',      nameEn: 'Doner Kebab',               price:  8, desc: '深夜救星，蒜酱加量，简单管饱' },
     { id: 'mcr5', cat: 'side',  emoji: '🥖', name: '薯条夹饼',      nameEn: 'Chip Barm',                 price:  4, desc: '北方国民小吃，炸薯条夹进软面包，朴实无华' },
-    { id: 'mcr6', cat: 'side',  emoji: '🥮', name: '曼彻斯特挞',    nameEn: 'Manchester Tart',           price:  5, desc: '覆盆子酱配卡仕达酱，椰蓉收尾，本地经典甜品' },
+    { id: 'mcr6', cat: 'side',  emoji: '🍮', name: '曼彻斯特挞',    nameEn: 'Manchester Tart',           price:  5, desc: '覆盆子酱配卡仕达酱，椰蓉收尾，本地经典甜品' },
     { id: 'mcr7', cat: 'drink', emoji: '☕', name: '白咖啡+糕点',   nameEn: 'Flat White + Pastry',       price:  7, desc: '北角区咖啡店出品，浓缩加奶，配当日现烤糕点', hot: true },
     { id: 'mcr8', cat: 'drink', emoji: '🍺', name: '本地生啤',      nameEn: 'Local Ale',                 price:  5, desc: '曼彻斯特精酿，麦香浓，不甜腻，下班标配' },
   ],
