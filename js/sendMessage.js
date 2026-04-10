@@ -585,8 +585,8 @@ async function _processMergedMessage(text) {
     const _baseSystem = buildSystemPrompt();
 
     // 钱场景判断
-    const _userMoneyKws = ['给我钱','转我','好穷','买不起','能不能给','要钱','零花钱','缺钱','没钱'];
-    const _userAskedMoney = _userMoneyKws.some(k => text.includes(k));
+    const _userMoneyKws = ['给我钱','给我一点','转我','好穷','买不起','能不能给','要钱','零花钱','缺钱','没钱'];
+    const _userAskedMoney = _userMoneyKws.some(k => text.includes(k)) || /给我\d+/.test(text);
 
     const _canGiveNow = (() => {
       if (sessionStorage.getItem('hintMoneyPending') === '1') return false;
@@ -625,7 +625,7 @@ async function _processMergedMessage(text) {
       if (reunionKws.some(k => t.includes(k))) { sessionStorage.setItem('moneyReasonType','reunion'); return 'reunion'; }
       const testKws = ['你给不给','试试你','看看你','敢不敢','证明','test','prove','dare','你会给吗'];
       const careKws = ['没吃','饿了','手机坏','买药','感冒','生病','交通','修','坏了','没钱吃','急用','压力','need','sick','hungry','broke','fix','stress'];
-      const flirtyKws = ['买奶茶','买零食','买个','想吃','想买','请我','奖励我','打赏','treat me','buy me'];
+      const flirtyKws = ['买奶茶','买零食','买个','想吃','想买','请我','奖励我','打赏','穿给你看','给你看','买裙','买衣','买包','买鞋','treat me','buy me','wear it for you'];
       let style = 'neutral';
       if (testKws.some(k => t.includes(k))) style = 'testing';
       else if (careKws.some(k => t.includes(k))) style = 'care';
@@ -647,7 +647,8 @@ async function _processMergedMessage(text) {
       neutral: ''
     }[_moneyStyle] || '';
 
-    const _styleBlocksGive = _moneyStyle === 'testing' || _moneyStyle === 'reunion' || _moneyStyle === 'flirty';
+    const _styleBlocksGive = _moneyStyle === 'testing' || _moneyStyle === 'reunion' || _moneyStyle === 'flirty'
+      || sessionStorage.getItem('haikuBlocksMoney') === '1';
 
     let moneyHint = '';
     if (!_userAskedMoney && !_canGiveNow) {
@@ -815,11 +816,14 @@ async function _processMergedMessage(text) {
       try {
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
-            '判断用户消息。只返回JSON，不要其他文字。\n' +
-            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
+            '你是一个消息分类器，不是对话角色。只分析用户消息的情绪和意图，不要代入任何角色，不要回复用户。\n' +
+            '只返回JSON，不要其他文字。\n' +
+            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
+            'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
+            'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
             'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
             `用户说：${text}`,
-            80
+            100
           ),
           new Promise(resolve => setTimeout(() => resolve(''), 2500))
         ]);
@@ -828,6 +832,34 @@ async function _processMergedMessage(text) {
           if (combinedResult) {
             if (combinedResult.flirt === true && !_intimacyForceCleared) isIntimate = true;
             _emotionLabel = combinedResult.emotion || '平淡';
+            // wantsMoney 判断：用 Haiku 语义结果覆盖关键词匹配
+            if (combinedResult.wantsMoney === true) {
+              const _ms = combinedResult.moneyStyle || 'flirty';
+              sessionStorage.setItem('moneyReasonType', _ms);
+              if (_ms === 'testing') {
+                // testing → 完全拦，他注意到了不会被牵着走
+                sessionStorage.setItem('haikuBlocksMoney', '1');
+              } else if (_ms === 'flirty') {
+                // flirty → 概率机制：关系深/心情好时更容易给
+                const _aff = getAffection();
+                const _mood = getMoodLevel ? getMoodLevel() : 7;
+                const _giveChance = Math.min(0.5,
+                  0.2
+                  + (_aff >= 70 ? 0.15 : _aff >= 50 ? 0.08 : 0)
+                  + (_mood >= 8 ? 0.1 : _mood >= 6 ? 0.05 : 0)
+                );
+                if (Math.random() > _giveChance) {
+                  sessionStorage.setItem('haikuBlocksMoney', '1');
+                } else {
+                  sessionStorage.removeItem('haikuBlocksMoney');
+                }
+              } else {
+                // care/none → 放行
+                sessionStorage.removeItem('haikuBlocksMoney');
+              }
+            } else {
+              sessionStorage.removeItem('haikuBlocksMoney');
+            }
             if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
               if (combinedResult.target === '外人') {
                 emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
@@ -1182,7 +1214,7 @@ async function _processMergedMessage(text) {
     const transferSuccess = giveMoneyMatch && giveAmount > 0 && (() => {
       const jealousy = getJealousyLevelCapped();
       const isJealousyGift = jealousy === 'mild' || jealousy === 'medium';
-      const userAsked = _userMoneyKws.some(k => text.includes(k));
+      const userAsked = _userMoneyKws.some(k => text.includes(k)) || /给我\d+/.test(text);
 
       // 从 sessionStorage 读取本轮已判断的 motive，传给 applyMoneyEffect
       // 修复假账：低好感区间(30-40)必须传 motive='care' 才能给钱
