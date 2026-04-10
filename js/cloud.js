@@ -380,6 +380,16 @@ async function loadFromCloud() {
         if (cloudCount > localCount) localStorage.setItem(s.takeoutCountKey, String(cloudCount));
       }
 
+      // 包裹通知：合并，保留未读
+      if (Array.isArray(s.deliveryNotices)) {
+        const local = JSON.parse(localStorage.getItem('deliveryNotices') || '[]');
+        const merged = [...local];
+        s.deliveryNotices.forEach(cn => {
+          if (!merged.find(ln => ln.id === cn.id)) merged.push(cn);
+        });
+        localStorage.setItem('deliveryNotices', JSON.stringify(merged.slice(0, 20)));
+      }
+
       // feedEventPool：合并去重
       if (Array.isArray(s.feedEventPool)) {
         const localPool = (typeof getFeedEventPool === 'function') ? getFeedEventPool() : [];
@@ -391,6 +401,8 @@ async function loadFromCloud() {
     }
 
     console.log('[cloud] 数据已加载');
+    // 通知徽章刷新（云端数据恢复后）
+    if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
     // 如果上次有未同步的本地数据，加载完立刻重新保存
     if (localStorage.getItem('cloudSavePending') === '1') {
       localStorage.removeItem('cloudSavePending');
@@ -583,6 +595,7 @@ async function saveToCloud() {
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
       takeoutOrders:   JSON.parse(localStorage.getItem('takeoutOrders')   || '[]').slice(0, 10),
       takeoutHistory:  JSON.parse(localStorage.getItem('takeoutHistory')  || '[]').slice(0, 50),
+      deliveryNotices: JSON.parse(localStorage.getItem('deliveryNotices') || '[]').slice(0, 20),
       takeoutCountKey: 'takeoutCount_' + new Date().toDateString(),
       takeoutCountVal: localStorage.getItem('takeoutCount_' + new Date().toDateString()) || '0',
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),

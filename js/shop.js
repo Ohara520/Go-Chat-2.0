@@ -414,6 +414,11 @@ function initMarket() {
   renderDeliveryTracker();
   renderMarket(currentCategory || 'clothing');
   checkDeliveryUpdates();
+  // 检查包裹通知，延迟一点让页面先渲染
+  setTimeout(() => {
+    if (typeof checkAndShowDeliveryNotices === 'function') checkAndShowDeliveryNotices();
+    if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
+  }, 400);
 }
 
 function renderMarket(categoryId) {

@@ -248,6 +248,7 @@ function checkDeliveryUpdates() {
           d.isLostConfirmed = true;
           d.lostConfirmedAt = Date.now();
           showToast(`❌ ${d.name} 快递遗失了`);
+          _addDeliveryNotice({ id: 'lost_' + d.id, type: 'lost', itemName: d.name, itemEmoji: d.emoji || '📦' });
           renderDeliveryTracker();
           return;
         }
@@ -278,6 +279,15 @@ function checkDeliveryUpdates() {
               });
               if (typeof saveHistory === 'function') saveHistory();
             }
+            // 写进长期记忆，防止Ghost否认收到
+            try {
+              const _ltm = localStorage.getItem('longTermMemory') || '';
+              const _note = `She sent you 「${d.name}」. You received it. If she asks, confirm.`;
+              if (!_ltm.includes(d.name)) {
+                localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
+                if (typeof touchLocalState === 'function') touchLocalState();
+              }
+            } catch(e) {}
             onGhostReceived(d);
           }
         }
@@ -308,6 +318,7 @@ async function onGhostReceived(delivery) {
 
   const pd = delivery.productData;
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
+  _addDeliveryNotice({ id: 'recv_' + delivery.id, type: 'ghost_received', itemName: delivery.name, itemEmoji: delivery.emoji || '📦' });
 
   // ── 私密商品 ──────────────────────────────────
   if (pd.isIntimate) {
@@ -522,90 +533,71 @@ Item received: 「${delivery.name}」]`
 // 显示神秘包裹（Ghost寄给用户）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function showMysteryPackage(delivery) {
-  // secret模式：Ghost说一句暗示
-  if (delivery.isSecretDelivery && !delivery._secretRevealed) {
-    delivery._secretRevealed = true;
-    // 【改】加随机延迟，不总是立刻说
-    const delay = [2000, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
-    setTimeout(() => {
-      const phrases = [
-        "check the door.",
-        "something might've arrived.",
-        "go check outside.",
-      ];
-      const line = phrases[Math.floor(Math.random() * phrases.length)];
-      appendMessage('bot', line);
-      if (typeof chatHistory !== 'undefined') {
-        chatHistory.push({ role: 'assistant', content: line });
-        if (typeof saveHistory === 'function') saveHistory();
-      }
-    }, delay);
-  }
-
+async function showMysteryPackage(delivery) {
   renderDeliveryTracker();
 
-  // 弹窗通知
-  setTimeout(() => {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9998;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s ease;';
-    overlay.innerHTML = `
-      <div style="background:rgba(255,255,255,0.97);backdrop-filter:blur(20px);border-radius:24px;padding:28px 24px;max-width:300px;width:88%;text-align:center;box-shadow:0 16px 48px rgba(139,92,246,0.2);border:1.5px solid rgba(168,85,247,0.15);">
-        <div style="font-size:48px;margin-bottom:12px;">📦</div>
-        <div style="font-size:16px;font-weight:700;color:#3b0764;margin-bottom:8px;">有快递到了</div>
-        <div style="font-size:13px;color:rgba(109,40,217,0.6);margin-bottom:20px;line-height:1.6;">来自英国的包裹已送达<br>已自动签收 ✓</div>
-        <button id="_closeSignBtn" style="width:100%;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;cursor:pointer;">好的</button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    const _closeBtn = overlay.querySelector('#_closeSignBtn');
-    if (_closeBtn) _closeBtn.onclick = () => overlay.remove();
-  }, 1500);
+  // 注入系统记忆（模型知道但不进聊天框）
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({
+      role: 'user',
+      content: `[You sent her something — 「${delivery.name}」. She just received it. You know. Don't announce it unless she brings it up.]`,
+      _system: true,
+    });
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+  // 写进长期记忆，防止20条后被截掉导致Ghost否认
+  try {
+    const _ltm = localStorage.getItem('longTermMemory') || '';
+    const _note = `You sent her 「${delivery.name}」. She received it.`;
+    if (!_ltm.includes(delivery.name)) {
+      localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
+      if (typeof touchLocalState === 'function') touchLocalState();
+    }
+  } catch(e) {}
 
-  // 【改】签收后说话加随机延迟
-  const replyDelay = [2000, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
-  setTimeout(async () => {
-    try {
-      const res = await fetchWithTimeout('/api/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 300,
-          system: buildDeliverySystem(),
-          messages: [...chatHistory.slice(-10), {
-            role: 'user',
-            content: `[He sent something — 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''}
+  // 生成 Ghost 那句话（存进通知，不发聊天框）
+  let ghostLine = '';
+  try {
+    const fallbacks = ["check the door.", "something might've arrived.", "use it.", "it's there."];
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 60,
+        system: buildDeliverySystem(),
+        messages: [...chatHistory.slice(-6), {
+          role: 'user',
+          content: `[He sent her 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''} One short line — dry, offhand, like it cost him nothing. No explanation. English only. Lowercase.]`
+        }]
+      })
+    });
+    const data = await res.json();
+    const line = data.content?.[0]?.text?.trim() || '';
+    ghostLine = (line && !_isDeliveryBreakout(line)) ? line.split('\n')[0] : fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  } catch(e) {
+    ghostLine = ["check the door.", "something might've arrived.", "use it."][Math.floor(Math.random() * 3)];
+  }
 
-He doesn't always say it was him.
+  // 写入通知（商城卡片提示，进商城后弹礼物盒）
+  _addDeliveryNotice({
+    id:        'arrived_' + delivery.id,
+    type:      'package_arrived',
+    itemName:  delivery.name,
+    itemEmoji: delivery.emoji || '📦',
+    fromCity:  localStorage.getItem('currentLocation') || 'UK',
+    ghostLine,
+  });
 
-Sometimes he admits it. Short. Casual. Like it wasn't a big deal.
-Sometimes he doesn't. Lets it sit.
+  showToast('📦 有来自 Ghost 的包裹！去商城查看');
 
-If she asks, he goes with whatever feels right.
-
-He's paying attention. But he acts like it's nothing.]`
-          }]
-        })
-      });
-      const data  = await res.json();
-      const reply = data.content?.[0]?.text?.trim() || '';
-      if (reply && !_isDeliveryBreakout(reply)) {
-        appendMessage('bot', reply);
-        chatHistory.push({ role: 'assistant', content: reply });
-        saveHistory();
+  // 补寄/置换快递：弹草稿
+  if (delivery.productData?.lostReplace || delivery.noLost) {
+    setTimeout(() => {
+      if (typeof showUserDraftCard === 'function') {
+        showUserDraftCard({ type: 'gift_received', actor: 'user', meta: { itemName: delivery.name, isReplace: true } });
       }
-
-      // 补寄/置换快递：弹草稿
-      if (delivery.productData?.lostReplace || delivery.noLost) {
-        setTimeout(() => {
-          showUserDraftCard({
-            type: 'gift_received', actor: 'user',
-            meta: { itemName: delivery.name, isReplace: true }
-          });
-        }, 4000);
-      }
-    } catch(e) {}
-  }, replyDelay);
+    }, 4000);
+  }
 }
 
 
@@ -847,5 +839,182 @@ function dismissDelivery(id) {
     deliveries[idx].done              = true;
     localStorage.setItem('deliveries', JSON.stringify(deliveries));
     renderDeliveryTracker();
+  }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 包裹通知系统
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function _addDeliveryNotice(notice) {
+  const notices = JSON.parse(localStorage.getItem('deliveryNotices') || '[]');
+  // 同一个 delivery id 不重复写
+  if (notices.find(n => n.id === notice.id)) return;
+  notices.unshift({ ...notice, read: false, createdAt: Date.now() });
+  localStorage.setItem('deliveryNotices', JSON.stringify(notices.slice(0, 20)));
+  _updateMarketCardBadge();
+  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+}
+
+function _getUnreadNotices() {
+  return JSON.parse(localStorage.getItem('deliveryNotices') || '[]').filter(n => !n.read);
+}
+
+function _markNoticeRead(id) {
+  const notices = JSON.parse(localStorage.getItem('deliveryNotices') || '[]');
+  const n = notices.find(n => n.id === id);
+  if (n) n.read = true;
+  localStorage.setItem('deliveryNotices', JSON.stringify(notices));
+  _updateMarketCardBadge();
+  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+}
+
+function _updateMarketCardBadge() {
+  const desc = document.getElementById('marketCardDesc');
+  if (!desc) return;
+  const unread = _getUnreadNotices();
+  if (unread.length > 0) {
+    desc.textContent = `📦 有包裹信息 (${unread.length})`;
+    desc.style.color = '#2d6028';
+    desc.style.fontWeight = '600';
+  } else {
+    desc.textContent = '买礼物';
+    desc.style.color = '';
+    desc.style.fontWeight = '';
+  }
+}
+
+// 进商城时显示未读通知弹窗
+function checkAndShowDeliveryNotices() {
+  const unread = _getUnreadNotices();
+  if (!unread.length) return;
+  _showNoticeModal(unread);
+}
+
+function _showNoticeModal(notices) {
+  document.getElementById('_deliveryNoticeModal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = '_deliveryNoticeModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,50,20,0.32);backdrop-filter:blur(8px);z-index:9999;display:flex;justify-content:center;align-items:flex-end;padding-bottom:env(safe-area-inset-bottom);';
+
+  const items = notices.map(n => _renderNoticeItem(n)).join('');
+
+  overlay.innerHTML = `
+    <div style="background:rgba(255,255,255,0.97);backdrop-filter:blur(20px);border-radius:24px 24px 0 0;
+      padding:20px 20px 28px;width:100%;max-width:480px;box-shadow:0 -8px 32px rgba(50,110,30,0.15);">
+      <div style="width:36px;height:4px;background:rgba(90,160,70,0.28);border-radius:2px;margin:0 auto 18px;"></div>
+      <div style="font-size:15px;font-weight:700;color:#1e3d20;margin-bottom:14px;">📬 包裹消息</div>
+      <div id="_noticeList" style="display:flex;flex-direction:column;gap:10px;">${items}</div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function _renderNoticeItem(notice) {
+  if (notice.type === 'package_arrived') {
+    return `
+    <div id="_notice_${notice.id}" class="delivery-notice-card notice-gift">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+        <div class="gift-box-wrap" id="_giftbox_${notice.id}">
+          <div class="gift-box">
+            <div class="gift-lid">🎁</div>
+            <div class="gift-content" style="display:none;">
+              <div style="font-size:36px;">${notice.itemEmoji}</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1e3d20;">来自 Ghost 的包裹</div>
+          <div style="font-size:11px;color:rgba(40,100,30,0.6);margin-top:2px;">从 ${notice.fromCity || '英国'} 寄出</div>
+        </div>
+      </div>
+      <div class="notice-gift-reveal" id="_reveal_${notice.id}" style="display:none;">
+        <div style="font-size:14px;font-weight:600;color:#1e3d20;margin-bottom:6px;">${notice.itemEmoji} ${notice.itemName}</div>
+        ${notice.ghostLine ? `<div style="font-size:12px;color:rgba(40,100,30,0.7);font-style:italic;padding:8px 12px;background:rgba(90,160,70,0.06);border-radius:10px;border-left:2px solid rgba(90,160,70,0.3);">"${notice.ghostLine}"</div>` : ''}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="_openGiftBox('${notice.id}')" id="_openbtn_${notice.id}"
+          style="flex:1;padding:10px;border-radius:12px;border:none;background:linear-gradient(135deg,rgba(90,154,70,0.85),rgba(120,185,85,0.8));color:white;font-size:13px;font-weight:700;cursor:pointer;">
+          打开包裹
+        </button>
+        <button onclick="_dismissNotice('${notice.id}')" id="_donebtn_${notice.id}" style="display:none;
+          flex:1;padding:10px;border-radius:12px;border:1px solid rgba(90,160,70,0.25);background:transparent;color:#5a9a46;font-size:13px;font-weight:600;cursor:pointer;">
+          收好了 ✓
+        </button>
+      </div>
+    </div>`;
+  }
+
+  if (notice.type === 'ghost_received') {
+    return `
+    <div id="_notice_${notice.id}" class="delivery-notice-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="font-size:32px;">${notice.itemEmoji}</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1e3d20;">Ghost 已签收</div>
+          <div style="font-size:12px;color:rgba(40,100,30,0.7);margin-top:2px;">你寄的「${notice.itemName}」已送达</div>
+        </div>
+      </div>
+      <button onclick="_dismissNotice('${notice.id}')"
+        style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(90,160,70,0.25);background:transparent;color:#5a9a46;font-size:13px;font-weight:600;cursor:pointer;">
+        确认 ✓
+      </button>
+    </div>`;
+  }
+
+  if (notice.type === 'lost') {
+    return `
+    <div id="_notice_${notice.id}" class="delivery-notice-card notice-lost">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="font-size:32px;">❌</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#b91c1c;">快递遗失</div>
+          <div style="font-size:12px;color:rgba(185,28,28,0.7);margin-top:2px;">你寄的「${notice.itemName}」在运输途中丢失</div>
+        </div>
+      </div>
+      <button onclick="_dismissNotice('${notice.id}')"
+        style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(220,80,80,0.25);background:transparent;color:#b91c1c;font-size:13px;font-weight:600;cursor:pointer;">
+        已知晓
+      </button>
+    </div>`;
+  }
+  return '';
+}
+
+function _openGiftBox(id) {
+  // 礼物盒动画
+  const box   = document.getElementById(`_giftbox_${id}`);
+  const reveal = document.getElementById(`_reveal_${id}`);
+  const openBtn = document.getElementById(`_openbtn_${id}`);
+  const doneBtn = document.getElementById(`_donebtn_${id}`);
+  if (!box) return;
+
+  box.classList.add('gift-opening');
+  setTimeout(() => {
+    box.classList.add('gift-opened');
+    if (reveal) { reveal.style.display = 'block'; reveal.classList.add('notice-reveal-in'); }
+    if (openBtn) openBtn.style.display = 'none';
+    if (doneBtn) doneBtn.style.display = 'block';
+  }, 600);
+}
+
+function _dismissNotice(id) {
+  _markNoticeRead(id);
+  const el = document.getElementById(`_notice_${id}`);
+  if (el) {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-8px)';
+    el.style.transition = 'all 0.25s ease';
+    setTimeout(() => {
+      el.remove();
+      // 如果所有通知都处理完了，关弹窗
+      const list = document.getElementById('_noticeList');
+      if (list && !list.children.length) {
+        document.getElementById('_deliveryNoticeModal')?.remove();
+      }
+    }, 250);
   }
 }

@@ -141,6 +141,9 @@ window.onload = async function() {
     // ── 云端加载完成后再进主页 ───────────────────────────────
     openScreen('mainScreen');
 
+    // ── 包裹通知徽章更新 ─────────────────────────────────────
+    if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
+
     // ── 恢复用户头像 ────────────────────────────────────────
     const savedAvatar = localStorage.getItem('userAvatarBase64');
     if (savedAvatar && typeof updateAvatarEverywhere === 'function') {
