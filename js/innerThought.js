@@ -60,10 +60,11 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   const hiddenCare = /careful|eat|sleep|rest|tired|cold|warm|safe|okay\?|alright\?|you good|how are you/.test(replyLower)
     && replyLower.length < 60;
 
-  // 场景7：他注意到了细节
-  const noticedDetail = replyLower.length < 80
-    && lastUserMsg.length > 20
-    && chatHistory.filter(m => m.role === 'user' && !m._system).length > 3;
+  // 场景7：他注意到了细节（收紧条件：reply极短、user有实质内容、且不属于其他已命中场景）
+  const noticedDetail = replyLower.length < 50
+    && lastUserMsg.length > 40
+    && !isStubborn && !missedCue && !justCared && !jealousyHidden && !coldWarCracking && !hiddenCare
+    && chatHistory.filter(m => m.role === 'user' && !m._system).length > 5;
 
   // 场景8：他想多说但没说
   const heldBack = replyLower.length < 50
@@ -106,7 +107,7 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   else if (isStubborn)     { thoughtType = 'contrast';  triggerChance = 0.75; }
   else if (hiddenCare)     { thoughtType = 'behavior';  triggerChance = 0.70; }
   else if (heldBack)       { thoughtType = 'contrast';  triggerChance = 0.60; }
-  else if (noticedDetail)  { thoughtType = 'contrast';  triggerChance = 0.45; }
+  else if (noticedDetail)  { thoughtType = 'noticed';   triggerChance = 0.40; }
   else {
     // 日常随机：35%（旧版25%，太低，提高让心声更活跃）
     thoughtType = 'contrast';
@@ -142,6 +143,7 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
     delayed:   `She said: "${userSnippet}" — he responded but missed the real thing she was sharing. What did he realize too late?`,
     behavior:  `He just did something for her — the reply shows it. He won't explain why. What's the actual reason underneath?`,
     crack:     `Cold war. He just said: "${replySnippet}" — still stiff, but something shifted slightly. What moved in him that he won't admit?`,
+    noticed:   `She just said: "${userSnippet}" — his reply was brief. But he caught something specific. One small thing he clocked and held onto.`,
   };
   const sceneHint = isBedtime
     ? `She's heading to bed. He just said: "${replySnippet}". He noticed more than he let on.`
@@ -303,6 +305,7 @@ Return JSON only. No explanation. No markdown.
       delayed:  'missed it.',
       behavior: 'just easier this way.',
       crack:    'maybe.',
+      noticed:  'filed it away.',
     };
     en = fallbacks[thoughtType] || 'noticed.';
   }
