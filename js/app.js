@@ -152,6 +152,12 @@ window.onload = async function() {
         setInterval(checkDeliveryUpdates, 5 * 60 * 1000);
     }
 
+    // ── 外卖进度检查（每2分钟）──────────────────────────────
+    if (typeof checkTakeoutUpdates === 'function') {
+        checkTakeoutUpdates();
+        setInterval(checkTakeoutUpdates, 2 * 60 * 1000);
+    }
+
     // ── 刷新聊天记录显示 ─────────────────────────────────────
     if (typeof refreshChatScreen === 'function') refreshChatScreen();
 }

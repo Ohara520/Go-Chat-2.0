@@ -1286,6 +1286,9 @@ async function _processMergedMessage(text) {
     try { handleLostPackageClaim(text); } catch(e) {}
     handlePostReplyActions(text, reply, intent).catch(e => console.warn('副行为出错:', e));
 
+    // 外卖用餐提示刷新（对话触发）
+    try { if (typeof renderTakeoutTracker === 'function') renderTakeoutTracker(); } catch(e) {}
+
     _isSending = false;
 
   } catch (err) {

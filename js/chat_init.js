@@ -219,6 +219,12 @@ async function initChat() {
   // 快递进度检查
   try { if (typeof checkDeliveryUpdates === 'function') checkDeliveryUpdates(); } catch(e) {}
 
+  // 外卖进度检查 + 离线期间到达的外卖反应
+  try { if (typeof checkTakeoutUpdates === 'function') checkTakeoutUpdates(); } catch(e) {}
+  setTimeout(() => {
+    try { if (typeof checkPendingTakeoutReactions === 'function') checkPendingTakeoutReactions(); } catch(e) {}
+  }, 2000);
+
   // 补触发离线签收的 Ghost 反应
   setTimeout(() => {
     try {

@@ -561,6 +561,11 @@
         <div class="card-title">单词</div>
         <div class="card-desc" id="vocabCardDesc">跟Ghost学英语</div>
       </div>
+      <div class="card" onclick="openTakeoutShop()" style="background:linear-gradient(135deg,rgba(255,220,150,0.45),rgba(255,200,100,0.32)) !important;border:1px solid rgba(220,160,50,0.35) !important;">
+        <div class="card-icon">🛵</div>
+        <div class="card-title">外卖</div>
+        <div class="card-desc">给Ghost点外卖</div>
+      </div>
     </div>
 
     <!-- QQ群弹窗 -->
@@ -1170,6 +1175,7 @@
     <div class="market-container">
       <!-- 快递追踪栏 -->
       <div id="deliveryTracker" class="delivery-tracker" style="display:none;"></div>
+      <div id="takeoutTracker" class="delivery-tracker" style="display:none;"></div>
 
       <!-- 分类 Tab -->
       <div id="categoryTabs" class="category-tabs"></div>
@@ -1588,6 +1594,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/delivery.js"></script>
 <script src="js/feed.js"></script>
 <script src="js/shop.js"></script>
+<script src="js/takeout.js"></script>
 <script src="js/photo.js"></script>
 <script src="js/intimacy.js"></script>
 <script src="js/jealousy.js"></script>

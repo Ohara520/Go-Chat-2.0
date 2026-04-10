@@ -360,6 +360,19 @@ async function loadFromCloud() {
       mergeByLength('coupleFeedHistory', s.coupleFeedHistory);
       mergeByLength('deliveryHistory', s.deliveryHistory);
 
+      // 外卖历史：取更多的
+      mergeByLength('takeoutHistory', s.takeoutHistory);
+
+      // 外卖进行中订单：按id合并，本地有就用本地（进度更新）
+      if (Array.isArray(s.takeoutOrders)) {
+        const localTk = JSON.parse(localStorage.getItem('takeoutOrders') || '[]');
+        const mergedTk = [...localTk];
+        s.takeoutOrders.forEach(co => {
+          if (!mergedTk.find(lo => lo.id === co.id)) mergedTk.push(co);
+        });
+        localStorage.setItem('takeoutOrders', JSON.stringify(mergedTk.slice(0, 10)));
+      }
+
       // feedEventPool：合并去重
       if (Array.isArray(s.feedEventPool)) {
         const localPool = (typeof getFeedEventPool === 'function') ? getFeedEventPool() : [];
@@ -561,6 +574,8 @@ async function saveToCloud() {
       feedEventPool: (typeof getFeedEventPool === 'function' ? getFeedEventPool() : []).filter(e => !e.consumed).slice(0, 20),
       lastFeedPostAt: localStorage.getItem('lastFeedPostAt') || '',
       deliveryHistory: JSON.parse(localStorage.getItem('deliveryHistory') || '[]').slice(0, 50),
+      takeoutOrders:   JSON.parse(localStorage.getItem('takeoutOrders')   || '[]').slice(0, 10),
+      takeoutHistory:  JSON.parse(localStorage.getItem('takeoutHistory')  || '[]').slice(0, 50),
       marketTriggered: JSON.parse(localStorage.getItem('marketTriggered') || '{}'),
       purchaseCounts: JSON.parse(localStorage.getItem('purchaseCounts') || '{}'),
       intimateTriggered: JSON.parse(localStorage.getItem('intimateTriggered') || '{}'),
