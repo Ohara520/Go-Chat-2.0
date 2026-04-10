@@ -561,6 +561,11 @@
         <div class="card-title">单词</div>
         <div class="card-desc" id="vocabCardDesc">跟Ghost学英语</div>
       </div>
+      <div class="card" onclick="openScreen('takeoutScreen')" style="background:linear-gradient(135deg,rgba(255,220,150,0.45),rgba(255,200,100,0.32)) !important;border:1px solid rgba(220,160,50,0.35) !important;">
+        <div class="card-icon">🛵</div>
+        <div class="card-title">外卖</div>
+        <div class="card-desc" id="takeoutCardDesc">给Ghost点外卖</div>
+      </div>
     </div>
 
     <!-- QQ群弹窗 -->
@@ -1179,6 +1184,21 @@
     </div>
   </div>
 
+  <!-- 外卖页 -->
+  <div class="screen" id="takeoutScreen">
+    <div class="screen-header" style="border-bottom:1px solid rgba(212,168,64,0.2);">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title" style="color:#5a3000;">🛵 给 Ghost 点外卖</div>
+      <div id="takeoutBalanceDisplay" style="font-size:13px;color:#c47010;font-weight:700;margin-left:auto;padding-right:4px;">£0</div>
+    </div>
+    <div class="takeout-container">
+      <div id="takeoutInfoBar"></div>
+      <div id="takeoutTabBar" style="display:flex;border-bottom:1px solid rgba(212,168,64,0.18);background:rgba(255,252,240,0.9);flex-shrink:0;"></div>
+      <div id="takeoutCatBar" style="display:flex;gap:8px;padding:10px 16px;background:rgba(255,252,240,0.7);flex-shrink:0;overflow-x:auto;scrollbar-width:none;"></div>
+      <div id="takeoutBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:40px;"></div>
+    </div>
+  </div>
+
   <!-- 故事书页 -->
   <div class="screen" id="achievementScreen">
     <div class="screen-header">
@@ -1588,6 +1608,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/delivery.js"></script>
 <script src="js/feed.js"></script>
 <script src="js/shop.js"></script>
+<script src="js/takeout.js"></script>
 <script src="js/photo.js"></script>
 <script src="js/intimacy.js"></script>
 <script src="js/jealousy.js"></script>

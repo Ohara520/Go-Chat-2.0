@@ -2387,3 +2387,13 @@
   from { opacity: 0; transform: scale(0.88) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+/* ===== 外卖页面 ===== */
+.takeout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(160deg, #fdf8ec 0%, #fef6e0 100%);
+}
+#takeoutCatBar::-webkit-scrollbar { display: none; }
