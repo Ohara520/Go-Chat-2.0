@@ -85,7 +85,7 @@ export default async function handler(req, res) {
       '6c9cd46425d211f1964152540025c377',
       '6e82f4a225d211f1b43e52540025c377',
       '6f7c680225d211f19aca52540025c377',
-      '新婚', '蜜月', '金婚', 'topup',
+      '新婚', '蜜月', '金婚', 'topup', '大加油包', '小加油包',
     ];
     const isOldPlan = OLD_PLAN_IDS.includes(data.plan_id) || (data.plan_id && data.plan_id.length > 20);
 
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
         monthly_quota: inherited,
         used_count: 0,
         remaining: inherited,
-        memory_limit: 20,
+        memory_limit: data.memory_limit || 10,
         period_end: '2099-12-31T23:59:59.000Z',
       });
     }
