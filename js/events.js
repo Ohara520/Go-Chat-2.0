@@ -1179,6 +1179,78 @@ const STORY_EVENTS = [
     }
   },
 
+  // ━━━ 外卖 ━━━
+
+  {
+    id: 'first_takeout',
+    icon: '🛵',
+    title: '初尝烟火',
+    desc: '你第一次给他点了外卖——隔着时区，把一顿热的送到他那里。',
+    triggerOn: 'session',
+    condition: (ctx) => {
+      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+      return history.length >= 1 && !ctx.triggered('first_takeout');
+    },
+    execute: async () => {
+      await new Promise(r => setTimeout(r, 3000));
+      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+      const first = history[history.length - 1];
+      const itemHint = first ? `第一次是「${first.name}」，从${first.cityLabel || '那边'}点的。` : '';
+      const res = await callGrokWithCtx(
+        buildGhostStyleCore(),
+        `[系统：她给你点了外卖，食物送到了你那里。${itemHint}你没想到有人会这样照顾你——隔着半个地球，给你送一顿热的。用你的方式反应，不用多说，但让她感觉到你注意到了。]`,
+        6
+      );
+      if (res) await emitGhostNarrativeEvent(res);
+    }
+  },
+
+  {
+    id: 'midnight_delivery',
+    icon: '🌙',
+    title: '夜半念及',
+    desc: '那个深夜，她没睡，想的是他有没有吃东西。',
+    triggerOn: 'session',
+    condition: (ctx) => {
+      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+      const hasMidnight = history.some(o => o.feeLabel && o.feeLabel.includes('凌晨'));
+      return hasMidnight && ctx.affection >= 75 && !ctx.triggered('midnight_delivery');
+    },
+    execute: async () => {
+      await new Promise(r => setTimeout(r, 3000));
+      const res = await callGrokWithCtx(
+        buildGhostStyleCore(),
+        `[系统：她在凌晨给你点了外卖。那个时间她应该在睡觉，但她没有，她想的是你有没有吃东西。你知道这意味着什么。用你的方式回应，不必把话说满。]`,
+        6
+      );
+      if (res) await emitGhostNarrativeEvent(res);
+    }
+  },
+
+  {
+    id: 'city_collector',
+    icon: '🗺️',
+    title: '千里同食',
+    desc: '你换到哪，她就给你点哪里的——她一直在跟着你的位置。',
+    triggerOn: 'session',
+    condition: (ctx) => {
+      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+      const cities = new Set(history.map(o => o.city).filter(Boolean));
+      return cities.size >= 5 && ctx.affection >= 80 && ctx.trust >= 70 && !ctx.triggered('city_collector');
+    },
+    execute: async () => {
+      await new Promise(r => setTimeout(r, 3000));
+      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+      const cities = [...new Set(history.map(o => o.cityLabel || o.city).filter(Boolean))].slice(0, 5);
+      const res = await callGrokWithCtx(
+        buildGhostStyleCore(),
+        `[系统：她跟着你换过的城市，一一给你点过当地的外卖——${cities.join('、')}。她一直在注意你在哪里。你不知道该说什么，但你注意到了这件事。]`,
+        6
+      );
+      if (res) await emitGhostNarrativeEvent(res);
+    }
+  },
+
 ];
 
 function markStoryDone(event) {
