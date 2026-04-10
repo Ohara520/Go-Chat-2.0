@@ -237,13 +237,23 @@ emotion强度：轻/中/重`,
       });
       saveHistory();
 
-      // 3-5天后出现包裹
-      const delay = (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000;
-      setTimeout(() => {
-        if (typeof addGhostReverseDelivery === 'function') {
-          addGhostReverseDelivery(item, type);
-        }
-      }, delay);
+      // 写入持久队列（替代 setTimeout，关页面不丢失）
+      // 3-5天后触发
+      const triggerAt = Date.now() + (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000;
+      const pending = getPendingReversePackages ? getPendingReversePackages() : JSON.parse(localStorage.getItem('pendingReversePackages') || '[]');
+      pending.push({
+        item,
+        emotionType: type,
+        triggerAt,
+        triggerAtTurn: _globalTurnCount + 5, // 至少再聊5轮才触发，避免太突兀
+        contextSnapshot: (typeof chatHistory !== 'undefined' ? chatHistory.filter(m => !m._system).slice(-4) : []),
+        motive: type === '思念' ? 'longing' : type === '难过' || type === '委屈' ? 'compensation' : 'practical_care',
+      });
+      if (typeof savePendingReversePackages === 'function') {
+        savePendingReversePackages(pending);
+      } else {
+        localStorage.setItem('pendingReversePackages', JSON.stringify(pending));
+      }
     }
 
     // ── 4. 地点特产触发 ───────────────────────────────────

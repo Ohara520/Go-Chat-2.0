@@ -107,7 +107,14 @@ const MERGE_DELAY = 300;
 function pickReadyPendingEvent() {
   const pending = getPendingReversePackages();
   if (!pending.length) return null;
-  const ready = pending.find(p => p.triggerAtTurn <= _globalTurnCount);
+
+  const now = Date.now();
+  // 同时满足：时间到了 AND 轮数到了
+  const ready = pending.find(p => {
+    const timeOk  = !p.triggerAt  || now >= p.triggerAt;
+    const turnOk  = !p.triggerAtTurn || p.triggerAtTurn <= _globalTurnCount;
+    return timeOk && turnOk;
+  });
   if (!ready) return null;
 
   const remaining = pending.filter(p => p !== ready);
@@ -1284,10 +1291,9 @@ async function _processMergedMessage(text) {
     }
 
     try { handleLostPackageClaim(text); } catch(e) {}
-    handlePostReplyActions(text, reply, intent).catch(e => console.warn('副行为出错:', e));
-
-    // 外卖用餐提示刷新（对话触发）
-    try { if (typeof renderTakeoutTracker === 'function') renderTakeoutTracker(); } catch(e) {}
+    // 修复：intent='event'时把完整pendingEvent对象传过去，events.js才能处理
+    const _intentForPost = (intent === 'event' && pendingEvent) ? pendingEvent : { type: intent };
+    handlePostReplyActions(text, reply, _intentForPost).catch(e => console.warn('副行为出错:', e));
 
     _isSending = false;
 
