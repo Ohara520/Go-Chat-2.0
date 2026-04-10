@@ -82,11 +82,12 @@ async function checkIntimateHighlight(userText, botReply) {
   if (Date.now() - lastAt < 5 * 24 * 3600 * 1000) return;
 
   try {
-    const raw = await callGrok(
-      `Ghost replied: "${botReply.slice(0, 200)}"
-
+    const raw = await fetchDeepSeek(
+      `你是一个情绪判断器。只返回JSON，不要其他文字。
+Ghost replied: "${botReply.slice(0, 200)}"
 Did Ghost show clear desire or wanting — through implication, tension, or controlled restraint? Answer only JSON: {"desire": true} or {"desire": false}`,
-      30, null, 'normal'
+      `判断`,
+      30
     );
     const result = safeParseJSON(raw);
     if (!result?.desire) return;
@@ -145,8 +146,8 @@ async function checkTriggersAndEmotion(userText, botText) {
   }
 
   try {
-    // ── 三重判断：用 grok-4.1-fast，Haiku 会破防 ──────────
-    const raw = await callGrok(
+    // ── 三重判断：用 Haiku（fetchDeepSeek），判断器场景不破防 ──
+    const raw = await fetchDeepSeek(
       `你是一个三重判断器。只返回JSON，不要其他文字。
 1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段
 2. 判断用户的消息透露了什么情绪，返回emotion字段
@@ -160,11 +161,9 @@ mood_change规则：
 格式：{"market":{"triggered":false},"emotion":{"triggered":false},"mood_change":0}
 market分类：保暖类/饮食类/疲惫类/思念类/卫生类
 emotion类型：开心/难过/委屈/饥饿/劳累/压力大/生病/太冷/太热/思念
-emotion强度：轻/中/重
-
-Ghost说：${botText}
-用户说：${userText}`,
-      180, null, 'normal'
+emotion强度：轻/中/重`,
+      `Ghost说：${botText}\n用户说：${userText}`,
+      180
     );
 
     const result = safeParseJSON(raw);
