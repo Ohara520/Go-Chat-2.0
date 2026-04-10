@@ -794,8 +794,10 @@ async function _processMergedMessage(text) {
 
     // 用户明显切换到日常话题时，强制退出调情状态
     const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|where are you|how was your day|how are you|what's up|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb/i;
+    let _intimacyForceCleared = false;
     if (_clearIntimateKws.test(text) && chatHistory.slice(-6).some(m => m._intimate)) {
       isIntimate = false;
+      _intimacyForceCleared = true; // 标记强制退出，阻止 Haiku 把它改回来
     }
 
     // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
@@ -814,8 +816,8 @@ async function _processMergedMessage(text) {
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
-            // 调情结果
-            if (combinedResult.flirt === true) isIntimate = true;
+            // 调情结果：强制退出时不允许 Haiku 把 isIntimate 改回 true
+            if (combinedResult.flirt === true && !_intimacyForceCleared) isIntimate = true;
             // 情绪结果
             if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
               if (combinedResult.target === '外人') {
@@ -863,6 +865,12 @@ async function _processMergedMessage(text) {
         }
       } else {
         sceneHint = '[Context: the mood has shifted back toward normal, but not entirely. He is quieter — has not fully reset yet.]';
+      }
+
+      // 余温期冷却：_dailyAfterIntimate 在 1-2 之间时，阻止 Haiku 把 isIntimate 拉回 true
+      // 防止用户说"想你"这种话又把 Grok 拉进来，造成反复循环
+      if (isIntimate && _dailyAfterIntimate >= 1 && _dailyAfterIntimate <= 2) {
+        isIntimate = false;
       }
     }
 
