@@ -206,7 +206,7 @@ ${recentContext}
 Scene: ${sceneHint}
 ${recentThoughtsHint}
 
-Return JSON only. No explanation. No markdown.
+Return JSON only. No explanation. No markdown. English only — no Chinese characters under any circumstance.
 {"en":"..."}`;
 
   let en = '';
@@ -260,37 +260,46 @@ Return JSON only. No explanation. No markdown.
       }
 
     } else {
-      // 普通场景：Grok（成本低，角色扮演稳定）
+      // 普通场景：DeepSeek（成本低、中文语境理解好）
       try {
-        const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 80);
-        if (grokRaw) {
-          const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","development work","coding questions","step out of character","can't roleplay","claude"];
-          // 先尝试JSON格式解析
-          const match = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
+        const dsRaw = await callDeepSeek(thoughtPrompt, 80);
+        if (dsRaw) {
+          const badPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","claude","deepseek","step out of character","can't roleplay"];
+          const match = dsRaw.match(/"en"\s*:\s*"([^"]+)"/);
           if (match) {
             const candidate = match[1].trim();
-            if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
+            if (!badPhrases.some(p => candidate.toLowerCase().includes(p))) {
               en = candidate;
             }
           } else {
-            // Grok返回纯文字时直接用（去掉JSON标记和多余符号）
-            const cleaned = grokRaw
+            const cleaned = dsRaw
               .replace(/```json|```/g, '')
               .replace(/^\s*\{.*?"en"\s*:\s*/s, '')
               .replace(/"\s*\}.*$/s, '')
               .replace(/^["']|["']$/g, '')
               .trim()
-              .split('\n')[0] // 只取第一行
+              .split('\n')[0]
               .trim();
             if (cleaned && cleaned.length > 0 && cleaned.length < 150) {
-              if (!kirkPhrases.some(p => cleaned.toLowerCase().includes(p))) {
+              if (!badPhrases.some(p => cleaned.toLowerCase().includes(p))) {
                 en = cleaned;
               }
             }
           }
         }
       } catch(e) {
-        console.warn('[心声] Grok调用失败:', e);
+        console.warn('[心声] DeepSeek调用失败:', e);
+      }
+
+      // DeepSeek 失败 → Haiku 兜底
+      if (!en) {
+        try {
+          const haikuRaw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 80);
+          if (haikuRaw) {
+            const match = haikuRaw.match(/"en"\s*:\s*"([^"]+)"/);
+            if (match) en = match[1].trim();
+          }
+        } catch(e) {}
       }
     }
   } catch(e) {
