@@ -808,30 +808,26 @@ async function _processMergedMessage(text) {
       _intimacyForceCleared = true; // 标记强制退出，阻止 Haiku 把它改回来
     }
 
-    // 正则没命中：DeepSeek 同时判断调情+情绪（有图片时跳过）
-    // 改用 D：中文情绪语境理解比 Haiku 准，Haiku 兜底
+    // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
+    // 情绪判断用 Haiku——每条消息都跑，速度优先
+    let _emotionLabel = '平淡'; // 供第二层判断用
     if (!isIntimate && !isRecentPhoto) {
       try {
-        const _emotionPrompt =
-          '判断用户消息。只返回JSON，不要其他文字。\n' +
-          '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-          'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。\n' +
-          `用户说：${text}`;
         const combinedRaw = await Promise.race([
-          callDeepSeek(_emotionPrompt, 80),
-          new Promise(resolve => setTimeout(() => resolve(''), 3000))
-        ]).then(r => r || fetchDeepSeek(
-          '判断用户消息。只返回JSON，不要其他文字。\n' +
-          '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-          'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
-          `用户说：${text}`, 80
-        ));
+          fetchDeepSeek(
+            '判断用户消息。只返回JSON，不要其他文字。\n' +
+            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
+            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            `用户说：${text}`,
+            80
+          ),
+          new Promise(resolve => setTimeout(() => resolve(''), 2500))
+        ]);
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
-            // 调情结果：强制退出时不允许改回 true
             if (combinedResult.flirt === true && !_intimacyForceCleared) isIntimate = true;
-            // 情绪结果
+            _emotionLabel = combinedResult.emotion || '平淡';
             if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
               if (combinedResult.target === '外人') {
                 emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
@@ -843,6 +839,36 @@ async function _processMergedMessage(text) {
           }
         }
       } catch(e) {}
+
+      // ── 第二层：DeepSeek 深度情绪分析 ──────────────────────
+      // 只在情绪不平淡时触发，分析潜台词/没说出来的东西，补充 sceneHint
+      if (!isIntimate && _emotionLabel !== '平淡') {
+        try {
+          const _recentCtxForDeep = chatHistory
+            .filter(m => !m._system && !m._recalled)
+            .slice(-6)
+            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 100)}`)
+            .join('\n');
+          const _deepPrompt =
+            `You are reading between the lines of a conversation between a woman and her long-distance partner Ghost.\n\n` +
+            `Recent context:\n${_recentCtxForDeep}\n\n` +
+            `Her latest message: "${text}"\n\n` +
+            `In 1-2 short English sentences: what is she actually feeling or asking for underneath the surface? ` +
+            `What is she NOT saying directly? Be specific — not generic. ` +
+            `If nothing significant is underneath, reply: "surface only."`;
+          const _deepRaw = await Promise.race([
+            callDeepSeek(_deepPrompt, 100),
+            new Promise(resolve => setTimeout(() => resolve(''), 3000))
+          ]);
+          if (_deepRaw && _deepRaw.trim() && !/^surface only/i.test(_deepRaw.trim())) {
+            // 把深度分析结果附加到 sceneHint（不覆盖已有的 sceneHint，追加）
+            const _deepInsight = _deepRaw.trim().split('\n')[0].slice(0, 200);
+            sceneHint = sceneHint
+              ? `${sceneHint} [Subtext: ${_deepInsight}]`
+              : `[Subtext: ${_deepInsight}]`;
+          }
+        } catch(e) {}
+      }
     }
 
     // ── 余温状态判断 ─────────────────────────────────────────
