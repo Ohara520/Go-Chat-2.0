@@ -214,13 +214,28 @@ One line. Lowercase. Private. Like it slipped out.`;
       // Grok生成调情心声
       try {
         const grokRaw = await callGrok(thoughtPrompt, 'inner thought now.', 80);
-        const matchG = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
-        if (matchG) {
-          const candidate = matchG[1].trim();
-          // Kirk检测
-          const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","development work","coding questions","step out of character","can't roleplay"];
-          if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
-            en = candidate;
+        const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","development work","coding questions","step out of character","can't roleplay"];
+        if (grokRaw) {
+          // 先尝试JSON格式
+          const matchG = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
+          if (matchG) {
+            const candidate = matchG[1].trim();
+            if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
+              en = candidate;
+            }
+          } else {
+            // 纯文字兜底
+            const cleaned = grokRaw
+              .replace(/```json|```/g, '')
+              .replace(/^["']|["']$/g, '')
+              .trim()
+              .split('\n')[0]
+              .trim();
+            if (cleaned && cleaned.length > 0 && cleaned.length < 150) {
+              if (!kirkPhrases.some(p => cleaned.toLowerCase().includes(p))) {
+                en = cleaned;
+              }
+            }
           }
         }
       } catch(e) {}
@@ -237,12 +252,28 @@ One line. Lowercase. Private. Like it slipped out.`;
       try {
         const grokRaw = await callGrok(thoughtPrompt, 'inner thought now.', 80);
         if (grokRaw) {
+          const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","development work","coding questions","step out of character","can't roleplay","claude"];
+          // 先尝试JSON格式解析
           const match = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
           if (match) {
             const candidate = match[1].trim();
-            const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","development work","coding questions","step out of character","can't roleplay","claude"];
             if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
               en = candidate;
+            }
+          } else {
+            // Grok返回纯文字时直接用（去掉JSON标记和多余符号）
+            const cleaned = grokRaw
+              .replace(/```json|```/g, '')
+              .replace(/^\s*\{.*?"en"\s*:\s*/s, '')
+              .replace(/"\s*\}.*$/s, '')
+              .replace(/^["']|["']$/g, '')
+              .trim()
+              .split('\n')[0] // 只取第一行
+              .trim();
+            if (cleaned && cleaned.length > 0 && cleaned.length < 150) {
+              if (!kirkPhrases.some(p => cleaned.toLowerCase().includes(p))) {
+                en = cleaned;
+              }
             }
           }
         }
