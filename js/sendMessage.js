@@ -107,14 +107,7 @@ const MERGE_DELAY = 300;
 function pickReadyPendingEvent() {
   const pending = getPendingReversePackages();
   if (!pending.length) return null;
-
-  const now = Date.now();
-  // 同时满足：时间到了 AND 轮数到了
-  const ready = pending.find(p => {
-    const timeOk  = !p.triggerAt  || now >= p.triggerAt;
-    const turnOk  = !p.triggerAtTurn || p.triggerAtTurn <= _globalTurnCount;
-    return timeOk && turnOk;
-  });
+  const ready = pending.find(p => p.triggerAtTurn <= _globalTurnCount);
   if (!ready) return null;
 
   const remaining = pending.filter(p => p !== ready);
@@ -599,6 +592,10 @@ async function _processMergedMessage(text) {
       if (sessionStorage.getItem('hintMoneyPending') === '1') return false;
       if (localStorage.getItem('coldWarMode') === 'true') return false;
       if (localStorage.getItem('userDislikesMoney') === 'true' && !_userAskedMoney) return false;
+      // 补上 applyMoneyEffect 的两个漏掉的条件，防止假账
+      if (typeof isMoneyRefuseActive === 'function' && isMoneyRefuseActive()) return false;
+      const _lastRefundAt = parseInt(localStorage.getItem('lastRefundAt') || '0');
+      if (Date.now() - _lastRefundAt < 2 * 3600 * 1000) return false;
       const _affNow = getAffection();
       if (_affNow < 30) return false;
       if (_affNow < 40) {
@@ -611,7 +608,7 @@ async function _processMergedMessage(text) {
       const _todayCount = getTodayGivenCount();
       const _dailyLimit = _userAskedMoney ? 5 : 3;
       if (_todayCount >= _dailyLimit) return false;
-      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 500)) return false;
+      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 3000)) return false;
       if (!_userAskedMoney) {
         const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
         const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
@@ -644,13 +641,13 @@ async function _processMergedMessage(text) {
 
     const _styleContext = {
       care:    ' She has a real reason — something is actually wrong or needed.',
-      flirty:  ' She is being playful and cheeky about it. Teasing back is fine.',
+      flirty:  ' She is being playful — asking for money as a tease. Do NOT give money. Tease back, deflect, or joke about it instead. This is a game, not a real request.',
       testing: ' She seems to be testing you. You notice.',
       reunion: ' She wants money to come see you — do NOT give money for this.',
       neutral: ''
     }[_moneyStyle] || '';
 
-    const _styleBlocksGive = _moneyStyle === 'testing' || _moneyStyle === 'reunion';
+    const _styleBlocksGive = _moneyStyle === 'testing' || _moneyStyle === 'reunion' || _moneyStyle === 'flirty';
 
     let moneyHint = '';
     if (!_userAskedMoney && !_canGiveNow) {
@@ -658,7 +655,17 @@ async function _processMergedMessage(text) {
     } else if (_canGiveNow && !_styleBlocksGive) {
       const _affNow2 = getAffection();
       const _affCaution = _affNow2 < 50 ? ' Not deeply close yet — only give if genuinely compelling.' : '';
-      moneyHint = `[Transfer available this reply — if you decide to give money, you MUST include GIVE_MONEY:amount:note in your reply. This tag is the ONLY way money gets sent. Never promise money without the tag. Giving is never automatic — he still decides.${_affCaution}${_trustStyleHint}${_styleContext}]`;
+      // 月度剩余额度
+      const _monthlyUsed  = typeof getWeeklyGiven === 'function' ? getWeeklyGiven() : 0;
+      const _monthlyLimit = typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 800;
+      const _monthlyLeft  = Math.max(0, _monthlyLimit - _monthlyUsed);
+      const _level        = typeof getMoneyComfortLevel === 'function' ? getMoneyComfortLevel() : 1;
+      const _amountGuide  = {
+        1: 'small amounts — £10-50 for everyday things, up to £80 for something real',
+        2: 'moderate amounts — £20-100 for everyday things, up to £150 for something meaningful',
+        3: 'generous amounts — £30-150 for everyday things, higher for significant needs',
+      }[_level] || 'small amounts';
+      moneyHint = `[Transfer available this reply — if you decide to give money, you MUST include GIVE_MONEY:amount:note in your reply. This tag is the ONLY way money gets sent. Never promise money without the tag. Giving is never automatic — he still decides. Amount guidance: ${_amountGuide}. Monthly budget remaining: £${_monthlyLeft}. Match the amount to what she actually needs — buying fruit is £10-20, not £100+. Be proportionate.${_affCaution}${_trustStyleHint}${_styleContext}]`;
     } else {
       const _testingExtra = _moneyStyle === 'testing' ? ' She seems to be testing you. Do not give just because she pushed.' : '';
       const _reunionExtra = _moneyStyle === 'reunion' ? ' She wants money to come see you. Do NOT give money for this — react to the idea of her coming instead.' : '';
@@ -1147,7 +1154,7 @@ async function _processMergedMessage(text) {
         const dailyLimit = userAsked ? 5 : 3;
         const limitMsg = getTodayGivenCount() >= dailyLimit
           ? '[System: Daily transfer limit reached — this transfer did not go through. Decline in your own way. Do not explain system limits.]'
-          : '[System: Weekly transfer limit reached — this transfer did not go through. Decline in your own way. Do not explain system limits.]';
+          : '[System: Monthly transfer limit reached — you have given enough this month. Tell her the monthly limit is up, and that salary comes on the 25th. Keep it short and dry. Do not explain system limits literally.]';
         chatHistory.push({ role: 'user', content: limitMsg, _system: true });
         // 假账过滤：清除回复里提到转钱/具体金额的部分
         reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
@@ -1291,9 +1298,7 @@ async function _processMergedMessage(text) {
     }
 
     try { handleLostPackageClaim(text); } catch(e) {}
-    // 修复：intent='event'时把完整pendingEvent对象传过去，events.js才能处理
-    const _intentForPost = (intent === 'event' && pendingEvent) ? pendingEvent : { type: intent };
-    handlePostReplyActions(text, reply, _intentForPost).catch(e => console.warn('副行为出错:', e));
+    handlePostReplyActions(text, reply, intent).catch(e => console.warn('副行为出错:', e));
 
     _isSending = false;
 

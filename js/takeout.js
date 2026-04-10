@@ -639,7 +639,9 @@ async function onGhostReceivedTakeout(order) {
         : `[A delivery just showed up. 「${order.name}」. You didn't know it was coming. She ordered it without telling you.]`,
       _system: true,
     });
-    if (typeof saveHistory === 'function') saveHistory();
+    // 只在有真实聊天记录时才保存，防止空 chatHistory 覆盖本地历史
+    const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
+    if (_realMsgs.length > 0 && typeof saveHistory === 'function') saveHistory();
   }
 
   const container = document.getElementById('messagesContainer');
@@ -650,54 +652,40 @@ async function onGhostReceivedTakeout(order) {
     return;
   }
 
-  // 如果正在发消息，延迟到空闲后再触发
-  const _baseDelay = (typeof _isSending !== 'undefined' && _isSending) ? 8000 : 0;
-  const delay = _baseDelay + [0, 30000, 120000][Math.floor(Math.random() * 3)];
+  // 正在发消息就等一会儿，不干扰用户输入；不再有超长随机延迟
   setTimeout(async () => {
-    // 二次检查，确保不在发消息中
-    if (typeof _isSending !== 'undefined' && _isSending) return;
     try {
-      const prompt = told
-        ? `[The food she told you about just arrived — 「${order.name}」. You have it now. React naturally.${order.desc ? ` (${order.desc})` : ''}]`
-        : `[A delivery just arrived — 「${order.name}」. You didn't know it was coming.${order.desc ? ` (${order.desc})` : ''}]`;
+      // ── 情绪变化（不生成回复，不注入聊天框）────────────────
+      // 外卖到达不打断聊天：写进长期记忆，Ghost 下次对话自然带出
+      const _feeHour     = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }));
+      const _isLateNight = _feeHour >= 2 && _feeHour < 6;
+      const _wasHungry   = _detectMealStatus() === 'hungry';
+      const _todayCount  = getTodayTakeoutCount();
 
-      let reply = '';
-      if (typeof callHaiku === 'function') {
-        reply = await callHaiku(
-          typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
-          [...(chatHistory || []).filter(m => !m._system).slice(-8), { role: 'user', content: prompt }]
-        );
-      }
+      let _affDelta   = 1;
+      let _trustDelta = 1;
+      if (_isLateNight)     { _affDelta += 1; }
+      if (_wasHungry)       { _affDelta += 1; _trustDelta += 1; }
+      if (_todayCount >= 2) { _affDelta += 1; }
 
-      const bad = ["i'm claude", "i am claude", "as an ai", "can't roleplay", "anthropic"];
-      if (reply && bad.some(p => reply.toLowerCase().includes(p))) reply = '';
+      if (typeof changeAffection === 'function') changeAffection(_affDelta);
+      if (typeof changeTrustHeat === 'function') changeTrustHeat(_trustDelta);
 
-      if (reply && reply.trim()) {
-        const line = reply.trim().split('\n').slice(0, 2).join('\n');
-        if (typeof appendMessage === 'function') appendMessage('bot', line);
-        if (typeof chatHistory !== 'undefined') {
-          chatHistory.push({ role: 'assistant', content: line });
-          if (typeof saveHistory === 'function') saveHistory();
-          if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+      // 写进长期记忆
+      try {
+        const _ltm  = localStorage.getItem('longTermMemory') || '';
+        const _note = told
+          ? `The food she mentioned — 「${order.name}」 — arrived. He has it now.`
+          : `A delivery showed up — 「${order.name}」. She ordered it without telling him.`;
+        if (!_ltm.includes(order.name)) {
+          localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
+          if (typeof touchLocalState === 'function') touchLocalState();
         }
+      } catch(e) {}
 
-        // ── 情绪变化 ─────────────────────────────────────────
-        const _feeHour = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }));
-        const _isLateNight = _feeHour >= 2 && _feeHour < 6;
-        const _wasHungry   = _detectMealStatus() === 'hungry';
-        const _todayCount  = getTodayTakeoutCount(); // 本次已计入，所以>=1
+      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
-        let _affDelta  = 1;
-        let _trustDelta = 1;
-
-        if (_isLateNight)  { _affDelta += 1; }            // 凌晨送到
-        if (_wasHungry)    { _affDelta += 1; _trustDelta += 1; } // 本来就饿
-        if (_todayCount >= 2) { _affDelta += 1; }          // 今天第2次或以上
-
-        if (typeof changeAffection === 'function') changeAffection(_affDelta);
-        if (typeof changeTrustHeat === 'function') changeTrustHeat(_trustDelta);
-      }
-    } catch(e) { console.warn('[外卖] 送达反应失败:', e); }
+    } catch(e) { console.warn('[外卖] 送达处理失败:', e); }
   }, delay);
 }
 

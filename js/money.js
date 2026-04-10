@@ -53,7 +53,7 @@ function getMoneyEaseBonus() {
 function getMaxSingleTransfer() {
   const level     = getMoneyComfortLevel();
   const easeBonus = getMoneyEaseBonus();
-  const caps      = { 0: 0, 1: 25, 2: 60, 3: 120 };
+  const caps      = { 0: 0, 1: 40, 2: 80, 3: 120 };
   return (caps[level] || 0) + (easeBonus * 20);
 }
 
@@ -280,31 +280,35 @@ function decideMoneyAmountFromState(motive = 'practical') {
   if (mood <= 3) return 0;
   if (level === 0) return 0;
 
-  // 基础区间按 comfortLevel
+  // 参考区间按 comfortLevel（模型自己评估，代码不做单次硬截断）
+  // L1: 小额日常 £10-50
+  // L2: 中等 £20-100
+  // L3: 宽松 £30-150
   const baseRanges = {
     0: [0, 0],
-    1: [10, 25],
-    2: [20, 60],
-    3: [40, 120],
+    1: [10, 50],
+    2: [20, 100],
+    3: [30, 150],
   };
   const [min, max] = baseRanges[level] || [0, 0];
 
-  // motive修正
   const motiveMultiplier = {
     practical:    1.0,
     care:         1.0,
-    celebration:  1.2,  // 特殊日子略高
-    compensation: 0.8,  // 补偿不要太大
+    celebration:  1.2,
+    compensation: 0.8,
   }[motive] || 1.0;
 
-  // mood微调
   const moodMult = mood >= 8 ? 1.1 : mood <= 4 ? 0.8 : 1.0;
 
   let amount = Math.floor((min + Math.random() * (max - min)) * motiveMultiplier * moodMult);
-  amount += easeBonus * 5; // firstSalary微加
+  amount += easeBonus * 5;
 
-  // 不超过单次上限
-  return Math.min(Math.max(amount, min), getMaxSingleTransfer());
+  // 只做月度上限检查，不做单次硬截断
+  const monthlyUsed  = getWeeklyGiven();
+  const monthlyLimit = _getWeeklyTransferLimit();
+  if (monthlyLimit > 0) amount = Math.min(amount, monthlyLimit - monthlyUsed);
+  return Math.max(amount, 0);
 }
 
 
@@ -467,15 +471,15 @@ function applyMoneyEffect(amount, options = {}) {
     if (conversationGiven >= 1) return false;
   }
 
-  const weeklyUsed  = getWeeklyGiven();
-  const weeklyLimit = _getWeeklyTransferLimit();
+  const weeklyUsed  = getWeeklyGiven();   // 实为月度已用
+  const weeklyLimit = _getWeeklyTransferLimit();  // 实为月度上限
 
-  // 吃醋转账不bypass每周上限
-  if (!options.bypassWeeklyLimit && weeklyUsed >= weeklyLimit) return false;
+  // 月度上限检查
+  if (!options.bypassWeeklyLimit && weeklyLimit > 0 && weeklyUsed >= weeklyLimit) return false;
 
-  const actualAmount = options.bypassWeeklyLimit
-    ? amount
-    : Math.min(amount, weeklyLimit - weeklyUsed);
+  // 只做月度剩余截断，不做单次硬截断
+  const remaining   = weeklyLimit > 0 ? weeklyLimit - weeklyUsed : amount;
+  const actualAmount = options.bypassWeeklyLimit ? amount : Math.min(amount, remaining);
 
   if (typeof addTransaction === 'function') {
     addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
@@ -502,19 +506,20 @@ function applyMoneyEffect(amount, options = {}) {
 // 周统计
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function getWeekKey() {
+function getMonthKey() {
   const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const week = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
-  return now.getFullYear() + '_w' + week;
+  return now.getFullYear() + '_m' + (now.getMonth() + 1);
 }
 
+// 兼容旧名称，内部改为月度
+function getWeekKey() { return getMonthKey(); }
+
 function getWeeklyGiven() {
-  return parseInt(localStorage.getItem('weeklyGiven_' + getWeekKey()) || '0');
+  return parseInt(localStorage.getItem('monthlyGiven_' + getMonthKey()) || '0');
 }
 
 function addWeeklyGiven(amount) {
-  localStorage.setItem('weeklyGiven_' + getWeekKey(), getWeeklyGiven() + amount);
+  localStorage.setItem('monthlyGiven_' + getMonthKey(), getWeeklyGiven() + amount);
 }
 
 function _getTransferCooldownMs() {
@@ -524,10 +529,14 @@ function _getTransferCooldownMs() {
 }
 
 function _getWeeklyTransferLimit() {
+  // 已改为月度上限
   const level  = getMoneyComfortLevel();
-  const limits = { 0: 0, 1: 100, 2: 200, 3: 300 };
+  const limits = { 0: 0, 1: 800, 2: 1600, 3: 2400 };
   return limits[level] || 0;
 }
+
+function getMonthlyGiven() { return getWeeklyGiven(); }
+function getMonthlyLimit() { return _getWeeklyTransferLimit(); }
 
 function getTodayGivenCount() {
   return parseInt(localStorage.getItem('givenCount_' + new Date().toISOString().slice(0, 10)) || '0');
