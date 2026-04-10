@@ -170,7 +170,7 @@ function addGhostReverseDelivery(item, emotionType) {
         content: `[you sent something. you remember it. don't bring it up unless needed.]`,
         _system: true
       });
-      if (typeof saveHistory === 'function') saveHistory();
+      if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
     }
     return;
   } else if (rand < 0.9) {
@@ -182,7 +182,7 @@ function addGhostReverseDelivery(item, emotionType) {
         content: `[you sent something. it's on its way. you know. don't confirm details if asked, but don't deny it either.]`,
         _system: true
       });
-      if (typeof saveHistory === 'function') saveHistory();
+      if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
     }
     const hintDelay = [2000, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
     setTimeout(async () => {
@@ -194,7 +194,7 @@ function addGhostReverseDelivery(item, emotionType) {
         if (line && line.trim()) {
           appendMessage('bot', line.trim().split('\n')[0]);
           chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
-          saveHistory();
+          _safeDeliverySaveHistory();
         }
       } catch(e) {}
     }, hintDelay);
@@ -206,7 +206,7 @@ function addGhostReverseDelivery(item, emotionType) {
         content: `[you sent her something. she'll find out soon. if she asks, confirm it.]`,
         _system: true
       });
-      if (typeof saveHistory === 'function') saveHistory();
+      if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
     }
     const directDelay = [2000, 2 * 60 * 1000][Math.floor(Math.random() * 2)];
     setTimeout(async () => {
@@ -218,7 +218,7 @@ function addGhostReverseDelivery(item, emotionType) {
         if (line && line.trim()) {
           appendMessage('bot', line.trim().split('\n')[0]);
           chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
-          saveHistory();
+          _safeDeliverySaveHistory();
         }
       } catch(e) {}
     }, directDelay);
@@ -277,7 +277,7 @@ function checkDeliveryUpdates() {
                 content: `[the item she sent — 「${d.name}」— just arrived. you have it now. if she asks, confirm it naturally.]`,
                 _system: true
               });
-              if (typeof saveHistory === 'function') saveHistory();
+              _safeDeliverySaveHistory(); // 防止空 chatHistory 覆盖真实记录
             }
             // 写进长期记忆，防止Ghost否认收到
             try {
@@ -305,6 +305,19 @@ function checkDeliveryUpdates() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Ghost 收到用户寄的东西
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 安全保存历史（防止空 chatHistory 覆盖真实记录）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function _safeDeliverySaveHistory() {
+  if (typeof chatHistory === 'undefined' || typeof saveHistory !== 'function') return;
+  const realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
+  if (realMsgs.length === 0) return; // 空的/只有系统消息 → 不覆盖
+  _safeDeliverySaveHistory();
+}
+
 
 async function onGhostReceived(delivery) {
   const container = document.getElementById('messagesContainer');
@@ -375,7 +388,7 @@ One or two lines. Lowercase. English only.]`;
         content: `[you received something intimate from her. you know. carry it.]`,
         _system: true
       });
-      saveHistory();
+      _safeDeliverySaveHistory();
       changeAffection(2);
     }
     return;
@@ -401,7 +414,7 @@ One or two lines. Lowercase. English only.]`;
       if (reply2) {
         appendMessage('bot', reply2);
         chatHistory.push({ role: 'assistant', content: reply2 });
-        saveHistory();
+        _safeDeliverySaveHistory();
         changeAffection(2);
       }
     } catch(e) {}
@@ -445,7 +458,7 @@ He doesn't make a show of it. But he keeps it.]`
         if (reply && !_isDeliveryBreakout(reply)) {
           appendMessage('bot', reply);
           chatHistory.push({ role: 'assistant', content: reply });
-          saveHistory();
+          _safeDeliverySaveHistory();
         }
       } catch(e) {}
     }, replyDelay);
@@ -486,7 +499,7 @@ Item received: 「${delivery.name}」]`
           if (reply2) {
             appendMessage('bot', reply2);
             chatHistory.push({ role: 'assistant', content: reply2 });
-            saveHistory();
+            _safeDeliverySaveHistory();
             changeAffection(pd.price > 3000 ? 5 : 3);
             if (pd.isGhostGift) {
               feedEvent_giftReceived(pd.name, 'ghost');
@@ -519,7 +532,7 @@ Item received: 「${delivery.name}」]`
           if (line && line.trim()) {
             appendMessage('bot', line.trim().split('\n')[0]);
             chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
-            saveHistory();
+            _safeDeliverySaveHistory();
           }
         } catch(e) {}
       }, afterthoughtDelay);
@@ -543,7 +556,7 @@ async function showMysteryPackage(delivery) {
       content: `[You sent her something — 「${delivery.name}」. She just received it. You know. Don't announce it unless she brings it up.]`,
       _system: true,
     });
-    if (typeof saveHistory === 'function') saveHistory();
+    if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
   }
   // 写进长期记忆，防止20条后被截掉导致Ghost否认
   try {
@@ -670,7 +683,7 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
     if (reply) {
       appendMessage('bot', reply);
       chatHistory.push({ role: 'assistant', content: reply });
-      saveHistory();
+      _safeDeliverySaveHistory();
     }
 
     // 赔偿
@@ -687,7 +700,7 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
           content: `[快递遗失赔偿 £${compensation}]`,
           _transfer: { amount: compensation, isRefund: false }
         });
-        saveHistory();
+        _safeDeliverySaveHistory();
         d.compensated = true;
 
         // 高价值商品触发补寄
