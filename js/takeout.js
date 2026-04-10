@@ -686,7 +686,22 @@ async function onGhostReceivedTakeout(order) {
           if (typeof saveHistory === 'function') saveHistory();
           if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
         }
-        if (typeof changeAffection === 'function') changeAffection(1);
+
+        // ── 情绪变化 ─────────────────────────────────────────
+        const _feeHour = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }));
+        const _isLateNight = _feeHour >= 2 && _feeHour < 6;
+        const _wasHungry   = _detectMealStatus() === 'hungry';
+        const _todayCount  = getTodayTakeoutCount(); // 本次已计入，所以>=1
+
+        let _affDelta  = 1;
+        let _trustDelta = 1;
+
+        if (_isLateNight)  { _affDelta += 1; }            // 凌晨送到
+        if (_wasHungry)    { _affDelta += 1; _trustDelta += 1; } // 本来就饿
+        if (_todayCount >= 2) { _affDelta += 1; }          // 今天第2次或以上
+
+        if (typeof changeAffection === 'function') changeAffection(_affDelta);
+        if (typeof changeTrustHeat === 'function') changeTrustHeat(_trustDelta);
       }
     } catch(e) { console.warn('[外卖] 送达反应失败:', e); }
   }, delay);
