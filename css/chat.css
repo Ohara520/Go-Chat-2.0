@@ -2330,3 +2330,13 @@
   font-weight: 600;
   letter-spacing: 0.3px;
 }
+
+/* ===== 外卖页面 ===== */
+.takeout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(160deg, #fdf8ec 0%, #fef6e0 100%);
+}
+#takeoutCatBar::-webkit-scrollbar { display: none; }

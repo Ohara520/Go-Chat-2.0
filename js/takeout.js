@@ -184,7 +184,6 @@ function _incrementTakeoutCount() {
   localStorage.setItem(key, getTodayTakeoutCount() + 1);
 }
 
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Tab 状态
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -194,68 +193,86 @@ let _menuTab    = 'main';   // 'main' | 'side' | 'drink'
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 主界面入口
+// 初始化（由 openScreen('takeoutScreen') 触发）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function openTakeoutShop() {
-  document.getElementById('_takeoutOverlay')?.remove();
-
-  const city    = _getTakeoutCity();
-  const overlay = document.createElement('div');
-  overlay.id = '_takeoutOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9997;display:flex;align-items:flex-end;justify-content:center;';
-  overlay.innerHTML = `
-    <div id="_takeoutSheet" style="background:#fffdf5;border-radius:24px 24px 0 0;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;border-top:1px solid #d4a840;">
-      <div style="width:40px;height:4px;background:#e8c97a;border-radius:2px;margin:14px auto 0;flex-shrink:0;"></div>
-      <div id="_takeoutNav" style="display:flex;border-bottom:1px solid #f0e0a0;flex-shrink:0;margin-top:12px;"></div>
-      <div id="_takeoutBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-
+function initTakeoutScreen() {
   _takeoutTab = 'shop';
   _menuTab    = 'main';
-  _renderNav();
-  _renderBody(city);
+  const balEl = document.getElementById('takeoutBalanceDisplay');
+  if (balEl) balEl.textContent = '£' + getBalance().toFixed(0);
+  _renderInfoBar();
+  _renderTabBar();
+  _renderCatBar();
+  _renderBody(_getTakeoutCity());
 }
 
-function _renderNav() {
-  const nav = document.getElementById('_takeoutNav');
-  if (!nav) return;
-  const activeOrders = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').filter(o => !o.done);
-  const dot = activeOrders.length
+function _renderInfoBar() {
+  const bar = document.getElementById('takeoutInfoBar');
+  if (!bar) return;
+  const fee  = getTakeoutFee();
+  const city = _getTakeoutCity();
+  bar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 16px 10px;background:rgba(255,248,220,0.85);border-bottom:1px solid rgba(212,168,64,0.2);flex-shrink:0;';
+  bar.innerHTML = city
+    ? `<span style="font-size:12px;color:#6a3800;font-weight:600;">📍 ${_getCityLabel()}</span>
+       <span style="font-size:11px;background:#f0c030;color:#4a2000;padding:3px 10px;border-radius:6px;font-weight:700;">${fee.label} &nbsp;£${fee.fee.toFixed(2)}</span>`
+    : `<span style="font-size:12px;color:#b02020;font-weight:600;">🚫 当前位置无法配送</span>`;
+}
+
+function _renderTabBar() {
+  const bar = document.getElementById('takeoutTabBar');
+  if (!bar) return;
+  const active = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').filter(o => !o.done);
+  const dot = active.length
     ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#c47010;margin-left:4px;vertical-align:middle;"></span>`
     : '';
-  const tabs = [
+  bar.innerHTML = [
     { id: 'shop',     label: '点单' },
     { id: 'tracking', label: `配送中${dot}` },
     { id: 'history',  label: '小票' },
-  ];
-  nav.innerHTML = tabs.map(t => {
+  ].map(t => {
     const on = _takeoutTab === t.id;
     return `<button onclick="_switchTakeoutTab('${t.id}')"
-      style="flex:1;padding:10px 0;border:none;background:transparent;font-size:13px;cursor:pointer;
-        color:${on ? '#7a4a00' : '#b8860b'};font-weight:${on ? 700 : 500};
-        border-bottom:${on ? '2px solid #c47010' : '2px solid transparent'};">
+      style="flex:1;padding:12px 0;border:none;background:transparent;font-size:14px;cursor:pointer;
+        color:${on ? '#7a4a00' : '#b8860b'};font-weight:${on ? 700 : 400};
+        border-bottom:${on ? '2.5px solid #c47010' : '2.5px solid transparent'};">
       ${t.label}
+    </button>`;
+  }).join('');
+}
+
+function _renderCatBar() {
+  const bar = document.getElementById('takeoutCatBar');
+  if (!bar) return;
+  if (_takeoutTab !== 'shop') { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const cats = { main: '🍽 正餐', side: '🥨 小食', drink: '☕ 饮品' };
+  bar.innerHTML = Object.entries(cats).map(([id, label]) => {
+    const on = _menuTab === id;
+    return `<button onclick="_switchMenuTab('${id}')"
+      style="flex:1;padding:8px 4px;border-radius:22px;border:1.5px solid ${on ? '#c47010' : '#e8c050'};
+        background:${on ? '#c47010' : 'rgba(255,252,240,0.9)'};color:${on ? '#fff' : '#8a5800'};
+        font-size:13px;font-weight:700;cursor:pointer;">
+      ${label}
     </button>`;
   }).join('');
 }
 
 function _switchTakeoutTab(tab) {
   _takeoutTab = tab;
-  _renderNav();
+  _renderTabBar();
+  _renderCatBar();
   _renderBody(_getTakeoutCity());
 }
 
 function _renderBody(city) {
-  const body = document.getElementById('_takeoutBody');
+  const body = document.getElementById('takeoutBody');
   if (!body) return;
   if (_takeoutTab === 'shop')     _renderShopTab(body, city);
   if (_takeoutTab === 'tracking') _renderTrackingTab(body);
   if (_takeoutTab === 'history')  _renderHistoryTab(body);
 }
+
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -283,7 +300,6 @@ function _renderShopTab(body, city) {
   const menu  = TAKEOUT_MENUS[city] || [];
   const items = menu.filter(m => m.cat === _menuTab);
   const cats  = { main: '正餐', side: '小食', drink: '饮品' };
-  const icons = { main: '🍽', side: '🥨', drink: '☕' };
 
   const banner = coldWar
     ? `<div style="background:#fff0f0;border:1px solid #f0b0b0;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#b02020;text-align:center;">❄️ 冷战期间无法点外卖</div>`
@@ -292,16 +308,6 @@ function _renderShopTab(body, city) {
     : hasActive
     ? `<div style="background:#fff8e8;border:1px solid #e8d060;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#a07020;text-align:center;">🛵 外卖配送中，送达后才能再点</div>`
     : '';
-
-  const tabBtn = (id) => {
-    const on = _menuTab === id;
-    return `<button onclick="_switchMenuTab('${id}')"
-      style="flex:1;padding:7px 4px;border-radius:20px;border:1.5px solid ${on ? '#c47010' : '#e8c050'};
-        background:${on ? '#c47010' : '#fff8e8'};color:${on ? '#fff' : '#8a5800'};
-        font-size:12px;font-weight:700;cursor:pointer;">
-      ${icons[id]} ${cats[id]}
-    </button>`;
-  };
 
   const cards = items.map(item => {
     const total     = item.price + fee.fee;
@@ -332,31 +338,15 @@ function _renderShopTab(body, city) {
 
   body.innerHTML = `
     <div style="padding:14px 16px 28px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div>
-          <div style="font-size:15px;font-weight:700;color:#3a2000;">给 Ghost 点外卖</div>
-          <div style="font-size:11px;color:#a07020;margin-top:2px;">📍 ${_getCityLabel()}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:10px;color:#a07020;">余额</div>
-          <div style="font-size:15px;font-weight:700;color:#c47010;">£${bal.toFixed(0)}</div>
-        </div>
-      </div>
-      <div style="background:#fff3cc;border:1px solid #e0c050;border-radius:10px;padding:8px 13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-        <div style="font-size:11px;font-weight:600;color:#6a3800;">${fee.label} · ${fee.time}</div>
-        <div style="font-size:11px;font-weight:700;background:#f0c030;color:#4a2000;padding:3px 10px;border-radius:6px;">£${fee.fee.toFixed(2)}</div>
-      </div>
       ${banner}
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
-        ${tabBtn('main')}${tabBtn('side')}${tabBtn('drink')}
-      </div>
-      ${cards || `<div style="text-align:center;padding:32px;color:#a07020;font-size:13px;">暂无${cats[_menuTab]}</div>`}
+      ${cards || `<div style="text-align:center;padding:48px 24px;color:#a07020;font-size:13px;">暂无${cats[_menuTab]}</div>`}
       <div style="text-align:center;font-size:10px;color:#b09060;margin-top:10px;">每天最多点3次 · 冷战期间不可用</div>
     </div>`;
 }
 
 function _switchMenuTab(tab) {
   _menuTab = tab;
+  _renderCatBar();
   _renderBody(_getTakeoutCity());
 }
 
@@ -585,7 +575,7 @@ function addTakeoutOrder(city, item) {
   // 跳到配送中 tab
   _takeoutTab = 'tracking';
   _renderNav();
-  const body = document.getElementById('_takeoutBody');
+  const body = document.getElementById('takeoutBody');
   if (body) _renderTrackingTab(body);
 
   return true;
@@ -781,7 +771,7 @@ function renderTakeoutTracker() {
   // 配送中标签
   orders.forEach(o => {
     const remaining = Math.max(0, Math.ceil((o.deliverAt - now) / 60000));
-    tags.push(`<span class="delivery-tag" onclick="openTakeoutShop()"
+    tags.push(`<span class="delivery-tag" onclick="openScreen('takeoutScreen')"
       style="background:rgba(255,243,200,0.95);border-color:rgba(212,168,64,0.6);color:#7a4a00;cursor:pointer;">
       <div class="delivery-tag-dot" style="background:#c47010;"></div>
       ${o.emoji} ${o.name.length > 6 ? o.name.slice(0,6)+'…' : o.name}
@@ -791,7 +781,7 @@ function renderTakeoutTracker() {
 
   // 用餐提示标签（无配送中时才显示）
   if (!orders.length && hint) {
-    tags.push(`<span class="delivery-tag" onclick="openTakeoutShop()"
+    tags.push(`<span class="delivery-tag" onclick="openScreen('takeoutScreen')"
       style="background:rgba(255,248,220,0.9);border-color:rgba(200,150,40,0.4);color:#8a5800;cursor:pointer;">
       🍽 ${hint}
     </span>`);
