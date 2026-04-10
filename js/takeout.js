@@ -542,7 +542,11 @@ function addTakeoutOrder(city, item) {
   addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
   if (typeof renderWallet === 'function') renderWallet();
 
-  const deliverInMs = (30 + Math.floor(Math.random() * 31)) * 60 * 1000;
+  // 配送时间按品类区分
+  const deliverMins = item.cat === 'drink' ? 15 + Math.floor(Math.random() * 11)
+                    : item.cat === 'side'  ? 20 + Math.floor(Math.random() * 16)
+                    :                       35 + Math.floor(Math.random() * 26);
+  const deliverInMs = deliverMins * 60 * 1000;
   const now = Date.now();
 
   const order = {
@@ -760,36 +764,16 @@ function getMealHint() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function renderTakeoutTracker() {
-  const tracker = document.getElementById('takeoutTracker');
-  if (!tracker) return;
+  // 只更新主页外卖卡片提示
+  updateTakeoutCardHint();
+}
 
-  const orders  = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').filter(o => !o.done);
-  const now     = Date.now();
-  const hint    = getMealHint();
-  const tags    = [];
-
-  // 配送中标签
-  orders.forEach(o => {
-    const remaining = Math.max(0, Math.ceil((o.deliverAt - now) / 60000));
-    tags.push(`<span class="delivery-tag" onclick="openScreen('takeoutScreen')"
-      style="background:rgba(255,243,200,0.95);border-color:rgba(212,168,64,0.6);color:#7a4a00;cursor:pointer;">
-      <div class="delivery-tag-dot" style="background:#c47010;"></div>
-      ${o.emoji} ${o.name.length > 6 ? o.name.slice(0,6)+'…' : o.name}
-      <span style="font-size:9px;opacity:0.8;margin-left:2px;">${remaining > 0 ? remaining+'min' : '即将送达'}</span>
-    </span>`);
-  });
-
-  // 用餐提示标签（无配送中时才显示）
-  if (!orders.length && hint) {
-    tags.push(`<span class="delivery-tag" onclick="openScreen('takeoutScreen')"
-      style="background:rgba(255,248,220,0.9);border-color:rgba(200,150,40,0.4);color:#8a5800;cursor:pointer;">
-      🍽 ${hint}
-    </span>`);
-  }
-
-  if (!tags.length) { tracker.style.display = 'none'; return; }
-  tracker.style.display = 'block';
-  tracker.innerHTML = tags.join('');
+function updateTakeoutCardHint() {
+  const desc = document.getElementById('takeoutCardDesc');
+  if (!desc) return;
+  const hint = getMealHint();
+  desc.textContent = hint || '给Ghost点外卖';
+  desc.style.color = hint ? '#c47010' : '';
 }
 
 

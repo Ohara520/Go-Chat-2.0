@@ -221,6 +221,7 @@ async function initChat() {
 
   // 外卖进度检查 + 离线期间到达的外卖反应
   try { if (typeof checkTakeoutUpdates === 'function') checkTakeoutUpdates(); } catch(e) {}
+  try { if (typeof updateTakeoutCardHint === 'function') updateTakeoutCardHint(); } catch(e) {}
   setTimeout(() => {
     try { if (typeof checkPendingTakeoutReactions === 'function') checkPendingTakeoutReactions(); } catch(e) {}
   }, 2000);
