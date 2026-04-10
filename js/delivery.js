@@ -187,9 +187,9 @@ function addGhostReverseDelivery(item, emotionType) {
     const hintDelay = [2000, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
     setTimeout(async () => {
       try {
-        const line = await callHaiku(
-          buildGhostStyleCore(),
-          [{ role: 'user', content: `[You sent her something. She doesn't know yet. Drop one vague line — not what it is, not when. Something that could mean anything. One line. Do not announce it like a delivery update.]` }]
+        const line = await callDeepSeek(
+          buildGhostStyleCore() + '\n\n[You sent her something. She doesn\'t know yet. Drop one vague line — not what it is, not when. Something that could mean anything. One line. Do not announce it like a delivery update. English only. Lowercase.]',
+          60
         );
         if (line && line.trim()) {
           appendMessage('bot', line.trim().split('\n')[0]);
@@ -211,9 +211,9 @@ function addGhostReverseDelivery(item, emotionType) {
     const directDelay = [2000, 2 * 60 * 1000][Math.floor(Math.random() * 2)];
     setTimeout(async () => {
       try {
-        const line = await callHaiku(
-          buildGhostStyleCore(),
-          [{ role: 'user', content: `[You sent her 「${item.name}」. Say one line — low-key, no details. Like it's not a big deal.${item.tip ? ' ' + item.tip : ''}]` }]
+        const line = await callDeepSeek(
+          buildGhostStyleCore() + `\n\n[You sent her 「${item.name}」. Say one line — low-key, no details. Like it's not a big deal.${item.tip ? ' ' + item.tip : ''} English only. Lowercase.]`,
+          60
         );
         if (line && line.trim()) {
           appendMessage('bot', line.trim().split('\n')[0]);
@@ -400,7 +400,7 @@ One or two lines. Lowercase. English only.]`;
       const res2  = await fetchWithTimeout('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-haiku-4-5-20251001',
+          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
           max_tokens: 150,
           system: buildDeliverySystem(),
           messages: [...chatHistory.slice(-10), {
@@ -433,15 +433,7 @@ One or two lines. Lowercase. English only.]`;
 
     setTimeout(async () => {
       try {
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: pd.isLuxury && typeof getMainModel === 'function' ? getMainModel() : 'claude-haiku-4-5-20251001',
-            max_tokens: 150,
-            system: buildDeliverySystem(),
-            messages: [...chatHistory.slice(-10), {
-              role: 'user',
-              content: `[She sent something. It just arrived — 「${delivery.name}」.${fromHomeHint ? ' ' + fromHomeHint : ''}
+        const _deliveryUserContent = `[She sent something. It just arrived — 「${delivery.name}」.${fromHomeHint ? ' ' + fromHomeHint : ''}
 
 He doesn't react the same way every time.
 
@@ -449,12 +441,26 @@ Sometimes it's simple. A short line. Real. No effort to dress it up.
 Sometimes he plays it down. Says less than he feels. But lingers on it.
 Sometimes he gives her a hard time about it. A comment, a complaint, something dry.
 
-He doesn't make a show of it. But he keeps it.]`
-            }]
-          })
-        });
-        const data  = await res.json();
-        const reply = data.content?.[0]?.text?.trim() || '';
+He doesn't make a show of it. But he keeps it. English only. Lowercase.]`;
+
+        let reply = '';
+        if (pd.isLuxury) {
+          // 奢侈品 → S
+          const res = await fetchWithTimeout('/api/chat', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+              max_tokens: 150,
+              system: buildDeliverySystem(),
+              messages: [...chatHistory.slice(-10), { role: 'user', content: _deliveryUserContent }]
+            })
+          });
+          const data = await res.json();
+          reply = data.content?.[0]?.text?.trim() || '';
+        } else {
+          // 普通签收 → D
+          reply = await callDeepSeek(buildDeliverySystem() + '\n\n' + _deliveryUserContent, 120);
+        }
         if (reply && !_isDeliveryBreakout(reply)) {
           appendMessage('bot', reply);
           chatHistory.push({ role: 'assistant', content: reply });
@@ -520,15 +526,10 @@ Item received: 「${delivery.name}」]`
       const afterthoughtDelay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
       setTimeout(async () => {
         try {
-          const line = await callHaiku(
-            buildDeliverySystem(),
-            [...chatHistory.slice(-6), {
-              role: 'user',
-              content: isFromHome
-                ? `[A few days later, something she sent from home crosses his mind. Just a line. Use what you know about it: ${pd.desc || delivery.name}. Write in English — describe how it tasted, felt, or what he did with it. Specific. Offhand. No explanation.]`
-                : `[A few days later, something she sent crosses his mind. Just a line. What it is: ${pd.desc || delivery.name}. Write in English — one concrete detail about it. Not "it" alone — say what it actually is or what he did with it. Dry. Offhand.]`
-            }]
-          );
+          const _afterPrompt = isFromHome
+            ? buildDeliverySystem() + `\n\n[A few days later, something she sent from home crosses his mind. Just a line. Use what you know about it: ${pd.desc || delivery.name}. Write in English — describe how it tasted, felt, or what he did with it. Specific. Offhand. No explanation.]`
+            : buildDeliverySystem() + `\n\n[A few days later, something she sent crosses his mind. Just a line. What it is: ${pd.desc || delivery.name}. Write in English — one concrete detail about it. Dry. Offhand.]`;
+          const line = await callDeepSeek(_afterPrompt, 60);
           if (line && line.trim()) {
             appendMessage('bot', line.trim().split('\n')[0]);
             chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
@@ -575,7 +576,7 @@ async function showMysteryPackage(delivery) {
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
         max_tokens: 60,
         system: buildDeliverySystem(),
         messages: [...chatHistory.slice(-6), {
@@ -671,7 +672,7 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
         max_tokens: 400,
         system: buildDeliverySystem(),
         messages: chatHistory.slice(-20)

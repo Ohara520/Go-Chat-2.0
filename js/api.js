@@ -242,20 +242,19 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
   }
 }
 
-// ===== DeepSeek 文本处理调用 =====
-// 注意：/api/translate 路由实际是 DeepSeek，不只用于翻译
-// 目前主要用于：长期记忆提取（sendMessage主流程末尾）
-// 失败时调用方自行用 fetchDeepSeek 兜底
+// ===== DeepSeek 生成调用 =====
+// /api/deepseek 路由用于内容生成（情绪判断/心声/签收/转账拒绝等）
+// /api/translate 已删除
 
 /**
- * 调用 DeepSeek（/api/translate 路由）做文本处理
- * @param {string} prompt      完整提示词（system+user合并传入）
- * @param {number} maxTokens   默认500
+ * 调用 DeepSeek（/api/deepseek 路由）做内容生成
+ * @param {string} prompt      完整 prompt（system+user 合并传入）
+ * @param {number} maxTokens   默认200
  * @returns {string} 回复文本，失败返回空字符串
  */
-async function callDeepSeek(prompt, maxTokens = 500) {
+async function callDeepSeek(prompt, maxTokens = 200) {
   try {
-    const res = await fetchWithTimeout('/api/translate', {
+    const res = await fetchWithTimeout('/api/deepseek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user: prompt, max_tokens: maxTokens }),

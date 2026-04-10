@@ -808,23 +808,28 @@ async function _processMergedMessage(text) {
       _intimacyForceCleared = true; // 标记强制退出，阻止 Haiku 把它改回来
     }
 
-    // 正则没命中：一次Haiku同时判断调情+情绪（有图片时跳过）
+    // 正则没命中：DeepSeek 同时判断调情+情绪（有图片时跳过）
+    // 改用 D：中文情绪语境理解比 Haiku 准，Haiku 兜底
     if (!isIntimate && !isRecentPhoto) {
       try {
+        const _emotionPrompt =
+          '判断用户消息。只返回JSON，不要其他文字。\n' +
+          '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
+          'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。\n' +
+          `用户说：${text}`;
         const combinedRaw = await Promise.race([
-          fetchDeepSeek(
-            '判断用户消息。只返回JSON，不要其他文字。\n' +
-            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
-            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
-            `用户说：${text}`,
-            80
-          ),
-          new Promise(resolve => setTimeout(() => resolve(''), 2500))
-        ]);
+          callDeepSeek(_emotionPrompt, 80),
+          new Promise(resolve => setTimeout(() => resolve(''), 3000))
+        ]).then(r => r || fetchDeepSeek(
+          '判断用户消息。只返回JSON，不要其他文字。\n' +
+          '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true}\n' +
+          'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+          `用户说：${text}`, 80
+        ));
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
-            // 调情结果：强制退出时不允许 Haiku 把 isIntimate 改回 true
+            // 调情结果：强制退出时不允许改回 true
             if (combinedResult.flirt === true && !_intimacyForceCleared) isIntimate = true;
             // 情绪结果
             if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
@@ -1168,18 +1173,17 @@ async function _processMergedMessage(text) {
       });
       if (!applied) {
         const dailyLimit = userAsked ? 5 : 3;
-        const isDaily = getTodayGivenCount() >= dailyLimit;
-        const limitMsg = isDaily
-          ? '[System: Daily transfer limit reached — this transfer did not go through. Decline naturally. Do not explain system limits.]'
-          : '[System: Monthly transfer limit reached — you have given enough this month. Tell her the monthly limit is up, salary comes on the 25th. Keep it short and dry.]';
+        const limitMsg = getTodayGivenCount() >= dailyLimit
+          ? '[System: Daily transfer limit reached — this transfer did not go through. Decline in your own way. Do not explain system limits.]'
+          : '[System: Monthly transfer limit reached — you have given enough this month. Tell her the monthly limit is up, and that salary comes on the 25th. Keep it short and dry. Do not explain system limits literally.]';
         chatHistory.push({ role: 'user', content: limitMsg, _system: true });
-
-        // 治本：直接替换整条回复为简短拒绝，不再尝试 regex 补丁
-        // 原回复里已经说了"sent it / check it"，打补丁会留残骸，不如换掉
-        const refusalLines = isDaily
-          ? ["not today.", "already sorted you once.", "that's enough for now.", "done for the day."]
-          : ["not this month.", "you've had enough this month. wait for the 25th.", "month's up. salary's coming."];
-        reply = refusalLines[Math.floor(Math.random() * refusalLines.length)];
+        // 假账过滤：清除回复里提到转钱/具体金额的部分
+        reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
+        reply = reply.replace(/£\d+[^.!?\n]*(send|transfer|give|wire|on its way|coming your way)[^.!?\n]*/gi, '').trim();
+        // 清理Ghost转账语气词（check it / sort it / should be there等）
+        reply = reply.replace(/\b(check it|sort it|check your account|should be there( now)?|on its way|coming your way|use it|take it|it's there|it's sent|sent it)\b[.,]?/gi, '').trim();
+        reply = reply.replace(/\s{2,}/g, ' ').trim();
+        reply = reply || '.';
         return false;
       }
       giveAmount = applied;

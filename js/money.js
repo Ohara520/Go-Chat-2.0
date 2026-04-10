@@ -411,9 +411,9 @@ English only.`;
 
 async function generateMoneyRefuseLine(pattern) {
   try {
-    const res = await callHaiku(
+    const res = await callDeepSeek(
       buildGhostStyleCore() + '\n' + buildMoneyAskReactionPrompt(pattern),
-      typeof chatHistory !== 'undefined' ? chatHistory.slice(-4) : []
+      80
     );
     if (res && res.trim()) return res.trim();
   } catch(e) {}
@@ -1100,7 +1100,7 @@ async function ghostSendInitMessage(offlineHours) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
         max_tokens: 150,
         ...(() => { const s = buildSystemPrompt(); return { system: s, systemParts: buildSystemPromptParts(s) }; })(),
         messages: [...(typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []),
