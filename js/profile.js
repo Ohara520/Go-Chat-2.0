@@ -21,15 +21,19 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const LOCATIONS = [
-  { name: 'Hereford Base',        weight: 50, weatherCity: 'Hereford',   reason: '日常驻守与训练' },
-  { name: 'Manchester',           weight: 15, weatherCity: 'Manchester', reason: '休假，回老家' },
-  { name: 'London',               weight: 10, weatherCity: 'London',     reason: null },
-  { name: 'Edinburgh',            weight: 5,  weatherCity: 'Edinburgh',  reason: null },
-  { name: 'Germany',              weight: 5,  weatherCity: 'Berlin',     reason: null },
-  { name: 'Poland',               weight: 5,  weatherCity: 'Warsaw',     reason: null },
-  { name: 'Norway',               weight: 5,  weatherCity: 'Oslo',       reason: null },
-  { name: 'Undisclosed Location', weight: 3,  weatherCity: null,         reason: null },
-  { name: 'Classified',           weight: 2,  weatherCity: null,         reason: null },
+  { name: 'Hereford Base',        weight: 40, weatherCity: 'Hereford',   reason: 'Routine garrison and training.', type: 'base' },
+  { name: 'Manchester',           weight: 12, weatherCity: 'Manchester', reason: 'Leave. Back home.',              type: 'leave' },
+  { name: 'London',               weight: 8,  weatherCity: 'London',     reason: 'NATO coordination briefing.',   type: 'leave' },
+  { name: 'Edinburgh',            weight: 5,  weatherCity: 'Edinburgh',  reason: 'Highland terrain training.',    type: 'base' },
+  { name: 'Germany',              weight: 5,  weatherCity: 'Berlin',     reason: 'NATO joint exercise.',          type: 'deployed' },
+  { name: 'Poland',               weight: 4,  weatherCity: 'Warsaw',     reason: 'Eastern European support op.',  type: 'deployed' },
+  { name: 'Norway',               weight: 4,  weatherCity: 'Oslo',       reason: 'Arctic warfare training.',      type: 'deployed' },
+  { name: 'Amsterdam',            weight: 3,  weatherCity: 'Amsterdam',  reason: 'European transit. Brief stop.', type: 'deployed' },
+  { name: 'Paris',                weight: 3,  weatherCity: 'Paris',      reason: 'NATO intel coordination.',      type: 'deployed' },
+  { name: 'Dublin',               weight: 3,  weatherCity: 'Dublin',     reason: 'Cross-border liaison mission.', type: 'deployed' },
+  { name: 'Tokyo',                weight: 3,  weatherCity: 'Tokyo',      reason: 'Far East joint exercise.',      type: 'deployed' },
+  { name: 'Undisclosed Location', weight: 3,  weatherCity: null,         reason: null,                            type: 'deployed' },
+  { name: 'Classified',           weight: 2,  weatherCity: null,         reason: null,                            type: 'deployed' },
 ];
 
 // ghost_knows: true=主动提; 'heard'=听说过会祝福; false=不知道
@@ -243,8 +247,16 @@ function initLocation() {
     localStorage.setItem('currentLocation', chosen.name);
     localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
     localStorage.setItem('currentLocationReason', chosen.reason || '');
+    localStorage.setItem('currentLocationType', chosen.type || 'base');
     const days = 2 + Math.floor(Math.random() * 4);
     localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
+
+    // 追踪本月各类地点天数（用于月底工资计算）
+    const monthKey = 'locDays_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1);
+    const locDays  = JSON.parse(localStorage.getItem(monthKey) || '{"deployed":0,"base":0,"leave":0}');
+    const type     = chosen.type || 'base';
+    locDays[type]  = (locDays[type] || 0) + days;
+    localStorage.setItem(monthKey, JSON.stringify(locDays));
   }
 
   const locEl = document.getElementById('botLocation');
@@ -356,7 +368,9 @@ function initProfile() {
   const locationZH = {
     'Hereford Base': '赫里福德基地', 'Manchester': '曼彻斯特', 'London': '伦敦',
     'Edinburgh': '爱丁堡', 'Germany': '德国', 'Poland': '波兰',
-    'Norway': '挪威', 'Undisclosed Location': '未公开地点', 'Classified': '位置保密',
+    'Norway': '挪威', 'Amsterdam': '阿姆斯特丹', 'Paris': '巴黎',
+    'Dublin': '都柏林', 'Tokyo': '东京',
+    'Undisclosed Location': '未公开地点', 'Classified': '位置保密',
   };
   const remark = localStorage.getItem('botNickname') || '';
 

@@ -125,7 +125,21 @@ function checkSalaryDay() {
     }
   }
 
-  const salary = (Math.floor(Math.random() * 11) + 15) * 100; // £1500-£2500
+  // 根据本月出差天数浮动工资
+  const _monthKey  = 'locDays_' + today.getFullYear() + '_' + (today.getMonth() + 1);
+  const _locDays   = JSON.parse(localStorage.getItem(_monthKey) || '{"deployed":0,"base":0,"leave":0}');
+  const _total     = (_locDays.deployed || 0) + (_locDays.base || 0) + (_locDays.leave || 0) || 30;
+  const _deployRatio = (_locDays.deployed || 0) / _total;
+
+  let _salaryMin, _salaryMax;
+  if (_deployRatio >= 0.6) {
+    _salaryMin = 22; _salaryMax = 32; // 出差多：任务津贴拉满 £2200-£3200
+  } else if (_deployRatio >= 0.3) {
+    _salaryMin = 15; _salaryMax = 25; // 混合 £1500-£2500
+  } else {
+    _salaryMin = 10; _salaryMax = 18; // 基地/休假为主 £1000-£1800
+  }
+  const salary = (Math.floor(Math.random() * (_salaryMax - _salaryMin + 1)) + _salaryMin) * 100;
   localStorage.setItem('lastSalaryAmount', salary);
   localStorage.setItem('lastSalaryMonth', today.getFullYear() + '-' + (today.getMonth() + 1));
 
@@ -153,8 +167,9 @@ function checkSalaryDay() {
     ];
     const fallbackLine = salaryFallbacks[Math.floor(Math.random() * salaryFallbacks.length)];
 
+    const _deployHint = _deployRatio >= 0.6 ? ' Been away most of the month.' : _deployRatio < 0.3 ? ' Quiet month.' : '';
     callGrokWithSystem(
-      `You are Simon Riley.\n\nYou just sent her your monthly salary: £${salary}.\n\nOne line. lowercase. No explanation. No extra context. Keep it short. Like he wouldn't make a thing out of it.`,
+      `You are Simon Riley.\n\nYou just sent her your monthly salary: £${salary}.${_deployHint}\n\nOne line. lowercase. No explanation. No extra context. Keep it short. Like he wouldn't make a thing out of it.`,
       'say something.',
       80
     ).then(async line => {
