@@ -418,9 +418,9 @@ function renderMarket(categoryId) {
       const iTrigger = intimateTriggered[p.name];
       const isHighlighted = isUnlocked && !owned && iTrigger && (now - iTrigger.timestamp < 2 * 24 * 3600 * 1000);
 
-      const lockBtnSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:4px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="currentColor"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      const lockIconSvg = ``;
       const badgeHtml = !isUnlocked
-        ? `<div class="ghost-mentioned-tag" style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:flex;align-items:center;gap:3px;">🔒 继续相处后解锁</div>`
+        ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(180,40,80,0.85),rgba(140,30,100,0.8));color:#ffd0e0;border:none;font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;">🔒 继续相处后解锁</div>`
         : isHighlighted
           ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(192,132,252,0.15));border:1px solid rgba(236,72,153,0.5);color:#be185d;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">💡 也许正合时机</div>`
           : p.badge
@@ -428,7 +428,7 @@ function renderMarket(categoryId) {
             : '';
 
       const actionHtml = !isUnlocked
-        ? `<button class="product-buy-btn intimate-buy-btn" disabled style="opacity:0.5;cursor:not-allowed;display:flex;align-items:center;justify-content:center;">${lockBtnSvg}未解锁</button>`
+        ? `<button class="product-buy-btn intimate-buy-btn" disabled style="opacity:0.6;cursor:not-allowed;">🔒 未解锁</button>`
         : owned
           ? `<div class="product-owned-tag">✅ 已购买</div>`
           : `<button class="product-buy-btn intimate-buy-btn" onclick="openBuyModal(${i})">${btnLabel}</button>`;
@@ -438,9 +438,7 @@ function renderMarket(categoryId) {
         <div class="product-emoji">${p.emoji}</div>
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${!isUnlocked ? '继续和他相处，慢慢解锁' : p.desc}</div>
-        <div class="product-price">
-          ${!isUnlocked ? `🔒 £${p.price.toLocaleString()}` : '£' + p.price.toLocaleString()}
-        </div>
+        <div class="product-price">${!isUnlocked ? '🔒 ' : ''}£${p.price.toLocaleString()}</div>
         ${actionHtml}
       </div>`;
     });
@@ -492,17 +490,24 @@ function renderMarket(categoryId) {
 
     // 未解锁：显示锁定卡片
     if (!isUnlocked) {
-      const lockBtnSvg = `<svg width="10" height="11" viewBox="0 0 12 14" fill="none" style="vertical-align:middle;margin-right:4px;"><rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="currentColor"/><path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      // luxury用金色系，其他用卡片原色
+      const tipStyle = isLuxury
+        ? `background:linear-gradient(135deg,rgba(200,160,60,0.9),rgba(170,120,30,0.85));color:#fff8dc;border:none;`
+        : `background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#4a7a30;`;
+      const btnStyle = isLuxury
+        ? `background:linear-gradient(135deg,rgba(160,120,40,0.55),rgba(130,90,30,0.5));color:rgba(245,232,192,0.75);border:1px solid rgba(200,160,60,0.3);cursor:not-allowed;`
+        : `background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#5a8a40;cursor:not-allowed;`;
+      const cardStyle = isLuxury ? '' : `background:#f4f9f0;border:1px solid rgba(140,190,100,0.22);`;
       return `
         <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''}"
-             style="opacity:0.75;cursor:pointer;"
-             onclick="showToast('继续和 Ghost 相处，解锁更多商品 🌿')">
-          <div class="ghost-mentioned-tag" style="font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:flex;align-items:center;gap:3px;">🔒 继续相处后解锁</div>
+             style="${cardStyle}opacity:0.82;cursor:pointer;"
+             onclick="showToast('继续和 Ghost 相处，解锁更多商品 ✨')">
+          <div class="ghost-mentioned-tag" style="${tipStyle}font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;">🔒 继续相处后解锁</div>
           <div class="product-emoji">${p.emoji}</div>
           <div class="product-name">${p.name}</div>
-          <div class="product-desc">${p.desc}</div>
+          <div class="product-desc">继续和他相处，慢慢解锁</div>
           <div class="product-price">£${p.price.toLocaleString()}</div>
-          <button class="product-buy-btn ${isLuxury?'':''}${isFromHome?'fromhome-buy-btn':''} ${isHome?'home-buy-btn':''}" disabled style="opacity:0.5;cursor:not-allowed;">${lockBtnSvg}未解锁</button>
+          <button class="product-buy-btn" disabled style="${btnStyle}display:flex;align-items:center;justify-content:center;">🔒 未解锁</button>
         </div>`;
     }
 
