@@ -110,7 +110,7 @@ export default async function handler(req, res) {
         monthly_quota: inherited,
         used_count: 0,
         remaining: inherited,
-        memory_limit: data.memory_limit || 10,
+        memory_limit: 20,
         period_end: '2099-12-31T23:59:59.000Z',
       });
     }
