@@ -1502,7 +1502,8 @@ async function loadSubscribeCard() {
     if (!planEl) return;
     if (data.subscribed) {
       planEl.textContent = `💎 ${data.plan_name}`;
-      if (data.plan_id === 'free' || data.plan_id === 'trial') {
+      const _noPeriod = ['free', 'trial', 'permanent'].includes(data.plan_id);
+      if (_noPeriod) {
         remEl.textContent = `剩余 ${data.remaining} 条`;
       } else {
         const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
