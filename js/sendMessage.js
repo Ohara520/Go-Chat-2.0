@@ -1168,17 +1168,18 @@ async function _processMergedMessage(text) {
       });
       if (!applied) {
         const dailyLimit = userAsked ? 5 : 3;
-        const limitMsg = getTodayGivenCount() >= dailyLimit
-          ? '[System: Daily transfer limit reached — this transfer did not go through. Decline in your own way. Do not explain system limits.]'
-          : '[System: Monthly transfer limit reached — you have given enough this month. Tell her the monthly limit is up, and that salary comes on the 25th. Keep it short and dry. Do not explain system limits literally.]';
+        const isDaily = getTodayGivenCount() >= dailyLimit;
+        const limitMsg = isDaily
+          ? '[System: Daily transfer limit reached — this transfer did not go through. Decline naturally. Do not explain system limits.]'
+          : '[System: Monthly transfer limit reached — you have given enough this month. Tell her the monthly limit is up, salary comes on the 25th. Keep it short and dry.]';
         chatHistory.push({ role: 'user', content: limitMsg, _system: true });
-        // 假账过滤：清除回复里提到转钱/具体金额的部分
-        reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
-        reply = reply.replace(/£\d+[^.!?\n]*(send|transfer|give|wire|on its way|coming your way)[^.!?\n]*/gi, '').trim();
-        // 清理Ghost转账语气词（check it / sort it / should be there等）
-        reply = reply.replace(/\b(check it|sort it|check your account|should be there( now)?|on its way|coming your way|use it|take it|it's there|it's sent|sent it)\b[.,]?/gi, '').trim();
-        reply = reply.replace(/\s{2,}/g, ' ').trim();
-        reply = reply || '.';
+
+        // 治本：直接替换整条回复为简短拒绝，不再尝试 regex 补丁
+        // 原回复里已经说了"sent it / check it"，打补丁会留残骸，不如换掉
+        const refusalLines = isDaily
+          ? ["not today.", "already sorted you once.", "that's enough for now.", "done for the day."]
+          : ["not this month.", "you've had enough this month. wait for the 25th.", "month's up. salary's coming."];
+        reply = refusalLines[Math.floor(Math.random() * refusalLines.length)];
         return false;
       }
       giveAmount = applied;
