@@ -689,8 +689,43 @@ async function confirmTransfer() {
       .join('\n');
   })();
 
-  // 有理由或没理由都直接走判断收/退
-  // 没有理由时judgeUserTransfer会返回noReason，Ghost退钱并问一句
+  // 检测上下文里有没有明确理由
+  const _ctxLower = _recentContext.toLowerCase();
+  const _hasContextReason =
+    /礼物|送你|给你的|520|1314|生日|情人节|纪念|gift|present|for you|birthday|anniversary/.test(_ctxLower) ||
+    /补偿|赔你|我错了|补给你|对不起|抱歉|make it up|compensation|my fault|sorry|apologize/.test(_ctxLower) ||
+    /帮你|拿去用|买东西|用吧|花吧|use it|for this|for that|spend it|心意|喜欢你|爱你|想给你/.test(_ctxLower);
+
+  // 没有理由 → Ghost问一句，存pendingTransfer等用户回答
+  if (!_hasContextReason) {
+    sessionStorage.setItem('pendingTransfer', JSON.stringify({ amount, deducted: true }));
+
+    const _askLine = await (async () => {
+      try {
+        const res = await callGrokWithSystem(
+          buildGhostStyleCore() + '\nShe just transferred money to you without explanation. You want to know what it means — not because you doubt her, just because you do. Ask once, short, dry, lowercase. Do not mention the amount.',
+          _recentContext || 'she just sent money.',
+          60
+        );
+        if (res && !isBreakout(res)) return res.trim().split('\n')[0];
+      } catch(e) {}
+      const opts = ["what's this for.", "what's it for.", "why.", "reason."];
+      return opts[Math.floor(Math.random() * opts.length)];
+    })();
+
+    if (typeof showTyping === 'function') showTyping();
+    await new Promise(r => setTimeout(r, 800));
+    if (typeof hideTyping === 'function') hideTyping();
+    if (typeof appendMessage === 'function') appendMessage('bot', _askLine);
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({ role: 'assistant', content: _askLine });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    if (typeof _isSending !== 'undefined') _isSending = false;
+    return;
+  }
+
+  // 有理由 → 判断收/退
   const judgeContext = { reason: _recentContext };
   const { shouldRefund, reason, acceptAmount } = judgeUserTransfer(amount, judgeContext);
   const refundAmount = amount - acceptAmount;
@@ -718,7 +753,13 @@ async function confirmTransfer() {
   } else if (reason === 'smallNoReason') {
     judgePrompt = `[System: She transferred £${amount} without explanation. Small amount. Ghost mood ${mood}/10 — he took it, but tone is slightly puzzled or casual. No clear reason makes it a little odd, but he did not refuse. Write KEEP on its own line at the end.]`;
   } else {
-    judgePrompt = `[System: She transferred £${amount}. Ghost mood ${mood}/10 — he accepted it. Tone follows mood: if high, casual and easy; if neutral, brief and to the point. Write KEEP on its own line at the end.]`;
+    judgePrompt = `[System: She transferred £${amount} to Ghost. He accepted it.
+He is not responding to the money — he is responding to what it means coming from her.
+He received it quietly. No performance. No making it a thing.
+One line. His own words. Not flat, not cold, not overly warm.
+Something that lands — like he got it, and he's fine with it.
+Do not say "noted". Do not explain why he kept it.
+Write KEEP on its own line at the end.]`;
   }
 
   if (typeof chatHistory !== 'undefined') {
@@ -751,7 +792,7 @@ async function confirmTransfer() {
       } catch(e) { return ''; }
     })();
 
-    if (!reply) reply = shouldRefund ? 'sent it back.' : 'noted.';
+    if (!reply) reply = shouldRefund ? 'sent it back.' : 'got it.';
 
     if (typeof hideTyping === 'function') hideTyping();
     if (typeof updateToRead === 'function') updateToRead();
@@ -820,6 +861,113 @@ async function confirmTransfer() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 转账UI卡片
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// handlePendingTransfer
+// 用户回答了理由后，继续处理之前挂起的转账
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function handlePendingTransfer(amount, userReason) {
+  const recentContext = (typeof chatHistory !== 'undefined')
+    ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
+      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n')
+    : '';
+
+  const judgeContext = { reason: recentContext + '\nHer reason: ' + userReason };
+  const { shouldRefund, reason, acceptAmount } = judgeUserTransfer(amount, judgeContext);
+  const refundAmount = amount - acceptAmount;
+  const mood = getMoodLevel();
+
+  let judgePrompt = '';
+  if (shouldRefund) {
+    const hintMap = {
+      coldWar:         `Cold war is active. Ghost sends it back — cold, minimal, no explanation.`,
+      comfortLevel:    `The relationship is not there yet. Return it, no explanation, not cold.`,
+      mood:            `Ghost is in a bad mood today (${mood}/10). Not taking it. Return it, tone is hard.`,
+      overMax:         `Too much. He does not take this amount. Return it, one line.`,
+      notThis:         `The reason is not enough, or the amount is off. Return it, brief.`,
+      fallback:        `Return it. No explanation.`,
+    };
+    judgePrompt = `[System: She just transferred £${amount} to Ghost. ${hintMap[reason] || hintMap.fallback} Write REFUND on its own line at the end.]`;
+  } else {
+    judgePrompt = `[System: She transferred £${amount} to Ghost. She explained why. He accepted it — not because of the money, because of what it means from her. One line. His own words. Not flat, not cold. Write KEEP on its own line at the end.]`;
+  }
+
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({ role: 'user', content: judgePrompt, _system: true, _userTransfer: { amount } });
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+
+  const container = document.getElementById('messagesContainer');
+  const cardId = container ? showUserTransferCard(container, amount) : null;
+  if (typeof showTyping === 'function') showTyping();
+  if (typeof _isSending !== 'undefined') _isSending = true;
+
+  try {
+    let reply = '';
+    try {
+      const res = await fetchWithTimeout('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: recentContext + '\n\n' + judgePrompt, max_tokens: 150, scene: 'normal' })
+      }, 15000);
+      if (res.ok) {
+        const d = await res.json();
+        const t = d.text?.trim() || '';
+        reply = (typeof isBreakout === 'function' && isBreakout(t)) ? '' : t;
+      }
+    } catch(e) {}
+
+    if (!reply) reply = shouldRefund ? 'sent it back.' : 'got it.';
+    if (typeof hideTyping === 'function') hideTyping();
+    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z]))\n?/g, '').replace(/\s{2,}/g, ' ').trim();
+
+    if (shouldRefund) {
+      const bal = typeof getBalance === 'function' ? getBalance() : 0;
+      if (typeof setBalance === 'function') setBalance(bal + amount);
+      if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（Ghost 退回）', amount });
+      localStorage.setItem('lastRefundAt', Date.now());
+      if (typeof renderWallet === 'function') renderWallet();
+      updateUserTransferCard(cardId, false);
+      if (container) showGhostTransferCard(container, amount, reply, true);
+      if (typeof chatHistory !== 'undefined') {
+        chatHistory.push({ role: 'assistant', content: reply });
+        chatHistory.push({ role: 'user', content: `[System: Ghost returned £${amount}.]`, _system: true });
+      }
+    } else {
+      changeAffection(1);
+      if (!localStorage.getItem('firstUserGiftAccepted')) localStorage.setItem('firstUserGiftAccepted', 'true');
+      updateUserTransferCard(cardId, true);
+      if (container) {
+        const now = new Date();
+        const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        const ghostReceivedDiv = document.createElement('div');
+        ghostReceivedDiv.className = 'message bot';
+        ghostReceivedDiv.innerHTML = `<div class="transfer-card ghost-transfer-card">
+          <div class="transfer-card-top"><div class="transfer-label">RECEIVED FROM YOU</div><div class="transfer-name">已收到</div></div>
+          <div class="transfer-amount-block"><div class="transfer-amount-label">AMOUNT</div><div class="transfer-amount">£${acceptAmount}</div></div>
+          <div class="transfer-footer"><div class="transfer-status">✅ 已收到</div><div class="transfer-time">${timeStr}</div></div></div>`;
+        container.appendChild(ghostReceivedDiv);
+        container.scrollTop = container.scrollHeight;
+      }
+      if (reply && typeof appendMessage === 'function') appendMessage('bot', reply);
+      if (typeof chatHistory !== 'undefined') chatHistory.push({ role: 'assistant', content: reply });
+    }
+
+    if (typeof saveHistory === 'function') saveHistory();
+    if (typeof incrementTodayCount === 'function') incrementTodayCount();
+    const _em = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email');
+    if (_em && typeof consumeQuota === 'function') consumeQuota().catch(() => {});
+  } catch(e) {
+    if (typeof hideTyping === 'function') hideTyping();
+    const bal = typeof getBalance === 'function' ? getBalance() : 0;
+    if (typeof setBalance === 'function') setBalance(bal + amount);
+    if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（网络错误）', amount });
+    if (typeof renderWallet === 'function') renderWallet();
+    updateUserTransferCard(cardId, false);
+  } finally {
+    if (typeof _isSending !== 'undefined') _isSending = false;
+  }
+}
 
 function showUserTransferCard(container, amount) {
   const now     = new Date();

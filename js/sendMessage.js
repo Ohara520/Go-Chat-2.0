@@ -414,6 +414,24 @@ async function _processMergedMessage(text) {
 
   resetSilenceTimer();
 
+  // ── pendingTransfer检测：用户回答了理由，继续处理转账 ──
+  const _pendingTransferRaw = sessionStorage.getItem('pendingTransfer');
+  if (_pendingTransferRaw) {
+    try {
+      const _pt = JSON.parse(_pendingTransferRaw);
+      if (_pt && _pt.amount && _pt.deducted) {
+        sessionStorage.removeItem('pendingTransfer');
+        // 用户这条消息作为理由，重新走判断收/退
+        if (typeof handlePendingTransfer === 'function') {
+          await handlePendingTransfer(_pt.amount, text);
+          return;
+        }
+      }
+    } catch(e) {
+      sessionStorage.removeItem('pendingTransfer');
+    }
+  }
+
   // ── 用户回来检测（离开超过2小时）────────────────────────
   const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
   const _comebackMins = Math.floor(_comebackGap / 60000);
