@@ -535,13 +535,34 @@ function _doTakeoutOrder(city, itemId) {
 function addTakeoutOrder(city, item) {
   const fee   = getTakeoutFee();
   const total = item.price + fee.fee;
-  const bal   = getBalance();
 
-  if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); return false; }
+  if (typeof showCardSelector === 'function') {
+    showCardSelector(total, item.name,
+      () => {
+        const bal = getBalance();
+        if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); return false; }
+        addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
+        if (typeof renderWallet === 'function') renderWallet();
+        if (typeof showGhostCardReceipt === 'function') showGhostCardReceipt(total, item.name, true);
+        _finishTakeoutOrder(city, item, fee);
+      },
+      () => {
+        if (!spendGhostCard(total, item.name, 'daily')) { if (typeof showToast === 'function') showToast('Ghost Card 额度不足'); return false; }
+        if (typeof showGhostCardReceipt === 'function') showGhostCardReceipt(total, item.name, false);
+        _finishTakeoutOrder(city, item, fee);
+      }
+    );
+  } else {
+    const bal = getBalance();
+    if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); return false; }
+    addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
+    if (typeof renderWallet === 'function') renderWallet();
+    _finishTakeoutOrder(city, item, fee);
+  }
+  return true;
+}
 
-  addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
-  if (typeof renderWallet === 'function') renderWallet();
-
+function _finishTakeoutOrder(city, item, fee) {
   // 配送时间按品类区分
   const deliverMins = item.cat === 'drink' ? 15 + Math.floor(Math.random() * 11)
                     : item.cat === 'side'  ? 20 + Math.floor(Math.random() * 16)

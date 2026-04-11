@@ -428,78 +428,7 @@ async function generateMoneyRefuseLine(pattern) {
 }
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 统一给钱执行函数
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function applyMoneyEffect(amount, options = {}) {
-  if (!amount || amount <= 0) return false;
-
-  const userRequested = options.userRequested || false;
-  const _aff = getAffection();
-
-  if (_aff < 30) return false;
-  if (_aff < 40 && !options.bypassAffectionGate) {
-    const _todayLowAffKey = 'lowAffGiven_' + new Date().toISOString().slice(0, 10);
-    if (localStorage.getItem(_todayLowAffKey)) return false;
-    // 【已接新 motive 体系】——只有 care 动机才在低好感时破例给
-    // 调用方通过 options.motive 传入，没传则保守不给
-    if (options.motive !== 'care') return false;
-    if (Math.random() > 0.3) return false;
-    localStorage.setItem(_todayLowAffKey, '1');
-    amount = Math.min(amount, 20);
-  }
-
-  if (!userRequested && localStorage.getItem('userDislikesMoney') === 'true') return false;
-
-  const todayCount = getTodayGivenCount();
-  const dailyLimit = userRequested ? 5 : 3;
-  if (todayCount >= dailyLimit) return false;
-
-  if (!userRequested && !options.bypassCooldown) {
-    const lastGivenAt = parseInt(localStorage.getItem('lastGivenAt') || '0');
-    if (Date.now() - lastGivenAt < _getTransferCooldownMs()) return false;
-  }
-
-  if (!userRequested && !options.bypassRefundCooldown) {
-    const lastRefundAt = parseInt(localStorage.getItem('lastRefundAt') || '0');
-    if (Date.now() - lastRefundAt < 2 * 3600 * 1000) return false;
-  }
-
-  const conversationGiven = parseInt(sessionStorage.getItem('conversationGivenCount') || '0');
-  if (!userRequested && !options.bypassSessionLimit) {
-    if (conversationGiven >= 1) return false;
-  }
-
-  const weeklyUsed  = getWeeklyGiven();   // 实为月度已用
-  const weeklyLimit = _getWeeklyTransferLimit();  // 实为月度上限
-
-  // 月度上限检查
-  if (!options.bypassWeeklyLimit && weeklyLimit > 0 && weeklyUsed >= weeklyLimit) return false;
-
-  // 只做月度剩余截断，不做单次硬截断
-  const remaining   = weeklyLimit > 0 ? weeklyLimit - weeklyUsed : amount;
-  const actualAmount = options.bypassWeeklyLimit ? amount : Math.min(amount, remaining);
-
-  if (typeof addTransaction === 'function') {
-    addTransaction({ icon: '💷', name: options.label || 'Ghost 零花钱', amount: actualAmount });
-  }
-  addWeeklyGiven(actualAmount);
-  incrementTodayGivenCount();
-  localStorage.setItem('lastGivenAt', Date.now());
-  sessionStorage.setItem('conversationGivenCount', String(conversationGiven + 1));
-
-  if (typeof renderWallet === 'function') renderWallet();
-  if (options.affection !== false) changeAffection(1);
-  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
-
-  if (options.showCard !== false) {
-    const container = document.getElementById('messagesContainer');
-    if (container) showGhostTransferCard(container, actualAmount, options.note || '', false);
-  }
-
-  return actualAmount;
-}
+// ── 旧转账系统已移除，请使用 Ghost Card ──
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1009,63 +938,7 @@ function updateUserTransferCard(cardId, kept) {
   el.style.color = kept ? '#4a8a30' : '#9ca3af';
 }
 
-function showGhostTransferCard(container, amount, noteText, isRefund) {
-  const now     = new Date();
-  const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-  const hasEnglish = noteText && /[a-zA-Z]/.test(noteText);
-  if (noteText && hasEnglish) {
-    const parts = noteText.split(/\n---\n/).filter(p => p.trim());
-    if (parts.length > 1) {
-      parts.forEach((p, i) => setTimeout(() => {
-        if (typeof appendMessage === 'function') appendMessage('bot', p.trim());
-      }, i * 600));
-    } else {
-      if (typeof appendMessage === 'function') appendMessage('bot', noteText);
-    }
-  }
-  setTimeout(() => {
-    const c = document.getElementById('messagesContainer');
-    if (!c) return;
-    const divOut = document.createElement('div');
-    divOut.className = 'message bot';
-    divOut.innerHTML = `<div class="transfer-card ghost-transfer-card ${isRefund ? 'refund-card' : ''}">
-      <div class="transfer-card-top">
-        <div class="transfer-label">${isRefund ? 'REFUND' : 'TRANSFER TO YOU'}</div>
-        <div class="transfer-name">${isRefund ? '退款' : '转给你'}</div>
-      </div>
-      <div class="transfer-amount-block">
-        <div class="transfer-amount-label">AMOUNT</div>
-        <div class="transfer-amount">£${amount}</div>
-      </div>
-      <div class="transfer-footer">
-        <div class="transfer-status ${isRefund ? 'refund-status' : ''}">${isRefund ? '退款中' : '转账中'}</div>
-        <div class="transfer-time">${timeStr}</div>
-      </div></div>`;
-    c.appendChild(divOut);
-    c.scrollTop = c.scrollHeight;
-    setTimeout(() => {
-      const c2 = document.getElementById('messagesContainer');
-      if (!c2) return;
-      const divIn = document.createElement('div');
-      divIn.className = 'message user';
-      divIn.innerHTML = `<div class="transfer-card user-transfer-card">
-        <div class="transfer-card-top">
-          <div class="transfer-label">RECEIVED</div>
-          <div class="transfer-name">${isRefund ? '已退款 ✓' : '已到账 ✓'}</div>
-        </div>
-        <div class="transfer-amount-block">
-          <div class="transfer-amount-label">AMOUNT</div>
-          <div class="transfer-amount">£${amount}</div>
-        </div>
-        <div class="transfer-footer">
-          <div class="transfer-status">${isRefund ? '已退款' : '已到账'}</div>
-          <div class="transfer-time">${timeStr}</div>
-        </div></div>`;
-      c2.appendChild(divIn);
-      c2.scrollTop = c2.scrollHeight;
-    }, 1000);
-  }, noteText ? 800 : 0);
-}
+// ── showGhostTransferCard 已移除 ──
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1122,4 +995,230 @@ async function ghostSendInitMessage(offlineHours) {
   } catch(e) {
     if (typeof hideTyping === 'function') hideTyping();
   }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 💳 Ghost Card 亲情卡系统
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function getGhostCardMonthlyLimit() {
+  const coldWar   = localStorage.getItem('coldWarMode') === 'true';
+  if (coldWar) return 0;
+
+  const jealousy  = typeof getJealousyLevelCapped === 'function' ? getJealousyLevelCapped() : 'none';
+  const mood      = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
+  const trust     = typeof getTrustHeat === 'function' ? getTrustHeat() : 50;
+  const affection = typeof getAffection === 'function' ? getAffection() : 50;
+  const s         = typeof getGhostResponseState === 'function' ? getGhostResponseState() : { moneyEase: 1, availability: 'normal' };
+
+  // 基础额度由 moneyEase 决定
+  const limitMap = { 0: 0, 1: 1200, 2: 2000, 3: 2600 };
+  let limit = limitMap[s.moneyEase] || 0;
+
+  // 关系特别顺时小幅上调
+  if (trust >= 80 && affection >= 75 && mood >= 7 && jealousy === 'none' && s.availability === 'open') {
+    limit += 400;
+  }
+
+  // 状态压制
+  if (mood <= 3)               limit = Math.min(limit, 1000);
+  if (jealousy === 'medium')   limit = Math.min(limit, 1400);
+  if (jealousy === 'severe')   limit = Math.min(limit, 800);
+
+  return Math.max(0, Math.min(limit, 3000));
+}
+
+function getGhostCard() {
+  const monthlyLimit = getGhostCardMonthlyLimit();
+  const defaults = {
+    balance: Math.round(monthlyLimit * 0.25),
+    monthlyLimit,
+    spentThisMonth: 0,
+    lastResetMonth: new Date().getMonth()
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem('ghostCard') || 'null');
+    if (!saved) {
+      localStorage.setItem('ghostCard', JSON.stringify(defaults));
+      return defaults;
+    }
+    // 月初重置
+    const now = new Date().getMonth();
+    if (saved.lastResetMonth !== now) {
+      const newLimit = getGhostCardMonthlyLimit();
+      saved.monthlyLimit    = newLimit;
+      saved.balance         = Math.round(newLimit * 0.25);
+      saved.spentThisMonth  = 0;
+      saved.lastResetMonth  = now;
+      // 冷战时停卡
+      if (newLimit === 0) saved.balance = 0;
+      localStorage.setItem('ghostCard', JSON.stringify(saved));
+    }
+    // 实时同步月度上限（状态变化时）
+    saved.monthlyLimit = monthlyLimit;
+    return { ...defaults, ...saved };
+  } catch(e) { return defaults; }
+}
+
+function saveGhostCard(card) {
+  try { localStorage.setItem('ghostCard', JSON.stringify(card)); } catch(e) {}
+}
+
+function getGhostCardBalance() {
+  const card = getGhostCard();
+  return Math.max(0, Math.min(card.balance, card.monthlyLimit - card.spentThisMonth));
+}
+
+function spendGhostCard(amount, itemName, category) {
+  category = category || 'unknown';
+  const card = getGhostCard();
+  const available = Math.min(card.balance, card.monthlyLimit - card.spentThisMonth);
+  if (available < amount) return false;
+  card.balance -= amount;
+  card.spentThisMonth += amount;
+  saveGhostCard(card);
+  if (typeof addTransaction === 'function') addTransaction({ icon: '💳', name: `Ghost Card · ${itemName}`, amount: -amount });
+  if (typeof renderWallet === 'function') renderWallet();
+  _ghostCardReaction(amount, itemName, category, card);
+  return true;
+}
+
+function _classifySpend(amount, category, card) {
+  const state    = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
+  const jealousy = typeof getJealousyLevelCapped === 'function' ? getJealousyLevelCapped() : 'none';
+  const { moneyEase = 1, sharpness = 0, warmth = 0, availability = 'normal' } = state;
+
+  const history = JSON.parse(localStorage.getItem('ghostCardRecentSpend') || '[]');
+  history.push({ amount, category, at: Date.now() });
+  const last10min = history.filter(s => Date.now() - s.at < 10 * 60 * 1000);
+  localStorage.setItem('ghostCardRecentSpend', JSON.stringify(history.slice(-20)));
+
+  if (last10min.length >= 3) return { reactionType: 'intervene', lineTone: 'sharp', needExplanation: true };
+
+  const limit = card.monthlyLimit || 2000;
+  const ratio = amount / limit;
+  const baseSensitivity = { daily: 0, self: 0.5, for_him: 0, gift: 1.5, unknown: 1 }[category] || 1;
+  let sensitivityMod = 0;
+  if (jealousy === 'medium') sensitivityMod += 1;
+  if (jealousy === 'severe') sensitivityMod += 2;
+  if (availability === 'closed') sensitivityMod += 1;
+  if (moneyEase >= 2) sensitivityMod -= 0.5;
+
+  let amountWeight = 0;
+  if (ratio > 0.3 || amount > 400) amountWeight = 3;
+  else if (ratio > 0.15 || amount > 200) amountWeight = 2;
+  else if (ratio > 0.05 || amount > 80) amountWeight = 1;
+
+  const todayReacted = localStorage.getItem(`ghostCardReacted_${category}_${new Date().toDateString()}`);
+  const finalScore = baseSensitivity + sensitivityMod + amountWeight + (todayReacted ? -1 : 0);
+
+  let reactionType, lineTone, needExplanation = false;
+  if (finalScore <= 0)   { reactionType = 'ignore';    lineTone = 'casual'; }
+  else if (finalScore <= 1)   { reactionType = 'note';      lineTone = warmth >= 2 ? 'casual' : 'dry'; }
+  else if (finalScore <= 2.5) { reactionType = 'ask';       lineTone = sharpness >= 2 ? 'guarded' : 'dry'; needExplanation = amount > 150; }
+  else if (finalScore <= 4)   { reactionType = 'probe';     lineTone = 'sharp'; needExplanation = true; }
+  else                        { reactionType = 'intervene'; lineTone = 'sharp'; needExplanation = true; }
+
+  if (category === 'gift' && (jealousy === 'medium' || jealousy === 'severe')) {
+    if (reactionType === 'ask')  reactionType = 'probe';
+    if (reactionType === 'note') reactionType = 'ask';
+    lineTone = 'sharp'; needExplanation = true;
+  }
+  return { reactionType, lineTone, needExplanation };
+}
+
+function _buildGhostCardPrompt(amount, itemName, category, decision) {
+  const { reactionType, lineTone, needExplanation } = decision;
+  const state    = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
+  const jealousy = typeof getJealousyLevelCapped === 'function' ? getJealousyLevelCapped() : 'none';
+  const categoryHint = { daily: 'everyday spending — food, drinks, transport', self: 'something for herself', for_him: 'a gift for you', gift: 'something for someone else', unknown: 'purpose unknown' }[category] || 'unknown purpose';
+  const toneHint = { casual: 'casual, offhand', dry: 'dry, controlled, brief', guarded: 'guarded, slightly sharp', sharp: 'sharp, direct, wants an answer' }[lineTone] || 'dry';
+  const reactionHint = {
+    ignore:    null,
+    note:      `You saw it. One line — notice it without making it a thing. ${toneHint}.`,
+    ask:       `You saw the charge. Ask what it was for — one line, ${toneHint}. ${needExplanation ? 'You want an actual answer.' : 'Not demanding, just asking.'}`,
+    probe:     `You saw the charge and it caught your attention. Push a little — ${toneHint}. One line, wants an explanation.${jealousy !== 'none' ? ' There is an edge to it.' : ''}`,
+    intervene: `Multiple charges or something significant. Putting a stop to it for now. One line — direct, not angry, but clear.`,
+  }[reactionType];
+  if (!reactionHint) return null;
+  return `[Ghost Card notification: she spent £${amount} on: ${categoryHint}. Item: 「${itemName}」.\nYour reaction: ${reactionHint}\nState — warmth: ${state.warmth ?? 1}/3, sharpness: ${state.sharpness ?? 0}/3, money ease: ${state.moneyEase ?? 1}/3.\nOne line only. English. Lowercase. Do not mention "card" or "notification".]`;
+}
+
+async function _ghostCardReaction(amount, itemName, category, card) {
+  try {
+    const _isFlirting = (chatHistory || []).slice(-4).some(m => m._intimate);
+    if (_isFlirting) return;
+    const decision = _classifySpend(amount, category, card);
+    if (decision.reactionType === 'ignore') return;
+    const prompt = _buildGhostCardPrompt(amount, itemName, category, decision);
+    if (!prompt) return;
+    localStorage.setItem(`ghostCardReacted_${category}_${new Date().toDateString()}`, '1');
+    await new Promise(r => setTimeout(r, 3000));
+    if (decision.reactionType === 'intervene') {
+      const c = getGhostCard(); c.balance = Math.max(0, c.balance - amount * 0.3); saveGhostCard(c);
+    }
+    const _sys = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
+    const _res = await fetchWithTimeout('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514', max_tokens: 60, system: _sys, messages: [...(chatHistory||[]).filter(m=>!m._system).slice(-4), { role:'user', content: prompt }] })
+    }, 10000);
+    const _data = await _res.json();
+    const _reply = (_data.content?.[0]?.text || '').trim();
+    const _bad = ["i'm claude","i am claude","as an ai","can't roleplay","ghost card","notification"];
+    if (_reply && !_bad.some(p => _reply.toLowerCase().includes(p))) {
+      if (typeof appendMessage === 'function') appendMessage('bot', _reply);
+      if (typeof chatHistory !== 'undefined') { chatHistory.push({ role:'assistant', content: _reply }); if (typeof saveHistory === 'function') saveHistory(); }
+    }
+  } catch(e) { console.warn('[GhostCard] 反应失败:', e); }
+}
+
+function showGhostCardReceipt(amount, itemName, isUserCard) {
+  const now = new Date();
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const dateStr = `${now.getMonth()+1}/${now.getDate()}`;
+  const c = document.getElementById('messagesContainer');
+  if (!c) return;
+  const div = document.createElement('div');
+  div.className = 'message user';
+  if (isUserCard) {
+    div.innerHTML = `<div class="payment-card my-card"><div class="payment-card-header"><span class="payment-card-icon">🌸</span><span class="payment-card-label">MY CARD</span></div><div class="payment-card-item">${itemName}</div><div class="payment-card-amount">£${amount}</div><div class="payment-card-footer"><span class="payment-card-status">✓ 支付成功</span><span class="payment-card-time">${dateStr} ${timeStr}</span></div></div>`;
+  } else {
+    div.innerHTML = `<div class="payment-card ghost-card"><div class="payment-card-header"><span class="payment-card-label">GHOST CARD</span><span class="payment-card-chip">◈</span></div><div class="payment-card-item">${itemName}</div><div class="payment-card-amount">£${amount}</div><div class="payment-card-footer"><span class="payment-card-status">✓ APPROVED</span><span class="payment-card-time">${dateStr} ${timeStr}</span></div></div>`;
+  }
+  c.appendChild(div); c.scrollTop = c.scrollHeight;
+}
+
+function showCardSelector(amount, itemName, onUserCard, onGhostCard) {
+  const ghostAvailable = getGhostCardBalance();
+  const userBal = typeof getBalance === 'function' ? getBalance() : 0;
+  const canUseGhost = ghostAvailable >= amount;
+  const canUseUser  = userBal >= amount;
+  const existing = document.getElementById('cardSelectorModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'cardSelectorModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;';
+  modal.innerHTML = `<div style="background:#fff;border-radius:24px 24px 0 0;padding:28px 20px 40px;width:100%;max-width:420px;animation:slideUp 0.25s ease;">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:11px;color:#aaa;letter-spacing:1.5px;">SELECT PAYMENT</div>
+      <div style="font-size:24px;font-weight:600;color:#1a1a1a;margin-top:4px;">£${amount}</div>
+      <div style="font-size:12px;color:#bbb;margin-top:2px;">${itemName}</div>
+    </div>
+    <div onclick="window._cardSelect('user')" style="background:linear-gradient(135deg,#fff5f8,#fde8f0);border:1.5px solid ${canUseUser?'#f4b8cc':'#eee'};border-radius:16px;padding:16px 18px;margin-bottom:12px;cursor:${canUseUser?'pointer':'not-allowed'};opacity:${canUseUser?1:0.45};display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:12px;"><span style="font-size:24px;">🌸</span><div><div style="font-size:13px;font-weight:600;color:#c06080;">我的卡</div><div style="font-size:11px;color:#d090a0;">余额 £${userBal.toFixed(2)}</div></div></div>
+      <div style="font-size:18px;color:#e090b0;">${canUseUser?'›':'余额不足'}</div>
+    </div>
+    <div onclick="window._cardSelect('ghost')" style="background:linear-gradient(135deg,#1a2018,#2a3828);border:1.5px solid ${canUseGhost?'rgba(201,168,76,0.5)':'#333'};border-radius:16px;padding:16px 18px;margin-bottom:20px;cursor:${canUseGhost?'pointer':'not-allowed'};opacity:${canUseGhost?1:0.45};display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+      <div style="display:flex;align-items:center;gap:12px;"><span style="font-size:20px;color:#c9a84c;">◈</span><div><div style="font-size:13px;font-weight:600;color:#c9a84c;letter-spacing:1px;">GHOST CARD</div><div style="font-size:11px;color:rgba(201,168,76,0.55);">${canUseGhost?`可用 £${ghostAvailable.toFixed(2)}`:'额度不足'}</div></div></div>
+      <div style="font-size:18px;color:#c9a84c;">${canUseGhost?'›':'—'}</div>
+    </div>
+    <div onclick="window._cardSelect('cancel')" style="text-align:center;font-size:13px;color:#bbb;cursor:pointer;padding:8px;">取消</div>
+  </div>`;
+  window._cardSelect = (choice) => {
+    modal.remove(); delete window._cardSelect;
+    if (choice === 'user' && canUseUser) onUserCard();
+    else if (choice === 'ghost' && canUseGhost) onGhostCard();
+  };
+  document.body.appendChild(modal);
 }

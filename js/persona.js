@@ -655,27 +655,14 @@ function buildSystemPrompt() {
     ? 'she has pushed back on money once — be cautious'
     : '';
 
-  // 转账冷却
-  const todayGivenCount  = (typeof getTodayGivenCount  === 'function') ? getTodayGivenCount()  : 0;
-  const weeklyUsed       = (typeof getWeeklyGiven       === 'function') ? getWeeklyGiven()       : 0;
-  const weeklyLimit      = (typeof _getWeeklyTransferLimit === 'function') ? _getWeeklyTransferLimit() : 500;
-  const lastGivenAt      = parseInt(localStorage.getItem('lastGivenAt') || '0');
-  const sessionGiven     = parseInt(sessionStorage.getItem('conversationGivenCount') || '0');
-  const lastSendGiftAt   = parseInt(localStorage.getItem('lastSendGiftAt') || '0');
-  const giftOnCooldown   = Date.now() - lastSendGiftAt <= 7 * 24 * 3600 * 1000;
+  // 转账冷却 — 旧系统已移除，Ghost Card 由系统处理
+  const giftOnCooldown = Date.now() - parseInt(localStorage.getItem('lastSendGiftAt') || '0') <= 7 * 24 * 3600 * 1000;
 
-  let moneyLimitNote = '';
-  if (todayGivenCount >= 3) {
-    moneyLimitNote = '[Daily transfer limit reached. Do NOT use GIVE_MONEY tag or mention money under any circumstances.]';
-  } else if (weeklyUsed >= weeklyLimit) {
-    moneyLimitNote = '[Weekly transfer limit reached. Do NOT use GIVE_MONEY tag.]';
-  } else if (Date.now() - lastGivenAt < 15 * 60 * 1000) {
-    // 【低优先级】这里写死了15分钟，和 money.js 的动态冷却轻微脱节
-    // 后续改成抽象描述：'Money is not repeated back-to-back. Leave space before doing it again.'
-    moneyLimitNote = '[Transfer cooldown active. Do NOT use GIVE_MONEY tag or hint at it.]';
-  } else if (sessionGiven >= 1) {
-    moneyLimitNote = '[Already transferred once this conversation. Do NOT use GIVE_MONEY tag again.]';
-  }
+  // Ghost Card 状态
+  const _ghostCardBalance = typeof getGhostCardBalance === 'function' ? getGhostCardBalance() : 0;
+  const _ghostCardLimit   = typeof getGhostCardMonthlyLimit === 'function' ? getGhostCardMonthlyLimit() : 0;
+  const _coldWar          = localStorage.getItem('coldWarMode') === 'true';
+  const _cardSuspended    = _coldWar || _ghostCardLimit === 0;
 
   // ===== 固定层 =====
   const fixedPrompt = buildFixedPrompt(userName);
@@ -755,13 +742,16 @@ ${buildDynamicBlocks()}
 
 ${buildAstroBlock(ghostZodiac)}
 
-[MONEY — GIVING RULES]
-Only give money when it actually means something:
-she mentioned needing something / lost something / he wants to make up for something.
-When giving: GIVE_MONEY:amount:note — English only.
-Never announce amounts in the reply itself.
-Cold war: never give. After one gesture per conversation, shift to words only.
-Tone when giving: flat, practical. "sort it." / "check it." / "you'll need it." Then move on.
+[GHOST CARD]
+You gave her a card linked to your account. She can use it to pay for things — takeout, shopping, whatever she needs.
+You can see when she spends on it.
+${_cardSuspended
+  ? `The card is currently suspended. If she asks for money or tries to use the card, tell her it is not available right now. Keep it brief.`
+  : `Card available. Monthly limit: £${_ghostCardLimit}. Current balance: £${_ghostCardBalance}.
+If she asks for money or a transfer — don't transfer directly. Point her to the card instead. Dry, practical.
+"use the card." / "it's there." / "check the card." — then move on.
+You do not send money directly anymore. The card is how it works now.`
+}
 
 [SENDING — GIVE RULES]
 ONLY via SEND_GIFT tag. Never hint or promise without the tag.

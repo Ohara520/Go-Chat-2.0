@@ -1643,158 +1643,255 @@
 /* ===== 商城 ===== */
 #marketScreen { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .market-container { padding: 0 0 40px; }
+
+/* 商城顶部余额栏 */
 .market-balance-bar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 18px 8px;
-    font-size: 13px; font-weight: 600; color: #1e3d20;
-    background: rgba(235,248,228,0.6);
-    border-bottom: 1px solid rgba(140,190,100,0.15);
+    padding: 12px 18px 10px;
+    background: linear-gradient(180deg, rgba(240,250,234,0.95), rgba(232,246,224,0.85));
+    border-bottom: 1px solid rgba(120,180,85,0.18);
+    backdrop-filter: blur(10px);
 }
+
+/* Ghost Card 余额显示（在余额栏里） */
+.market-ghost-card-bal {
+    display: flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, #181e16, #232c20);
+    border: 1px solid rgba(201,168,76,0.35);
+    border-radius: 10px; padding: 5px 12px;
+    font-size: 12px; font-weight: 600; color: #c9a84c;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    letter-spacing: 0.3px;
+}
+.market-ghost-card-bal::before {
+    content: '◈'; font-size: 11px; color: rgba(201,168,76,0.7);
+}
+
+/* 分类标签 */
 .category-tabs {
     display: flex; overflow-x: auto; gap: 6px;
-    padding: 8px 16px; scrollbar-width: none;
+    padding: 10px 16px 8px; scrollbar-width: none;
+    background: rgba(240,250,234,0.5);
+    border-bottom: 1px solid rgba(120,180,85,0.1);
 }
 .category-tabs::-webkit-scrollbar { display: none; }
 .category-tab {
     white-space: nowrap;
-    padding: 6px 14px; border-radius: 20px;
-    font-size: 12px; font-weight: 600;
-    background: rgba(255,255,255,0.65);
+    padding: 7px 16px; border-radius: 20px;
+    font-size: 12px; font-weight: 500;
+    background: rgba(255,255,255,0.7);
     border: 1px solid rgba(140,190,100,0.22);
-    color: rgba(50,100,40,0.65); cursor: pointer; transition: all 0.18s;
-    flex-shrink: 0;
+    color: rgba(40,90,30,0.6); cursor: pointer;
+    transition: all 0.18s; flex-shrink: 0;
+    letter-spacing: 0.2px;
 }
 .category-tab.active {
-    background: linear-gradient(135deg, rgba(90,154,70,0.85), rgba(120,185,85,0.8));
+    background: linear-gradient(135deg, #4a8c38, #6aaa4e);
     color: white; border-color: transparent;
-    box-shadow: 0 3px 10px rgba(80,140,55,0.22);
+    box-shadow: 0 3px 12px rgba(70,130,50,0.28);
+    font-weight: 600;
 }
+
+/* 商品网格 */
 .products-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 18px 10px;
-    padding: 24px 12px 20px;
+    gap: 14px 10px;
+    padding: 20px 12px 20px;
 }
+
+/* 普通商品卡片 */
 .product-card {
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(14px);
-    border-radius: 16px; padding: 14px 12px 12px;
-    border: 1px solid rgba(255,255,255,0.9);
-    box-shadow: 0 3px 14px rgba(80,140,55,0.07);
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(16px);
+    border-radius: 18px; padding: 16px 12px 12px;
+    border: 1px solid rgba(255,255,255,0.95);
+    box-shadow: 0 2px 12px rgba(60,120,40,0.07), 0 1px 3px rgba(0,0,0,0.04);
     display: flex; flex-direction: column; align-items: center;
     text-align: center; gap: 5px; cursor: pointer;
     transition: transform 0.15s, box-shadow 0.15s;
     position: relative; overflow: visible;
 }
-.product-card:active { transform: scale(0.97); }
-.product-emoji { font-size: 36px; }
-.product-name { font-size: 13px; font-weight: 700; color: #1e3d20; }
-.product-desc { font-size: 11px; color: rgba(50,100,40,0.55); line-height: 1.4; }
+.product-card:active {
+    transform: scale(0.97);
+    box-shadow: 0 1px 6px rgba(60,120,40,0.1);
+}
+.product-emoji { font-size: 36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); }
+.product-name { font-size: 13px; font-weight: 700; color: #1e3d20; letter-spacing: 0.1px; }
+.product-desc { font-size: 11px; color: rgba(40,90,30,0.5); line-height: 1.4; }
 .product-price { font-size: 15px; font-weight: 700; color: #3a7a2a; }
 .product-buy-btn {
     width: 100%; padding: 7px 0; border: none; border-radius: 20px;
-    background: linear-gradient(135deg, rgba(90,154,70,0.78), rgba(120,185,85,0.72));
-    color: white;
-    font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s;
-    margin-top: 4px;
+    background: linear-gradient(135deg, rgba(74,140,56,0.85), rgba(106,170,78,0.8));
+    color: white; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; margin-top: 4px;
+    box-shadow: 0 2px 8px rgba(70,130,50,0.2);
+    letter-spacing: 0.3px;
 }
-.product-buy-btn:active { transform: scale(0.95); }
+.product-buy-btn:active { transform: scale(0.95); opacity: 0.9; }
 .product-owned-tag { font-size: 11px; color: #059669; font-weight: 700; margin-top: 4px; }
 
 /* 高亮触发 */
 .ghost-mentioned {
-    border: 1.5px solid rgba(90,160,70,0.5) !important;
-    background: linear-gradient(145deg, rgba(255,255,255,0.78), rgba(228,248,215,0.62)) !important;
+    border: 1.5px solid rgba(90,160,70,0.45) !important;
+    background: linear-gradient(145deg, rgba(255,255,255,0.85), rgba(228,248,215,0.68)) !important;
+    box-shadow: 0 4px 16px rgba(80,150,50,0.12) !important;
 }
 .ghost-mentioned-tag {
     position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
-    background: linear-gradient(135deg, #3a7a2a, #6ab040);
+    background: linear-gradient(135deg, #3a7a2a, #5aa030);
     color: white; font-size: 9px; font-weight: 700;
-    padding: 2px 8px; border-radius: 10px; white-space: nowrap;
-    z-index: 2;
+    padding: 2px 10px; border-radius: 10px; white-space: nowrap;
+    z-index: 2; letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(50,120,30,0.3);
 }
 
 /* 已购/售罄 */
-.owned-card { opacity: 0.58; filter: grayscale(55%); pointer-events: none; position: relative; }
+.owned-card { opacity: 0.55; filter: grayscale(60%); pointer-events: none; position: relative; }
 .owned-card::after {
     content: '已寄出'; position: absolute; top: 50%; left: 50%;
     transform: translate(-50%,-50%) rotate(-18deg);
-    font-size: 18px; font-weight: 900; color: rgba(50,120,40,0.7);
-    border: 2.5px solid rgba(50,120,40,0.55); border-radius: 6px;
+    font-size: 16px; font-weight: 900; color: rgba(40,110,30,0.65);
+    border: 2px solid rgba(40,110,30,0.5); border-radius: 6px;
     padding: 3px 8px; letter-spacing: 3px; pointer-events: none;
 }
 
 /* 心愿单 */
 .wishlist-card {
-    border: 1px solid rgba(100,180,75,0.35) !important;
-    background: linear-gradient(145deg, rgba(255,255,255,0.72), rgba(228,248,215,0.62)) !important;
+    border: 1px solid rgba(100,180,75,0.3) !important;
+    background: linear-gradient(145deg, rgba(255,255,255,0.78), rgba(228,248,215,0.65)) !important;
 }
 .wishlist-price { color: #2d7a20 !important; font-weight: 800; }
-.wishlist-buy-btn { background: linear-gradient(135deg, rgba(90,160,70,0.82), rgba(120,185,90,0.78)) !important; }
+.wishlist-buy-btn {
+    background: linear-gradient(135deg, rgba(74,140,56,0.88), rgba(106,170,78,0.82)) !important;
+    box-shadow: 0 2px 8px rgba(70,130,50,0.2) !important;
+}
 .product-badge-preview {
-    font-size: 10px; color: rgba(50,120,35,0.72);
-    background: rgba(90,160,70,0.12); border-radius: 8px;
-    padding: 2px 8px; margin: 2px 0 4px;
+    font-size: 10px; color: rgba(40,110,30,0.7);
+    background: rgba(80,150,55,0.1); border-radius: 8px;
+    padding: 2px 8px; margin: 2px 0 4px; letter-spacing: 0.2px;
 }
 
-/* 精品专柜 - 保留深色奢侈感，不换色 */
+/* ── 精品专柜 — 暗金奢华，商城唯一深色区（非Ghost Card）── */
 .luxury-card {
-    background: linear-gradient(145deg, rgba(30,20,50,0.85), rgba(50,30,70,0.8)) !important;
-    border: 1px solid rgba(200,160,60,0.3) !important;
+    background: linear-gradient(145deg, #1a1a22, #242430) !important;
+    border: 1px solid rgba(201,168,76,0.28) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(201,168,76,0.08) !important;
     color: #f5e8c0 !important;
 }
-.luxury-card .product-name { color: #f5e8c0 !important; }
-.luxury-card .product-desc { color: rgba(245,232,192,0.6) !important; }
-.luxury-card .product-price { color: #fcd34d !important; }
+.luxury-card .product-emoji { filter: drop-shadow(0 2px 8px rgba(201,168,76,0.25)); }
+.luxury-card .product-name { color: #e8d898 !important; letter-spacing: 0.2px; }
+.luxury-card .product-desc { color: rgba(230,210,160,0.5) !important; }
+.luxury-card .product-price { color: #c9a84c !important; font-weight: 600; }
+.luxury-card .product-buy-btn {
+    background: linear-gradient(135deg, rgba(160,128,48,0.9), rgba(201,168,76,0.85)) !important;
+    color: #1a1a16 !important; font-weight: 700 !important;
+    box-shadow: 0 2px 10px rgba(160,128,48,0.3) !important;
+}
 
-/* 私密专区 — 保留暧昧深色风 */
+/* ── Ghost Card 区域（商城最显眼的暗色） ── */
+.ghost-card-section {
+    margin: 0 12px 16px;
+    background: linear-gradient(135deg, #161c14, #1e2a1a, #161c14);
+    border-radius: 20px;
+    border: 1px solid rgba(201,168,76,0.3);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(201,168,76,0.12);
+    overflow: hidden; position: relative;
+    padding: 18px 18px 16px;
+}
+.ghost-card-section::before {
+    content: '';
+    position: absolute; width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%);
+    top: -60px; right: -40px; pointer-events: none;
+}
+.ghost-card-label {
+    font-size: 9px; letter-spacing: 3.5px;
+    color: rgba(201,168,76,0.55); margin-bottom: 4px;
+}
+.ghost-card-title {
+    font-size: 18px; font-weight: 300;
+    color: #e8d898; letter-spacing: 0.5px; margin-bottom: 12px;
+}
+.ghost-card-balance-row {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 12px;
+}
+.ghost-card-amount { font-size: 32px; font-weight: 300; color: #c9a84c; font-family: Georgia, serif; }
+.ghost-card-limit { font-size: 10px; color: rgba(201,168,76,0.4); text-align: right; line-height: 1.6; }
+.ghost-card-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(201,168,76,0.2), transparent);
+    margin-bottom: 12px;
+}
+.ghost-card-chip {
+    font-size: 22px; color: rgba(201,168,76,0.5); letter-spacing: 2px;
+}
+
+/* ── 用户自购区 ── */
+.user-items-section-title {
+    display: flex; align-items: center; gap: 10px;
+    margin: 4px 12px 8px; padding: 8px 0;
+}
+.user-items-label {
+    font-size: 9px; letter-spacing: 2.5px; color: rgba(40,90,30,0.45);
+    border-top: 1px solid rgba(120,180,85,0.2);
+    border-bottom: 1px solid rgba(120,180,85,0.2);
+    padding: 4px 0; flex: 1;
+}
+.user-item-card {
+    background: rgba(255,255,255,0.78) !important;
+    border: 1.5px solid rgba(180,210,160,0.4) !important;
+}
+.user-item-tag {
+    font-size: 9px; color: rgba(40,90,30,0.45);
+    letter-spacing: 1px; margin-bottom: 2px;
+}
+
+/* ── 私密专区 ── */
 .intimate-card {
-    background: linear-gradient(145deg, rgba(30,10,20,0.88), rgba(55,15,35,0.85)) !important;
-    border: 1px solid rgba(220,80,120,0.35) !important;
-    box-shadow: 0 4px 24px rgba(180,40,80,0.18), inset 0 0 30px rgba(200,60,100,0.06) !important;
+    background: linear-gradient(145deg, rgba(30,10,20,0.9), rgba(55,15,35,0.88)) !important;
+    border: 1px solid rgba(220,80,120,0.32) !important;
+    box-shadow: 0 4px 24px rgba(180,40,80,0.15), inset 0 0 30px rgba(200,60,100,0.04) !important;
     position: relative; overflow: visible;
 }
 .intimate-card::before {
-    content: '';
-    position: absolute; top: 0; left: -60%;
+    content: ''; position: absolute; top: 0; left: -60%;
     width: 40%; height: 100%;
-    background: linear-gradient(105deg, transparent, rgba(255,180,210,0.06), transparent);
-    animation: intimateShimmer 4s ease-in-out infinite;
-    pointer-events: none;
-    overflow: hidden;
-    border-radius: 16px;
+    background: linear-gradient(105deg, transparent, rgba(255,180,210,0.05), transparent);
+    animation: intimateShimmer 4.5s ease-in-out infinite;
+    pointer-events: none; border-radius: 16px;
 }
 @keyframes intimateShimmer {
     0%   { left: -60%; }
     50%  { left: 120%; }
     100% { left: 120%; }
 }
-.intimate-card .product-emoji { filter: drop-shadow(0 0 6px rgba(220,80,120,0.5)); }
+.intimate-card .product-emoji { filter: drop-shadow(0 0 6px rgba(220,80,120,0.45)); }
 .intimate-card .product-name { color: #f0a0c0 !important; letter-spacing: 0.5px; }
-.intimate-card .product-desc { color: rgba(220,160,180,0.6) !important; }
+.intimate-card .product-desc { color: rgba(220,160,180,0.55) !important; }
 .intimate-card .product-price { color: #e8829c !important; font-weight: 700; }
 .intimate-buy-btn {
-    background: linear-gradient(135deg, rgba(180,40,80,0.85), rgba(140,30,100,0.8)) !important;
-    border: 1px solid rgba(220,80,120,0.4) !important;
-    box-shadow: 0 2px 12px rgba(180,40,80,0.25) !important;
-    color: #ffd0e0 !important;
-    letter-spacing: 0.3px;
-}
-.intimate-buy-btn:hover {
-    background: linear-gradient(135deg, rgba(210,60,100,0.9), rgba(160,40,120,0.88)) !important;
-    box-shadow: 0 4px 18px rgba(200,60,100,0.35) !important;
+    background: linear-gradient(135deg, rgba(180,40,80,0.88), rgba(140,30,100,0.82)) !important;
+    border: 1px solid rgba(220,80,120,0.35) !important;
+    box-shadow: 0 2px 12px rgba(180,40,80,0.22) !important;
+    color: #ffd0e0 !important; letter-spacing: 0.3px;
 }
 .intimate-card.ghost-mentioned {
-    border: 1px solid rgba(240,100,150,0.6) !important;
-    box-shadow: 0 0 20px rgba(200,60,100,0.3), inset 0 0 30px rgba(200,60,100,0.08) !important;
+    border: 1px solid rgba(240,100,150,0.55) !important;
+    box-shadow: 0 0 20px rgba(200,60,100,0.25), inset 0 0 30px rgba(200,60,100,0.06) !important;
 }
 
-/* 建立小家 */
+/* ── 建立小家 ── */
 .home-card {
-    border: 1px solid rgba(100,175,70,0.3) !important;
-    background: linear-gradient(145deg, rgba(255,255,255,0.72), rgba(222,245,210,0.6)) !important;
+    border: 1px solid rgba(100,175,70,0.28) !important;
+    background: linear-gradient(145deg, rgba(255,255,255,0.75), rgba(222,245,210,0.62)) !important;
 }
-.home-buy-btn { background: linear-gradient(135deg, rgba(70,140,50,0.82), rgba(100,170,65,0.78)) !important; }
+.home-buy-btn {
+    background: linear-gradient(135deg, rgba(65,130,45,0.85), rgba(95,160,60,0.8)) !important;
+    box-shadow: 0 2px 8px rgba(65,130,45,0.2) !important;
+}
 
 /* 从家寄给他 */
 .fromhome-card {

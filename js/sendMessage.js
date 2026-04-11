@@ -225,12 +225,7 @@ function parseAssistantTags(reply) {
   // 清理多余空行
   cleanedReply = cleanedReply.replace(/\n{3,}/g, '\n').trim();
 
-  // GIVE_MONEY:金额:备注
-  const moneyMatch = cleanedReply.match(/GIVE_MONEY:(\d+):?([^\n]*)/i);
-  if (moneyMatch) {
-    giveMoney = { amount: parseInt(moneyMatch[1], 10), note: (moneyMatch[2] || '').trim() };
-    cleanedReply = cleanedReply.replace(/GIVE_MONEY:[^\n]*/ig, '').trim();
-  }
+  // GIVE_MONEY tag 已移除
 
   // COLD_WAR_START
   if (/COLD_WAR_START/i.test(cleanedReply)) {
@@ -597,94 +592,7 @@ async function _processMergedMessage(text) {
     // ── System Prompt 构建 ───────────────────────────────────
     const _baseSystem = buildSystemPrompt();
 
-    // 钱场景判断
-    const _userMoneyKws = ['给我钱','给我一点','转我','好穷','买不起','能不能给','要钱','零花钱','缺钱','没钱'];
-    const _userAskedMoney = _userMoneyKws.some(k => text.includes(k)) || /给我\d+/.test(text);
-
-    const _canGiveNow = (() => {
-      if (sessionStorage.getItem('hintMoneyPending') === '1') return false;
-      if (localStorage.getItem('coldWarMode') === 'true') return false;
-      if (localStorage.getItem('userDislikesMoney') === 'true' && !_userAskedMoney) return false;
-      // 补上 applyMoneyEffect 的两个漏掉的条件，防止假账
-      if (typeof isMoneyRefuseActive === 'function' && isMoneyRefuseActive()) return false;
-      const _lastRefundAt = parseInt(localStorage.getItem('lastRefundAt') || '0');
-      if (Date.now() - _lastRefundAt < 2 * 3600 * 1000) return false;
-      const _affNow = getAffection();
-      if (_affNow < 30) return false;
-      if (_affNow < 40) {
-        const _todayLowAffKey = 'lowAffGiven_' + new Date().toDateString();
-        if (localStorage.getItem(_todayLowAffKey)) return false;
-        if (sessionStorage.getItem('moneyReasonType') !== 'care') return false;
-        if (Math.random() > 0.3) return false;
-        localStorage.setItem(_todayLowAffKey, '1');
-      }
-      const _todayCount = getTodayGivenCount();
-      const _dailyLimit = _userAskedMoney ? 5 : 3;
-      if (_todayCount >= _dailyLimit) return false;
-      if (getWeeklyGiven() >= (typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 3000)) return false;
-      if (!_userAskedMoney) {
-        const _lastGiven = parseInt(localStorage.getItem('lastGivenAt') || '0');
-        const _cooldown = typeof _getTransferCooldownMs === 'function' ? _getTransferCooldownMs() : 15 * 60 * 1000;
-        if (Date.now() - _lastGiven < _cooldown) return false;
-      }
-      // 本轮已转过一次，不论用户是否主动要钱都不再给
-      if (parseInt(sessionStorage.getItem('conversationGivenCount') || '0') >= 1) return false;
-      return true;
-    })();
-
-    const _moneyStyle = (() => {
-      const t = text.toLowerCase();
-      const reunionKws = ['机票','票钱','来找你','来英国','去英国','飞过去','飞去找','见面的钱','plane ticket','flight','come see you','come to uk','visit you','manchester'];
-      if (reunionKws.some(k => t.includes(k))) { sessionStorage.setItem('moneyReasonType','reunion'); return 'reunion'; }
-      const testKws = ['你给不给','试试你','看看你','敢不敢','证明','test','prove','dare','你会给吗'];
-      const careKws = ['没吃','饿了','手机坏','买药','感冒','生病','交通','修','坏了','没钱吃','急用','压力','need','sick','hungry','broke','fix','stress'];
-      const flirtyKws = ['买奶茶','买零食','买个','想吃','想买','请我','奖励我','打赏','穿给你看','给你看','买裙','买衣','买包','买鞋','treat me','buy me','wear it for you'];
-      let style = 'neutral';
-      if (testKws.some(k => t.includes(k))) style = 'testing';
-      else if (careKws.some(k => t.includes(k))) style = 'care';
-      else if (flirtyKws.some(k => t.includes(k))) style = 'flirty';
-      sessionStorage.setItem('moneyReasonType', style);
-      return style;
-    })();
-
-    const _trust = getTrustHeat();
-    const _trustStyleHint = _trust < 40
-      ? ' Trust between you is still shallow — if you give, be measured and slightly guarded.'
-      : _trust >= 70 ? ' You trust her enough — if you give, it can feel natural.' : '';
-
-    const _styleContext = {
-      care:    ' She has a real reason — something is actually wrong or needed.',
-      flirty:  ' She is being playful — asking for money as a tease. Do NOT give money. Tease back, deflect, or joke about it instead. This is a game, not a real request.',
-      testing: ' She seems to be testing you. You notice.',
-      reunion: ' She wants money to come see you — do NOT give money for this.',
-      neutral: ''
-    }[_moneyStyle] || '';
-
-    const _styleBlocksGive = _moneyStyle === 'testing' || _moneyStyle === 'reunion' || _moneyStyle === 'flirty'
-      || sessionStorage.getItem('haikuBlocksMoney') === '1';
-
-    let moneyHint = '';
-    if (!_userAskedMoney && !_canGiveNow) {
-      moneyHint = '[No money this reply — no clear financial or care context. Do NOT output GIVE_MONEY tag.]';
-    } else if (_canGiveNow && !_styleBlocksGive) {
-      const _affNow2 = getAffection();
-      const _affCaution = _affNow2 < 50 ? ' Not deeply close yet — only give if genuinely compelling.' : '';
-      // 月度剩余额度
-      const _monthlyUsed  = typeof getWeeklyGiven === 'function' ? getWeeklyGiven() : 0;
-      const _monthlyLimit = typeof _getWeeklyTransferLimit === 'function' ? _getWeeklyTransferLimit() : 800;
-      const _monthlyLeft  = Math.max(0, _monthlyLimit - _monthlyUsed);
-      const _level        = typeof getMoneyComfortLevel === 'function' ? getMoneyComfortLevel() : 1;
-      const _amountGuide  = {
-        1: 'small amounts — £10-50 for everyday things, up to £80 for something real',
-        2: 'moderate amounts — £20-100 for everyday things, up to £150 for something meaningful',
-        3: 'generous amounts — £30-150 for everyday things, higher for significant needs',
-      }[_level] || 'small amounts';
-      moneyHint = `[Transfer available this reply — if you decide to give money, you MUST include GIVE_MONEY:amount:note in your reply. This tag is the ONLY way money gets sent. Never promise money without the tag. Giving is never automatic — he still decides. Amount guidance: ${_amountGuide}. Monthly budget remaining: £${_monthlyLeft}. Match the amount to what she actually needs — buying fruit is £10-20, not £100+. Be proportionate.${_affCaution}${_trustStyleHint}${_styleContext}]`;
-    } else {
-      const _testingExtra = _moneyStyle === 'testing' ? ' She seems to be testing you. Do not give just because she pushed.' : '';
-      const _reunionExtra = _moneyStyle === 'reunion' ? ' She wants money to come see you. Do NOT give money for this — react to the idea of her coming instead.' : '';
-      moneyHint = `[Transfer blocked this reply — do NOT mention sending money or use GIVE_MONEY tag.${_testingExtra}${_reunionExtra}]`;
-    }
+    // ── 旧转账系统已移除，使用 Ghost Card ──
 
     // 场景提示
     const t = text.toLowerCase();
@@ -783,11 +691,17 @@ async function _processMergedMessage(text) {
     // 语言规则
     const langHint = '[LANGUAGE — HARD RULE: Reply in English only. Always. No exceptions. Even if she writes in Chinese, you reply in English. Not a single Chinese character in your response.]';
 
+    // ── Ghost Card hint（用户要钱时提醒模型用卡回应）────────
+    const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|能不能给|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
+    const _cardHint = _moneyKws.test(text)
+      ? '[She is asking for money. Do not transfer directly — the card you gave her handles that. Refer her to the card if needed. "use the card." / "it\'s there." — dry and brief. Do not promise a direct transfer.]'
+      : '';
+
     const finalSystem = [
       _baseSystem,
       antiBreakoutHint,
       emotionHint,
-      moneyHint,
+      _cardHint,
       _timeGapHint,
       sceneHint || '[React directly to what she just said. Take it at face value.]',
       responseMode,
@@ -1239,56 +1153,7 @@ async function _processMergedMessage(text) {
       }, recallDelay);
     }
 
-    // ── 转账处理 ─────────────────────────────────────────────
-    const giveMoneyMatch = parsedMoney;
-    let giveAmount = giveMoneyMatch ? giveMoneyMatch.amount : 0;
-
-    const transferSuccess = giveMoneyMatch && giveAmount > 0 && (() => {
-      const jealousy = getJealousyLevelCapped();
-      const isJealousyGift = jealousy === 'mild' || jealousy === 'medium';
-      const userAsked = _userMoneyKws.some(k => text.includes(k)) || /给我\d+/.test(text);
-
-      // 从 sessionStorage 读取本轮已判断的 motive，传给 applyMoneyEffect
-      // 修复假账：低好感区间(30-40)必须传 motive='care' 才能给钱
-      // 没有 motive 时 applyMoneyEffect 会拒绝，但模型已经说要给——就变假账了
-      const _motive = sessionStorage.getItem('moneyReasonType') || 'practical';
-
-      const applied = applyMoneyEffect(giveAmount, {
-        note: giveMoneyMatch.note || '',
-        label: isJealousyGift ? 'Ghost jealousy transfer' : 'Ghost allowance',
-        bypassWeeklyLimit: isJealousyGift,
-        userRequested: userAsked,
-        motive: isJealousyGift ? 'care' : _motive,
-        showCard: false,  // 卡片由下方统一渲染，避免和消息气泡时序错乱
-      });
-      if (!applied) {
-        const dailyLimit = userAsked ? 5 : 3;
-        const limitMsg = getTodayGivenCount() >= dailyLimit
-          ? '[System: Daily transfer limit reached — this transfer did not go through. Decline in your own way. Do not explain system limits.]'
-          : '[System: Monthly transfer limit reached — you have given enough this month. Tell her the monthly limit is up, and that salary comes on the 25th. Keep it short and dry. Do not explain system limits literally.]';
-        chatHistory.push({ role: 'user', content: limitMsg, _system: true });
-        // 假账过滤：清除回复里提到转钱/具体金额的部分
-        reply = reply.replace(/i('ll| will| can| just| already)? (send|transfer|give|wire|move|put|drop)[^.!?\n]*£\d+[^.!?\n]*/gi, '').trim();
-        reply = reply.replace(/£\d+[^.!?\n]*(send|transfer|give|wire|on its way|coming your way)[^.!?\n]*/gi, '').trim();
-        // 清理Ghost转账语气词（check it / sort it / should be there等）
-        reply = reply.replace(/\b(check it|sort it|check your account|should be there( now)?|on its way|coming your way|use it|take it|it's there|it's sent|sent it)\b[.,]?/gi, '').trim();
-        reply = reply.replace(/\s{2,}/g, ' ').trim();
-        reply = reply || '.';
-        return false;
-      }
-      giveAmount = applied;
-      incrementMoneyRequest();
-      return true;
-    })();
-
-    // ── 转账卡片渲染（applyMoneyEffect成功后才渲染，顺序正确）──
-    // showCard:false 表示 applyMoneyEffect 不自己渲染，由这里统一控制
-    if (transferSuccess && giveAmount > 0) {
-      const _transferContainer = document.getElementById('messagesContainer');
-      if (_transferContainer) {
-        showGhostTransferCard(_transferContainer, giveAmount, giveMoneyMatch.note || '', false);
-      }
-    }
+    // ── 旧转账系统已移除 ──
 
     // ── 冷战检测 ─────────────────────────────────────────────
     if (localStorage.getItem('coldWarMode') === 'true') {
@@ -1331,7 +1196,6 @@ async function _processMergedMessage(text) {
     chatHistory.push({
       role: 'assistant',
       content: reply,
-      ...(transferSuccess ? { _transfer: { amount: giveAmount, isRefund: false } } : {})
     });
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
@@ -1358,7 +1222,7 @@ async function _processMergedMessage(text) {
 
     // ── 副作用（fire-and-forget）────────────────────────────
     consumeLoveOverride();
-    const mainReplyHasCareAction = transferSuccess || !!sendGift;
+    const mainReplyHasCareAction = !!sendGift;
     if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
 
