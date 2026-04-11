@@ -636,7 +636,7 @@ async function saveToCloud() {
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
     // 钱包余额从transactions实时计算，确保与本地显示一致
     const _txs = JSON.parse(localStorage.getItem('transactions') || '[]');
-    const _walletCalc = Math.max(0, _txs.reduce((s, t) => s + (t.amount || 0), 0));
+    const _walletCalc = Math.max(0, _txs.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0));
     const walletVal = _walletCalc || parseFloat(localStorage.getItem('wallet') || '0');
     if (walletVal > 0) upsertData.balance = walletVal;
 
