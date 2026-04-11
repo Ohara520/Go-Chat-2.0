@@ -2494,3 +2494,54 @@
   background: linear-gradient(160deg, #fdf8ec 0%, #fef6e0 100%);
 }
 #takeoutCatBar::-webkit-scrollbar { display: none; }
+
+/* ── Ghost Card · 钱包面板 ── */
+.wallet-ghost-card {
+    background: linear-gradient(135deg, #161c14, #1e2a1a, #161c14);
+    border-radius: 18px;
+    border: 1px solid rgba(201,168,76,0.28);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(201,168,76,0.08);
+    padding: 18px 20px 16px;
+    position: relative; overflow: hidden;
+}
+.wallet-ghost-card--suspended {
+    display: flex; align-items: center; justify-content: space-between;
+    opacity: 0.5;
+}
+.wallet-ghost-card--suspended .wgc-suspended-text {
+    font-size: 12px; color: rgba(201,168,76,0.5); letter-spacing: 1px;
+}
+.wgc-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 16px;
+}
+.wgc-label {
+    font-size: 9px; letter-spacing: 3.5px;
+    color: rgba(201,168,76,0.5); margin-bottom: 6px;
+}
+.wgc-available {
+    font-size: 34px; font-weight: 300;
+    color: #c9a84c; font-family: Georgia, serif; line-height: 1;
+}
+.wgc-sublabel {
+    font-size: 10px; color: rgba(201,168,76,0.35);
+    letter-spacing: 1px; margin-top: 4px;
+}
+.wgc-chip {
+    font-size: 22px; color: rgba(201,168,76,0.4);
+}
+.wgc-bar-wrap { margin-top: 4px; }
+.wgc-bar-track {
+    height: 3px; border-radius: 2px;
+    background: rgba(201,168,76,0.12);
+    overflow: hidden; margin-bottom: 7px;
+}
+.wgc-bar-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, rgba(201,168,76,0.5), rgba(201,168,76,0.8));
+    transition: width 0.4s ease;
+}
+.wgc-bar-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: rgba(201,168,76,0.35); letter-spacing: 0.5px;
+}

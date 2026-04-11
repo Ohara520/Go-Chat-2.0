@@ -270,6 +270,13 @@ async function loadFromCloud() {
         if (s.moneyRefuseCount != null) localStorage.setItem('moneyRefuseCount', String(s.moneyRefuseCount));
         if (s.userDislikesMoney != null) localStorage.setItem('userDislikesMoney', String(s.userDislikesMoney));
         if (s.sassyPost != null) localStorage.setItem('sassyPost', s.sassyPost);
+        // Ghost Card：云端较新时才覆盖，保留本地花费记录
+        if (s.ghostCard && typeof s.ghostCard === 'object') {
+          const localCard = JSON.parse(localStorage.getItem('ghostCard') || 'null');
+          if (!localCard || (s.ghostCard.spentThisMonth || 0) > (localCard.spentThisMonth || 0)) {
+            localStorage.setItem('ghostCard', JSON.stringify(s.ghostCard));
+          }
+        }
         if (s.marketTriggered != null) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
         if (s.coupleFeedDate != null) localStorage.setItem('coupleFeedDate', s.coupleFeedDate);
         if (s.organicFeedCountKey && s.organicFeedCount != null) localStorage.setItem(s.organicFeedCountKey, s.organicFeedCount);
@@ -291,6 +298,7 @@ async function loadFromCloud() {
         restoreIfMissing('userDislikesMoney', s.userDislikesMoney);
         restoreIfMissing('coupleFeedDate', s.coupleFeedDate);
         restoreIfMissing('lastFeedPostAt', s.lastFeedPostAt);
+        if (s.ghostCard && !localStorage.getItem('ghostCard')) localStorage.setItem('ghostCard', JSON.stringify(s.ghostCard));
       }
 
       // ── 合并类：无论新旧都合并 ──────────────────────────────
@@ -612,6 +620,7 @@ async function saveToCloud() {
       moneyRefuseCount: localStorage.getItem('moneyRefuseCount') || '0',
       userDislikesMoney: localStorage.getItem('userDislikesMoney') || '',
       sassyPost: localStorage.getItem('sassyPost') || '',
+      ghostCard: JSON.parse(localStorage.getItem('ghostCard') || 'null'),
     };
     const nowIso = new Date().toISOString();
     const upsertData = {

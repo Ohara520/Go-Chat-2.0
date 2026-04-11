@@ -137,6 +137,7 @@ function renderWallet() {
       toggleBtn.style.display = 'none';
     }
   }
+  renderGhostCardWallet();
 }
 
 function toggleTransactions() {
@@ -144,3 +145,59 @@ function toggleTransactions() {
   renderWallet();
 }
 
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Ghost Card — 钱包面板
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function renderGhostCardWallet() {
+  const container = document.querySelector('.wallet-container');
+  if (!container) return;
+
+  let el = document.getElementById('ghostCardWallet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'ghostCardWallet';
+    const txSection = container.querySelector('.transaction-section');
+    txSection ? container.insertBefore(el, txSection) : container.appendChild(el);
+  }
+
+  const card           = (typeof getGhostCard === 'function') ? getGhostCard() : null;
+  const coldWar        = localStorage.getItem('coldWarMode') === 'true';
+  const suspended      = coldWar || !card || card.monthlyLimit === 0;
+  const available      = card ? Math.max(0, Math.min(card.balance, card.monthlyLimit - card.spentThisMonth)) : 0;
+  const monthlyLimit   = card ? card.monthlyLimit : 0;
+  const spentThisMonth = card ? (card.spentThisMonth || 0) : 0;
+  const usedPct        = monthlyLimit > 0 ? Math.min(100, Math.round(spentThisMonth / monthlyLimit * 100)) : 0;
+
+  if (suspended) {
+    el.innerHTML = `
+      <div class="wallet-ghost-card wallet-ghost-card--suspended">
+        <div class="wgc-label">GHOST CARD</div>
+        <div class="wgc-suspended-text">${coldWar ? 'Card suspended' : 'Not available'}</div>
+        <div class="wgc-chip">◈</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="wallet-ghost-card">
+      <div class="wgc-top">
+        <div>
+          <div class="wgc-label">GHOST CARD</div>
+          <div class="wgc-available">£${available.toFixed(0)}</div>
+          <div class="wgc-sublabel">available</div>
+        </div>
+        <div class="wgc-chip">◈</div>
+      </div>
+      <div class="wgc-bar-wrap">
+        <div class="wgc-bar-track">
+          <div class="wgc-bar-fill" style="width:${usedPct}%"></div>
+        </div>
+        <div class="wgc-bar-labels">
+          <span>spent £${spentThisMonth.toFixed(0)}</span>
+          <span>limit £${monthlyLimit.toFixed(0)}</span>
+        </div>
+      </div>
+    </div>`;
+}
