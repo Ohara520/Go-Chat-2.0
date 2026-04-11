@@ -100,6 +100,13 @@ const MARKET_PRODUCTS = {
     { emoji: '🔦', name: 'Surefire战术手电筒套装', desc: '特种部队标配，限量款，低调实用', price: 980, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
     { emoji: '🔭', name: '蔡司战术望远镜', desc: '德国顶级光学，野外必备，他用得上', price: 1380, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
     { emoji: '📗', name: '《讨好老婆的99招》', desc: '诺亚亲笔撰写，限量珍藏版，全球仅此一册', price: 5200, shipping: 35, isGhostGift: true, isJokeGift: true, unlock: SHOP_UNLOCK_TIERS.committed },
+    // ── 用户自己的奢侈品 ──
+    { emoji: '👜', name: 'LV Neverfull 手提包', desc: '经典帆布，实用又百搭，你值得', price: 3200, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.warm },
+    { emoji: '👛', name: 'Chanel 小号CF包', desc: '菱格纹，金链，每个女生的梦', price: 8800, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.committed },
+    { emoji: '🧣', name: 'Hermès 丝巾', desc: '法国产地，限量印花，系法百变', price: 980, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.soft },
+    { emoji: '💄', name: 'Dior 口红套装', desc: '经典999+限定色，礼盒装', price: 680, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.soft },
+    { emoji: '🌊', name: 'La Mer 精华套装', desc: '顶级海洋护肤，认真对待自己', price: 1580, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.warm },
+    { emoji: '💎', name: 'Tiffany 项链', desc: '925银+纯金，简单但很对', price: 1280, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.warm },
   ],
   fromhome: [
     { emoji: '🦆', name: '北京烤鸭礼盒',     desc: '真空包装，附上饼和甜面酱，教他怎么吃', price: 98,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
