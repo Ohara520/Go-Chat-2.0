@@ -806,3 +806,8 @@ function getWeeklySale() {
 
 // ===== 商城+情绪触发（合并Haiku调用）=====
 // ===== 钱相关意图并行判断（不阻塞主回复）=====
+
+function confirmAge() {
+  document.getElementById('ageGateModal')?.remove();
+  renderMarket('intimate');
+}
