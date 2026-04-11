@@ -51,7 +51,7 @@ function getMarketCategories() {
 const MARKET_PRODUCTS = {
   clothing: [
     // 日常服饰
-    { emoji: '👟', name: 'Merino羊毛T恤',    desc: '基础款，细腻柔软，他每天都会穿',          price: 65,  shipping: 18, maxPurchase: 2 },
+    { emoji: '👕', name: 'Merino羊毛T恤',    desc: '基础款，细腻柔软，他每天都会穿',          price: 65,  shipping: 18, maxPurchase: 2 },
     { emoji: '🧢', name: '简约棒球帽',        desc: '低调百搭，任务之外的他',                  price: 48,  shipping: 18, maxPurchase: 2 },
     { emoji: '🩲', name: 'CK内裤',            desc: '低调有质感，你懂的',                      price: 55,  shipping: 18, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
     { emoji: '👟', name: '简约帆布休闲鞋',    desc: '低调干净，不在任务时的他',                price: 95,  shipping: 18, maxPurchase: 2 },

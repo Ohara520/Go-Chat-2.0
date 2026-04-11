@@ -91,7 +91,7 @@ function renderWallet() {
   txList.forEach(tx => {
     if (tx.time && tx.time.startsWith(monthKey)) {
       if (tx.amount > 0) monthIn += tx.amount;
-      else monthOut += Math.abs(tx.amount);
+      else if (!tx.ghostCard) monthOut += Math.abs(tx.amount);
     }
   });
   const inEl = document.getElementById('monthIncome');

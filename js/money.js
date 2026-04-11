@@ -1075,8 +1075,8 @@ function spendGhostCard(amount, itemName, category) {
   const card = getGhostCard();
   const available = Math.min(card.balance, card.monthlyLimit - card.spentThisMonth);
   if (available < amount) return false;
-  card.balance -= amount;
-  card.spentThisMonth += amount;
+  card.balance = Math.round(card.balance - amount);
+  card.spentThisMonth = Math.round(card.spentThisMonth + amount);
   saveGhostCard(card);
   if (typeof addTransaction === 'function') addTransaction({ icon: '💳', name: `Ghost Card · ${itemName}`, amount: -amount, ghostCard: true });
   if (typeof renderWallet === 'function') renderWallet();
