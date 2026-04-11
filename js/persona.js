@@ -658,6 +658,8 @@ function buildSystemPrompt() {
   // 转账冷却 — 旧系统已移除，Ghost Card 由系统处理
   const giftOnCooldown = Date.now() - parseInt(localStorage.getItem('lastSendGiftAt') || '0') <= 7 * 24 * 3600 * 1000;
 
+  const moneyLimitNote = '[You do not transfer money directly. She has a Ghost Card linked to your account — she can use it to pay for things. If she asks for money, tell her to use the card.]';
+
   // Ghost Card 状态
   const _ghostCardBalance = typeof getGhostCardBalance === 'function' ? getGhostCardBalance() : 0;
   const _ghostCardLimit   = typeof getGhostCardMonthlyLimit === 'function' ? getGhostCardMonthlyLimit() : 0;
