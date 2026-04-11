@@ -23,7 +23,7 @@ function getBalance() {
 
   // 从transactions算余额
   const txs = getTransactions();
-  return Math.max(0, txs.reduce((sum, t) => sum + (t.amount || 0), 0));
+  return Math.max(0, txs.reduce((sum, t) => t.ghostCard ? sum : sum + (t.amount || 0), 0));
 }
 
 function setBalance(val) {

@@ -1078,7 +1078,7 @@ function spendGhostCard(amount, itemName, category) {
   card.balance -= amount;
   card.spentThisMonth += amount;
   saveGhostCard(card);
-  if (typeof addTransaction === 'function') addTransaction({ icon: '💳', name: `Ghost Card · ${itemName}`, amount: -amount });
+  if (typeof addTransaction === 'function') addTransaction({ icon: '💳', name: `Ghost Card · ${itemName}`, amount: -amount, ghostCard: true });
   if (typeof renderWallet === 'function') renderWallet();
   _ghostCardReaction(amount, itemName, category, card);
   return true;
