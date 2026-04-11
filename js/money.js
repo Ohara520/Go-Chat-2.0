@@ -1196,29 +1196,100 @@ function showCardSelector(amount, itemName, onUserCard, onGhostCard) {
   const canUseUser  = userBal >= amount;
   const existing = document.getElementById('cardSelectorModal');
   if (existing) existing.remove();
+
   const modal = document.createElement('div');
   modal.id = 'cardSelectorModal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;';
-  modal.innerHTML = `<div style="background:#fff;border-radius:24px 24px 0 0;padding:28px 20px 40px;width:100%;max-width:420px;animation:slideUp 0.25s ease;">
-    <div style="text-align:center;margin-bottom:20px;">
-      <div style="font-size:11px;color:#aaa;letter-spacing:1.5px;">SELECT PAYMENT</div>
-      <div style="font-size:24px;font-weight:600;color:#1a1a1a;margin-top:4px;">£${amount}</div>
-      <div style="font-size:12px;color:#bbb;margin-top:2px;">${itemName}</div>
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,20,10,0.6);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;';
+
+  modal.innerHTML = `
+    <div style="
+      background: rgba(240,248,234,0.92);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: 24px 24px 0 0;
+      padding: 28px 20px 44px;
+      width: 100%; max-width: 420px;
+      animation: slideUp 0.28s cubic-bezier(0.34,1.2,0.64,1);
+      border-top: 1px solid rgba(120,180,85,0.25);
+      box-shadow: 0 -8px 40px rgba(20,60,10,0.15);
+    ">
+      <div style="text-align:center;margin-bottom:22px;">
+        <div style="width:36px;height:4px;background:rgba(60,120,40,0.2);border-radius:2px;margin:0 auto 16px;"></div>
+        <div style="font-size:9px;letter-spacing:3px;color:rgba(40,90,30,0.5);margin-bottom:6px;">SELECT PAYMENT</div>
+        <div style="font-size:26px;font-weight:700;color:#1e3d20;letter-spacing:-0.5px;">£${amount}</div>
+        <div style="font-size:12px;color:rgba(40,90,30,0.45);margin-top:3px;">${itemName}</div>
+      </div>
+
+      <!-- 我的卡：毛玻璃绿色 -->
+      <div onclick="window._cardSelect('user')" style="
+        background: rgba(255,255,255,0.65);
+        backdrop-filter: blur(12px);
+        border: 1.5px solid ${canUseUser ? 'rgba(100,170,70,0.4)' : 'rgba(180,180,180,0.2)'};
+        border-radius: 18px; padding: 16px 18px; margin-bottom: 10px;
+        cursor: ${canUseUser ? 'pointer' : 'not-allowed'};
+        opacity: ${canUseUser ? 1 : 0.4};
+        display: flex; align-items: center; justify-content: space-between;
+        box-shadow: 0 2px 12px rgba(60,120,40,0.08);
+        transition: all 0.15s;
+      ">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="
+            width:42px;height:42px;border-radius:12px;
+            background:linear-gradient(135deg,rgba(90,154,70,0.15),rgba(120,185,85,0.1));
+            border:1px solid rgba(90,154,70,0.2);
+            display:flex;align-items:center;justify-content:center;font-size:20px;
+          ">💳</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#1e3d20;">我的卡</div>
+            <div style="font-size:11px;color:rgba(40,90,30,0.5);margin-top:1px;">余额 £${userBal.toFixed(2)}</div>
+          </div>
+        </div>
+        <div style="font-size:16px;color:rgba(60,130,40,0.5);">${canUseUser ? '›' : '不足'}</div>
+      </div>
+
+      <!-- Ghost Card：暗金 -->
+      <div onclick="window._cardSelect('ghost')" style="
+        background: linear-gradient(135deg,#161c14,#1e2a1a,#161c14);
+        border: 1.5px solid ${canUseGhost ? 'rgba(201,168,76,0.45)' : 'rgba(80,80,70,0.4)'};
+        border-radius: 18px; padding: 16px 18px; margin-bottom: 20px;
+        cursor: ${canUseGhost ? 'pointer' : 'not-allowed'};
+        opacity: ${canUseGhost ? 1 : 0.4};
+        display: flex; align-items: center; justify-content: space-between;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(201,168,76,0.1);
+        position: relative; overflow: hidden;
+      ">
+        <div style="
+          position:absolute;width:80px;height:80px;border-radius:50%;
+          background:radial-gradient(circle,rgba(201,168,76,0.08),transparent 70%);
+          top:-20px;right:-10px;pointer-events:none;
+        "></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="
+            width:42px;height:42px;border-radius:12px;
+            background:rgba(201,168,76,0.1);
+            border:1px solid rgba(201,168,76,0.25);
+            display:flex;align-items:center;justify-content:center;
+            font-size:18px;color:#c9a84c;
+          ">◈</div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#c9a84c;letter-spacing:2px;">GHOST CARD</div>
+            <div style="font-size:11px;color:rgba(201,168,76,0.5);margin-top:1px;">
+              ${canUseGhost ? `可用 £${ghostAvailable.toFixed(2)}` : '额度不足'}
+            </div>
+          </div>
+        </div>
+        <div style="font-size:16px;color:rgba(201,168,76,0.6);">${canUseGhost ? '›' : '—'}</div>
+      </div>
+
+      <div onclick="window._cardSelect('cancel')" style="text-align:center;font-size:13px;color:rgba(40,90,30,0.4);cursor:pointer;padding:8px;letter-spacing:0.5px;">取消</div>
     </div>
-    <div onclick="window._cardSelect('user')" style="background:linear-gradient(135deg,#fff5f8,#fde8f0);border:1.5px solid ${canUseUser?'#f4b8cc':'#eee'};border-radius:16px;padding:16px 18px;margin-bottom:12px;cursor:${canUseUser?'pointer':'not-allowed'};opacity:${canUseUser?1:0.45};display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:12px;"><span style="font-size:24px;">🌸</span><div><div style="font-size:13px;font-weight:600;color:#c06080;">我的卡</div><div style="font-size:11px;color:#d090a0;">余额 £${userBal.toFixed(2)}</div></div></div>
-      <div style="font-size:18px;color:#e090b0;">${canUseUser?'›':'余额不足'}</div>
-    </div>
-    <div onclick="window._cardSelect('ghost')" style="background:linear-gradient(135deg,#1a2018,#2a3828);border:1.5px solid ${canUseGhost?'rgba(201,168,76,0.5)':'#333'};border-radius:16px;padding:16px 18px;margin-bottom:20px;cursor:${canUseGhost?'pointer':'not-allowed'};opacity:${canUseGhost?1:0.45};display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-      <div style="display:flex;align-items:center;gap:12px;"><span style="font-size:20px;color:#c9a84c;">◈</span><div><div style="font-size:13px;font-weight:600;color:#c9a84c;letter-spacing:1px;">GHOST CARD</div><div style="font-size:11px;color:rgba(201,168,76,0.55);">${canUseGhost?`可用 £${ghostAvailable.toFixed(2)}`:'额度不足'}</div></div></div>
-      <div style="font-size:18px;color:#c9a84c;">${canUseGhost?'›':'—'}</div>
-    </div>
-    <div onclick="window._cardSelect('cancel')" style="text-align:center;font-size:13px;color:#bbb;cursor:pointer;padding:8px;">取消</div>
-  </div>`;
+  `;
+
   window._cardSelect = (choice) => {
     modal.remove(); delete window._cardSelect;
     if (choice === 'user' && canUseUser) onUserCard();
     else if (choice === 'ghost' && canUseGhost) onGhostCard();
   };
+
   document.body.appendChild(modal);
 }

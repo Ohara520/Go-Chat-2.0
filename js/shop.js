@@ -38,6 +38,7 @@ const MARKET_CATEGORIES = [
   { id: 'gift',     label: '🎁 特别礼物' },
   { id: 'fromhome', label: '🏠 从家寄给他' },
   { id: 'luxury',   label: '💎 精品专柜' },
+  { id: 'myitems',  label: '🛍️ 我的专区' },
   { id: 'wishlist', label: '✈️ 面基计划' },
   { id: 'home',     label: '🏡 建立小家' },
   { id: 'intimate', label: '🔒 私密专区' },
@@ -59,12 +60,6 @@ const MARKET_PRODUCTS = {
     { emoji: '🧥', name: '厚实连帽卫衣',      desc: '营地休息时穿的，宽松舒适',                price: 88,  shipping: 18, maxPurchase: 2 },
     { emoji: '🥾', name: '战术军靴（升级款）', desc: '比上一双更耐穿，任务首选',                price: 220, shipping: 18, maxPurchase: 2 },
     { emoji: '🕶️', name: '墨镜',              desc: 'Ghost标配，低调又帅',                     price: 95,  shipping: 18, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    // 奢侈服饰
-    { emoji: '🧥', name: 'Cashmere羊绒毛衣',  desc: '苏格兰产地，极细软糯，穿上就不想脱',      price: 680, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
-    { emoji: '🧥', name: 'Barbour蜡质夹克',   desc: '英国经典户外品牌，低调有质感',            price: 980, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { emoji: '🧥', name: 'Belstaff皮夹克',    desc: '英国品牌，低调有型，他不会主动要但会记得', price: 1800, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { emoji: '🥾', name: "Church's德比皮鞋",  desc: '英国皇室御用，低调精致，任务外的正装',    price: 980, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
-    { emoji: '🧥', name: 'Gore-Tex冲锋衣',    desc: '防水防风，野外任务必备，顶配版',          price: 1380, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
   ],
   food: [
     { emoji: '☕', name: '精品咖啡豆礼盒',      desc: '三种产区，他每天早上用得上，附手冲说明',  price: 98,  shipping: 15, maxPurchase: 2 },
@@ -92,6 +87,11 @@ const MARKET_PRODUCTS = {
     { emoji: '🌡️', name: 'Stanley保温水壶', desc: '营地必备，保温12小时，低调实用',   price: 118,  shipping: 15 },
   ],
   luxury: [
+    { emoji: '🧥', name: 'Cashmere羊绒毛衣',        desc: '苏格兰产地，极细软糯，穿上就不想脱',           price: 680,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
+    { emoji: '🧥', name: 'Barbour蜡质夹克',          desc: '英国经典户外品牌，低调有质感',                 price: 980,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
+    { emoji: '🧥', name: 'Belstaff皮夹克',           desc: '英国品牌，低调有型，他不会主动要但会记得',      price: 1800, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
+    { emoji: '🥾', name: "Church's德比皮鞋",         desc: '英国皇室御用，低调精致，任务外的正装',         price: 980,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
+    { emoji: '🧥', name: 'Gore-Tex冲锋衣',           desc: '防水防风，野外任务必备，顶配版',               price: 1380, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
     { emoji: '💍', name: 'Cartier 戒指（情侣款）', desc: 'Love系列，你戴一枚，他戴一枚', price: 5800, shipping: 35, isUserItem: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '🎖️', name: '定制军牌', desc: 'Ghost刻了两个人的名字' } },
     { emoji: '⌚', name: 'Rolex 劳力士（送 Ghost）', desc: 'Submariner 潜航者，他不会承认自己喜欢', price: 8500, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '👜', name: '名牌包包', desc: 'Ghost说抱歉，补了一个' } },
     { emoji: '🧥', name: 'Belstaff军旅背包（限量）', desc: '英国品牌，Ghost同款，限量版', price: 1280, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
