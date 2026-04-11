@@ -6,7 +6,74 @@ const PHOTO_BUCKET  = 'photos';
 
 let _pendingAvatarChoice = null;
 
-// ===== 图片压缩（输入dataURL，输出base64）=====
+// ===== IndexedDB 图片存储 =====
+// 把 base64 存 IndexedDB，不存 localStorage，防止超限丢记录
+
+const PHOTO_IDB_NAME    = 'GhostPhotoStore';
+const PHOTO_IDB_VERSION = 1;
+const PHOTO_IDB_STORE   = 'photos';
+
+function _openPhotoDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(PHOTO_IDB_NAME, PHOTO_IDB_VERSION);
+    req.onupgradeneeded = e => {
+      e.target.result.createObjectStore(PHOTO_IDB_STORE, { keyPath: 'key' });
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function savePhotosToIDB(key, base64List) {
+  try {
+    const db = await _openPhotoDB();
+    return new Promise((resolve, reject) => {
+      const tx    = db.transaction(PHOTO_IDB_STORE, 'readwrite');
+      const store = tx.objectStore(PHOTO_IDB_STORE);
+      store.put({ key, base64List, savedAt: Date.now() });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror    = e => reject(e.target.error);
+    });
+  } catch(e) {
+    console.warn('[PhotoIDB] 存储失败:', e);
+    return false;
+  }
+}
+
+async function loadPhotosFromIDB(key) {
+  try {
+    const db = await _openPhotoDB();
+    return new Promise((resolve, reject) => {
+      const tx    = db.transaction(PHOTO_IDB_STORE, 'readonly');
+      const store = tx.objectStore(PHOTO_IDB_STORE);
+      const req   = store.get(key);
+      req.onsuccess = e => resolve(e.target.result?.base64List || null);
+      req.onerror   = e => reject(e.target.error);
+    });
+  } catch(e) {
+    console.warn('[PhotoIDB] 读取失败:', e);
+    return null;
+  }
+}
+
+// 清理30天前的旧图片
+async function cleanOldPhotosFromIDB() {
+  try {
+    const db        = await _openPhotoDB();
+    const threshold = Date.now() - 30 * 24 * 3600 * 1000;
+    const tx    = db.transaction(PHOTO_IDB_STORE, 'readwrite');
+    const store = tx.objectStore(PHOTO_IDB_STORE);
+    const req   = store.openCursor();
+    req.onsuccess = e => {
+      const cursor = e.target.result;
+      if (!cursor) return;
+      if (cursor.value.savedAt < threshold) cursor.delete();
+      cursor.continue();
+    };
+  } catch(e) {}
+}
+
+
 function compressImageToBase64(dataUrl, maxWidth = 800, quality = 0.82) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -194,14 +261,19 @@ async function handlePhotoUpload(fileDataList) {
       container.scrollTop = container.scrollHeight;
     }
 
-    // 3. 存入聊天历史（带base64供后续文字消息使用）
+    // 3. 存入 IndexedDB + chatHistory 只存 key（不存 base64，防止 localStorage 超限丢记录）
     if (typeof chatHistory !== 'undefined') {
+      const _photoKey = 'photo_' + Date.now();
+      await savePhotosToIDB(_photoKey, base64List);
       chatHistory.push({
         role: 'user',
         content: `[用户发了${base64List.length}张图片]`,
-        _photoBase64: base64List // 供后续文字消息携带图片用
+        _photoBase64: base64List,  // 内存里保留供本次会话使用
+        _photoIdbKey: _photoKey,   // 持久化 key，刷新后从 IDB 恢复
       });
       if (typeof saveHistory === 'function') saveHistory();
+      // 定期清理旧图片
+      cleanOldPhotosFromIDB().catch(() => {});
     }
 
     // 4. 判断场景

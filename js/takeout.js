@@ -653,11 +653,11 @@ async function onGhostReceivedTakeout(order) {
     return;
   }
 
-  // 正在发消息就等一会儿，不干扰用户输入；不再有超长随机延迟
+  // 正在发消息就等一会儿，不干扰用户输入
+  const delay = typeof _isSending !== 'undefined' && _isSending ? 6000 : 0;
   setTimeout(async () => {
     try {
-      // ── 情绪变化（不生成回复，不注入聊天框）────────────────
-      // 外卖到达不打断聊天：写进长期记忆，Ghost 下次对话自然带出
+      // ── 情绪变化 ─────────────────────────────────────────
       const _feeHour     = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }));
       const _isLateNight = _feeHour >= 2 && _feeHour < 6;
       const _wasHungry   = _detectMealStatus() === 'hungry';
@@ -683,6 +683,60 @@ async function onGhostReceivedTakeout(order) {
           if (typeof touchLocalState === 'function') touchLocalState();
         }
       } catch(e) {}
+
+      // Ghost 用 S 说一句反应（调情中存 pending 不打断）
+      const _isFlirting = sessionStorage.getItem('loveOverride') === 'true'
+        || (chatHistory || []).slice(-4).some(m => m._intimate);
+      if (_isFlirting) {
+        const _pt = JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]');
+        _pt.push({ order, savedAt: Date.now() });
+        localStorage.setItem('pendingTakeoutReactions', JSON.stringify(_pt));
+      } else {
+        try {
+          const _descHint = order.desc ? `\nWhat it is: ${order.desc}` : '';
+          const _prompt = told
+            ? `[Her takeout just arrived — 「${order.nameEn || order.name}」. You have it now.${_descHint}
+
+She ordered this for you. That matters — regardless of what the food is.
+React to it honestly: what you notice about it, how it smells, what you think.
+You may be dry about it. You may underplay it. But underneath — you received it, and you received what she meant by it.
+Do not dismiss it. Do not make her feel the gesture was wasted.
+Lowercase. English only. Two to three lines.]`
+            : `[A delivery just showed up — 「${order.nameEn || order.name}」. You didn't know she was ordering.${_descHint}
+
+She did this without telling you. She was thinking of you.
+React to the food and to what just happened — dry, real, a little caught off guard.
+You don't perform gratitude. But you don't act like it means nothing.
+The fact she did this — that stays with you.
+Lowercase. English only. Two to three lines.]`;
+          const _res = await fetchWithTimeout('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+              max_tokens: 100,
+              system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
+              messages: [
+                ...(chatHistory || []).filter(m => !m._system).slice(-6),
+                { role: 'user', content: _prompt }
+              ]
+            })
+          }, 15000);
+          const _data = await _res.json();
+          const _reply = (_data.content?.[0]?.text || '').trim();
+          const _bad = ["i'm claude","i am claude","as an ai","can't roleplay","anthropic"];
+          if (_reply && !_bad.some(p => _reply.toLowerCase().includes(p))) {
+            const _line = _reply.split('\n').slice(0, 2).join('\n');
+            if (typeof appendMessage === 'function') appendMessage('bot', _line);
+            if (typeof chatHistory !== 'undefined') {
+              chatHistory.push({ role: 'assistant', content: _line });
+              const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
+              if (_realMsgs.length > 0 && typeof saveHistory === 'function') saveHistory();
+              if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+            }
+          }
+        } catch(e) { console.warn('[外卖] 回复生成失败:', e); }
+      }
 
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
@@ -779,4 +833,11 @@ function checkPendingTakeoutReactions() {
       setTimeout(() => onGhostReceivedTakeout(item.order), idx * 4000);
     });
   } catch(e) {}
+}
+
+// 用户切回聊天页时自动触发 pending
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) setTimeout(checkPendingTakeoutReactions, 1000);
+  });
 }

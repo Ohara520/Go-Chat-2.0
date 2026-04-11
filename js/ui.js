@@ -395,6 +395,32 @@ function renderChatHistory(chatHistory) {
         return;
       }
 
+      // 没有内存 base64 但有 IDB key → 从 IndexedDB 异步恢复
+      if (msg._photoIdbKey && typeof loadPhotosFromIDB === 'function') {
+        const div = document.createElement('div');
+        div.className = 'message user';
+        div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
+        div.innerHTML = `<div style="opacity:0.5;font-size:12px;padding:8px;">📷 加载中...</div>`;
+        container.appendChild(div);
+        loadPhotosFromIDB(msg._photoIdbKey).then(b64List => {
+          if (b64List && b64List.length > 0) {
+            const maxW = b64List.length > 1 ? '130px' : '220px';
+            div.innerHTML = `<div style="display:inline-flex;gap:6px;flex-wrap:wrap;max-width:280px;">
+              ${b64List.map(b64 => {
+                const src = `data:image/jpeg;base64,${b64}`;
+                return `<img src="${src}" style="max-width:${maxW};border-radius:12px;display:block;cursor:pointer;"
+                  onclick="if(typeof showPhotoPreview==='function')showPhotoPreview('${src}')" />`;
+              }).join('')}
+            </div>`;
+          } else {
+            div.innerHTML = `<div style="opacity:0.4;font-size:12px;padding:8px;">📷 图片</div>`;
+          }
+        }).catch(() => {
+          div.innerHTML = `<div style="opacity:0.4;font-size:12px;padding:8px;">📷 图片</div>`;
+        });
+        return;
+      }
+
       appendMessage('user', msg.content, false);
 
     // ── assistant消息 ────────────────────────────────────────

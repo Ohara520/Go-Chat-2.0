@@ -294,14 +294,27 @@ function autoUnlockFromReply(reply) {
 
 // ===== 历史保存 =====
 function saveHistory() {
+  // 保护：空数组或只有系统消息时不写，防止覆盖真实记录
+  const realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
+  if (realMsgs.length === 0) {
+    console.warn('[saveHistory] 跳过：没有真实消息，不覆盖本地记录');
+    return;
+  }
   // 只保留最近150条，防止localStorage超限
   if (chatHistory.length > 150) {
-    const realMsgs = chatHistory.filter(m => !m._system);
     const sysMsgs = chatHistory.filter(m => m._system).slice(-10);
     chatHistory = [...sysMsgs, ...realMsgs.slice(-140)];
   }
   try {
-    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    // 存 localStorage 前剥掉 base64，只保留 IDB key，防止超限丢记录
+    const toSave = chatHistory.map(m => {
+      if (m._photoBase64) {
+        const { _photoBase64, ...rest } = m;
+        return rest;
+      }
+      return m;
+    });
+    localStorage.setItem('chatHistory', JSON.stringify(toSave));
     if (typeof touchLocalState === 'function') touchLocalState();
   } catch(e) {
     console.warn('[saveHistory] 存储失败:', e);
@@ -797,16 +810,23 @@ async function _processMergedMessage(text) {
       /性感|色色|涩涩|勾引/,
       /胸|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
       /intimate|turn.*on|turned.*on/i,
-      /🍆|🍑|💦|👅|🫦|🥵/,
+      /🍆|🍑|💦|👅|🫦/,
+      // 生理问题也走G，但由 intimacy.js 的 anti-spike 控制节奏
+      /勃起|硬了|几厘米|尺寸|几寸|进去|cock|dick|pussy|erect|inches/i,
     ];
-    let isIntimate = isRecentPhoto ? false : INTIMATE_PATTERNS.some(p => p.test(text));
+
+    // 使用 intimacy.js 的 intent 系统决定是否调情
+    const _intimateIntent = typeof detectIntimateIntent === 'function'
+      ? detectIntimateIntent(text) : 'none';
+    let isIntimate = isRecentPhoto ? false
+      : (_intimateIntent !== 'none' || INTIMATE_PATTERNS.some(p => p.test(text)));
 
     // 用户明显切换到日常话题时，强制退出调情状态
     const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|where are you|how was your day|how are you|what's up|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb/i;
     let _intimacyForceCleared = false;
     if (_clearIntimateKws.test(text) && chatHistory.slice(-6).some(m => m._intimate)) {
       isIntimate = false;
-      _intimacyForceCleared = true; // 标记强制退出，阻止 Haiku 把它改回来
+      _intimacyForceCleared = true;
     }
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
@@ -942,6 +962,9 @@ async function _processMergedMessage(text) {
         if (!sessionStorage.getItem('intimateSummarized')) {
           sessionStorage.setItem('intimateSummarized', '1');
           _summarizeIntimateMemory();
+          // 余温结束，同步重置调情进度，防止 G 被一句话拉回来
+          sessionStorage.setItem('flirtProgress', '0');
+          sessionStorage.setItem('nonFlirtStreak', '0');
         }
       } else {
         sceneHint = '[Slightly quieter. Not fully reset. Just respond to her directly.]';

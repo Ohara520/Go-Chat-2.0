@@ -229,15 +229,11 @@ That's enough for now.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// intimacyLevel 计算
-// 依赖：getTrustHeat, getMoodLevel, getAffection
-//
-// slowBurn：自然最高 2，3/4 只靠 override / 剧情
-// established：自然可到 4，但门槛高
-// override：优先覆盖，用完即清
+// 调情上限（cap）— 长期关系状态决定"最高能到哪"
+// 不决定当前回复走多深，只是天花板
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function getIntimacyLevel() {
+function getIntimacyCap() {
   const trust     = getTrustHeat();
   const mood      = getMoodLevel();
   const affection = getAffection();
@@ -245,23 +241,17 @@ function getIntimacyLevel() {
   const mode      = localStorage.getItem('marriageType') || 'established';
   const override  = sessionStorage.getItem('intimacyOverride');
 
-  // 冷战中不进入调情
   if (coldWar) return 0;
 
-  // 剧情一次性解锁（两个模式都适用）
   if (override === '4') return 4;
   if (override === '3') return 3;
 
-  // ── slowBurn ──────────────────────────────────────
-  // 自然最高 2，3/4 只靠 override / 剧情
   if (mode === 'slowBurn') {
     if (trust < 60 || mood < 4) return 0;
     if (trust < 70 || mood < 5) return 1;
     return 2;
   }
 
-  // ── established ───────────────────────────────────
-  // 自然可到 4，但门槛严格
   if (trust < 50 || mood < 4) return 0;
   if (trust < 60 || mood < 5) return 1;
   if (trust < 72 || mood < 6) return 2;
@@ -269,6 +259,131 @@ function getIntimacyLevel() {
   if (trust >= 82 && affection >= 80 && mood >= 7) return 4;
   return 3;
 }
+
+// 兼容旧调用
+function getIntimacyLevel() { return getIntimacyCap(); }
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 三级意图检测
+// affection / flirt / explicit / none
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function detectIntimateIntent(userText) {
+  const t = (userText || '').toLowerCase();
+
+  // explicit — 生理/露骨，直接但要降维处理
+  if (/勃起|硬了|几厘米|多长|尺寸|几寸|进去|插|做爱|sex|cock|dick|pussy|cum|orgasm|erect|inches|how big|how long.*下面|下面.*多长/i.test(t)) {
+    return 'explicit';
+  }
+
+  // flirt — 明确调情挑逗
+  if (/摸摸|蹭蹭|贴贴|咬我|舔我|撩你|你好坏|坏死了|流氓|kiss|touch me|want you|naughty|tease|床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|色色|涩涩|勾引|身体.*摸|摸.*身体|🍆|🍑|💦|👅|🫦/i.test(t)) {
+    return 'flirt';
+  }
+
+  // affection — 撒娇亲昵，不算调情
+  if (/抱抱|亲亲|么么|想你|miss you|想抱|贴贴|蹭|依|宝贝|baby|抱我|hold me/i.test(t)) {
+    return 'affection';
+  }
+
+  return 'none';
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 调情进度引擎（progress）
+// 楼梯：决定"这轮先走到哪一级"
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function getFlirtProgress() {
+  return parseFloat(sessionStorage.getItem('flirtProgress') || '0');
+}
+
+function saveFlirtProgress(val) {
+  sessionStorage.setItem('flirtProgress', String(Math.max(0, Math.min(val, 4))));
+  sessionStorage.setItem('lastFlirtTime', String(Date.now()));
+}
+
+// 阻尼增长：越往后越难涨
+function pushFlirtProgress(intent, current) {
+  const deltas = { affection: 0.3, flirt: 0.7, explicit: 1.0, none: 0 };
+  const delta = deltas[intent] || 0;
+  const resistance = 1 - (current / 4); // 越高越难涨
+  return current + delta * resistance;
+}
+
+// 衰减：氛围断了慢慢降温
+function decayFlirtProgress(current, intent, nonFlirtStreak) {
+  let p = current;
+
+  // 非调情连续2条 → 降温
+  if (intent === 'none' && nonFlirtStreak >= 2) {
+    p *= 0.6;
+  } else if (intent === 'none') {
+    p *= 0.85;
+  }
+
+  // 时间辅助衰减
+  const lastTime = parseInt(sessionStorage.getItem('lastFlirtTime') || '0');
+  const gap = Date.now() - lastTime;
+  if (gap > 8 * 60 * 1000) p *= 0.5;   // 8分钟没有调情
+  if (gap > 20 * 60 * 1000) p *= 0.3;  // 20分钟基本归零
+
+  return Math.max(0, p);
+}
+
+// 非调情连续计数
+function getNonFlirtStreak() {
+  return parseInt(sessionStorage.getItem('nonFlirtStreak') || '0');
+}
+
+function updateNonFlirtStreak(intent) {
+  if (intent === 'none') {
+    sessionStorage.setItem('nonFlirtStreak', String(getNonFlirtStreak() + 1));
+  } else {
+    sessionStorage.setItem('nonFlirtStreak', '0');
+  }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 当前轮次 step 计算
+// 结合 progress + anti-spike + cap
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function getCurrentIntimacyStep(userText) {
+  let intent = detectIntimateIntent(userText);
+  const nonFlirtStreak = getNonFlirtStreak();
+  let progress = getFlirtProgress();
+
+  // 衰减（先算衰减，再推进）
+  progress = decayFlirtProgress(progress, intent === 'none' ? 'none' : intent, nonFlirtStreak);
+
+  // anti-spike：第一句就 explicit 且 progress 不够 → 降级为 flirt
+  if (intent === 'explicit' && progress < 1.5) {
+    intent = 'flirt';
+  }
+
+  // 推进
+  if (intent !== 'none') {
+    progress = pushFlirtProgress(intent, progress);
+  }
+
+  // 更新记录
+  updateNonFlirtStreak(intent === 'none' ? 'none' : 'flirt');
+  saveFlirtProgress(progress);
+
+  const step = Math.floor(progress);
+
+  // 调试输出
+  if (typeof console !== 'undefined') {
+    console.log('[intimacy]', { intent, progress: progress.toFixed(2), step, cap: getIntimacyCap() });
+  }
+
+  return step;
+}
+
 
 function allowIntimacyOnce(level = 3) {
   sessionStorage.setItem('intimacyOverride', String(level));
@@ -280,35 +395,30 @@ function consumeIntimacyOverride() {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 调情触发检测
-// 只有用户消息包含调情意图才注入 intimacy block
+// 调情触发检测（兼容旧接口）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function detectFlirtTrigger(userText) {
-  const text = (userText || '').toLowerCase();
-  const triggers = [
-    // 中文 — 只保留有明确身体接触暗示或刻意挑逗的
-    // 移除：亲亲、亲一下、想我吗等（日常撒娇/想念，交给 Claude 或 H 语义判断）
-    '摸摸','蹭蹭','贴贴','抱抱','么么','咬','舔',
-    '你好坏','坏死了','流氓','撩你',
-    // 英文 — 模糊的交给 H 判断，只留明确的
-    'kiss','hug','hold me','want you',
-    'touch me','naughty','tease','flirt',
-  ];
-  return triggers.some(t => text.includes(t));
+  return detectIntimateIntent(userText) !== 'none';
 }
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 构建调情 prompt 块
-// 在 API 调用前注入
+// cap + step → finalLevel
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function buildIntimacyBlock(userText) {
-  // trigger gating：没有调情意图就不注入
-  if (userText && !detectFlirtTrigger(userText)) return '';
+  const intent = detectIntimateIntent(userText || '');
+  if (intent === 'none' && userText) return '';
 
-  const level = getIntimacyLevel();
-  consumeIntimacyOverride(); // override 用完即清
-  return FLIRT_CORE + '\n' + (INTIMACY_LEVELS[level] || INTIMACY_LEVELS[0]);
+  const cap  = getIntimacyCap();
+  const step = getCurrentIntimacyStep(userText || '');
+  const finalLevel = Math.min(cap, step);
+
+  consumeIntimacyOverride();
+
+  console.log('[intimacy] buildIntimacyBlock', { cap, step, finalLevel });
+
+  return FLIRT_CORE + '\n' + (INTIMACY_LEVELS[finalLevel] || INTIMACY_LEVELS[0]);
 }
