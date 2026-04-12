@@ -609,7 +609,7 @@ async function _processMergedMessage(text) {
     } else if (/爱我|爱你|喜欢你|i love|love you|do you love|你爱我/.test(t)) {
       sceneHint = '[Love/affection check — respond as himself. Deflect, redirect, or let something slip — but stay present.]';
     } else if (/哄|撒娇|宝贝|抱抱|亲亲|陪我|miss you|想你|hug|baby|hold me/.test(t)) {
-      sceneHint = '[She is being affectionate — he gives it back. Brief. Real. His way, not a script. He does not explain it or make a thing of it.]';
+      sceneHint = '[She is being affectionate. Respond naturally — whether he gives it back or just receives it depends on how things are between them right now. His way. Brief. Do not ignore it.]';
     } else if (/吃醋|jealous|谁|who is|who was|你认识|you know her|you know him/.test(t)) {
       sceneHint = "[Possible jealousy trigger — react immediately, don't calculate. Sharper tone, more direct.]";
     } else if (/难过|伤心|哭|委屈|不开心|hurt|sad|crying|upset|awful/.test(t)) {
