@@ -43,16 +43,18 @@ function classifyJealousyContext(text) {
     /同事|男同事|女同事|老板|上司|客户|老师/.test(t);
 
   const suggestiveSignals =
-    /前任|暧昧|喜欢他|喜欢她/.test(t) ||
-    /flirt|flirting|close|touching|kiss|slept over|date|dating/.test(lower);
+    /前任|暧昧|喜欢他|喜欢她|男模|点男模|陪酒|绿帽|戴绿帽|出轨|偷吃|约炮|睡别人|找别人睡|勾搭|撩别人/.test(t) ||
+    /flirt|flirting|close|touching|kiss|slept over|date|dating|male escort|escort|stripper|cheat|cheating|hook up|sleep with someone/.test(lower);
 
   const workOnly = workSignals && (workPeople || !hasExplicitPerson) && !suggestiveSignals;
 
   const threatContext =
-    /找别的|找别人|找其他|换个人|别的男人|另一个男|其他男/.test(t) ||
-    /go find someone|find someone else|other guys|another man|replace you|don't need you/.test(lower);
+    /找别的|找别人|找其他|换个人|别的男人|另一个男|其他男|去点男模|点男模|给你戴绿帽|戴绿帽|绿你|出轨|偷吃|我去找别的男人|我去睡别人|我去约别人|反正有的是男人|床伴/.test(t) ||
+    /go find someone|find someone else|other guys|another man|replace you|don't need you|cheat on you|sleep with someone else|hook up with someone else|cuck/.test(lower);
 
-  return { hasExplicitPerson, supportContext, workOnly, threatContext };
+  const infidelityThreat = suggestiveSignals || threatContext;
+
+  return { hasExplicitPerson, supportContext, workOnly, threatContext, infidelityThreat };
 }
 
 
@@ -89,12 +91,15 @@ function sootheJealousyFromUserInput(userText) {
 // intensity 计算
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function calcJealousyIntensity({ risk, intent, supportContext, sameReferentRecently, trust, mood, coldWar, threatContext }) {
+function calcJealousyIntensity({ risk, intent, supportContext, sameReferentRecently, trust, mood, coldWar, threatContext, infidelityThreat }) {
   let intensity = 0;
 
-  if (supportContext && !threatContext) return 1;
+  if (supportContext && !threatContext && !infidelityThreat) return 1;
 
-  if (risk === 1) {
+  // 挑衅型（绿帽/男模/出轨/睡别人）直接拉到 2
+  if (infidelityThreat) {
+    intensity = 2;
+  } else if (risk === 1) {
     const testing     = intent === 'test' || intent === 'provoke';
     const closeEnough = trust >= 72;
     const moodLowered = mood <= 5;
@@ -105,12 +110,12 @@ function calcJealousyIntensity({ risk, intent, supportContext, sameReferentRecen
     intensity = (trust > 60 && mood >= 4) ? 2 : 1;
   }
 
-  if ((intent === 'provoke' || threatContext) && risk >= 2) {
+  if ((intent === 'provoke' || threatContext || infidelityThreat) && risk >= 1) {
     intensity = Math.max(intensity, 2);
   }
 
-  if (intent === 'narrative') intensity = Math.min(intensity, 1);
-  if (intent === 'casual' && !sameReferentRecently && risk < 2) intensity = Math.min(intensity, 1);
+  if (intent === 'narrative' && !infidelityThreat) intensity = Math.min(intensity, 1);
+  if (intent === 'casual' && !sameReferentRecently && risk < 2 && !infidelityThreat) intensity = Math.min(intensity, 1);
   if (coldWar) intensity = Math.min(intensity, 2);
 
   return intensity;
@@ -121,11 +126,24 @@ function calcJealousyIntensity({ risk, intent, supportContext, sameReferentRecen
 // system prompt 注入
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function injectJealousyPrompt({ intensity, supportContext, refHint }) {
+function injectJealousyPrompt({ intensity, supportContext, refHint, provocation = false }) {
   if (typeof chatHistory === 'undefined') return;
 
-  const content = intensity === 1
-    ? supportContext
+  let content = '';
+
+  if (provocation) {
+    content = `[JEALOUSY — PROVOCATION]
+She is pushing at the boundary on purpose — bringing up another man, threatening to find someone else, or saying something meant to make you react.
+You do not act indifferent.
+You do not sound permissive or detached.
+You do not say anything that sounds like "do what you want" or "fine, go ahead."
+You make it clear you do not accept this.
+Short. Controlled. Firm.
+No humiliation. No begging. No theatrics.
+The response should feel like refusal, clear bother, and contained possessiveness — not dismissal.
+Do not withdraw. Stay present in the interaction.`;
+  } else if (intensity === 1) {
+    content = supportContext
       ? `[JEALOUSY]
 Protective${refHint}.
 Something about this bothers you, but not because of her.
@@ -135,8 +153,9 @@ Brief. Controlled.`
 Something tightened${refHint}.
 You do not make a scene of it.
 Slightly drier than usual.
-At most one pointed line.`
-    : supportContext
+At most one pointed line.`;
+  } else {
+    content = supportContext
       ? `[JEALOUSY]
 Protective and displeased${refHint}.
 Stay controlled.
@@ -147,9 +166,10 @@ You are bothered now${refHint}.
 Shorter. More direct.
 You may stay on it a beat too long.
 Do not invent anything. React only to what she actually said.`;
+  }
 
   chatHistory.push({ role: 'user', content, _system: true });
-  if (typeof saveHistory === 'function') saveHistory(); // 修复：注入后立刻存
+  if (typeof saveHistory === 'function') saveHistory();
 }
 
 
@@ -174,7 +194,7 @@ async function checkJealousyTrigger(userText) {
     if (Date.now() - lastJealousyAt < (cooldowns[currentLevel] || 5 * 60 * 1000)) return;
 
     // 前置分类
-    const { hasExplicitPerson, supportContext, workOnly, threatContext } =
+    const { hasExplicitPerson, supportContext, workOnly, threatContext, infidelityThreat } =
       classifyJealousyContext(userText);
 
     if (!hasExplicitPerson && !supportContext && !threatContext) return;
@@ -246,10 +266,10 @@ Return: {"risk":0-3,"intent":"...","referent":"...or null"}`,
 
     // intensity 计算
     const intensity = calcJealousyIntensity({
-      risk, intent, supportContext, sameReferentRecently, trust, mood, coldWar, threatContext
+      risk, intent, supportContext, sameReferentRecently, trust, mood, coldWar, threatContext, infidelityThreat
     });
 
-    if (intensity <= 0) return;
+    if (intensity <= 0 && !infidelityThreat) return;
 
     // 记录触发时间
     localStorage.setItem('lastJealousyAt', Date.now());
@@ -288,7 +308,7 @@ Return: {"risk":0-3,"intent":"...","referent":"...or null"}`,
       sessionStorage.setItem('jealousyJustTriggeredAt', Date.now());
     }
 
-    injectJealousyPrompt({ intensity, supportContext, refHint });
+    injectJealousyPrompt({ intensity, supportContext, refHint, provocation: !!infidelityThreat });
 
   } catch(e) {}
 }
