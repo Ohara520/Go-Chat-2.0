@@ -890,11 +890,7 @@ async function _processMergedMessage(text) {
         sceneHint = '[Slightly quieter. Not fully reset. Just respond to her directly.]';
       }
 
-      // 余温期冷却：_dailyAfterIntimate 在 1-2 之间时，阻止 Haiku 把 isIntimate 拉回 true
-      // 防止用户说"想你"这种话又把 Grok 拉进来，造成反复循环
-      if (isIntimate && _dailyAfterIntimate >= 1 && _dailyAfterIntimate <= 2) {
-        isIntimate = false;
-      }
+      // 冷却已移除：进度系统自己管升温降温，不需要额外拦截
     }
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
