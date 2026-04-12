@@ -355,11 +355,7 @@ async function updateLongTermMemory() {
   const memoryUserPrompt = `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。`;
 
   try {
-    // 先走DeepSeek，失败走Haiku兜底
-    let newMemory = await callDeepSeek(memorySystemPrompt + '\n\n' + memoryUserPrompt, 500);
-    if (!newMemory) {
-      newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 500);
-    }
+    const newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 500);
     if (newMemory) saveLongTermMemory(newMemory);
   } catch(e) {}
 }
@@ -774,7 +770,7 @@ async function _processMergedMessage(text) {
                 .filter(m => !m._system && !m._recalled).slice(-4)
                 .map(m => m.content || '').join(' ');
               const _isWarmingUp = /kiss|抱|亲|摸|靠近|想你|miss you|love you|爱你|贴|蹭|咬|撩/.test(_warmCtx);
-              if (_hasRecentIntimateCtx || _isWarmingUp) isIntimate = true;
+              if (_hasRecentIntimateCtx || (combinedResult.flirt === true && _isWarmingUp)) isIntimate = true;
             }
             _emotionLabel = combinedResult.emotion || '平淡';
             // wantsMoney 判断：用 Haiku 语义结果覆盖关键词匹配
