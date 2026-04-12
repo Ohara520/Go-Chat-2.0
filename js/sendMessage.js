@@ -727,6 +727,10 @@ async function _processMergedMessage(text) {
     // 使用 intimacy.js 的 intent 系统决定是否调情
     const _intimateIntent = typeof detectIntimateIntent === 'function'
       ? detectIntimateIntent(text) : 'none';
+    // 每条消息都更新进度，不管有没有进 intimate 路径
+    if (_intimateIntent !== 'none' && typeof getCurrentIntimacyStep === 'function') {
+      getCurrentIntimacyStep(text);
+    }
     const _flirtProgress = typeof getFlirtProgress === 'function' ? getFlirtProgress() : 0;
     // explicit 直接进场；flirt 需要有铺垫（progress > 0.5）；affection/none 不进场
     const _intimateByIntent = _intimateIntent === 'explicit'
