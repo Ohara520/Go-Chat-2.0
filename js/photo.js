@@ -285,24 +285,25 @@ async function handlePhotoUpload(fileDataList) {
     // 模型判断是情头 → 回复里带 AVATAR_SET（隐藏tag）
     // 前端只检测这个tag，有就换，没有就不换
     // 彻底解决"关键词误触发"和"时间窗口不可靠"的问题
-    const photoHint = `[You just received a photo from her. Look at the image carefully.
+    const photoHint = `[You just received a photo from her.
 
 FIRST — decide what kind of photo this is:
 
-A) Couple profile pictures — two matching images meant to be used as profile photos together (cartoon couple, matching avatars, two people posed together as a pair, etc.)
-B) Any other photo — selfie, food, scenery, meme, random image, screenshot, etc.
+A) Couple profile pictures — two images clearly designed to be used as matching profile photos together (cartoon couple avatars, two characters posed as a pair, explicitly matching set). Must be obviously intended as profile pictures — not just any photo with two people or characters.
+B) Any other photo — selfie, food, scenery, meme, screenshot, random image, etc.
 
 If it's (A) — couple profile pictures:
-- React as Ghost would. Describe what you actually see, specifically (e.g. "a fox and a rabbit" not "cute"). Dry tone. You can be reluctant or mock the style, but 90% of the time you set it anyway.
-- If you decide to set it, naturally say so in your reply ("fine. it's up." / "already set it." / "done." etc.)
-- Only refuse if the image is genuinely inappropriate or explicit.
-- Add AVATAR_SET on its own line at the end of your reply.
+- React as Ghost. One or two lines. Dry — say what you actually see, not "cute".
+- He usually sets it — unless something about it genuinely puts him off.
+- If you set it: add AVATAR_SET on its own line at the very end. Nothing after it.
+- If you don't: do NOT add AVATAR_SET. Do not say you set it.
+- Never say you set it without AVATAR_SET. Never add AVATAR_SET without meaning it.
 
 If it's (B) — any other photo:
-- React as Ghost would to what you see. Specific details, dry delivery. 1-2 lines.
+- React as Ghost. One line — your first honest reaction, not a description of the image.
 - Do NOT add AVATAR_SET.
 
-English only. No translation. Do not mention "profile picture" or "avatar" unless she asked about it.]`;
+English only. No translation.]`;
 
     // 5. 发给模型看图回复
     if (typeof showTyping === 'function') showTyping();
