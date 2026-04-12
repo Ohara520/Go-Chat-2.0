@@ -732,9 +732,10 @@ async function _processMergedMessage(text) {
       getCurrentIntimacyStep(text);
     }
     const _flirtProgress = typeof getFlirtProgress === 'function' ? getFlirtProgress() : 0;
-    // explicit 直接进场；flirt 需要有铺垫（progress > 0.5）；affection/none 不进场
-    const _intimateByIntent = _intimateIntent === 'explicit'
-      || (_intimateIntent === 'flirt' && _flirtProgress > 0.5);
+    // 有调情意图就进G，由G的level系统控制升温节奏
+    // affection积累到一定进度也会进G（轻度调情）
+    const _intimateByIntent = _intimateIntent === 'explicit' || _intimateIntent === 'flirt'
+      || (_intimateIntent === 'affection' && _flirtProgress >= 1.0);
     let isIntimate = isRecentPhoto ? false
       : (_intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text)));
 
