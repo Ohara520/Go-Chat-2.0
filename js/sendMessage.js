@@ -872,6 +872,8 @@ async function _processMergedMessage(text) {
       const _forceExit = _dailyAfterIntimate >= 3;
 
       if (_dailyAfterIntimate === 0) {
+        // G 刚说了什么，用户在接着回应——继续走 G，保持上下文
+        isIntimate = true;
         sceneHint = '[He is slightly quieter than usual. More present. Not performing anything — just here. Respond to what she says, naturally.]';
       } else if (_dailyAfterIntimate === 1) {
         sceneHint = '[He is settled. Responding normally. There is a slight ease between them — unspoken, not referenced. Just answer what she said.]';
