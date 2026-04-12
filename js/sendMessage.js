@@ -578,11 +578,11 @@ async function _processMergedMessage(text) {
     // cleanHistory：Sonnet用（调情内容替换为占位符，20条，防破防）
     // 修复 #061: 确保 _recalled 消息完全不传给模型
     const cleanHistory = chatHistory
-      .filter(m => (!m._system || m._imageDesc) && !m._recalled)
+      .filter(m => (!m._system || m._imageDesc) && !m._recalled && !m._intimate)
       .slice(-20)
       .map(m => ({
         role: m.role,
-        content: m._intimate ? '[ they were close for a moment. ]' : m.content
+        content: m.content
       }));
 
     // ── System Prompt 构建 ───────────────────────────────────
