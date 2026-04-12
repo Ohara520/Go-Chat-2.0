@@ -711,12 +711,10 @@ function confirmPurchase() {
         setBalance(bal - total);
         addTransaction({ icon: p.emoji, name: itemLabel, amount: -total });
         renderWallet();
-        if (typeof showGhostCardReceipt === 'function') showGhostCardReceipt(total, p.name, true);
         _finishPurchase(p, isWishlist, isLuxury);
       },
       () => {
         if (!spendGhostCard(total, p.name, category)) { showToast('💔 Ghost Card 额度不足！'); return; }
-        if (typeof showGhostCardReceipt === 'function') showGhostCardReceipt(total, p.name, false);
         _finishPurchase(p, isWishlist, isLuxury);
       }
     );
