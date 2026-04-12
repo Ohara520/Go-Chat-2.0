@@ -724,7 +724,6 @@ async function _processMergedMessage(text) {
       /性感|色色|涩涩|勾引/,
       /胸|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
       /intimate|turn.*on|turned.*on/i,
-      /🍆|🍑|💦|👅|🫦/,
       // 生理问题也走G，但由 intimacy.js 的 anti-spike 控制节奏
       /勃起|硬了|几厘米|尺寸|几寸|进去|cock|dick|pussy|erect|inches/i,
     ];
@@ -732,8 +731,12 @@ async function _processMergedMessage(text) {
     // 使用 intimacy.js 的 intent 系统决定是否调情
     const _intimateIntent = typeof detectIntimateIntent === 'function'
       ? detectIntimateIntent(text) : 'none';
+    const _flirtProgress = typeof getFlirtProgress === 'function' ? getFlirtProgress() : 0;
+    // explicit 直接进场；flirt 需要有铺垫（progress > 0.5）；affection/none 不进场
+    const _intimateByIntent = _intimateIntent === 'explicit'
+      || (_intimateIntent === 'flirt' && _flirtProgress > 0.5);
     let isIntimate = isRecentPhoto ? false
-      : (_intimateIntent !== 'none' || INTIMATE_PATTERNS.some(p => p.test(text)));
+      : (_intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text)));
 
     // 用户明显切换到日常话题时，强制退出调情状态
     const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|where are you|how was your day|how are you|what's up|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb/i;
@@ -1105,7 +1108,7 @@ async function _processMergedMessage(text) {
       getMoodLevel() <= 3 ||                      // 心情很差，说重了
       _replyText.length > 120                     // 说太多了，不像他
     );
-    if (lastBotResult?.msgDiv && !parsedMoney && _recallHasReason && Math.random() < 0.015) {
+    if (false) { // 撤回功能已关闭
       const recallDelay = (Math.floor(Math.random() * 4) + 3) * 1000;
       _isSending = true;
       setTimeout(async () => {
