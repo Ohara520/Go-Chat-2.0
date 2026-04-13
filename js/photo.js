@@ -437,13 +437,15 @@ English only. No translation.]`;
       updateGhostAvatar(_avatarDataUrl);
       localStorage.setItem('ghostAvatarUrl', _avatarDataUrl);
       localStorage.setItem('ghostAvatarBase64', ghostB64);
-      if (typeof touchLocalState === 'function') touchLocalState();
+      // 不在这里触发 saveToCloud，等上传完成后再存云端
 
       console.log('[avatar] 模型决定换头像，上传中...');
       uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
         if (url) {
           updateGhostAvatar(url);
           localStorage.removeItem('ghostAvatarBase64');
+          // 上传成功后才写云端，防止 base64 被存进云端导致恢复时变回默认
+          if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
           if (typeof showToast === 'function') showToast('头像已更新并同步 ☁️');
           console.log('[avatar] 上传成功:', url.slice(0, 60));
         }
