@@ -1031,11 +1031,16 @@ function getGhostCardMonthlyLimit() {
 
 function getGhostCard() {
   const monthlyLimit = getGhostCardMonthlyLimit();
+  const now = new Date();
+  const todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const dailyAllowance = Math.round(monthlyLimit / 30);
+
   const defaults = {
-    balance: Math.round(monthlyLimit * 0.25),
+    balance: dailyAllowance, // 第一天给一天的量
     monthlyLimit,
     spentThisMonth: 0,
-    lastResetMonth: new Date().getMonth()
+    lastResetMonth: now.getMonth(),
+    lastDailyAt: todayStr,
   };
   try {
     const saved = JSON.parse(localStorage.getItem('ghostCard') || 'null');
@@ -1043,20 +1048,28 @@ function getGhostCard() {
       localStorage.setItem('ghostCard', JSON.stringify(defaults));
       return defaults;
     }
-    // 月初重置
-    const now = new Date().getMonth();
-    if (saved.lastResetMonth !== now) {
+
+    // 月初重置花费记录（余额保留，不清零）
+    if (saved.lastResetMonth !== now.getMonth()) {
       const newLimit = getGhostCardMonthlyLimit();
-      saved.monthlyLimit    = newLimit;
-      saved.balance         = Math.round(newLimit * 0.25);
-      saved.spentThisMonth  = 0;
-      saved.lastResetMonth  = now;
-      // 冷战时停卡
+      saved.monthlyLimit   = newLimit;
+      saved.spentThisMonth = 0;
+      saved.lastResetMonth = now.getMonth();
       if (newLimit === 0) saved.balance = 0;
-      localStorage.setItem('ghostCard', JSON.stringify(saved));
     }
-    // 实时同步月度上限（状态变化时）
+
+    // 按天补发——计算距上次发放过了多少天
+    const lastDailyAt = saved.lastDailyAt || todayStr;
+    const lastDate = new Date(lastDailyAt);
+    const diffDays = Math.floor((now - lastDate) / 86400000);
+    if (diffDays >= 1 && monthlyLimit > 0) {
+      const newAllowance = Math.round(monthlyLimit / 30) * diffDays;
+      saved.balance = Math.min(saved.balance + newAllowance, monthlyLimit);
+      saved.lastDailyAt = todayStr;
+    }
+
     saved.monthlyLimit = monthlyLimit;
+    localStorage.setItem('ghostCard', JSON.stringify(saved));
     return { ...defaults, ...saved };
   } catch(e) { return defaults; }
 }
