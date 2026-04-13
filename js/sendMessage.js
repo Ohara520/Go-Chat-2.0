@@ -754,12 +754,12 @@ async function _processMergedMessage(text) {
       try {
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
-            '你是一个消息分类器，不是对话角色。只分析用户消息的情绪和意图，不要代入任何角色，不要回复用户。\n' +
+            '你是一个消息分类器。你的唯一任务是分析用户消息并返回JSON。不要代入任何角色，不要回复用户，不要扮演任何人。\n' +
             '只返回JSON，不要其他文字。\n' +
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
             'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
             'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
-            'flirt判断标准：只有明显身体接触暗示、露骨描述、刻意挑逗才为true。单纯撒娇/想念/日常亲昵为false。',
+            'flirt判断标准：凡是涉及对方身体、私人习惯、亲密感、身体能力、外貌、两人之间的张力，或者话里有暗示意味的，都算true。只有明确是普通日常闲聊才为false。不确定时宁可判true。',
             `用户说：${text}`,
             100
           ),
@@ -769,13 +769,8 @@ async function _processMergedMessage(text) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
             if (combinedResult.flirt === true && !_intimacyForceCleared) {
-              // 加门槛：防止 Haiku 无缘由把 G 拉进来
-              const _hasRecentIntimateCtx = chatHistory.slice(-6).some(m => m._intimate);
-              const _warmCtx = chatHistory
-                .filter(m => !m._system && !m._recalled).slice(-4)
-                .map(m => m.content || '').join(' ');
-              const _isWarmingUp = /kiss|抱|亲|摸|靠近|想你|miss you|love you|爱你|贴|蹭|咬|撩/.test(_warmCtx);
-              if (_hasRecentIntimateCtx || (combinedResult.flirt === true && _isWarmingUp)) isIntimate = true;
+              // flirt=true 直接进 G，由 G 的 level 系统控制升温节奏
+              isIntimate = true;
             }
             _emotionLabel = combinedResult.emotion || '平淡';
             // wantsMoney 判断：用 Haiku 语义结果覆盖关键词匹配
@@ -1352,10 +1347,15 @@ One or two lines. English only. lowercase.`;
 
     if (geminiReply && !_intimateBreakout(geminiReply)) {
       hideTyping();
-      const parts = geminiReply.split('\n---\n').filter(p => p.trim());
-      for (const part of parts) {
-        if (part.trim()) appendMessage('bot', part.trim());
-      }
+      // 清理 Grok 可能返回的 markdown 代码块标记
+      const cleanedReply = geminiReply
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim();
+      // 只取第一段，防止 Grok 多段输出导致重复消息
+      const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
+      const firstPart = parts[0];
+      if (firstPart) appendMessage('bot', firstPart.trim());
       chatHistory.push({ role: 'assistant', content: geminiReply.trim(), _intimate: true });
       saveHistory();
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
