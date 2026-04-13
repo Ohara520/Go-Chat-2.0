@@ -1353,11 +1353,22 @@ One or two lines. English only. lowercase.`;
 
     if (geminiReply && !_intimateBreakout(geminiReply)) {
       hideTyping();
-      // 清理 Grok 可能返回的 markdown 代码块标记
-      const cleanedReply = geminiReply
+      // 清理 Grok 可能返回的 markdown 代码块标记 + unlock tag
+      let cleanedReply = geminiReply
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
         .trim();
+      // 处理 unlock tag（解锁资料后从文本删掉）
+      const _unlockMatch = cleanedReply.match(/"unlock"\s*:\s*"([^"]+)"/);
+      if (_unlockMatch) {
+        const _f = _unlockMatch[1].trim();
+        const _validFields = ['birthday','zodiac','height','weight','blood_type','hometown'];
+        if (_validFields.includes(_f)) {
+          localStorage.setItem('ghostUnlocked_' + _f, 'true');
+          if (typeof renderGhostProfile === 'function') renderGhostProfile();
+        }
+      }
+      cleanedReply = cleanedReply.replace(/\{[^}]*"unlock"[^}]*\}/g, '').trim();
       // 只取第一段，防止 Grok 多段输出导致重复消息
       const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
       const firstPart = parts[0];
