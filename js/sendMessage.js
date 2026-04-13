@@ -1362,7 +1362,7 @@ One or two lines. English only. lowercase.`;
       const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
       const firstPart = parts[0];
       if (firstPart) appendMessage('bot', firstPart.trim());
-      chatHistory.push({ role: 'assistant', content: geminiReply.trim(), _intimate: true });
+      chatHistory.push({ role: 'assistant', content: cleanedReply, _intimate: true });
       saveHistory();
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
       if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
