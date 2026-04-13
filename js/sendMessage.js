@@ -212,7 +212,11 @@ function isBreakout(txt) {
 
 // ===== 辅助：解析模型输出的控制标签 =====
 function parseAssistantTags(reply) {
-  let cleanedReply = reply;
+  // 清理模型可能带的 markdown 代码块标记
+  let cleanedReply = reply
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
   let giveMoney = null;
   let coldWarStart = false;
   let sendGift = null;
