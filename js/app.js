@@ -106,6 +106,11 @@ async function startChat() {
       localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
     }
 
+    // 已婚就一定见过面
+    if (!localStorage.getItem('metInPerson')) {
+      localStorage.setItem('metInPerson', 'true');
+    }
+
     // 首次登录自动记录结婚日期
     if (!localStorage.getItem('marriageDate')) {
         const today = new Date();
