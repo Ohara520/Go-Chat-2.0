@@ -1068,6 +1068,8 @@ async function _processMergedMessage(text) {
     reply = reply.replace(/\s*—\s*/g, '\n').trim();
 
     // ── Step 6: 渲染消息 ─────────────────────────────────────
+    // 兜底清理 markdown 代码块标记
+    reply = reply.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
     const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2);
     if (finalParts.length === 0) finalParts.push('...');
 
