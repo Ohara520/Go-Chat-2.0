@@ -419,6 +419,9 @@ if (window.visualViewport) {
     const chatScreen = document.getElementById('chatScreen');
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
     const vv = window.visualViewport;
+    // 同时调整位置和高度，防止 iOS 键盘弹起时内容被顶上去
+    chatScreen.style.top    = vv.offsetTop + 'px';
+    chatScreen.style.height = vv.height + 'px';
     const chatContainer = chatScreen.querySelector('.chat-container');
     if (chatContainer) chatContainer.style.height = vv.height + 'px';
     const msgs = document.getElementById('messagesContainer');
@@ -442,6 +445,8 @@ if (_isIOS) {
     if (!chatScreen || !chatScreen.classList.contains('active')) return;
     if (e.target.id !== 'chatInput') return;
     setTimeout(() => {
+      chatScreen.style.top    = '';
+      chatScreen.style.height = '';
       const chatContainer = chatScreen.querySelector('.chat-container');
       if (chatContainer) chatContainer.style.height = '';
       const msgs = document.getElementById('messagesContainer');
