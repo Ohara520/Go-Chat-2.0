@@ -76,6 +76,36 @@ async function startChat() {
     }
 
     localStorage.setItem('userName', name);
+
+    // 首次登录自动生成 Ghost 生日（永久固定，不需要用户设置）
+    if (!localStorage.getItem('ghostBirthday')) {
+      const _months = [31,28,31,30,31,30,31,31,30,31,30,31];
+      const _m = Math.floor(Math.random() * 12) + 1;
+      const _d = Math.floor(Math.random() * _months[_m-1]) + 1;
+      const _y = 1991 + Math.floor(Math.random() * 4); // 1991-1994，对应32-35岁
+      const _bday = `${_y}-${String(_m).padStart(2,'0')}-${String(_d).padStart(2,'0')}`;
+      localStorage.setItem('ghostBirthday', _bday);
+      // 自动算星座
+      const _zodiacMap = [
+        [1,20,'摩羯座'],[2,19,'水瓶座'],[3,21,'双鱼座'],[4,20,'白羊座'],
+        [5,21,'金牛座'],[6,22,'双子座'],[7,23,'巨蟹座'],[8,23,'狮子座'],
+        [9,23,'处女座'],[10,24,'天秤座'],[11,23,'天蝎座'],[12,22,'射手座'],[1,19,'摩羯座']
+      ];
+      const _zodiacEnMap = {
+        '摩羯座':'Capricorn','水瓶座':'Aquarius','双鱼座':'Pisces','白羊座':'Aries',
+        '金牛座':'Taurus','双子座':'Gemini','巨蟹座':'Cancer','狮子座':'Leo',
+        '处女座':'Virgo','天秤座':'Libra','天蝎座':'Scorpio','射手座':'Sagittarius'
+      };
+      let _zodiac = '摩羯座';
+      for (let i = 0; i < _zodiacMap.length - 1; i++) {
+        const [sm, sd, name] = _zodiacMap[i];
+        const [em, ed] = _zodiacMap[i+1];
+        if ((_m === sm && _d >= sd) || (_m === em && _d < ed)) { _zodiac = name; break; }
+      }
+      localStorage.setItem('ghostZodiac', _zodiac);
+      localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
+    }
+
     // 首次登录自动记录结婚日期
     if (!localStorage.getItem('marriageDate')) {
         const today = new Date();
