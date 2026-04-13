@@ -239,7 +239,7 @@ async function loadFromCloud() {
     // 4c. wallet字段作为兜底（transactions为空时才用）
     if (data.balance != null && data.balance > 0) {
       const localTxs = JSON.parse(localStorage.getItem('transactions') || '[]');
-      const localBal = localTxs.reduce((s, t) => s + (t.amount || 0), 0);
+      const localBal = localTxs.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
       if (localBal <= 0) {
         // transactions为空且余额为0，说明数据丢了，用云端balance兜底
         localStorage.setItem('wallet', parseFloat(data.balance).toFixed(2));
@@ -357,19 +357,33 @@ async function loadFromCloud() {
         localStorage.setItem('deliveries', JSON.stringify(merged.slice(0, 30)));
       }
 
-      // 故事书/相册/朋友圈历史/快递历史：取更多的
-      const mergeByLength = (key, arr) => {
-        if (!Array.isArray(arr)) return;
+      // 故事书/相册/朋友圈历史/快递历史：双向合并去重，不丢任何一边的数据
+      const mergeArrays = (key, cloudArr, maxLen) => {
+        if (!Array.isArray(cloudArr) || cloudArr.length === 0) return;
         const local = JSON.parse(localStorage.getItem(key) || '[]');
-        if (arr.length > local.length) localStorage.setItem(key, JSON.stringify(arr));
+        if (local.length === 0) { localStorage.setItem(key, JSON.stringify(cloudArr.slice(0, maxLen))); return; }
+        // 用内容前40字符+时间戳做key去重
+        const getKey = item => {
+          const content = (item.content || item.text || item.title || JSON.stringify(item)).slice(0, 40);
+          const time = item.time || item.date || item.at || item.createdAt || '';
+          return content + '_' + time;
+        };
+        const merged = [...local];
+        const localKeys = new Set(local.map(getKey));
+        cloudArr.forEach(ci => { if (!localKeys.has(getKey(ci))) merged.push(ci); });
+        // 按时间排序，新的在前
+        merged.sort((a, b) => {
+          const ta = a.time || a.date || a.at || a.createdAt || '';
+          const tb = b.time || b.date || b.at || b.createdAt || '';
+          return tb.localeCompare(ta);
+        });
+        localStorage.setItem(key, JSON.stringify(merged.slice(0, maxLen)));
       };
-      mergeByLength('storyBook', s.storyBook);
-      mergeByLength('collections', s.collections);
-      mergeByLength('coupleFeedHistory', s.coupleFeedHistory);
-      mergeByLength('deliveryHistory', s.deliveryHistory);
-
-      // 外卖历史：取更多的
-      mergeByLength('takeoutHistory', s.takeoutHistory);
+      mergeArrays('storyBook', s.storyBook, 30);
+      mergeArrays('collections', s.collections, 50);
+      mergeArrays('coupleFeedHistory', s.coupleFeedHistory, 50);
+      mergeArrays('deliveryHistory', s.deliveryHistory, 50);
+      mergeArrays('takeoutHistory', s.takeoutHistory, 50);
 
       // 外卖进行中订单：按id合并，本地有就用本地（进度更新）
       if (Array.isArray(s.takeoutOrders)) {
