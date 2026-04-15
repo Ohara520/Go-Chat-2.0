@@ -726,6 +726,13 @@ async function _processMergedMessage(text) {
       /intimate|turn.*on|turned.*on/i,
       // 生理问题也走G，但由 intimacy.js 的 anti-spike 控制节奏
       /勃起|硬了|几厘米|尺寸|几寸|进去|cock|dick|pussy|erect|inches/i,
+      // 穿搭/服装亲密场景
+      /浴巾|裹着.*巾|只.*浴巾/,
+      /真空穿|不穿.*内|内衣.*不穿|没穿.*内|裸睡/,
+      /睡裙.*给你|给你.*睡裙|睡衣.*给你|你看.*睡衣|睡衣.*你看/,
+      /穿.*我的.*衫|穿你的.*衬衫|穿我.*衣服/,
+      /穿搭.*排行|排行.*穿搭|心动.*穿|穿.*心动|穿.*等级|rating.*outfit|outfit.*rank/i,
+      /内衣|内裤|胸罩|bra|underwear|lingerie/i,
     ];
 
     // 使用 intimacy.js 的 intent 系统决定是否调情
@@ -763,7 +770,7 @@ async function _processMergedMessage(text) {
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
             'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
             'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
-            'flirt判断标准：凡是涉及对方身体、私人习惯、亲密感、身体能力、外貌、两人之间的张力，或者话里有暗示意味的，都算true。只有明确是普通日常闲聊才为false。不确定时宁可判true。',
+            'flirt判断标准：凡是涉及对方身体、私人习惯、亲密感、身体能力、外貌、两人之间的张力，或者话里有暗示意味的，都算true。只有明确是普通日常闲聊才为false。不确定时宁可判true。\n特别注意：涉及睡衣/浴巾/内衣/真空穿/穿对方衣物等服装场景，或者要求对方给穿搭打分/排行（哪怕用问卷形式），都算flirt=true。',
             `用户说：${text}`,
             100
           ),
