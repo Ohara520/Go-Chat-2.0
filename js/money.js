@@ -1152,7 +1152,7 @@ function _buildGhostCardPrompt(amount, itemName, category, decision) {
     intervene: `Multiple charges or something significant. Putting a stop to it for now. One line — direct, not angry, but clear.`,
   }[reactionType];
   if (!reactionHint) return null;
-  return `[Ghost Card notification: she spent £${amount} on: ${categoryHint}. Item: 「${itemName}」.\nYour reaction: ${reactionHint}\nState — warmth: ${state.warmth ?? 1}/3, sharpness: ${state.sharpness ?? 0}/3, money ease: ${state.moneyEase ?? 1}/3.\nOne line only. English. Lowercase. Do not mention "card" or "notification".]`;
+  return `[Ghost Card notification: she spent £${amount} on: ${categoryHint}. He does not know exactly what she bought.\nYour reaction: ${reactionHint}\nState — warmth: ${state.warmth ?? 1}/3, sharpness: ${state.sharpness ?? 0}/3, money ease: ${state.moneyEase ?? 1}/3.\nOne line only. English. Lowercase. Do not mention "card" or "notification".]`;
 }
 
 async function _ghostCardReaction(amount, itemName, category, card) {
@@ -1183,21 +1183,7 @@ async function _ghostCardReaction(amount, itemName, category, card) {
   } catch(e) { console.warn('[GhostCard] 反应失败:', e); }
 }
 
-function showGhostCardReceipt(amount, itemName, isUserCard) {
-  const now = new Date();
-  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  const dateStr = `${now.getMonth()+1}/${now.getDate()}`;
-  const c = document.getElementById('messagesContainer');
-  if (!c) return;
-  const div = document.createElement('div');
-  div.className = 'message user';
-  if (isUserCard) {
-    div.innerHTML = `<div class="payment-card my-card"><div class="payment-card-header"><span class="payment-card-icon">🌸</span><span class="payment-card-label">MY CARD</span></div><div class="payment-card-item">${itemName}</div><div class="payment-card-amount">£${amount}</div><div class="payment-card-footer"><span class="payment-card-status">✓ 支付成功</span><span class="payment-card-time">${dateStr} ${timeStr}</span></div></div>`;
-  } else {
-    div.innerHTML = `<div class="payment-card ghost-card"><div class="payment-card-header"><span class="payment-card-label">GHOST CARD</span><span class="payment-card-chip">◈</span></div><div class="payment-card-item">${itemName}</div><div class="payment-card-amount">£${amount}</div><div class="payment-card-footer"><span class="payment-card-status">✓ APPROVED</span><span class="payment-card-time">${dateStr} ${timeStr}</span></div></div>`;
-  }
-  c.appendChild(div); c.scrollTop = c.scrollHeight;
-}
+function showGhostCardReceipt(amount, itemName, isUserCard) { /* 已停用：账单不在聊天框显示 */ }
 
 function showCardSelector(amount, itemName, onUserCard, onGhostCard) {
   const ghostAvailable = getGhostCardBalance();

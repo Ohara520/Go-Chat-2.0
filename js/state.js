@@ -181,9 +181,11 @@ function getGhostStatusEmoji() {
     return { emoji: '🌙😶', label: '深夜' };
   }
 
-  if (mood >= 8) return { emoji: '😌', label: '心情好' };
+  if (mood >= 9) return { emoji: '😊', label: '心情很好' };
+  if (mood >= 7) return { emoji: '😌', label: '心情好' };
   if (mood >= 5) return { emoji: '😐', label: '心情平' };
-  return { emoji: '😶', label: '心情差' };
+  if (mood >= 3) return { emoji: '😔', label: '心情差' };
+  return { emoji: '😑', label: '心情很差' };
 }
 
 // 时间偏移每6小时才漂移一次，不每次进页面都跑

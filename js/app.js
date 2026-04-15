@@ -107,6 +107,23 @@ async function startChat() {
       localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
     }
 
+    // 首次登录固定身高体重血型（每个用户随机但固定）
+    if (!localStorage.getItem('ghostHeight')) {
+      const _heights = ['182cm','183cm','185cm','186cm','188cm','189cm','190cm','191cm'];
+      localStorage.setItem('ghostHeight', _heights[Math.floor(Math.random() * _heights.length)]);
+    }
+    if (!localStorage.getItem('ghostWeight')) {
+      const _w = 88 + Math.floor(Math.random() * 10); // 88-97kg
+      localStorage.setItem('ghostWeight', _w + 'kg');
+    }
+    if (!localStorage.getItem('ghostBloodType')) {
+      const _types = ['A','A','B','O','O','O','AB']; // O更常见
+      localStorage.setItem('ghostBloodType', _types[Math.floor(Math.random() * _types.length)]);
+    }
+    if (!localStorage.getItem('ghostHometown')) {
+      localStorage.setItem('ghostHometown', 'Manchester, UK');
+    }
+
     // 已婚就一定见过面
     if (!localStorage.getItem('metInPerson')) {
       localStorage.setItem('metInPerson', 'true');
@@ -202,6 +219,23 @@ window.onload = async function() {
       }
       localStorage.setItem('ghostZodiac', _zodiac);
       localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
+    }
+
+    // 已有用户兜底：身高体重血型
+    if (!localStorage.getItem('ghostHeight')) {
+      const _heights = ['182cm','183cm','185cm','186cm','188cm','189cm','190cm','191cm'];
+      localStorage.setItem('ghostHeight', _heights[Math.floor(Math.random() * _heights.length)]);
+    }
+    if (!localStorage.getItem('ghostWeight')) {
+      const _w = 88 + Math.floor(Math.random() * 10);
+      localStorage.setItem('ghostWeight', _w + 'kg');
+    }
+    if (!localStorage.getItem('ghostBloodType')) {
+      const _types = ['A','A','B','O','O','O','AB'];
+      localStorage.setItem('ghostBloodType', _types[Math.floor(Math.random() * _types.length)]);
+    }
+    if (!localStorage.getItem('ghostHometown')) {
+      localStorage.setItem('ghostHometown', 'Manchester, UK');
     }
 
     // 已婚必然见过面
