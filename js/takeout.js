@@ -648,6 +648,14 @@ function checkTakeoutUpdates() {
 async function onGhostReceivedTakeout(order) {
   if (typeof showToast === 'function') showToast(`✅ ${order.emoji} ${order.name} 已送到 Ghost！`);
 
+  // ── 外卖台词防重复池 ────────────────────────────────────
+  const _getTakeoutPool = () => JSON.parse(localStorage.getItem('takeoutReplyPool') || '[]');
+  const _saveTakeoutPool = (pool) => localStorage.setItem('takeoutReplyPool', JSON.stringify(pool.slice(-5)));
+  const _recentTakeoutLines = _getTakeoutPool().map(l => `"${l}"`).join(', ');
+  const _noRepeatHint = _recentTakeoutLines
+    ? `\n\nDo not reuse or echo these recent lines: ${_recentTakeoutLines}. Vary your phrasing, angle, and reaction completely.`
+    : '';
+
   // 判断用户有没有提前说过
   const kw = [order.name.toLowerCase(), (order.nameEn || '').toLowerCase(), 'takeout', 'food', 'ordered', '外卖', '点了', '送'];
   const told = (chatHistory || []).filter(m => m.role === 'user' && !m._system).slice(-20)
@@ -722,14 +730,14 @@ She ordered this for you. That matters — regardless of what the food is.
 React to it honestly: what you notice about it, how it smells, what you think.
 You may be dry about it. You may underplay it. But underneath — you received it, and you received what she meant by it.
 Do not dismiss it. Do not make her feel the gesture was wasted.
-Lowercase. English only. Two to three lines.]`
+Lowercase. English only. Two to three lines.${_noRepeatHint}]`
             : `[A delivery just showed up — 「${order.nameEn || order.name}」. You didn't know she was ordering.${_descHint}
 
 She did this without telling you. She was thinking of you.
 React to the food and to what just happened — dry, real, a little caught off guard.
 You don't perform gratitude. But you don't act like it means nothing.
 The fact she did this — that stays with you.
-Lowercase. English only. Two to three lines.]`;
+Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
           const _res = await fetchWithTimeout('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -749,6 +757,8 @@ Lowercase. English only. Two to three lines.]`;
           if (_reply && !_bad.some(p => _reply.toLowerCase().includes(p))) {
             const _line = _reply.split('\n').slice(0, 2).join('\n');
             if (typeof appendMessage === 'function') appendMessage('bot', _line);
+            // 存入防重复池
+            const _pool = _getTakeoutPool(); _pool.push(_line); _saveTakeoutPool(_pool);
             if (typeof chatHistory !== 'undefined') {
               chatHistory.push({ role: 'assistant', content: _line });
               const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
