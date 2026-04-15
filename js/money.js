@@ -1055,13 +1055,11 @@ function getGhostCard() {
       saved.balance        = newLimit; // 月初一次性给满
     }
 
-    // 一次性迁移：旧版按天补发的用户，补齐本月剩余应得额度
-    // lastDailyAt 存在 = 旧数据标记；迁移后删掉，不再重复执行
-    if (saved.lastDailyAt) {
-      const entitled = Math.max(0, monthlyLimit - (saved.spentThisMonth || 0));
-      if (saved.balance < entitled) saved.balance = entitled;
-      delete saved.lastDailyAt;
-    }
+    // 保证余额不低于本月剩余应得额度
+    // 兼容旧版按天补发数据、云端同步覆盖等各种情况
+    const entitled = Math.max(0, monthlyLimit - (saved.spentThisMonth || 0));
+    if (saved.balance < entitled) saved.balance = entitled;
+    if (saved.lastDailyAt) delete saved.lastDailyAt; // 清理旧字段
 
     saved.monthlyLimit = monthlyLimit;
     localStorage.setItem('ghostCard', JSON.stringify(saved));
