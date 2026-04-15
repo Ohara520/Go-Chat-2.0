@@ -1742,14 +1742,29 @@ function toggleStickerFromPlus() {
       weatherEl.textContent = w || '—';
     }
 
-    // 通话时间：今天的时间戳
+    // 通话时间：基于 UK 当前时间往前推，确保都是过去的时间
+    const _ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London', hour: 'numeric', hour12: false
+    }).format(new Date()));
+    const _pastTime = (minAgo, maxAgo) => {
+      const ago = minAgo + Math.floor(Math.random() * (maxAgo - minAgo));
+      let h = _ukHour - ago;
+      const isToday = h >= 0;
+      if (h < 0) h += 24;
+      const m = Math.floor(Math.random() * 60);
+      const t = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+      return (isToday ? '今天 ' : '昨天 ') + t;
+    };
     const t1 = document.getElementById('profileCallTime1');
-    if (t1) {
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2,'0');
-      const mm = String(Math.floor(Math.random()*60)).padStart(2,'0');
-      t1.textContent = '今天 ' + hh + ':' + mm;
+    if (t1) t1.textContent = _pastTime(1, 4);
+
+    // 备忘录任务：读缓存，触发后台生成
+    const cachedMemo = localStorage.getItem('phoneMemoTasks');
+    const memoEl = document.getElementById('profileTaskList');
+    if (memoEl && cachedMemo) {
+      memoEl.innerHTML = cachedMemo.replace(/\n/g, '<br>');
     }
+    if (typeof generatePhoneMemo === 'function') generatePhoneMemo();
   }
   </script>
 </body>

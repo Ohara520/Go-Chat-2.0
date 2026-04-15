@@ -1162,5 +1162,75 @@ function renderAlbum() {
   }).join('');
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 手机资料页备忘录生成
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+async function generatePhoneMemo() {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const cached = localStorage.getItem('phoneMemoDate');
+  if (cached === todayKey && localStorage.getItem('phoneMemoTasks')) return;
+
+  const location   = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const locType    = localStorage.getItem('currentLocationType') || 'base';
+  const coldWar    = localStorage.getItem('coldWarMode') === 'true';
+  const mood       = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
+  const ltm        = localStorage.getItem('longTermMemory') || '';
+
+  // 从 longTermMemory 里找有没有她相关的有意义片段（过滤系统笔记）
+  const _sysP = [/^she sent/i,/^you sent/i,/received it/i,/if she asks/i,/confirm/i,/^\[/,/^you /i,/^she /i];
+  const ltmHints = ltm.split('
+').map(l => l.trim()).filter(l => {
+    if (l.length < 8 || l.length > 80) return false;
+    return !_sysP.some(p => p.test(l));
+  }).slice(0, 3).join('; ');
+
+  const stateHint = coldWar
+    ? 'Things are tense between them right now.'
+    : ltmHints
+    ? `Some context about her: ${ltmHints}`
+    : '';
+
+  const locHint = locType === 'deployed'
+    ? `He is currently deployed at ${location}.`
+    : locType === 'leave'
+    ? `He is on leave in ${location}.`
+    : `He is at ${location}.`;
+
+  const prompt = `You are writing Ghost's phone memo/task list for today. ${locHint} ${stateHint}
+
+Write exactly 3 short task items for his day. Rules:
+- Each item starts with "—"
+- Mix: 1-2 military/operational tasks, 1 personal/mundane task
+- Mark one already done with " ✓" at the end
+- One item may subtly reference her without being obvious (e.g. "pick up the thing she mentioned" or "call back" — not explicit)
+- Keep each item under 8 words
+- English only, lowercase
+- Output only the 3 lines, nothing else`;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 80,
+        system: 'You write brief, realistic memo items. Output only the list.',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').trim();
+    if (text && text.includes('—')) {
+      localStorage.setItem('phoneMemoTasks', text);
+      localStorage.setItem('phoneMemoDate', todayKey);
+      // 更新页面（如果资料页还开着）
+      const el = document.getElementById('profileTaskList');
+      if (el) el.innerHTML = text.replace(/
+/g, '<br>');
+    }
+  } catch(e) {}
+}
+
 // 页面初始化
 document.addEventListener('DOMContentLoaded', () => { initProfile(); });
