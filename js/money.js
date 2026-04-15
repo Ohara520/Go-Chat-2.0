@@ -1046,22 +1046,25 @@ function getGhostCard() {
       return defaults;
     }
 
-    // 月初重置：花费清零，余额一次性给满新额度
+    // 月初重置：花费清零，新月额度叠加到余额（可跨月积攒）
     if (saved.lastResetMonth !== now.getMonth()) {
       const newLimit = getGhostCardMonthlyLimit();
       saved.monthlyLimit   = newLimit;
       saved.spentThisMonth = 0;
       saved.lastResetMonth = now.getMonth();
-      saved.balance        = newLimit; // 月初一次性给满
+      // 旧余额保留，叠加新月额度，上限 3 个月额度防止无限堆积
+      saved.balance = Math.min((saved.balance || 0) + newLimit, newLimit * 3);
     }
+
+    // 月内锁定上限：只升不降，但冷战 / moneyEase=0 等硬关闭状态仍然生效
+    const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit);
+    saved.monthlyLimit = lockedLimit;
 
     // 保证余额不低于本月剩余应得额度
     // 兼容旧版按天补发数据、云端同步覆盖等各种情况
-    const entitled = Math.max(0, monthlyLimit - (saved.spentThisMonth || 0));
+    const entitled = Math.max(0, lockedLimit - (saved.spentThisMonth || 0));
     if (saved.balance < entitled) saved.balance = entitled;
     if (saved.lastDailyAt) delete saved.lastDailyAt; // 清理旧字段
-
-    saved.monthlyLimit = monthlyLimit;
     localStorage.setItem('ghostCard', JSON.stringify(saved));
     return { ...defaults, ...saved };
   } catch(e) { return defaults; }
@@ -1073,13 +1076,14 @@ function saveGhostCard(card) {
 
 function getGhostCardBalance() {
   const card = getGhostCard();
-  return Math.max(0, Math.min(card.balance, card.monthlyLimit - card.spentThisMonth));
+  if (card.monthlyLimit === 0) return 0; // 冷战 / 硬关闭
+  return Math.max(0, card.balance);
 }
 
 function spendGhostCard(amount, itemName, category) {
   category = category || 'unknown';
   const card = getGhostCard();
-  const available = Math.min(card.balance, card.monthlyLimit - card.spentThisMonth);
+  const available = card.monthlyLimit === 0 ? 0 : card.balance;
   if (available < amount) return false;
   card.balance = Math.round(card.balance - amount);
   card.spentThisMonth = Math.round(card.spentThisMonth + amount);
