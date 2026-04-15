@@ -77,7 +77,21 @@ async function maybeProactiveMessage() {
   const todayDetail = sessionStorage.getItem('todayDetail') || '';
   const ghostState = sessionStorage.getItem('ghostState') || '';
   const stateHint = ghostState ? ` He is currently: ${ghostState}. The message may naturally relate to what he's doing or thinking right now — or not. Let it feel unforced.` : '';
-  const systemNote = `[PROACTIVE — something just crossed his mind. He sends one line without framing it as reaching out. No greeting. No "hey". No question to start. Just a statement, an observation, or a fragment — like he thought of something and sent it before deciding not to. Short. Self-contained. He doesn't explain why he sent it. He doesn't wait for a response. Not a check-in. Not asking how she is. Just something that happened or crossed his mind.${stateHint}${todayDetail ? ` Today's context: ${todayDetail}` : ''} English only, lowercase.]`;
+
+  // 防重复池
+  const _proPool = (() => { try { return JSON.parse(localStorage.getItem('proactiveReplyPool') || '[]'); } catch(e) { return []; } })();
+  const _proNoRepeat = _proPool.length > 0
+    ? `\nDo not reuse phrasing from these recent lines: ${_proPool.map(l => `"${l}"`).join(', ')}. Change angle entirely.`
+    : '';
+
+  // 检测她最后一条消息是否提到去做某事
+  const _lastUserMsg = chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '';
+  const _leftSignal = /去吃|去洗|去睡|去忙|先去|回来|eating|shower|bath|sleep|brb|busy now/i.test(_lastUserMsg);
+  const _followUpHint = _leftSignal
+    ? `\nShe mentioned leaving or doing something before going quiet. This message can be a dry follow-up — is she back, did she eat, is she okay. Keep it short. Not soft.`
+    : '';
+
+  const systemNote = `[PROACTIVE — something just crossed his mind. He sends one line without framing it as reaching out. No greeting. No "hey". Just a statement, observation, or fragment — like he thought of something and sent it. Short. Self-contained. Not a check-in. Not asking how she is. Just something real.${stateHint}${todayDetail ? ` Today's context: ${todayDetail}` : ''}${_followUpHint}${_proNoRepeat} English only, lowercase.]`;
 
   try {
     showTyping();
@@ -90,12 +104,12 @@ async function maybeProactiveMessage() {
     );
     hideTyping();
 
-    // 过滤掉系统标签和问句开头
     const cleaned = (reply || '').replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
     if (!cleaned || /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)/i.test(cleaned)) {
       scheduleProactiveMessage(); return;
     }
-    // 破防检测已在 cleanBotText 出口统一处理
+    // 存入防重复池
+    _proPool.push(cleaned); localStorage.setItem('proactiveReplyPool', JSON.stringify(_proPool.slice(-8)));
     appendMessage('bot', cleaned);
     chatHistory.push({ role: 'assistant', content: cleaned, _time: Date.now() });
     saveHistory();
