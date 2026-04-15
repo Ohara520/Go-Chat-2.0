@@ -1179,8 +1179,7 @@ async function generatePhoneMemo() {
 
   // 从 longTermMemory 里找有没有她相关的有意义片段（过滤系统笔记）
   const _sysP = [/^she sent/i,/^you sent/i,/received it/i,/if she asks/i,/confirm/i,/^\[/,/^you /i,/^she /i];
-  const ltmHints = ltm.split('
-').map(l => l.trim()).filter(l => {
+  const ltmHints = ltm.split('\n').map(l => l.trim()).filter(l => {
     if (l.length < 8 || l.length > 80) return false;
     return !_sysP.some(p => p.test(l));
   }).slice(0, 3).join('; ');
@@ -1226,8 +1225,7 @@ Write exactly 3 short task items for his day. Rules:
       localStorage.setItem('phoneMemoDate', todayKey);
       // 更新页面（如果资料页还开着）
       const el = document.getElementById('profileTaskList');
-      if (el) el.innerHTML = text.replace(/
-/g, '<br>');
+      if (el) el.innerHTML = text.replace(/\n/g, '<br>');
     }
   } catch(e) {}
 }
