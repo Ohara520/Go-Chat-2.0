@@ -249,14 +249,34 @@ async function emitGhostEvent(eventType, payload = {}) {
     }
 
     case 'check_in': {
+      // 读最近聊天 + 检测离开信号
+      const _recentForCI = (typeof chatHistory !== 'undefined')
+        ? chatHistory.filter(m => !m._system && !m._recalled).slice(-8)
+            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 100)}`).join('\n')
+        : '';
+      const _lastUserMsg = (typeof chatHistory !== 'undefined')
+        ? (chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '')
+        : '';
+      const _leftSignal = /去吃|去洗|去睡|去忙|先去|回来|好了吗|吃了吗|洗完|睡着|eating|shower|bath|sleep|brb|back|done|finished|busy now/i.test(_lastUserMsg);
+
+      // 防重复池
+      const _ciPool = (() => { try { return JSON.parse(localStorage.getItem('checkInReplyPool') || '[]'); } catch(e) { return []; } })();
+      const _ciNoRepeat = _ciPool.length > 0
+        ? `\n\nDo not reuse or echo these recent lines: ${_ciPool.map(l => `"${l}"`).join(', ')}. Vary completely.`
+        : '';
+
       try {
         const mood = getMoodLevel();
         const moodHint =
-          mood <= 3
-            ? 'Lean slightly more toward observe than care.'
-            : mood >= 7
-              ? 'Care can surface a little more easily, but still restrained.'
-              : '';
+          mood <= 3 ? 'Lean more toward observe than care.'
+          : mood >= 7 ? 'Care can surface a little more, but still restrained.'
+          : '';
+        const _followUpHint = _leftSignal
+          ? `\n\nIMPORTANT: She mentioned leaving or doing something. This is a natural follow-up — ask if she is back / done / ate / okay. Keep it short and dry, not warm.`
+          : '';
+        const _contextBlock = _recentForCI
+          ? `\n\nRecent conversation:\n${_recentForCI}\n\nUse this context. If she mentioned leaving, follow up. If the conversation had a specific topic, let that subtly color what he sends.`
+          : '';
         const t = await callGrokWithCtx(
           buildGhostStyleCore() + `
 Send ONE short check-in line to his wife.
@@ -267,48 +287,44 @@ Choose ONE intent internally (do not label it):
 
 How to write:
 - Often drop the subject
-- Keep it short
-- 1–4 words preferred
+- Keep it short — 1–4 words preferred
 - Can be a fragment, not a full sentence
 - Slightly blunt is fine
-- Similar structure is okay, but do not repeat the exact same wording every time
-
-Usually one line.
-Occasionally two short lines if it adds something — not explanation.
 
 Avoid:
 - full polite questions
 - emotional reassurance
-- sweetness
-- romantic tone
-- anything that sounds careful, soft, or chatty
+- sweetness or romantic tone
+- anything careful, soft, or chatty
+- repeating the same wording as recent messages
 
 Rules:
 - English only
 - Feels like he sent it without thinking
 - Dry. Casual. Real.
-${moodHint}`,
+${moodHint}${_followUpHint}${_contextBlock}${_ciNoRepeat}`,
           `Write his check-in.`
         );
         if (t && t.trim()) {
           line = t.trim().split('\n').slice(0, 2).join('\n');
+          _ciPool.push(line); localStorage.setItem('checkInReplyPool', JSON.stringify(_ciPool.slice(-6)));
           sideEffect = () => {
-            // 累计 check_in 次数——供 Story System '留意于你' 节点使用
             const cnt = parseInt(localStorage.getItem('checkInCount') || '0');
             localStorage.setItem('checkInCount', cnt + 1);
           };
           break;
         }
       } catch(e) {}
-      const ciOpts = [
-        "still up.",
-        "ate yet.",
-        "you went quiet.",
-        "where'd you go.",
-        "busy.",
-        "quiet again.",
+      // fallback：更多样化，过滤用过的
+      const _ciAllOpts = [
+        "still up.", "ate yet.", "where'd you go.", "quiet again.",
+        "back yet.", "all good.", "done?", "still there.",
+        "how long.", "eating?", "you okay.", "check in.",
       ];
-      line = ciOpts[Math.floor(Math.random() * ciOpts.length)];
+      const _unusedOpts = _ciAllOpts.filter(o => !_ciPool.includes(o));
+      const _ciOpts = _unusedOpts.length > 0 ? _unusedOpts : _ciAllOpts;
+      line = _leftSignal ? "back yet." : _ciOpts[Math.floor(Math.random() * _ciOpts.length)];
+      _ciPool.push(line); localStorage.setItem('checkInReplyPool', JSON.stringify(_ciPool.slice(-6)));
       sideEffect = () => {
         const cnt = parseInt(localStorage.getItem('checkInCount') || '0');
         localStorage.setItem('checkInCount', cnt + 1);
