@@ -132,7 +132,7 @@ function pickReadyPendingEvent() {
 function decideMainIntent(text, pendingEvent) {
   if (pendingEvent) return 'event';
   const t = (text || '').toLowerCase();
-  if (/touch me|want you|naughty|tease me|摸摸|蹭蹭|贴贴|咬|舔|撩|涩涩|色色/.test(t)) return 'intimate';
+  if (/touch me|want you|naughty|tease me|摸摸|蹭蹭|贴贴|咬|舔|撩|涩涩|色色|亲亲|么么|kiss me|cuddle/.test(t)) return 'intimate';
   if (/难过|伤心|哭|委屈|不开心|崩溃|hurt|sad|crying|upset|awful/.test(t)) return 'emotional';
   if (/给我钱|转我|好穷|买不起|要钱|零花钱|缺钱|没钱/.test(t)) return 'money';
   return 'routine';
@@ -733,6 +733,8 @@ async function _processMergedMessage(text) {
       /穿.*我的.*衫|穿你的.*衬衫|穿我.*衣服/,
       /穿搭.*排行|排行.*穿搭|心动.*穿|穿.*心动|穿.*等级|rating.*outfit|outfit.*rank/i,
       /内衣|内裤|胸罩|bra|underwear|lingerie/i,
+      // 撒娇/亲密肢体语言
+      /亲亲|么么|抱抱|亲一下|kiss me|hug me|cuddle/i,
     ];
 
     // 使用 intimacy.js 的 intent 系统决定是否调情
