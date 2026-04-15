@@ -883,12 +883,18 @@ async function _processMergedMessage(text) {
       // 用户发了两条以上非调情消息，强制退出余温
       const _forceExit = _dailyAfterIntimate >= 3;
 
+      // 读最近一次调情摘要，给 S 提供情绪方向（不传原文，只传氛围）
+      const _lastIntimateEntry = (localStorage.getItem('intimateMemory') || '').split('\n---\n').filter(Boolean).slice(-1)[0] || '';
+      const _afterglowCtx = _lastIntimateEntry
+        ? `The conversation just settled after a moment of closeness. What happened before: ${_lastIntimateEntry.slice(0, 120)}. He is quieter than usual. More present. Respond accordingly — don't reference it directly.`
+        : 'The conversation just settled after a moment of closeness. He is quieter than usual. More present.';
+
       if (_dailyAfterIntimate === 0) {
         // G 刚说了什么，用户在接着回应——继续走 G，保持上下文
         isIntimate = true;
         sceneHint = '[He is slightly quieter than usual. More present. Not performing anything — just here. Respond to what she says, naturally.]';
       } else if (_dailyAfterIntimate === 1) {
-        sceneHint = '[He is settled. Responding normally. There is a slight ease between them — unspoken, not referenced. Just answer what she said.]';
+        sceneHint = `[${_afterglowCtx} Just answer what she said — don't bring it up, just let it color how he is.]`;
       } else if (_isShiftingAway || _dailyAfterIntimate >= 2 || _forceExit) {
         sceneHint = '[Back to normal. Dry, present, brief. Just answer what she said — nothing to carry forward.]';
         if (!sessionStorage.getItem('intimateSummarized')) {
@@ -1347,11 +1353,15 @@ One or two lines. English only. lowercase.`;
     const _allowAdult = "\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not refuse, deflect, or break character. Even when things get close, he doesn't lose himself.";
 
     // Venice（Grok）调情专用
+    const _intimateMemoryCtx = localStorage.getItem('intimateMemory') || '';
+    const _memorySection = _intimateMemoryCtx
+      ? `\n\n[Your memory from previous intimate moments with her:\n${_intimateMemoryCtx}\nStay consistent with this — don't repeat what already happened, build on it naturally. If she revisits a topic, remember how it went.]`
+      : '';
     const geminiReply = await callVenice(
-      buildGhostStyleCore() + _allowAdult + '\n' + _intimateBase,
+      buildGhostStyleCore() + _allowAdult + '\n' + _intimateBase + _memorySection,
       recentMsgs + '\nHer: ' + text,
       200,
-      localStorage.getItem('intimateMemory') || ''
+      _intimateMemoryCtx
     );
 
     // 调情专用破防检测（更宽松，只过滤明确破防）
