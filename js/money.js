@@ -1032,15 +1032,12 @@ function getGhostCardMonthlyLimit() {
 function getGhostCard() {
   const monthlyLimit = getGhostCardMonthlyLimit();
   const now = new Date();
-  const todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-  const dailyAllowance = Math.round(monthlyLimit / 30);
 
   const defaults = {
-    balance: dailyAllowance, // 第一天给一天的量
+    balance: monthlyLimit, // 首次初始化直接给满月度额度
     monthlyLimit,
     spentThisMonth: 0,
     lastResetMonth: now.getMonth(),
-    lastDailyAt: todayStr,
   };
   try {
     const saved = JSON.parse(localStorage.getItem('ghostCard') || 'null');
@@ -1049,23 +1046,21 @@ function getGhostCard() {
       return defaults;
     }
 
-    // 月初重置花费记录（余额保留，不清零）
+    // 月初重置：花费清零，余额一次性给满新额度
     if (saved.lastResetMonth !== now.getMonth()) {
       const newLimit = getGhostCardMonthlyLimit();
       saved.monthlyLimit   = newLimit;
       saved.spentThisMonth = 0;
       saved.lastResetMonth = now.getMonth();
-      if (newLimit === 0) saved.balance = 0;
+      saved.balance        = newLimit; // 月初一次性给满
     }
 
-    // 按天补发——计算距上次发放过了多少天
-    const lastDailyAt = saved.lastDailyAt || todayStr;
-    const lastDate = new Date(lastDailyAt);
-    const diffDays = Math.floor((now - lastDate) / 86400000);
-    if (diffDays >= 1 && monthlyLimit > 0) {
-      const newAllowance = Math.round(monthlyLimit / 30) * diffDays;
-      saved.balance = Math.min(saved.balance + newAllowance, monthlyLimit);
-      saved.lastDailyAt = todayStr;
+    // 一次性迁移：旧版按天补发的用户，补齐本月剩余应得额度
+    // lastDailyAt 存在 = 旧数据标记；迁移后删掉，不再重复执行
+    if (saved.lastDailyAt) {
+      const entitled = Math.max(0, monthlyLimit - (saved.spentThisMonth || 0));
+      if (saved.balance < entitled) saved.balance = entitled;
+      delete saved.lastDailyAt;
     }
 
     saved.monthlyLimit = monthlyLimit;
