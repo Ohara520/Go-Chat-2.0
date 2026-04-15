@@ -654,9 +654,11 @@ function openBuyModal(idx) {
   const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
   const isOwned = buyCount >= maxBuy;
 
+  const ghostBal = typeof getGhostCardBalance === 'function' ? getGhostCardBalance() : 0;
+  const canAfford = bal >= total || ghostBal >= total;
   if (isOwned) {
     btn.disabled = true; btn.textContent = isUserItem ? '✅ 已购买' : '🔴 已售罄';
-  } else if (bal < total) {
+  } else if (!canAfford) {
     btn.disabled = true; btn.textContent = '💔 余额不足';
   } else {
     btn.disabled = false;
