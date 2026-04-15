@@ -804,7 +804,7 @@ function renderDeliveryTracker() {
   const active = deliveries.filter(d => {
     if (d.done || d.lostTicketExpired) return false;
     if (d.visibleAt && now < d.visibleAt) return false;
-    if (d.isLostConfirmed && d.lostConfirmedAt && now - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
+    if (d.isLostConfirmed && (!d.lostConfirmedAt || now - d.lostConfirmedAt > 48 * 3600 * 1000)) return false;
     if (d.isSecretDelivery) return d.currentStage >= d.stages.length - 2;
     return true;
   });
@@ -847,7 +847,7 @@ function openDeliveryModal(idx) {
   const active     = deliveries.filter(d => {
     if (d.done || d.lostTicketExpired) return false;
     if (d.visibleAt && now < d.visibleAt) return false;
-    if (d.isLostConfirmed && d.lostConfirmedAt && now - d.lostConfirmedAt > 48 * 3600 * 1000) return false;
+    if (d.isLostConfirmed && (!d.lostConfirmedAt || now - d.lostConfirmedAt > 48 * 3600 * 1000)) return false;
     if (d.isSecretDelivery) return d.currentStage >= d.stages.length - 2;
     return true;
   });
@@ -1056,7 +1056,7 @@ function _renderNoticeItem(notice) {
           <div style="font-size:12px;color:rgba(185,28,28,0.7);margin-top:2px;">你寄的「${notice.itemName}」在运输途中丢失</div>
         </div>
       </div>
-      <button onclick="_dismissNotice('${notice.id}')"
+      <button onclick="_dismissNotice('${notice.id}'); const _lid = '${notice.id}'.replace('lost_',''); if(_lid) dismissDelivery(parseInt(_lid));"
         style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(220,80,80,0.25);background:transparent;color:#b91c1c;font-size:13px;font-weight:600;cursor:pointer;">
         已知晓
       </button>
@@ -1084,6 +1084,11 @@ function _openGiftBox(id) {
 
 function _dismissNotice(id) {
   _markNoticeRead(id);
+  // 丢失通知关掉后，同步从快递追踪条移除
+  if (id.startsWith('lost_')) {
+    const deliveryId = parseInt(id.replace('lost_', ''));
+    if (deliveryId) dismissDelivery(deliveryId);
+  }
   const el = document.getElementById(`_notice_${id}`);
   if (el) {
     el.style.opacity = '0';
