@@ -752,11 +752,6 @@ function _finishPurchase(p, isWishlist, isLuxury) {
   if (isWishlist) showToast('💝 已加入心愿单！');
   else if (p.isUserItem) {
     showToast('🛍️ 购买成功！');
-    // 用户自购：注入弱提示，Ghost 可能察觉
-    if (typeof chatHistory !== 'undefined') {
-      const hint = `[She bought something for herself today — 「${p.name}」. If it comes up naturally in conversation, you may notice. Do not assume she told you. Do not bring it up directly.]`;
-      chatHistory.push({ role: 'user', content: hint, _system: true });
-    }
   }
   else showToast('📦 已寄出！Ghost 会收到的～');
 

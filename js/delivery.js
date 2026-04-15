@@ -120,7 +120,6 @@ function addDelivery(product, isGhostSend, isLuxury) {
   deliveries.unshift(delivery);
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
   renderDeliveryTracker();
-  showPurchaseReceipt(delivery);
 }
 
 
@@ -334,7 +333,6 @@ function checkDeliveryUpdates() {
           }
 
           if (d.productData?.isUserItem) {
-            // 用户自购：到货提示，不触发 Ghost 签收流程
             showToast(`✅ ${d.emoji} ${d.name} 已送达！`);
           } else if (d.isGhostSend) {
             showMysteryPackage(d);
