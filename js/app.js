@@ -8,6 +8,7 @@ function openScreen(id) {
     target.style.display = 'flex';
     target.classList.add('active');
     if (id === 'profileScreen'  && typeof initProfile       === 'function') initProfile();
+    if (id === 'profileScreen'  && typeof renderPhoneProfile === 'function') setTimeout(renderPhoneProfile, 80);
     if (id === 'chatScreen'     && typeof refreshChatScreen === 'function') refreshChatScreen();
     if (id === 'coupleScreen'   && typeof initCoupleSpace   === 'function') {
       initCoupleSpace();

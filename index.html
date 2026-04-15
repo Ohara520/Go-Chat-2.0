@@ -628,7 +628,7 @@
       <div class="chat-header">
         <div class="chat-header-left">
           <button class="chat-back-btn" onclick="openScreen('mainScreen')" title="返回">‹</button>
-          <div class="ghost-avatar" onclick="openScreen('profileScreen')" style="background:none;padding:0;overflow:visible;">
+          <div class="ghost-avatar" onclick="openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);" style="background:none;padding:0;overflow:visible;">
             <img src="images/ghost-avatar.jpg" class="ghost-avatar-img" style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.7);">
             <div class="online-indicator"></div>
           </div>
@@ -638,9 +638,6 @@
           <div class="chat-header-meta">
             <span id="botMood">🙂</span>
             <span class="chat-header-dot">·</span>
-            <span id="botLocation">Hereford Base</span>
-            <span class="chat-header-dot">·</span>
-            <span id="botWeather">🌤️</span>
             <span id="botUKTime"></span>
           </div>
           <div id="feedNewBadge" class="feed-new-badge" style="display:none;" onclick="openScreen('coupleScreen')">📸 有新动态</div>
@@ -772,48 +769,70 @@
         <span class="profile-tag">TF141 · 中尉</span>
       </div>
 
-      <!-- 签名 -->
-      <div class="profile-signature" id="profileSignature">—</div>
+      <!-- 手机内容卡片 -->
+      <div class="profile-info-table" style="margin-bottom:14px;">
 
-      <!-- 信息表格 -->
-      <div class="profile-info-table">
-        <div class="profile-item">
-          <span class="profile-label">年龄 / Age</span>
-          <span class="profile-value">35</span>
+        <!-- 最近通话 -->
+        <div style="padding:10px 16px 2px;border-bottom:1px solid rgba(140,190,100,0.18);">
+          <div style="font-size:10px;color:rgba(50,100,40,0.45);letter-spacing:1.5px;margin-bottom:6px;">最近通话</div>
+          <div id="profileCallLog">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(140,190,100,0.1);">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:50%;background:rgba(90,154,70,0.12);border:1px solid rgba(90,154,70,0.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2d6028;">P</div>
+                <div>
+                  <div style="font-size:13px;color:#1e3d20;font-weight:500;">Price</div>
+                  <div style="font-size:11px;color:rgba(50,100,40,0.5);">已接听 · 4分12秒</div>
+                </div>
+              </div>
+              <div style="font-size:11px;color:rgba(50,100,40,0.4);" id="profileCallTime1"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(140,190,100,0.1);">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:50%;background:rgba(220,80,80,0.08);border:1px solid rgba(220,80,80,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#b04040;">S</div>
+                <div>
+                  <div style="font-size:13px;color:#1e3d20;font-weight:500;">Soap</div>
+                  <div style="font-size:11px;color:rgba(180,60,60,0.7);">未接来电</div>
+                </div>
+              </div>
+              <div style="font-size:11px;color:rgba(50,100,40,0.4);">昨天 23:47</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:50%;background:rgba(90,154,70,0.12);border:1px solid rgba(90,154,70,0.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2d6028;">K</div>
+                <div>
+                  <div style="font-size:13px;color:#1e3d20;font-weight:500;">Kilter</div>
+                  <div style="font-size:11px;color:rgba(50,100,40,0.5);">已接听 · 1分07秒</div>
+                </div>
+              </div>
+              <div style="font-size:11px;color:rgba(50,100,40,0.4);">昨天 19:22</div>
+            </div>
+          </div>
         </div>
-        <div class="profile-item">
-          <span class="profile-label">家乡 / Hometown</span>
-          <span class="profile-value profile-locked" id="profileHometown">🔒 聊出来才知道</span>
-        </div>
-        <div class="profile-item">
-          <span class="profile-label">生日 / Birthday</span>
-          <span class="profile-value profile-locked" id="profileBirthday">🔒 聊出来才知道</span>
-        </div>
-        <div class="profile-item">
-          <span class="profile-label">星座 / Zodiac</span>
-          <span class="profile-value profile-locked" id="profileZodiac">🔒 聊出来才知道</span>
-        </div>
-        <div class="profile-item">
-          <span class="profile-label">身高 / Height</span>
-          <span class="profile-value profile-locked" id="profileHeight">🔒 聊出来才知道</span>
-        </div>
-        <div class="profile-item">
-          <span class="profile-label">体重 / Weight</span>
-          <span class="profile-value profile-locked" id="profileWeight">🔒 聊出来才知道</span>
-        </div>
-        <div class="profile-item">
-          <span class="profile-label">血型 / Blood Type</span>
-          <span class="profile-value profile-locked" id="profileBloodType">🔒 聊出来才知道</span>
-        </div>
-      </div>
 
-      <!-- 备注 -->
-      <div class="profile-note">
-        <div class="profile-note-label">❤️ 我的备注</div>
-        <input type="text" class="profile-note-input" id="profileRemark"
-          placeholder="给他起个备注..."
-          onchange="saveRemark()"
-          maxlength="20">
+        <!-- 备忘录 -->
+        <div style="padding:10px 16px;border-bottom:1px solid rgba(140,190,100,0.18);">
+          <div style="font-size:10px;color:rgba(50,100,40,0.45);letter-spacing:1.5px;margin-bottom:8px;">备忘录</div>
+          <div style="background:rgba(220,245,210,0.45);border-radius:8px;padding:10px 12px;margin-bottom:8px;border-left:3px solid rgba(100,170,70,0.4);">
+            <div style="font-size:11px;color:rgba(45,90,35,0.5);margin-bottom:4px;">任务</div>
+            <div style="font-size:12px;color:rgba(45,90,35,0.85);line-height:1.7;" id="profileTaskList">— 装备检查 ✓<br>— Price 协调会 ✓<br>— 夜间巡逻</div>
+          </div>
+          <div id="profileMemoWrap" style="display:none;background:rgba(220,245,210,0.45);border-radius:8px;padding:10px 12px;border-left:3px solid rgba(100,170,70,0.4);">
+            <div style="font-size:12px;color:rgba(45,90,35,0.8);font-style:italic;" id="profileMemoLine"></div>
+          </div>
+        </div>
+
+        <!-- 天气 + 步数 -->
+        <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:12px;color:#1e3d20;font-weight:500;" id="profileLocation">—</div>
+            <div style="font-size:11px;color:rgba(50,100,40,0.5);" id="profileWeatherLine">— °C</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;color:rgba(50,100,40,0.5);">今日步数</div>
+            <div style="font-size:14px;color:#1e3d20;font-weight:600;" id="profileSteps">—</div>
+          </div>
+        </div>
+
       </div>
 
       <!-- 进入情侣空间 -->
@@ -827,7 +846,7 @@
   <div class="screen" id="coupleScreen">
 
     <div class="couple-page-header">
-      <button class="couple-back-btn" onclick="openScreen('profileScreen')">‹</button>
+      <button class="couple-back-btn" onclick="openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);">‹</button>
       <div class="couple-page-title">Love Space</div>
     </div>
 
@@ -1675,5 +1694,56 @@ function toggleStickerFromPlus() {
 }
 </script>
 
+
+  <script>
+  function renderPhoneProfile() {
+    // 备忘录：从 longTermMemory 抽一句
+    const ltm = localStorage.getItem('longTermMemory') || '';
+    const lines = ltm.split('\n').map(l => l.trim()).filter(l => l.length > 6 && l.length < 80);
+    const memoWrap = document.getElementById('profileMemoWrap');
+    const memoLine = document.getElementById('profileMemoLine');
+    if (memoWrap && memoLine && lines.length > 0) {
+      const pick = lines[Math.floor(Math.random() * Math.min(lines.length, 8))];
+      memoLine.textContent = pick;
+      memoWrap.style.display = 'block';
+    } else if (memoWrap) {
+      memoWrap.style.display = 'none';
+    }
+
+    // 步数：每天随机一次，4000-9500
+    const todayKey = 'profileSteps_' + new Date().toISOString().slice(0,10);
+    let steps = localStorage.getItem(todayKey);
+    if (!steps) {
+      steps = (Math.floor(Math.random() * 5500) + 4000).toLocaleString();
+      localStorage.setItem(todayKey, steps);
+    }
+    const stepsEl = document.getElementById('profileSteps');
+    if (stepsEl) stepsEl.textContent = steps;
+
+    // 地点：从 botLocation 读取
+    const locEl = document.getElementById('profileLocation');
+    if (locEl) {
+      const l = document.getElementById('botLocation');
+      locEl.textContent = l ? l.textContent.trim() : '—';
+    }
+
+    // 天气：从聊天头部的 botWeather 读取（已被现有逻辑更新）
+    const weatherEl = document.getElementById('profileWeatherLine');
+    if (weatherEl) {
+      const wEl = document.getElementById('botWeather');
+      const w = wEl ? wEl.textContent.trim() : '';
+      weatherEl.textContent = w || '—';
+    }
+
+    // 通话时间：今天的时间戳
+    const t1 = document.getElementById('profileCallTime1');
+    if (t1) {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,'0');
+      const mm = String(Math.floor(Math.random()*60)).padStart(2,'0');
+      t1.textContent = '今天 ' + hh + ':' + mm;
+    }
+  }
+  </script>
 </body>
 </html>
