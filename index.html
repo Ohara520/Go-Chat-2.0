@@ -639,6 +639,8 @@
             <span id="botMood">🙂</span>
             <span class="chat-header-dot">·</span>
             <span id="botUKTime"></span>
+            <span id="botLocation" style="display:none;">Hereford Base</span>
+            <span id="botWeather" style="display:none;">🌤️</span>
           </div>
           <div id="feedNewBadge" class="feed-new-badge" style="display:none;" onclick="openScreen('coupleScreen')">📸 有新动态</div>
         </div>
@@ -1697,9 +1699,14 @@ function toggleStickerFromPlus() {
 
   <script>
   function renderPhoneProfile() {
-    // 备忘录：从 longTermMemory 抽一句
+    // 备忘录：从 longTermMemory 抽一句，过滤掉系统性指令笔记
     const ltm = localStorage.getItem('longTermMemory') || '';
-    const lines = ltm.split('\n').map(l => l.trim()).filter(l => l.length > 6 && l.length < 80);
+    const _sysPatterns = [/^she sent you/i,/^you sent her/i,/^she received/i,/^you received/i,/if she asks/i,/confirm/i,/\[/,/^\[/,/^you /i,/^she /i];
+    const lines = ltm.split('\n').map(l => l.trim()).filter(l => {
+      if (l.length < 8 || l.length > 80) return false;
+      if (_sysPatterns.some(p => p.test(l))) return false;
+      return true;
+    });
     const memoWrap = document.getElementById('profileMemoWrap');
     const memoLine = document.getElementById('profileMemoLine');
     if (memoWrap && memoLine && lines.length > 0) {
