@@ -59,7 +59,7 @@ function startPomodoro() {
   pomodoroSecondsLeft = pomodoroTotalSeconds;
 
   // 保存进度到 sessionStorage，用于页面切换后恢复
-  sessionStorage.setItem('pomodoroProgress', JSON.stringify({
+  localStorage.setItem('pomodoroProgress', JSON.stringify({
     startTime: Date.now(),
     totalSeconds: pomodoroTotalSeconds,
     job: selectedJob,
@@ -100,11 +100,40 @@ function updatePomodoroRing() {
 function cancelPomodoro() {
   clearInterval(pomodoroTimer);
   pomodoroTimer = null;
-  sessionStorage.removeItem('pomodoroProgress');
+  localStorage.removeItem('pomodoroProgress');
   document.getElementById('timerWrap').style.display = 'none';
   document.getElementById('jobSelector').style.display = 'grid';
   document.getElementById('startBtn').style.display = 'block';
   showToast('已放弃，下次加油 💪');
+}
+
+function pausePomodoro() {
+  if (pomodoroTimer) {
+    // 暂停：停止计时，保存当前剩余秒数
+    clearInterval(pomodoroTimer);
+    pomodoroTimer = null;
+    const progress = JSON.parse(localStorage.getItem('pomodoroProgress') || '{}');
+    progress.paused = true;
+    progress.remainingSeconds = pomodoroSecondsLeft;
+    localStorage.setItem('pomodoroProgress', JSON.stringify(progress));
+    const btn = document.getElementById('pauseBtn');
+    if (btn) { btn.textContent = '继续'; btn.style.background = 'rgba(90,154,70,0.15)'; btn.style.color = '#2d6028'; }
+    const label = document.getElementById('timerJobLabel');
+    if (label) label.textContent = label.textContent.replace('中', '中（已暂停）').replace('（已恢复）（已暂停）', '（已暂停）');
+  } else {
+    // 继续：重启计时
+    const progress = JSON.parse(localStorage.getItem('pomodoroProgress') || '{}');
+    progress.paused = false;
+    progress.startTime = Date.now();
+    progress.totalSeconds = pomodoroTotalSeconds;
+    delete progress.remainingSeconds;
+    localStorage.setItem('pomodoroProgress', JSON.stringify(progress));
+    pomodoroTimer = setInterval(tickPomodoro, 1000);
+    const btn = document.getElementById('pauseBtn');
+    if (btn) { btn.textContent = '暂停'; btn.style.background = ''; btn.style.color = ''; }
+    const label = document.getElementById('timerJobLabel');
+    if (label) label.textContent = label.textContent.replace('（已暂停）', '');
+  }
 }
 
 function finishPomodoro() {
@@ -112,7 +141,7 @@ function finishPomodoro() {
   const jobInfo = JOB_INFO[selectedJob.job];
 
   // 清除进度记录
-  sessionStorage.removeItem('pomodoroProgress');
+  localStorage.removeItem('pomodoroProgress');
 
   // 更新今日数据
   const dayKey = getTodayWorkKey();
@@ -579,7 +608,7 @@ function renderCollectionScreen(page = 0) {
 // 页面切换后恢复计时器
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function resumePomodoroIfNeeded() {
-  const raw = sessionStorage.getItem('pomodoroProgress');
+  const raw = localStorage.getItem('pomodoroProgress');
   if (!raw) return;
   try {
     const progress = JSON.parse(raw);
@@ -588,7 +617,7 @@ function resumePomodoroIfNeeded() {
 
     if (remaining <= 0) {
       // 计时结束了，直接结算
-      sessionStorage.removeItem('pomodoroProgress');
+      localStorage.removeItem('pomodoroProgress');
       selectedJob = progress.job;
       pomodoroTotalSeconds = progress.totalSeconds;
       pomodoroSecondsLeft = 0;
@@ -599,20 +628,28 @@ function resumePomodoroIfNeeded() {
     // 恢复计时状态
     selectedJob = progress.job;
     pomodoroTotalSeconds = progress.totalSeconds;
-    pomodoroSecondsLeft = remaining;
+    // 暂停状态：用保存的剩余秒数；否则用经过时间计算
+    pomodoroSecondsLeft = progress.paused ? (progress.remainingSeconds || remaining) : remaining;
 
     document.getElementById('jobSelector').style.display = 'none';
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('pomodoroDone').style.display = 'none';
     document.getElementById('timerWrap').style.display = 'flex';
-    document.getElementById('timerJobLabel').textContent = progress.job.emoji + ' ' + progress.job.name + '中（已恢复）';
+    document.getElementById('timerJobLabel').textContent = progress.job.emoji + ' ' + progress.job.name + (progress.paused ? '中（已暂停）' : '中（已恢复）');
 
     updatePomodoroRing();
     if (pomodoroTimer) clearInterval(pomodoroTimer);
-    pomodoroTimer = setInterval(tickPomodoro, 1000);
-    showToast('计时已恢复 ⏱️');
+
+    if (progress.paused) {
+      // 暂停状态：不启动计时器，更新按钮样式
+      const btn = document.getElementById('pauseBtn');
+      if (btn) { btn.textContent = '继续'; btn.style.background = 'rgba(90,154,70,0.15)'; btn.style.color = '#2d6028'; }
+    } else {
+      pomodoroTimer = setInterval(tickPomodoro, 1000);
+      showToast('计时已恢复 ⏱️');
+    }
   } catch(e) {
-    sessionStorage.removeItem('pomodoroProgress');
+    localStorage.removeItem('pomodoroProgress');
   }
 }
 
