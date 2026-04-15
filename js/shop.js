@@ -760,6 +760,8 @@ function _finishPurchase(p, isWishlist, isLuxury) {
 
   if (!isWishlist && !p.isUserItem) {
     addDelivery(p, false, isLuxury);
+  } else if (!isWishlist && p.isUserItem) {
+    addDelivery(p, false, isLuxury); // 用户自购也建立快递追踪
   } else if (isWishlist && p.ghostMsg) {
     setTimeout(() => {
       if (typeof appendMessage === 'function') {

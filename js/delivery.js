@@ -62,6 +62,14 @@ const DELIVERY_STAGES_GHOST = [
   { status: '✅ 已签收',      en: 'Delivered.',                       zh: '已签收。' },
 ];
 
+// 用户自购：快递到自己手上
+const DELIVERY_STAGES_SELF = [
+  { status: '📦 备货中',   en: 'Processing your order.',  zh: '备货中。' },
+  { status: '🚚 已发货',   en: 'Shipped out.',             zh: '已发货。' },
+  { status: '📍 派送中',   en: 'Out for delivery.',        zh: '派送中。' },
+  { status: '✅ 已签收',   en: 'Delivered.',               zh: '已签收。' },
+];
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 创建快递（用户寄给Ghost）
@@ -72,7 +80,9 @@ function addDelivery(product, isGhostSend, isLuxury) {
   const totalMs = isGhostSend
     ? (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000
     : (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
-  const stages   = isGhostSend ? DELIVERY_STAGES_GHOST : DELIVERY_STAGES_USER;
+  const stages   = isGhostSend ? DELIVERY_STAGES_GHOST
+                   : product.isUserItem ? DELIVERY_STAGES_SELF
+                   : DELIVERY_STAGES_USER;
   const now      = Date.now();
   const interval = totalMs / stages.length;
 
@@ -110,6 +120,62 @@ function addDelivery(product, isGhostSend, isLuxury) {
   deliveries.unshift(delivery);
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
   renderDeliveryTracker();
+  showPurchaseReceipt(delivery);
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 购买小票
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function showPurchaseReceipt(delivery) {
+  const container = document.getElementById('messagesContainer');
+  if (!container) return;
+  const now     = new Date();
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const dateStr = (now.getMonth()+1) + '/' + now.getDate();
+  const pd      = delivery.productData || {};
+  const price   = pd.price || 0;
+  const isGhost = delivery.isGhostSend;
+
+  const div = document.createElement('div');
+  div.className = 'message user';
+  div.innerHTML = `
+    <div style="
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(90,154,70,0.25);
+      border-radius: 18px;
+      padding: 16px 18px;
+      min-width: 200px;
+      max-width: 280px;
+      box-shadow: 0 2px 16px rgba(60,120,40,0.08);
+    ">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:9px;letter-spacing:2.5px;color:rgba(40,90,30,0.45);font-weight:600;">ORDER PLACED</div>
+        <div style="font-size:10px;color:rgba(40,90,30,0.35);">${dateStr} ${timeStr}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="font-size:32px;line-height:1;">${delivery.emoji || '📦'}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:#1e3d20;line-height:1.3;">${delivery.name}</div>
+          ${isGhost ? '<div style=\"font-size:10px;color:rgba(168,85,247,0.8);margin-top:2px;font-weight:600;letter-spacing:1px;\">GHOST GIFT</div>' : ''}
+        </div>
+      </div>
+      ${price > 0 ? `
+      <div style="border-top:1px dashed rgba(90,154,70,0.2);padding-top:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:11px;color:rgba(40,90,30,0.5);">合计</div>
+        <div style="font-size:16px;font-weight:700;color:#1e3d20;">£${price}</div>
+      </div>
+      ` : ''}
+      <div style="display:flex;align-items:center;gap:6px;background:rgba(90,154,70,0.06);border-radius:10px;padding:8px 10px;">
+        <div style="width:6px;height:6px;border-radius:50%;background:#5a9a46;animation:pulse 1.5s infinite;flex-shrink:0;"></div>
+        <div style="font-size:11px;color:#3a6a28;font-weight:500;">📦 已打包，准备出发</div>
+      </div>
+    </div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
 }
 
 
@@ -267,7 +333,10 @@ function checkDeliveryUpdates() {
             if (typeof saveToCloud     === 'function') saveToCloud().catch(() => {});
           }
 
-          if (d.isGhostSend) {
+          if (d.productData?.isUserItem) {
+            // 用户自购：到货提示，不触发 Ghost 签收流程
+            showToast(`✅ ${d.emoji} ${d.name} 已送达！`);
+          } else if (d.isGhostSend) {
             showMysteryPackage(d);
           } else {
             // 【改】系统私信改成英文简化版
