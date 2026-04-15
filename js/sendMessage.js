@@ -772,9 +772,15 @@ async function _processMergedMessage(text) {
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
-            if (combinedResult.flirt === true && !_intimacyForceCleared) {
-              // flirt=true 直接进 G，由 G 的 level 系统控制升温节奏
-              isIntimate = true;
+            if (!_intimacyForceCleared) {
+              // 有调情上下文时宽松判断：继续走 G
+              const _hasRecentIntimateCtx = chatHistory.slice(-10).some(m => m._intimate);
+              // 明显日常话题：退出调情
+              const _dailyExit = /吃饭|睡觉|训练|任务|上班|下班|累了|饿了|天气|无聊|回来了|出门|到了|换个话题|不说了|算了|随便/i.test(text) ||
+                /ate|sleep|training|mission|work|tired|hungry|weather|boring|got home|heading out|change.*topic|never mind|forget it/i.test(text);
+              if (combinedResult.flirt === true || (_hasRecentIntimateCtx && !_dailyExit)) {
+                isIntimate = true;
+              }
             }
             _emotionLabel = combinedResult.emotion || '平淡';
             // wantsMoney 判断：用 Haiku 语义结果覆盖关键词匹配
@@ -849,7 +855,7 @@ async function _processMergedMessage(text) {
     }
 
     // ── 余温状态判断 ─────────────────────────────────────────
-    const _recentMsgsPlain = chatHistory.filter(m => !m._system && !m._recalled).slice(-6);
+    const _recentMsgsPlain = chatHistory.filter(m => !m._system && !m._recalled).slice(-10);
     const _lastIntimateIdx = [..._recentMsgsPlain].reverse().findIndex(m => m._intimate);
     const _recentIntimate = _lastIntimateIdx !== -1;
 
