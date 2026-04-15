@@ -206,10 +206,10 @@ emotion强度：轻/中/重`,
       // 7天冷却
       const coolKey  = 'reverseShipCool_' + type;
       const lastTime = parseInt(localStorage.getItem(coolKey) || '0');
-      if (Date.now() - lastTime < 7 * 24 * 3600 * 1000) return;
+      if (Date.now() - lastTime < 3 * 24 * 3600 * 1000) return;
 
       // 概率：轻5% 中10% 重15%
-      const probMap = { '轻': 0.05, '中': 0.10, '重': 0.15 };
+      const probMap = { '轻': 0.15, '中': 0.25, '重': 0.40 };
       const prob = probMap[intensity] || 0.08;
       if (Math.random() > prob) return;
 
@@ -239,13 +239,13 @@ emotion强度：轻/中/重`,
 
       // 写入持久队列（替代 setTimeout，关页面不丢失）
       // 3-5天后触发
-      const triggerAt = Date.now() + (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000;
+      const triggerAt = Date.now() + (Math.floor(Math.random() * 3) + 1) * 24 * 3600 * 1000;
       const pending = getPendingReversePackages ? getPendingReversePackages() : JSON.parse(localStorage.getItem('pendingReversePackages') || '[]');
       pending.push({
         item,
         emotionType: type,
         triggerAt,
-        triggerAtTurn: _globalTurnCount + 5, // 至少再聊5轮才触发，避免太突兀
+        triggerAtTurn: _globalTurnCount + 2, // 至少再聊2轮才触发，避免太突兀
         contextSnapshot: (typeof chatHistory !== 'undefined' ? chatHistory.filter(m => !m._system).slice(-4) : []),
         motive: type === '思念' ? 'longing' : type === '难过' || type === '委屈' ? 'compensation' : 'practical_care',
       });

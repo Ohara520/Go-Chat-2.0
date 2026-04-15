@@ -249,39 +249,14 @@ async function emitGhostEvent(eventType, payload = {}) {
     }
 
     case 'check_in': {
-      // 读最近聊天，检测用户有没有说去做某件事（吃饭/洗澡/睡觉等）
-      const _recentForCI = (typeof chatHistory !== 'undefined')
-        ? chatHistory.filter(m => !m._system && !m._recalled).slice(-8)
-            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 100)}`).join('\n')
-        : '';
-
-      // 检测她是否提过要去做某事
-      const _lastUserMsg = (typeof chatHistory !== 'undefined')
-        ? (chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '')
-        : '';
-      const _leftSignal = /去吃|去洗|去睡|去忙|先去|回来|好了吗|吃了吗|洗完|睡着|eating|shower|bath|sleep|brb|back|done|finished|busy now/i.test(_lastUserMsg);
-
-      // 防重复：读最近 check_in 台词池
-      const _ciPool = (() => { try { return JSON.parse(localStorage.getItem('checkInReplyPool') || '[]'); } catch(e) { return []; } })();
-      const _ciNoRepeat = _ciPool.length > 0
-        ? `\n\nDo not reuse or echo these recent lines: ${_ciPool.map(l => `"${l}"`).join(', ')}. Vary completely.`
-        : '';
-
       try {
         const mood = getMoodLevel();
         const moodHint =
-          mood <= 3 ? 'Lean more toward observe than care.'
-          : mood >= 7 ? 'Care can surface a little more, but still restrained.'
-          : '';
-
-        const _followUpHint = _leftSignal
-          ? `\n\nIMPORTANT: She mentioned leaving or doing something. This is a natural follow-up — ask if she is back / done / ate / okay. Keep it short and dry, not warm.`
-          : '';
-
-        const _contextBlock = _recentForCI
-          ? `\n\nRecent conversation:\n${_recentForCI}\n\nUse this context. If she mentioned leaving, follow up. If the conversation had a specific topic, let that subtly color what he sends.`
-          : '';
-
+          mood <= 3
+            ? 'Lean slightly more toward observe than care.'
+            : mood >= 7
+              ? 'Care can surface a little more easily, but still restrained.'
+              : '';
         const t = await callGrokWithCtx(
           buildGhostStyleCore() + `
 Send ONE short check-in line to his wife.
@@ -292,45 +267,48 @@ Choose ONE intent internally (do not label it):
 
 How to write:
 - Often drop the subject
-- Keep it short — 1–4 words preferred
+- Keep it short
+- 1–4 words preferred
 - Can be a fragment, not a full sentence
 - Slightly blunt is fine
+- Similar structure is okay, but do not repeat the exact same wording every time
+
+Usually one line.
+Occasionally two short lines if it adds something — not explanation.
 
 Avoid:
 - full polite questions
 - emotional reassurance
-- sweetness or romantic tone
-- anything careful, soft, or chatty
-- repeating the same wording as recent messages
+- sweetness
+- romantic tone
+- anything that sounds careful, soft, or chatty
 
 Rules:
 - English only
 - Feels like he sent it without thinking
 - Dry. Casual. Real.
-${moodHint}${_followUpHint}${_contextBlock}${_ciNoRepeat}`,
+${moodHint}`,
           `Write his check-in.`
         );
         if (t && t.trim()) {
           line = t.trim().split('\n').slice(0, 2).join('\n');
-          // 存入防重复池
-          _ciPool.push(line); localStorage.setItem('checkInReplyPool', JSON.stringify(_ciPool.slice(-6)));
           sideEffect = () => {
+            // 累计 check_in 次数——供 Story System '留意于你' 节点使用
             const cnt = parseInt(localStorage.getItem('checkInCount') || '0');
             localStorage.setItem('checkInCount', cnt + 1);
           };
           break;
         }
       } catch(e) {}
-      // fallback：更多样化，且过滤掉最近用过的
-      const _ciAllOpts = [
-        "still up.", "ate yet.", "where'd you go.", "quiet again.",
-        "back yet.", "all good.", "done?", "still there.",
-        "how long.", "eating?", "you okay.", "check in.",
+      const ciOpts = [
+        "still up.",
+        "ate yet.",
+        "you went quiet.",
+        "where'd you go.",
+        "busy.",
+        "quiet again.",
       ];
-      const _unusedOpts = _ciAllOpts.filter(o => !_ciPool.includes(o));
-      const _ciOpts = _unusedOpts.length > 0 ? _unusedOpts : _ciAllOpts;
-      line = _leftSignal && _ciOpts.includes("back yet.") ? "back yet." : _ciOpts[Math.floor(Math.random() * _ciOpts.length)];
-      _ciPool.push(line); localStorage.setItem('checkInReplyPool', JSON.stringify(_ciPool.slice(-6)));
+      line = ciOpts[Math.floor(Math.random() * ciOpts.length)];
       sideEffect = () => {
         const cnt = parseInt(localStorage.getItem('checkInCount') || '0');
         localStorage.setItem('checkInCount', cnt + 1);
@@ -668,10 +646,10 @@ async function checkLocationSpecialTrigger(userText) {
     const specials = LOCATION_SPECIALS?.[locationKey];
     if (!specials || specials.length === 0) return;
 
-    // ── 30天周期冷却（同地点每30天最多触发一次）────
+    // ── 7天冷却（同地点每7天最多触发一次）────
     const sentKey  = 'locationSpecialSent_' + locationKey;
     const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
-    if (lastSent && Date.now() - lastSent < 30 * 24 * 3600 * 1000) return;
+    if (lastSent && Date.now() - lastSent < 7 * 24 * 3600 * 1000) return;
 
     // ── 关系门槛检查 ─────────────────────────────
     const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
@@ -756,10 +734,10 @@ function checkLocationSpecialAutoTrigger() {
     const specials = LOCATION_SPECIALS?.[locationKey];
     if (!specials || specials.length === 0) return;
 
-    // 同地点30天冷却
+    // 同地点7天冷却
     const sentKey  = 'locationSpecialSent_' + locationKey;
     const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
-    if (lastSent && Date.now() - lastSent < 30 * 24 * 3600 * 1000) return;
+    if (lastSent && Date.now() - lastSent < 7 * 24 * 3600 * 1000) return;
 
     // 关系门槛（主动寄比对话触发更亲密，门槛更高）
     const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
@@ -778,7 +756,7 @@ function checkLocationSpecialAutoTrigger() {
       return;
     }
     const daysHere = (Date.now() - arrivedAt) / (24 * 3600 * 1000);
-    if (daysHere < 3) return;
+    if (daysHere < 1) return;
 
     // 40%概率主动触发（不是每次都触发，保留随机感）
     if (Math.random() > 0.4) return;

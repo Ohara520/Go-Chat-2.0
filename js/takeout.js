@@ -543,12 +543,12 @@ function addTakeoutOrder(city, item) {
         if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); return false; }
         addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
         if (typeof renderWallet === 'function') renderWallet();
-        if (typeof showGhostCardReceipt === 'function') showGhostCardReceipt(total, item.name, true);
+        if (typeof showToast === 'function') showToast(`🛵 ${item.name} 已下单！`);
         _finishTakeoutOrder(city, item, fee);
       },
       () => {
         if (!spendGhostCard(total, item.name, 'daily')) { if (typeof showToast === 'function') showToast('Ghost Card 额度不足'); return false; }
-        if (typeof showGhostCardReceipt === 'function') showGhostCardReceipt(total, item.name, false);
+        if (typeof showToast === 'function') showToast(`🛵 ${item.name} 已下单！`);
         _finishTakeoutOrder(city, item, fee);
       }
     );
