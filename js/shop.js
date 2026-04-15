@@ -619,7 +619,7 @@ function openBuyModal(idx) {
   const weeklySale = isLuxury ? getWeeklySale() : null;
   const onSale = weeklySale && weeklySale.name === p.name;
   const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
-  const shipping = p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15);
+  const shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
   const total = displayPrice + shipping;
   const bal = getBalance();
   const triggerReason = getProductTrigger(p.name);
@@ -684,7 +684,7 @@ function confirmPurchase() {
   const weeklySale = isLuxury ? getWeeklySale() : null;
   const onSale = weeklySale && weeklySale.name === p.name;
   const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
-  const shipping = p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15);
+  const shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
   const total = displayPrice + shipping;
   const txLabel = isWishlist ? '心愿 · ' : p.isGhostGift ? '寄给Ghost · ' : p.isUserItem ? '购买 · ' : '寄给Ghost · ';
   const itemLabel = txLabel + p.name;
