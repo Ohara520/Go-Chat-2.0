@@ -104,14 +104,14 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   else if (coldWarCracking){ thoughtType = 'crack';     triggerChance = 0.85; }
   else if (jealousyHidden) { thoughtType = 'jealousy';  triggerChance = 0.80; }
   else if (missedCue)      { thoughtType = 'delayed';   triggerChance = 0.75; }
-  else if (isStubborn)     { thoughtType = 'contrast';  triggerChance = 0.75; }
+  else if (isStubborn)     { thoughtType = 'contrast';  triggerChance = 0.50; }
   else if (hiddenCare)     { thoughtType = 'behavior';  triggerChance = 0.70; }
-  else if (heldBack)       { thoughtType = 'contrast';  triggerChance = 0.60; }
+  else if (heldBack)       { thoughtType = 'contrast';  triggerChance = 0.40; }
   else if (noticedDetail)  { thoughtType = 'noticed';   triggerChance = 0.40; }
   else {
     // 日常随机：35%（旧版25%，太低，提高让心声更活跃）
     thoughtType = 'contrast';
-    triggerChance = 0.35;
+    triggerChance = 0.20;
   }
 
   const finalChance = Math.min(0.95, triggerChance + _atmosphereBoost);
@@ -173,21 +173,26 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
     ? `\nDo NOT repeat or echo these recent inner thoughts:\n${recentThoughts.map(t => `- "${t}"`).join('\n')}`
     : '';
 
-  const thoughtPrompt = `You are Ghost. One unspoken thought — what crossed his mind and didn't come out.
+  const thoughtPrompt = `You are Ghost. This is the thought he didn't say out loud.
 
-One line. Two at most.
-Specific. Grounded. No metaphors. No poetry. No sighs.
-Not a feeling — a thought. The actual thing that passed through his head.
-No environment. No actions. No "sitting here", no "staring at the phone", no scene-setting.
-Lowercase. First person only. Clipped.
+One line. Rarely two.
+Lowercase. First person. Clipped.
+Not a description — the actual fragment that passed through his head.
+No scene-setting. No sighing. No "i'm sitting here thinking".
+Specific to this moment. Grounded in what just happened.
+
+The thought can be:
+— something he noticed but didn't name ("she did it again.")
+— something he almost said but swallowed ("shouldn't have left it there.")
+— something small that landed harder than expected ("that one got through.")
+— something dry that masks what he actually feels ("fine. she's fine.")
 
 ${longDistanceRule}
 ${recentContext}
 Scene: ${sceneHint}
 ${recentThoughtsHint}
 
-Return JSON only. English only.
-{"en":"..."}`;
+Return the thought only. No quotes. No JSON. No explanation. English only.`;
 
   let en = '';
 
@@ -208,25 +213,14 @@ Return JSON only. English only.
         const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 80);
         const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","development work","coding questions","step out of character","can't roleplay"];
         if (grokRaw) {
-          // 先尝试JSON格式
-          const matchG = grokRaw.match(/"en"\s*:\s*"([^"]+)"/);
-          if (matchG) {
-            const candidate = matchG[1].trim();
-            if (!kirkPhrases.some(p => candidate.toLowerCase().includes(p))) {
-              en = candidate;
-            }
-          } else {
-            // 纯文字兜底
-            const cleaned = grokRaw
-              .replace(/```json|```/g, '')
-              .replace(/^["']|["']$/g, '')
-              .trim()
-              .split('\n')[0]
-              .trim();
-            if (cleaned && cleaned.length > 0 && cleaned.length < 150) {
-              if (!kirkPhrases.some(p => cleaned.toLowerCase().includes(p))) {
-                en = cleaned;
-              }
+          // 直接取纯文字
+          const cleaned = grokRaw
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/^["'`]|["'`]$/g, '')
+            .trim().split('\n')[0].trim();
+          if (cleaned && cleaned.length > 0 && cleaned.length < 120) {
+            if (!kirkPhrases.some(p => cleaned.toLowerCase().includes(p))) {
+              en = cleaned;
             }
           }
         }
@@ -234,50 +228,42 @@ Return JSON only. English only.
 
       // Grok失败，Haiku兜底
       if (!en) {
-        const raw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 80);
-        const match = raw.match(/"en"\s*:\s*"([^"]+)"/);
-        if (match) en = match[1].trim();
+        const raw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 60);
+        if (raw) {
+          const cleaned = raw.replace(/^["'`]|["'`]$/g, '').trim().split('\n')[0].trim();
+          if (cleaned && cleaned.length > 0 && cleaned.length < 120) en = cleaned;
+        }
       }
 
     } else {
-      // 普通场景：DeepSeek（成本低、中文语境理解好）
+      // 普通场景：Sonnet（质量更高，心声更有人味）
       try {
-        const dsRaw = await callDeepSeek(thoughtPrompt, 80);
-        if (dsRaw) {
-          const badPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","claude","deepseek","step out of character","can't roleplay"];
-          const match = dsRaw.match(/"en"\s*:\s*"([^"]+)"/);
-          if (match) {
-            const candidate = match[1].trim();
-            if (!badPhrases.some(p => candidate.toLowerCase().includes(p))) {
-              en = candidate;
-            }
-          } else {
-            const cleaned = dsRaw
-              .replace(/```json|```/g, '')
-              .replace(/^\s*\{.*?"en"\s*:\s*/s, '')
-              .replace(/"\s*\}.*$/s, '')
-              .replace(/^["']|["']$/g, '')
-              .trim()
-              .split('\n')[0]
-              .trim();
-            if (cleaned && cleaned.length > 0 && cleaned.length < 150) {
-              if (!badPhrases.some(p => cleaned.toLowerCase().includes(p))) {
-                en = cleaned;
-              }
+        const badPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","claude","step out of character","can't roleplay"];
+        const sonnetRaw = await callSonnet(thoughtPrompt, [{ role: 'user', content: 'inner thought now.' }], 60);
+        if (sonnetRaw) {
+          const cleaned = sonnetRaw
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/^["'`]|["'`]$/g, '')
+            .trim().split('\n')[0].trim();
+          if (cleaned && cleaned.length > 0 && cleaned.length < 120) {
+            if (!badPhrases.some(p => cleaned.toLowerCase().includes(p))) {
+              en = cleaned;
             }
           }
         }
       } catch(e) {
-        console.warn('[心声] DeepSeek调用失败:', e);
+        console.warn('[心声] Sonnet调用失败:', e);
       }
 
-      // DeepSeek 失败 → Haiku 兜底
+      // Sonnet 失败 → Haiku 兜底
       if (!en) {
         try {
-          const haikuRaw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 80);
+          const haikuRaw = await fetchDeepSeek(thoughtPrompt, 'inner thought now.', 60);
           if (haikuRaw) {
-            const match = haikuRaw.match(/"en"\s*:\s*"([^"]+)"/);
-            if (match) en = match[1].trim();
+            const cleaned = haikuRaw
+              .replace(/^["'`]|["'`]$/g, '')
+              .trim().split('\n')[0].trim();
+            if (cleaned && cleaned.length > 0 && cleaned.length < 120) en = cleaned;
           }
         } catch(e) {}
       }
