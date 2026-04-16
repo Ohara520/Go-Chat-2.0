@@ -882,14 +882,21 @@ function openDeliveryComplaint() {
       </div>`;
   }
 
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-  document.body.appendChild(overlay);
-
+  // 修复：先定义函数再 appendChild，防止点击太快函数未注册
   window._selectComplaint = (id) => {
-    overlay.remove();
+    const _ov = document.getElementById('complaintModalOverlay');
+    if (_ov) _ov.remove();
     delete window._selectComplaint;
     _runComplaintSearch(id, all);
   };
+
+  // 修复：用事件委托替代内联 onclick，防止冒泡关闭弹窗
+  overlay.addEventListener('click', e => {
+    // 只有点遮罩背景本身才关闭
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
 }
 
 function _runComplaintSearch(id, allDeliveries) {
