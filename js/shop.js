@@ -162,7 +162,7 @@ const MARKET_PRODUCTS = {
     { emoji: '💋', name: '远程震动玩具',     desc: '隔着时区也能在一起，手机连接，他来控制',              price: 388, shipping: 18, isIntimate: true, ghostReact: 'controlled', tip: "i'll figure it out.", badge: '异地专属', unlock: SHOP_UNLOCK_TIERS.committed },
     { emoji: '🎲', name: '亲密挑战卡牌',     desc: '52张，每张都是一个只属于你们的约定',                  price: 78,  shipping: 10, isIntimate: true, ghostReact: 'dry',        tip: "52 cards. we won't need all of them.", unlock: SHOP_UNLOCK_TIERS.warm },
     { emoji: '🍓', name: '可食用身体彩绘套装', desc: '草莓和巧克力两色，画什么由你决定',                  price: 118, shipping: 12, isIntimate: true, ghostReact: 'dry',        tip: 'creative.', unlock: SHOP_UNLOCK_TIERS.warm },
-    { emoji: '📱', name: '情趣应用年费会员', desc: '远程互动功能全解锁，异地也能很近',                    price: 328, shipping: 0,  isIntimate: true, ghostReact: 'controlled', tip: 'already downloaded it.', isDigital: true, unlock: SHOP_UNLOCK_TIERS.committed },
+    // 已下架：情趣应用年费会员（软件类无需快递，暂时下架）
   ],
 };
 
@@ -807,4 +807,195 @@ function getWeeklySale() {
 function confirmAge() {
   document.getElementById('ageGateModal')?.remove();
   renderMarket('intimate');
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 快递投诉系统
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function openDeliveryComplaint() {
+  // 找出所有已丢失且在3天内、还没投诉过的快递
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const history    = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+  const all        = [...deliveries, ...history];
+  const now        = Date.now();
+  const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
+  const complained = JSON.parse(localStorage.getItem('complainedDeliveries') || '[]');
+
+  const eligible = all.filter(d =>
+    d.isLostConfirmed &&
+    !complained.includes(d.id) &&
+    d.doneAt && (now - d.doneAt) <= THREE_DAYS
+  );
+
+  const existing = document.getElementById('complaintModalOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'complaintModalOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,20,10,0.55);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;';
+
+  if (eligible.length === 0) {
+    overlay.innerHTML = `
+      <div style="background:linear-gradient(160deg,#d8edd8,#eaf2e0);border-radius:24px 24px 0 0;padding:32px 24px 48px;width:100%;max-width:420px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:12px;">📮</div>
+        <div style="font-size:16px;font-weight:700;color:#1e3d20;margin-bottom:8px;">暂无可投诉的快递</div>
+        <div style="font-size:13px;color:rgba(40,90,30,0.6);line-height:1.7;margin-bottom:24px;">
+          只有<b>3天内</b>丢失的快递才可以投诉<br>超过时效或未丢失的不在受理范围
+        </div>
+        <button onclick="document.getElementById('complaintModalOverlay').remove()"
+          style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(90,154,70,0.15);color:#2d6028;font-size:14px;font-weight:600;cursor:pointer;">
+          知道了
+        </button>
+      </div>`;
+  } else {
+    const listHtml = eligible.map(d => `
+      <div onclick="window._selectComplaint('${d.id}')"
+        id="complaint_item_${d.id}"
+        style="background:rgba(255,255,255,0.7);border:1.5px solid rgba(100,170,70,0.25);border-radius:16px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all 0.15s;">
+        <div style="font-size:28px;">${d.emoji || '📦'}</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:#1e3d20;">${d.name}</div>
+          <div style="font-size:11px;color:rgba(40,90,30,0.5);margin-top:2px;">
+            丢失于 ${new Date(d.doneAt).toLocaleDateString('zh-CN')} · £${d.productData?.price || 0}
+          </div>
+        </div>
+        <div style="font-size:18px;color:rgba(60,130,40,0.4);">›</div>
+      </div>`).join('');
+
+    overlay.innerHTML = `
+      <div style="background:linear-gradient(160deg,#d8edd8,#eaf2e0);border-radius:24px 24px 0 0;padding:28px 20px 48px;width:100%;max-width:420px;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="width:36px;height:4px;background:rgba(60,120,40,0.2);border-radius:2px;margin:0 auto 16px;"></div>
+          <div style="font-size:11px;letter-spacing:2px;color:rgba(40,90,30,0.45);margin-bottom:6px;">DELIVERY COMPLAINT</div>
+          <div style="font-size:18px;font-weight:700;color:#1e3d20;">选择要投诉的快递</div>
+          <div style="font-size:12px;color:rgba(40,90,30,0.5);margin-top:4px;">仅受理3天内的丢件</div>
+        </div>
+        <div style="max-height:300px;overflow-y:auto;">${listHtml}</div>
+        <button onclick="document.getElementById('complaintModalOverlay').remove()"
+          style="width:100%;margin-top:12px;padding:13px;border-radius:14px;border:none;background:transparent;color:rgba(40,90,30,0.45);font-size:13px;cursor:pointer;">
+          取消
+        </button>
+      </div>`;
+  }
+
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+
+  window._selectComplaint = (id) => {
+    overlay.remove();
+    delete window._selectComplaint;
+    _runComplaintSearch(id, all);
+  };
+}
+
+function _runComplaintSearch(id, allDeliveries) {
+  const d = allDeliveries.find(x => x.id === id);
+  if (!d) return;
+
+  // 显示搜索中动画
+  const searchOverlay = document.createElement('div');
+  searchOverlay.id = 'complaintSearchOverlay';
+  searchOverlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,20,10,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;';
+  searchOverlay.innerHTML = `
+    <div style="background:linear-gradient(160deg,#d8edd8,#eaf2e0);border-radius:24px;padding:36px 32px;text-align:center;width:260px;">
+      <div style="font-size:40px;margin-bottom:16px;">🔍</div>
+      <div style="font-size:15px;font-weight:700;color:#1e3d20;margin-bottom:8px;">正在联系快递公司…</div>
+      <div style="font-size:12px;color:rgba(40,90,30,0.55);" id="complaintStatusText">核查运单信息</div>
+      <div style="width:100%;height:4px;background:rgba(90,154,70,0.15);border-radius:2px;margin-top:16px;overflow:hidden;">
+        <div id="complaintProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,#5a9a46,#7dba5a);border-radius:2px;transition:width 0.4s ease;"></div>
+      </div>
+    </div>`;
+  document.body.appendChild(searchOverlay);
+
+  // 进度条动画
+  const steps = ['核查运单信息', '联系配送站点', '调取监控记录', '等待核查结果…'];
+  let step = 0;
+  const bar = document.getElementById('complaintProgressBar');
+  const statusText = document.getElementById('complaintStatusText');
+  const stepTimer = setInterval(() => {
+    step++;
+    if (bar) bar.style.width = (step * 25) + '%';
+    if (statusText && steps[step]) statusText.textContent = steps[step];
+    if (step >= steps.length - 1) clearInterval(stepTimer);
+  }, 700);
+
+  // 3秒后出结果
+  setTimeout(() => {
+    clearInterval(stepTimer);
+    searchOverlay.remove();
+    _showComplaintResult(d);
+  }, 3000);
+}
+
+function _showComplaintResult(d) {
+  const price = d.productData?.price || 0;
+  const rand = Math.random();
+
+  let resultEmoji, resultTitle, resultDesc, refundAmount;
+  if (rand < 0.10) {
+    // 10%：全额赔偿
+    refundAmount = price;
+    resultEmoji = '🎉';
+    resultTitle = '投诉成功！全额赔付';
+    resultDesc  = `快递公司确认责任在我方，全额赔付 <b>£${price}</b> 已到账`;
+  } else if (rand < 0.50) {
+    // 40%：赔一半
+    refundAmount = Math.round(price * 0.5);
+    resultEmoji = '✅';
+    resultTitle = '投诉部分成功';
+    resultDesc  = `快递公司赔付 50%，<b>£${refundAmount}</b> 已到账`;
+  } else {
+    // 50%：没有赔偿
+    refundAmount = 0;
+    resultEmoji = '😔';
+    resultTitle = '投诉未获赔付';
+    resultDesc  = '快递公司认定责任不在配送方，建议联系商家协商';
+  }
+
+  // 记录已投诉
+  const complained = JSON.parse(localStorage.getItem('complainedDeliveries') || '[]');
+  if (!complained.includes(d.id)) {
+    complained.push(d.id);
+    localStorage.setItem('complainedDeliveries', JSON.stringify(complained));
+  }
+
+  // 从 deliveries 和 deliveryHistory 里删掉这条
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  localStorage.setItem('deliveries', JSON.stringify(deliveries.filter(x => x.id !== d.id)));
+  const history = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+  localStorage.setItem('deliveryHistory', JSON.stringify(history.filter(x => x.id !== d.id)));
+
+  // 赔偿入账
+  if (refundAmount > 0) {
+    if (typeof setBalance === 'function') setBalance(getBalance() + refundAmount);
+    if (typeof addTransaction === 'function') {
+      addTransaction({ icon: '📮', name: `快递投诉赔付 · ${d.name}`, amount: refundAmount });
+    }
+    if (typeof renderWallet === 'function') renderWallet();
+  }
+
+  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+
+  // 显示结果弹窗
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,20,10,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(160deg,#d8edd8,#eaf2e0);border-radius:24px;padding:36px 28px;max-width:320px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(20,60,20,0.2);">
+      <div style="font-size:52px;margin-bottom:16px;">${resultEmoji}</div>
+      <div style="font-size:18px;font-weight:700;color:#1e3d20;margin-bottom:10px;">${resultTitle}</div>
+      <div style="font-size:13px;color:rgba(40,90,30,0.7);line-height:1.7;margin-bottom:24px;">${resultDesc}</div>
+      <button onclick="this.closest('div[style]').remove(); if(typeof initMarket==='function') initMarket();"
+        style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,#5a9a46,#7dba5a);color:white;font-size:15px;font-weight:600;cursor:pointer;">
+        好的
+      </button>
+    </div>`;
+  overlay.onclick = e => {
+    if (e.target === overlay) {
+      overlay.remove();
+      if (typeof initMarket === 'function') initMarket();
+    }
+  };
+  document.body.appendChild(overlay);
 }
