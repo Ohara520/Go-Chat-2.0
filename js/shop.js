@@ -823,11 +823,13 @@ function openDeliveryComplaint() {
   const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
   const complained = JSON.parse(localStorage.getItem('complainedDeliveries') || '[]');
 
-  const eligible = all.filter(d =>
-    d.isLostConfirmed &&
-    !complained.includes(d.id) &&
-    d.doneAt && (now - d.doneAt) <= THREE_DAYS
-  );
+  const eligible = all.filter(d => {
+    if (!d.isLostConfirmed) return false;
+    if (complained.includes(d.id)) return false;
+    // 丢失时记录的是 lostConfirmedAt，正常签收记录 doneAt，两个都兼容
+    const lostAt = d.lostConfirmedAt || d.doneAt || 0;
+    return lostAt > 0 && (now - lostAt) <= THREE_DAYS;
+  });
 
   const existing = document.getElementById('complaintModalOverlay');
   if (existing) existing.remove();
@@ -858,7 +860,7 @@ function openDeliveryComplaint() {
         <div style="flex:1;">
           <div style="font-size:14px;font-weight:600;color:#1e3d20;">${d.name}</div>
           <div style="font-size:11px;color:rgba(40,90,30,0.5);margin-top:2px;">
-            丢失于 ${new Date(d.doneAt).toLocaleDateString('zh-CN')} · £${d.productData?.price || 0}
+            丢失于 ${new Date(d.lostConfirmedAt || d.doneAt).toLocaleDateString('zh-CN')} · £${d.productData?.price || 0}
           </div>
         </div>
         <div style="font-size:18px;color:rgba(60,130,40,0.4);">›</div>

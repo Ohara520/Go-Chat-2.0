@@ -250,6 +250,10 @@ function initLocation() {
     localStorage.setItem('currentLocationType', chosen.type || 'base');
     const days = 2 + Math.floor(Math.random() * 4);
     localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
+    // 修复：换地点时记录到达时间，供 checkLocationSpecialAutoTrigger 判断"待满2天"
+    const _locKey = (chosen.name || '').replace(/\s+/g, '_');
+    localStorage.setItem('locationArrivedAt_' + _locKey, now.toString());
+    localStorage.setItem('locationArrivedAt_' + chosen.name, now.toString());
 
     // 追踪本月各类地点天数（用于月底工资计算）
     const monthKey = 'locDays_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1);

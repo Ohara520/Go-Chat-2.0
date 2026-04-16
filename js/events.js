@@ -772,7 +772,7 @@ function checkLocationSpecialAutoTrigger() {
       return;
     }
     const daysHere = (Date.now() - arrivedAt) / (24 * 3600 * 1000);
-    if (daysHere < 1) return;
+    if (daysHere < 2) return; // 修复：待满2天才触发
 
     // 40%概率主动触发（不是每次都触发，保留随机感）
     if (Math.random() > 0.4) return;
