@@ -496,7 +496,18 @@ One or two lines. Lowercase. English only.]`;
       : '';
 
     // 【改】签收→说话加随机延迟，不总是立刻说
-    const replyDelay = [0, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
+    // 修复：延迟缩短到最多30秒，防止用户等太久或提前问导致答错
+    const replyDelay = [0, 10 * 1000, 30 * 1000][Math.floor(Math.random() * 3)];
+
+    // 修复：系统消息立刻注入，不等延迟——用户提前问也能拿到正确上下文
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({
+        role: 'user',
+        content: `[the item she sent — 「${delivery.name}」— just arrived. you have it now. if she asks, confirm it naturally.]`,
+        _system: true
+      });
+      _safeDeliverySaveHistory();
+    }
 
     setTimeout(async () => {
       try {
