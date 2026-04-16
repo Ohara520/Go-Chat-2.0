@@ -1776,5 +1776,92 @@ function toggleStickerFromPlus() {
     if (typeof generatePhoneMemo === 'function') generatePhoneMemo();
   }
   </script>
+
+<!-- ===== 维护弹窗 ===== -->
+<div id="maintenanceOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(10,20,10,0.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:linear-gradient(160deg,#d8edd8,#eaf2e0);border-radius:28px;padding:36px 28px;max-width:320px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(20,60,20,0.25);">
+    <div style="font-size:52px;margin-bottom:16px;">🔧</div>
+    <div style="font-size:20px;font-weight:700;color:#1e3d20;margin-bottom:8px;">维护中</div>
+    <div style="font-size:14px;color:#4a7a40;line-height:1.7;margin-bottom:24px;">
+      我们正在升级服务，预计很快恢复<br>感谢你的耐心等待 🌿
+    </div>
+    <!-- 开发者入口（点击5次图标解锁） -->
+    <div id="devTapCount" style="display:none;margin-bottom:16px;">
+      <input id="devPasswordInput" type="password" placeholder="开发者密码"
+        style="width:100%;padding:12px 16px;border-radius:14px;border:1.5px solid rgba(90,154,70,0.3);background:rgba(255,255,255,0.7);font-size:14px;color:#1e3d20;outline:none;box-sizing:border-box;margin-bottom:10px;"
+        onkeydown="if(event.key==='Enter')checkDevPassword()">
+      <button onclick="checkDevPassword()"
+        style="width:100%;padding:12px;border-radius:14px;border:none;background:linear-gradient(135deg,#5a9a46,#7dba5a);color:white;font-size:14px;font-weight:600;cursor:pointer;">
+        进入
+      </button>
+      <div id="devPasswordError" style="font-size:12px;color:#b02020;margin-top:8px;display:none;">密码错误</div>
+    </div>
+    <div style="font-size:12px;color:rgba(40,90,30,0.4);" id="devHintText" onclick="handleDevTap()">
+      © Noah Studio
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ── 维护开关 ──────────────────────────────────────────
+  // 需要维护时改为 true，恢复后改回 false
+  var MAINTENANCE_ON = true;
+
+  // 开发者密码（改成你自己的）
+  var DEV_PASSWORD = 'ghost2024';
+
+  // ── 初始化 ────────────────────────────────────────────
+  var overlay = document.getElementById('maintenanceOverlay');
+  if (!overlay) return;
+
+  // 已通过开发者验证，直接放行
+  if (sessionStorage.getItem('devUnlocked') === '1') {
+    overlay.style.display = 'none';
+    return;
+  }
+
+  if (MAINTENANCE_ON) {
+    overlay.style.display = 'flex';
+    // 把其他页面内容锁住，防止滚动穿透
+    document.body.style.overflow = 'hidden';
+  } else {
+    overlay.style.display = 'none';
+  }
+
+  // ── 连点5次解锁开发者输入框 ──────────────────────────
+  var _tapCount = 0;
+  var _tapTimer = null;
+  window.handleDevTap = function() {
+    _tapCount++;
+    clearTimeout(_tapTimer);
+    _tapTimer = setTimeout(function() { _tapCount = 0; }, 1500);
+    if (_tapCount >= 5) {
+      _tapCount = 0;
+      document.getElementById('devTapCount').style.display = 'block';
+      document.getElementById('devHintText').textContent = '输入开发者密码';
+      setTimeout(function() {
+        document.getElementById('devPasswordInput').focus();
+      }, 100);
+    }
+  };
+
+  // ── 验证密码 ──────────────────────────────────────────
+  window.checkDevPassword = function() {
+    var input = document.getElementById('devPasswordInput').value;
+    var errEl = document.getElementById('devPasswordError');
+    if (input === DEV_PASSWORD) {
+      sessionStorage.setItem('devUnlocked', '1');
+      overlay.style.display = 'none';
+      document.body.style.overflow = '';
+    } else {
+      errEl.style.display = 'block';
+      document.getElementById('devPasswordInput').value = '';
+      setTimeout(function() { errEl.style.display = 'none'; }, 2000);
+    }
+  };
+})();
+</script>
+
 </body>
 </html>
