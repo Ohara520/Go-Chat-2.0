@@ -31,9 +31,18 @@ async function loadFromCloud() {
     if (error || !data) return;
 
     // ── 时间戳 ──────────────────────────────────────────────
+    // 根本修复：用 stateSavedAt 判断 state_snapshot 是否比本地新
+    // updated_at 同时被 saveChatHistoryNow 更新，不代表 state 的新旧
+    // stateSavedAt 只在 saveToCloud 成功时写入，不受聊天频繁保存影响
     const cloudTs = data.updated_at ? new Date(data.updated_at).getTime() : 0;
-    const localTs = parseInt(localStorage.getItem('localUpdatedAt') || localStorage.getItem('chatUpdatedAt') || '0');
-    const cloudIsNewer = cloudTs > localTs + 500; // 500ms容差，防止同设备误判
+    const cloudStateTs = data.state_snapshot?.stateSavedAt
+      ? parseInt(data.state_snapshot.stateSavedAt)
+      : 0;
+    const localTs = parseInt(localStorage.getItem('localUpdatedAt') || '0');
+    // · 本地无数据（换设备/清缓存）→ 云端一定算更新，无条件加载
+    // · 本地有数据 + 云端有 stateSavedAt → 精确对比，不被聊天时间戳欺骗
+    // · 本地有数据 + 云端无 stateSavedAt（旧格式兼容）→ 保守处理，不覆盖本地
+    const cloudIsNewer = localTs === 0 || (cloudStateTs > 0 && cloudStateTs > localTs + 500);
 
     // ── 1. 聊天记录：合并云端和本地，保留更多 ────────────────
     if (data.chat_history && data.chat_history.length > 0) {
@@ -635,6 +644,9 @@ async function saveToCloud() {
       userDislikesMoney: localStorage.getItem('userDislikesMoney') || '',
       sassyPost: localStorage.getItem('sassyPost') || '',
       ghostCard: JSON.parse(localStorage.getItem('ghostCard') || 'null'),
+      // 关键：记录 state 保存时间，loadFromCloud 用它精确判断 cloudIsNewer
+      // 不被 saveChatHistoryNow 频繁更新 updated_at 所影响
+      stateSavedAt: Date.now(),
     };
     const nowIso = new Date().toISOString();
     const upsertData = {
@@ -655,10 +667,19 @@ async function saveToCloud() {
     if (walletVal > 0) upsertData.balance = walletVal;
 
     // 重试一次，防止偶发网络问题导致数据丢失
+    // 修复：upsert 加 15 秒超时，防止 Supabase 无响应导致 _isSavingToCloud 永久锁死
+    // 锁死后所有后续 saveToCloud 调用都被跳过，state 再也存不上去
+    const _upsertWithTimeout = () => Promise.race([
+      sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('upsert timeout 15s')), 15000)
+      )
+    ]);
+
     let saveOk = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const { error: upsertErr } = await sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' });
+        const { error: upsertErr } = await _upsertWithTimeout();
         if (!upsertErr) { saveOk = true; break; }
         console.warn('[cloud] 保存失败第', attempt+1, '次:', upsertErr.message);
         if (attempt === 0) await new Promise(r => setTimeout(r, 2000));

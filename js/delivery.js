@@ -382,7 +382,7 @@ function _safeDeliverySaveHistory() {
   if (typeof chatHistory === 'undefined' || typeof saveHistory !== 'function') return;
   const realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
   if (realMsgs.length === 0) return; // 空的/只有系统消息 → 不覆盖
-  _safeDeliverySaveHistory();
+  saveHistory();
 }
 
 

@@ -428,7 +428,7 @@ function detectFlirtTrigger(userText) {
 
 function buildIntimacyBlock(userText) {
   const intent = detectIntimateIntent(userText || '');
-  if (intent === 'none' && userText) return '';
+  if (intent === 'none') return '';
 
   const cap  = getIntimacyCap();
   const step = getCurrentIntimacyStep(userText || '');

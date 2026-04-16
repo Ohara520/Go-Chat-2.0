@@ -600,7 +600,7 @@ function _finishTakeoutOrder(city, item, fee) {
 
   // 跳到配送中 tab
   _takeoutTab = 'tracking';
-  _renderNav();
+  _renderTabBar();
   const body = document.getElementById('takeoutBody');
   if (body) _renderTrackingTab(body);
 

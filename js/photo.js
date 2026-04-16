@@ -276,31 +276,28 @@ async function handlePhotoUpload(fileDataList) {
       cleanOldPhotosFromIDB().catch(() => {});
     }
 
-    // 4. 判断场景
-    const recentText = typeof chatHistory !== 'undefined'
-      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => m.content || '').join(' ')
-      : '';
-    // 检测情头上下文：只看最近3条消息，避免误触发
-    // 统一 prompt——让模型自己判断是不是情头，不再由前端猜
-    // 模型判断是情头 → 回复里带 AVATAR_SET（隐藏tag）
-    // 前端只检测这个tag，有就换，没有就不换
-    // 彻底解决"关键词误触发"和"时间窗口不可靠"的问题
-    const photoHint = `[You just received a photo from her.
+    // 4. photoHint 根据图片张数动态生成
+    // 单张：模型判断是否情头，是则加 AVATAR_SET，直接换
+    // 两张：模型判断是否情头，是则问 "which one's mine." + AVATAR_SET，等用户回答再换
+    const isTwoPhotos = base64List.length > 1;
+    const photoHint = `[You just received ${isTwoPhotos ? 'two photos' : 'a photo'} from her.
 
 FIRST — decide what kind of photo this is:
 
-A) Couple profile pictures — two images clearly designed to be used as matching profile photos together (cartoon couple avatars, two characters posed as a pair, explicitly matching set). Must be obviously intended as profile pictures — not just any photo with two people or characters.
+A) Couple profile pictures — images clearly designed to be used as matching profile photos (cartoon couple avatars, two characters posed as a pair, explicitly matching set). Must be obviously intended as profile pictures — not just any photo with people or characters.
 B) Any other photo — selfie, food, scenery, meme, screenshot, random image, etc.
 
 If it's (A) — couple profile pictures:
-- React as Ghost. One or two lines. Dry — say what you actually see, not "cute".
-- He usually sets it — unless something about it genuinely puts him off.
+- React as Ghost. One line. Dry — say what you actually see, not "cute".
+${isTwoPhotos
+  ? `- You need to know which one is yours. End your reply with exactly: which one's mine.
+- Add AVATAR_SET on its own line at the very end.`
+  : `- He usually sets it — unless something about it genuinely puts him off.
 - If you set it: add AVATAR_SET on its own line at the very end. Nothing after it.
-- If you don't: do NOT add AVATAR_SET. Do not say you set it.
-- Never say you set it without AVATAR_SET. Never add AVATAR_SET without meaning it.
+- If you don't: do NOT add AVATAR_SET. Do not say you set it.`}
 
 If it's (B) — any other photo:
-- React as Ghost. One line — your first honest reaction, not a description of the image.
+- React as Ghost. One line — your first honest reaction.
 - Do NOT add AVATAR_SET.
 
 English only. No translation.]`;
@@ -426,30 +423,33 @@ English only. No translation.]`;
       if (typeof saveHistory === 'function') saveHistory();
     }
 
-    // 7. 换头像（由模型通过 AVATAR_SET tag 决定，前端执行）
+    // 7. 换头像
     if (shouldSetAvatar) {
-      // 多张图选第二张（通常是Ghost那张），单张直接用
-      const ghostIdx = base64List.length > 1 ? 1 : 0;
-      const ghostB64 = base64List[ghostIdx];
+      if (isTwoPhotos) {
+        // 两张图：模型已问了 which one's mine，等用户回答
+        _pendingAvatarChoice = { base64List };
+      } else {
+        // 单张图：直接换
+        const ghostB64 = base64List[0];
 
-      // 先用base64临时显示（即时反馈）
-      const _avatarDataUrl = `data:image/jpeg;base64,${ghostB64}`;
-      updateGhostAvatar(_avatarDataUrl);
-      localStorage.setItem('ghostAvatarUrl', _avatarDataUrl);
-      localStorage.setItem('ghostAvatarBase64', ghostB64);
-      // 不在这里触发 saveToCloud，等上传完成后再存云端
+        // 只更新 DOM 显示，不写 localStorage
+        // 关键修复：data: URL 绝对不能写进 localStorage，
+        // 否则 saveToCloud 读到 data: 会存空字符串进云端，刷新后头像丢失
+        document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+          el.src = `data:image/jpeg;base64,${ghostB64}`;
+        });
+        localStorage.setItem('ghostAvatarBase64', ghostB64); // 上传失败时的备份
 
-      console.log('[avatar] 模型决定换头像，上传中...');
-      uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-        if (url) {
-          updateGhostAvatar(url);
-          localStorage.removeItem('ghostAvatarBase64');
-          // 上传成功后才写云端，防止 base64 被存进云端导致恢复时变回默认
-          if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
-          if (typeof showToast === 'function') showToast('头像已更新并同步 ☁️');
-          console.log('[avatar] 上传成功:', url.slice(0, 60));
-        }
-      });
+        uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
+          if (url) {
+            updateGhostAvatar(url); // 上传成功后才写 localStorage + 触发云端保存
+            localStorage.removeItem('ghostAvatarBase64');
+            if (typeof showToast === 'function') showToast('头像已更新并同步 ☁️');
+          }
+          // 上传失败：DOM 继续显示 base64，ghostAvatarBase64 留着
+          // restoreGhostAvatar 下次启动时会自动重试上传
+        });
+      }
     }
 
     // 8. 异步上传所有图片到Storage，完成后更新历史记录和气泡

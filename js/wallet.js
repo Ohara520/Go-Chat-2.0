@@ -84,7 +84,9 @@ function renderWallet() {
   const walletBalEl = document.getElementById('walletBalance');
   if (walletBalEl) walletBalEl.textContent = '£' + bal.toFixed(2);
 
-  const txList = getTransactions();
+  // 过滤掉黑卡交易：Ghost Card 扣款在黑卡进度条里展示，不放用户钱包列表
+  // 否则用户看到红色 -£[amount] 会误以为自己的钱被扣了
+  const txList = getTransactions().filter(t => !t.ghostCard);
   const now = new Date();
   const monthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
   let monthIn = 0, monthOut = 0;

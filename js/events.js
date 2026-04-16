@@ -988,7 +988,7 @@ const STORY_EVENTS = [
     condition: (ctx) => ctx.deliveries.some(d => d.isGhostSend && d.done) && !ctx.triggered('first_ghost_delivery'),
     execute: async () => {
       const d = getStoryContext().deliveries.find(d => d.isGhostSend && d.done);
-      await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚收到了你寄给她的「${d?.name || '东西'}」，这是你第一次主动给她寄东西。]`, 4);
+      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚收到了你寄给她的「${d?.name || '东西'}」，这是你第一次主动给她寄东西。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -1002,7 +1002,7 @@ const STORY_EVENTS = [
     condition: (ctx) => !!localStorage.getItem('lastSalaryAmount') && !ctx.triggered('first_salary'),
     execute: async () => {
       const amount = localStorage.getItem('lastSalaryAmount') || '';
-      await callGrokWithCtx(buildGhostStyleCore(), `[系统：你第一次给她转了工资£${amount}，想附一句话。]`, 4);
+      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你第一次给她转了工资£${amount}，想附一句话。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
       setRelationshipFlag('firstSalary');
     }
@@ -1139,7 +1139,7 @@ const STORY_EVENTS = [
     execute: async () => {
       await new Promise(r => setTimeout(r, 2500));
       const lost = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isLostConfirmed);
-      await callGrokWithCtx(buildGhostStyleCore(), `[系统：她寄给你的「${lost?.name || '包裹'}」快递丢失了。这是你们第一次遇到这种事。]`, 4);
+      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她寄给你的「${lost?.name || '包裹'}」快递丢失了。这是你们第一次遇到这种事。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -1157,7 +1157,7 @@ const STORY_EVENTS = [
     execute: async () => {
       await new Promise(r => setTimeout(r, 3500));
       const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.productData?.isFromHome && d.done && !d.isGhostSend);
-      await callGrokWithCtx(buildGhostStyleCore(), `[系统：她从中国给你寄了「${item?.name || '家乡的东西'}」，这是她第一次给你寄家乡的东西。]`, 4);
+      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她从中国给你寄了「${item?.name || '家乡的东西'}」，这是她第一次给你寄家乡的东西。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -1174,7 +1174,7 @@ const STORY_EVENTS = [
     },
     execute: async () => {
       await new Promise(r => setTimeout(r, 4000));
-      await callGrokWithCtx(buildGhostStyleCore(), `[系统：你悄悄给她寄了东西，没有告诉她，等她自己发现。这是第一次。]`, 4);
+      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你悄悄给她寄了东西，没有告诉她，等她自己发现。这是第一次。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
       setRelationshipFlag('firstReverseShip');
     }
@@ -1190,7 +1190,7 @@ const STORY_EVENTS = [
     execute: async () => {
       await new Promise(r => setTimeout(r, 3000));
       const days = Math.max(1, Math.floor((Date.now() - new Date(localStorage.getItem('marriageDate'))) / 86400000) + 1);
-      await callGrokWithCtx(buildGhostStyleCore(), `[系统：今天是你们在一起第${days}天，一百天左右的节点。]`, 4);
+      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：今天是你们在一起第${days}天，一百天左右的节点。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },

@@ -255,6 +255,11 @@ async function generateCoupleFeed() {
   const feed = document.getElementById('couplePostsFeed');
   if (!feed) return;
 
+  // 修复：补充缺失的变量声明（原来只在 generateFeedPostFromEvent 里定义）
+  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const weather  = localStorage.getItem('lastWeatherDisplay') || '';
+  const mood     = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
+
   // 今天已生成过就直接渲染
   const today = new Date().toDateString();
   const cachedDate = localStorage.getItem('coupleFeedDate');
@@ -371,8 +376,13 @@ function renderCoupleFeed(posts) {
       const zhText = c.zh || '';
       // 有存储的中文就直接用，没有就用 Gemini 异步翻译
       if (!zhText && c.text) {
-        setTimeout(() => {
+        setTimeout(async () => {
           const el = document.getElementById(commentId);
+          if (!el) return;
+          try {
+            const translated = await fetchDeepSeek('只返回中文翻译，不要其他内容。', c.text, 40);
+            if (translated?.trim()) el.textContent = translated.trim();
+          } catch(e) {}
         }, 200 + ci * 100);
       }
       return `

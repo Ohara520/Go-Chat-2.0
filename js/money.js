@@ -751,7 +751,7 @@ Write KEEP on its own line at the end.]`;
       localStorage.setItem('lastMoneyRefusedAt', Date.now());
       if (typeof renderWallet === 'function') renderWallet();
       updateUserTransferCard(cardId, false);
-      if (container) showGhostTransferCard(container, amount, reply, true);
+      if (reply && typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {
         chatHistory.push({ role: 'assistant', content: reply || `sent it back. £${amount}.` });
         chatHistory.push({ role: 'user', content: `[System: Ghost just returned £${amount}. He knows he sent it back.]`, _system: true });
@@ -866,7 +866,7 @@ async function handlePendingTransfer(amount, userReason) {
       localStorage.setItem('lastRefundAt', Date.now());
       if (typeof renderWallet === 'function') renderWallet();
       updateUserTransferCard(cardId, false);
-      if (container) showGhostTransferCard(container, amount, reply, true);
+      if (reply && typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {
         chatHistory.push({ role: 'assistant', content: reply });
         chatHistory.push({ role: 'user', content: `[System: Ghost returned £${amount}.]`, _system: true });
@@ -938,7 +938,7 @@ function updateUserTransferCard(cardId, kept) {
   el.style.color = kept ? '#4a8a30' : '#9ca3af';
 }
 
-// ── showGhostTransferCard 已移除 ──
+// ── showGhostTransferCard 已删除：退款只需 appendMessage + updateUserTransferCard ──
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
