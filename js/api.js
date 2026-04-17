@@ -242,6 +242,27 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
   }
 }
 
+// 支持多角色的 Venice 调用（自动路由到当前角色的调情 API）
+async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateMemory = '') {
+  try {
+    const endpoint = typeof getCurrentVeniceEndpoint === 'function'
+      ? getCurrentVeniceEndpoint()
+      : '/api/venice';
+    const body = { system, user, max_tokens: maxTokens };
+    if (intimateMemory) body.intimateMemory = intimateMemory;
+    const res = await fetchWithTimeout(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, 22000);
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.text?.trim() || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 // ===== DeepSeek 生成调用 =====
 // /api/deepseek 路由用于内容生成（情绪判断/心声/签收/转账拒绝等）
 // /api/translate 已删除

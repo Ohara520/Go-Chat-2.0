@@ -2544,3 +2544,205 @@
     display: flex; justify-content: space-between;
     font-size: 10px; color: rgba(201,168,76,0.35); letter-spacing: 0.5px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   KEEGAN 主题 — 雾霾蓝覆盖层
+   只在 body.theme-keegan 下生效，不影响 Ghost 的绿色
+   切换角色时 character.js 的 applyCharacterTheme() 自动加减这个 class
+═══════════════════════════════════════════════════════════ */
+
+/* ── 核心色值（方便查阅）──
+   深蓝文字：#1a3a50
+   主蓝文字：#2a5870
+   主蓝色：  #3a7a96
+   浅蓝色：  #5aaac6
+   蓝边框：  rgba(100,160,190,0.22)
+   蓝背景：  rgba(228,242,250,0.35)
+   蓝阴影：  rgba(40,90,120,0.07)
+── */
+
+/* 聊天 Header */
+body.theme-keegan .chat-header {
+  background: linear-gradient(135deg, rgba(120,175,210,0.6) 0%, rgba(150,195,225,0.55) 100%);
+  border-bottom-color: rgba(255,255,255,0.55);
+}
+body.theme-keegan .chat-header-center h3 { color: #1a3a50; }
+body.theme-keegan .chat-header-meta { color: rgba(26,58,80,0.6); }
+body.theme-keegan .chat-back-btn { color: #2a5870; }
+body.theme-keegan .online-indicator { background: #60c4e0; border-color: #d4eaf3; }
+
+/* 消息区背景 */
+body.theme-keegan .messages { background: rgba(228,242,250,0.35); }
+
+/* 用户气泡 */
+body.theme-keegan .message.user .message-bubble {
+  background: linear-gradient(135deg, rgba(58,122,150,0.82), rgba(90,155,185,0.78));
+  box-shadow: 0 4px 14px rgba(40,90,120,0.22);
+}
+
+/* Bot 气泡 */
+body.theme-keegan .message.bot .message-bubble {
+  box-shadow: 0 3px 12px rgba(40,90,120,0.1);
+}
+body.theme-keegan .message.bot .message-bubble { color: #1a3a50; }
+body.theme-keegan .message.bot .bubble-zh { color: rgba(26,58,80,0.5); }
+
+/* 翻译按钮 */
+body.theme-keegan .translate-btn { color: rgba(42,88,112,0.5); border-color: rgba(42,88,112,0.2); }
+body.theme-keegan .translate-btn:hover { color: rgba(42,88,112,0.9); border-color: rgba(42,88,112,0.5); }
+
+/* 时间分割线 */
+body.theme-keegan .time-divider::before,
+body.theme-keegan .time-divider::after {
+  background: linear-gradient(to right, transparent, rgba(100,160,190,0.2), transparent);
+}
+body.theme-keegan .time-divider span {
+  color: rgba(42,88,112,0.55);
+  border-color: rgba(100,160,190,0.25);
+}
+
+/* 打字动画 */
+body.theme-keegan .typing-dot { background: rgba(58,122,150,0.55); }
+
+/* 输入框 */
+body.theme-keegan .input-area { border-top-color: rgba(100,160,190,0.2); }
+body.theme-keegan .input-field {
+  border-color: rgba(100,160,190,0.45);
+  color: #1a3a50;
+}
+body.theme-keegan .input-field::placeholder { color: rgba(42,88,112,0.5); }
+body.theme-keegan .input-field:focus {
+  border-color: rgba(58,122,150,0.7);
+  box-shadow: 0 0 14px rgba(58,122,150,0.15);
+}
+
+/* 发送按钮 */
+body.theme-keegan .send-btn {
+  background: linear-gradient(135deg, #3a7a96, #5aaac6);
+  box-shadow: 0 4px 12px rgba(40,90,120,0.32);
+}
+body.theme-keegan .send-btn:hover { box-shadow: 0 6px 18px rgba(40,90,120,0.45); }
+
+/* 转账按钮 */
+body.theme-keegan .transfer-btn { border-color: rgba(100,160,190,0.45); }
+
+/* 心声气泡 */
+body.theme-keegan .thought-bubble {
+  border-color: rgba(100,160,190,0.35);
+  color: #2a5870;
+  box-shadow: 0 4px 20px rgba(40,90,120,0.2);
+}
+body.theme-keegan .thought-bubble::after {
+  border-right-color: rgba(100,160,190,0.35);
+  border-top-color: rgba(100,160,190,0.35);
+}
+
+/* 心声按钮脉冲 */
+body.theme-keegan .thought-btn-pulse {
+  animation: thoughtPulseBlue 1s ease-in-out infinite;
+}
+@keyframes thoughtPulseBlue {
+  0%   { background: rgba(255,255,255,0.45); transform: scale(1); box-shadow: none; }
+  50%  { background: rgba(120,175,210,0.65); transform: scale(1.15); box-shadow: 0 0 12px rgba(58,122,150,0.5); }
+  100% { background: rgba(255,255,255,0.45); transform: scale(1); box-shadow: none; }
+}
+
+/* 资料页 */
+body.theme-keegan .profile-screen-nav {
+  background: linear-gradient(135deg, rgba(100,165,205,0.5), rgba(130,190,220,0.45));
+}
+body.theme-keegan .profile-nav-back { color: #2a5870; }
+body.theme-keegan .profile-nav-title { color: #1a3a50; }
+body.theme-keegan .profile-name { color: #1a3a50; }
+body.theme-keegan .profile-name-sub { color: rgba(26,58,80,0.6); }
+body.theme-keegan .profile-tag {
+  background: linear-gradient(135deg, rgba(100,165,205,0.45), rgba(130,190,220,0.4));
+  border-color: rgba(100,160,190,0.3);
+  color: #2a5870;
+}
+body.theme-keegan .profile-value { color: #2a5870; }
+body.theme-keegan .profile-btn {
+  background: linear-gradient(135deg, rgba(58,122,150,0.78), rgba(90,155,185,0.72));
+}
+body.theme-keegan .profile-signature { border-left-color: rgba(80,140,180,0.55); }
+
+/* 钱包页 */
+body.theme-keegan .wallet-card {
+  background: linear-gradient(135deg, rgba(58,122,150,0.75), rgba(40,100,130,0.65), rgba(80,145,175,0.6));
+  box-shadow: 0 8px 30px rgba(30,80,110,0.18);
+}
+body.theme-keegan .transaction-item { border-bottom-color: rgba(80,140,180,0.1); }
+body.theme-keegan .transaction-name { color: #2a5870; }
+body.theme-keegan .transaction-amount.in { color: #1a5070; }
+body.theme-keegan .transaction-toggle { border-top-color: rgba(80,140,180,0.1); color: rgba(26,58,80,0.5); }
+
+/* 商城顶部 */
+body.theme-keegan .market-balance-bar {
+  background: linear-gradient(180deg, rgba(228,242,250,0.95), rgba(215,235,245,0.85));
+  border-bottom-color: rgba(100,160,190,0.18);
+}
+body.theme-keegan .category-tab {
+  color: rgba(26,58,80,0.6); border-color: rgba(100,160,190,0.22);
+}
+body.theme-keegan .category-tab.active {
+  background: linear-gradient(135deg, #2a6882, #4a9ab8);
+  box-shadow: 0 3px 12px rgba(40,100,140,0.28);
+}
+
+/* 产品购买按钮 */
+body.theme-keegan .product-buy-btn {
+  background: linear-gradient(135deg, rgba(42,104,130,0.85), rgba(74,154,184,0.8));
+  box-shadow: 0 2px 8px rgba(40,100,140,0.2);
+}
+body.theme-keegan .buy-modal-confirm {
+  background: linear-gradient(135deg, rgba(58,122,150,0.88), rgba(90,170,200,0.82));
+  box-shadow: 0 4px 12px rgba(40,100,140,0.32);
+}
+
+/* 外卖页 */
+body.theme-keegan .takeout-container {
+  background: linear-gradient(160deg, #e8f4fa 0%, #d8eef8 100%);
+}
+
+/* 情侣空间 */
+body.theme-keegan .couple-tab.active {
+  background: linear-gradient(135deg, rgba(58,122,150,0.88), rgba(90,170,200,0.85));
+  box-shadow: 0 3px 14px rgba(40,100,140,0.28);
+}
+
+/* Tab Bar 高亮 */
+body.theme-keegan .tab-bar-item.tab-active .tab-bar-label { color: #2a5870 !important; }
+body.theme-keegan .tab-bar-dot { background: #3a7a96 !important; }
+
+/* Toast */
+body.theme-keegan .toast {
+  background: rgba(26,58,80,0.88);
+}
+
+/* 快递标签 */
+body.theme-keegan .delivery-tag {
+  border-color: rgba(100,160,190,0.38);
+  color: #2a5870;
+  box-shadow: 0 2px 8px rgba(40,100,140,0.12);
+}
+body.theme-keegan .delivery-tag-dot { background: #3a7a96; }
+
+/* 故事书 */
+body.theme-keegan .story-card.unlocked::before {
+  background: linear-gradient(135deg, rgba(58,122,150,0.82), rgba(90,170,200,0.72));
+  box-shadow: 0 0 8px rgba(58,122,150,0.38);
+}
+body.theme-keegan .story-book-list::before {
+  background: linear-gradient(180deg, rgba(58,122,150,0.5), rgba(100,160,190,0.3), rgba(58,122,150,0.1));
+}
+body.theme-keegan .achievement-tab.active {
+  color: #2a5870;
+  border-bottom-color: rgba(58,122,150,0.68);
+}
+
+/* 内心独白 */
+body.theme-keegan .inner-thought { border-color: rgba(58,122,150,0.32); }
+body.theme-keegan .inner-thought-label { color: rgba(130,190,220,0.7); }
+body.theme-keegan .it-en { color: rgba(220,240,250,0.95); }
+

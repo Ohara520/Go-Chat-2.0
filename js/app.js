@@ -29,6 +29,7 @@ function openScreen(id) {
 
 function goBack() {
     openScreen('mainScreen');
+    if (typeof showTabBar === 'function') showTabBar();
 }
 
 // ===== 启动页 =====
@@ -138,6 +139,7 @@ async function startChat() {
         localStorage.setItem('marriageDate', dateStr);
     }
     openScreen('mainScreen');
+    if (typeof showTabBar === 'function') showTabBar();
 }
 
 // ===== 初始化 =====
@@ -244,6 +246,7 @@ window.onload = async function() {
     }
 
     openScreen('mainScreen');
+    if (typeof showTabBar === 'function') showTabBar();
 
     // ── 包裹通知徽章更新 ─────────────────────────────────────
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();

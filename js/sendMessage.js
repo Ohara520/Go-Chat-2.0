@@ -481,7 +481,7 @@ async function _processMergedMessage(text) {
       setTimeout(() => {
         if (_isSending) return;
         showTyping();
-        callHaiku(buildGhostStyleCore(), [
+        callHaiku((typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()), [
           ...chatHistory.filter(m => !m._system).slice(-6),
           { role: 'user', content: _comebackPrompt }
         ], 80).then(r => {
@@ -747,10 +747,12 @@ async function _processMergedMessage(text) {
       getCurrentIntimacyStep(text);
     }
     const _flirtProgress = typeof getFlirtProgress === 'function' ? getFlirtProgress() : 0;
-    // 有调情意图就进G，由G的level系统控制升温节奏
-    // affection积累到一定进度也会进G（轻度调情）
-    const _intimateByIntent = _intimateIntent === 'explicit' || _intimateIntent === 'flirt'
-      || (_intimateIntent === 'affection' && _flirtProgress >= 1.0);
+    // 修复：affection 也直接进 Venice，不再设进度门槛
+    // 让 Venice 自己从冷到热地升温，外面不帮它过滤
+    // 暗示性的话、语境性的调情，Venice 接住比 Sonnet 强得多
+    const _intimateByIntent = _intimateIntent === 'explicit'
+      || _intimateIntent === 'flirt'
+      || _intimateIntent === 'affection';
     let isIntimate = isRecentPhoto ? false
       : (_intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text)));
 
@@ -774,7 +776,7 @@ async function _processMergedMessage(text) {
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
             'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
             'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
-            'flirt判断标准：凡是涉及对方身体、私人习惯、亲密感、身体能力、外貌、两人之间的张力，或者话里有暗示意味的，都算true。只有明确是普通日常闲聊才为false。不确定时宁可判true。\n特别注意：涉及睡衣/浴巾/内衣/真空穿/穿对方衣物等服装场景，或者要求对方给穿搭打分/排行（哪怕用问卷形式），都算flirt=true。',
+            'flirt判断标准：凡是涉及对方身体、私人习惯、亲密感、身体能力、外貌、两人之间的张力，或者话里有暗示意味的，都算true。只有明确是普通日常闲聊才为false。不确定时宁可判true。\n特别注意1：涉及睡衣/浴巾/内衣/真空穿/穿对方衣物等服装场景，或者要求对方给穿搭打分/排行（哪怕用问卷形式），都算flirt=true。\n特别注意2：语境性的暗示也算——比如"你今天穿什么睡觉""好热不想穿衣服""你想我吗""你有没有想过我们在一起"，哪怕不直白，有亲密暗示就算true。',
             `用户说：${text}`,
             100
           ),
@@ -998,7 +1000,7 @@ async function _processMergedMessage(text) {
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
           .join('\n');
         const haiku1 = await callHaiku(
-          buildGhostStyleCore() + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
+          (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
           [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
           200
         );
@@ -1013,7 +1015,7 @@ async function _processMergedMessage(text) {
               body: JSON.stringify({
                 model: getMainModel(),
                 max_tokens: 300,
-                system: buildGhostStyleCore() + '\n' + antiBreakoutHint,
+                system: (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint,
                 messages: cleanHistory.slice(-10)
               })
             }, 20000);
@@ -1074,7 +1076,7 @@ async function _processMergedMessage(text) {
 
         if (!hasClearReferent || hasInventedRivalry) {
           const regenRaw = await fetchDeepSeek(
-            buildGhostStyleCore() + '\n[REWRITE RULE] The previous reply invented a third party who was never mentioned by the user. Rewrite expressing the same emotion aimed at the SITUATION not a person. Use "so that takes priority?" / "guess that matters more." / "alright. noted." — NOT "he/him/lucky him". English only.',
+            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n[REWRITE RULE] The previous reply invented a third party who was never mentioned by the user. Rewrite expressing the same emotion aimed at the SITUATION not a person. Use "so that takes priority?" / "guess that matters more." / "alright. noted." — NOT "he/him/lucky him". English only.',
             `Recent chat:\n${recentText.slice(-200)}\n\nReply to rewrite: "${reply.slice(0, 200)}"`,
             150
           );
@@ -1154,13 +1156,13 @@ async function _processMergedMessage(text) {
           if (_recallIsIntimate) {
             const recentMsgs2 = chatHistory.filter(m => !m._system && !m._recalled).slice(-8)
               .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`).join('\n');
-            reply2 = await callVenice(
-              buildGhostStyleCore() + '\nYou just sent a message and took it back. Send another — different angle, same tension. Flat delivery. English only. Short.',
+            reply2 = await callVeniceForCurrentChar(
+              (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nYou just sent a message and took it back. Send another — different angle, same tension. Flat delivery. English only. Short.',
               recentMsgs2, 150
             );
           } else {
             reply2 = await callHaiku(
-              buildSystemPrompt(),
+              (typeof buildCurrentSystemPrompt === 'function' ? buildCurrentSystemPrompt() : buildSystemPrompt()),
               [...cleanHistory.slice(-8), {
                 role: 'user',
                 content: '[System: You just sent a message and took it back. Send another — different angle, rephrased, or shorter. lowercase, English only.]'
@@ -1367,10 +1369,10 @@ One or two lines. English only. lowercase.`;
     const _memorySection = _intimateMemoryCtx
       ? `\n\n[Your memory from previous intimate moments with her:\n${_intimateMemoryCtx}\nStay consistent with this — don't repeat what already happened, build on it naturally. If she revisits a topic, remember how it went.]`
       : '';
-    const geminiReply = await callVenice(
-      buildGhostStyleCore() + _allowAdult + '\n' + _intimateBase + _memorySection,
+    const geminiReply = await callVeniceForCurrentChar(
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + _memorySection,
       recentMsgs + '\nHer: ' + text,
-      200,
+      120,
       _intimateMemoryCtx
     );
 
@@ -1381,7 +1383,12 @@ One or two lines. English only. lowercase.`;
       return ["i'm claude","i am claude","made by anthropic","i can't roleplay","i cannot roleplay",
         "as an ai","i'm an ai","i'm kiro","i am kiro","i'm kirk","i am kirk","kiro","kirk",
         "ai assistant","development work","coding questions","not the right tool",
-        "i need to step back","i'm an ai assistant","how can i help you today"].some(p => l.includes(p));
+        "i need to step back","i'm an ai assistant","how can i help you today",
+        // 补充常见漏网破防词
+        "i want to be transparent","i should clarify","let me be honest",
+        "as a language model","i need to be clear","i must clarify",
+        "i'm not able to","i cannot engage","i won't be able to",
+        "this isn't something i","that's not something i"].some(p => l.includes(p));
     };
 
     if (geminiReply && !_intimateBreakout(geminiReply)) {
@@ -1422,7 +1429,7 @@ One or two lines. English only. lowercase.`;
       return { role: m.role, content: m.content };
     });
     const haiku2 = await callHaiku(
-      buildGhostStyleCore() + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.',
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.',
       [..._haiku2History, { role: 'user', content: text }],
       100
     );

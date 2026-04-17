@@ -167,6 +167,32 @@ async function loadFromCloud() {
       setIfMissing('ghostUnlocked_weight', p.ghostUnlocked_weight);
       setIfMissing('ghostUnlocked_blood_type', p.ghostUnlocked_blood_type);
       setIfMissing('ghostUnlocked_hometown', p.ghostUnlocked_hometown);
+
+      // ── 多角色：恢复各角色存档到前缀 key ──────────────
+      if (p.currentCharacter) {
+        localStorage.setItem('currentCharacter', p.currentCharacter);
+      }
+      if (p.characters && typeof p.characters === 'object') {
+        const _charKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
+        const _currentChar = localStorage.getItem('currentCharacter') || 'ghost';
+        Object.keys(p.characters).forEach(charId => {
+          const charData = p.characters[charId];
+          if (!charData || typeof charData !== 'object') return;
+          _charKeys.forEach(key => {
+            if (charData[key] !== undefined && charData[key] !== null) {
+              const val = typeof charData[key] === 'string'
+                ? charData[key]
+                : JSON.stringify(charData[key]);
+              localStorage.setItem(`${charId}_${key}`, val);
+              // 当前角色的数据同时写进标准 key
+              if (charId === _currentChar) {
+                localStorage.setItem(key, val);
+              }
+            }
+          });
+        });
+        console.log('[cloud] 多角色数据已恢复');
+      }
     }
 
     // ── 3. 情绪/关系：云端更新才覆盖，本地操作优先 ────────────
@@ -487,6 +513,10 @@ async function saveChatHistoryNow() {
     const now = new Date().toISOString();
     localStorage.setItem('chatUpdatedAt', now);
 
+    // 聊天记录也存到前缀 key，供多角色切换时保留
+    const _chatChar = localStorage.getItem('currentCharacter') || 'ghost';
+    localStorage.setItem(`${_chatChar}_chatHistory`, JSON.stringify(chatHistoryData));
+
     await sb.from('user_data').upsert({
       user_id: userId,
       chat_history: chatHistoryData,
@@ -591,7 +621,37 @@ async function saveToCloud() {
       })(),
       monthlyCheckinKey: 'monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1),
       monthlyCheckinCount: localStorage.getItem('monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1)) || '0',
+      // ── 多角色：当前角色标记 ──
+      currentCharacter: localStorage.getItem('currentCharacter') || 'ghost',
     };
+
+    // ── 多角色：保存各角色的专属数据 ──────────────────────
+    // 先把当前角色数据刷进前缀 key，再统一读取存云端
+    const _currentChar = localStorage.getItem('currentCharacter') || 'ghost';
+    const _charKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
+    const _allChars = ['ghost', 'keegan'];
+
+    // 确保当前角色的数据已同步到前缀 key
+    if (_charKeys.length > 0) {
+      _charKeys.forEach(key => {
+        const val = localStorage.getItem(key);
+        if (val !== null) localStorage.setItem(`${_currentChar}_${key}`, val);
+      });
+    }
+
+    // 读取每个角色的存档
+    const _charactersData = {};
+    _allChars.forEach(charId => {
+      const charState = {};
+      _charKeys.forEach(key => {
+        const val = localStorage.getItem(`${charId}_${key}`);
+        if (val !== null) {
+          try { charState[key] = JSON.parse(val); } catch(e) { charState[key] = val; }
+        }
+      });
+      _charactersData[charId] = charState;
+    });
+    profile.characters = _charactersData;
     const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw
       ? JSON.parse(chatHistoryRaw)

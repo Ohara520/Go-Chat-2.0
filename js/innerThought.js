@@ -345,7 +345,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
                 body: JSON.stringify({
                   model: MODEL_HAIKU,
                   max_tokens: 80,
-                  system: buildGhostStyleCore(),
+                  system: (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore()),
                   messages: [
                     ...chatHistory.filter(m => !m._system).slice(-4),
                     { role: 'user', content: '[System: She just went to sleep. Send a goodnight — not formal, not sweet. Just what he would actually say. One line, lowercase, English only.]' }

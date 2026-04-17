@@ -582,17 +582,28 @@
       </div>
     </div>
 
-    <!-- 账户区域 -->
-    <div style="padding: 8px 16px 32px; text-align:center;">
-      <div id="main-account-email" style="font-size:12px;color:#9aca9a;margin-bottom:10px;"></div>
+    <!-- Tab Bar 底部留白（防止内容被遮住）-->
+    <div style="height:72px;flex-shrink:0;"></div>
+  </div>
 
-      <!-- 订阅状态卡片 -->
+  <!-- ═══ 我的 Tab 页面 ═══ -->
+  <div class="screen" id="meScreen" style="display:none;">
+    <div style="padding: calc(16px + env(safe-area-inset-top)) 20px 14px;
+      background: linear-gradient(135deg, rgba(155,205,125,0.5), rgba(185,225,150,0.45));
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      flex-shrink:0; display:flex; align-items:center; gap:12px;">
+      <div style="font-size:17px;font-weight:700;color:#1e3d20;flex:1;">我的</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:20px 16px calc(80px + env(safe-area-inset-bottom));background:rgba(235,248,228,0.12);">
+
+      <!-- 邮箱 -->
+      <div id="me-account-email" style="font-size:12px;color:#9aca9a;text-align:center;margin-bottom:14px;"></div>
+
+      <!-- 订阅卡片 -->
       <div id="subscribeCard" onclick="openSubscribePage()" style="
-        background: linear-gradient(135deg, rgba(90,160,70,0.1) 0%, rgba(120,185,85,0.08) 100%);
-        border: 1px solid rgba(90,160,70,0.22);
-        border-radius: 16px; padding: 12px 16px; margin-bottom: 6px;
-        cursor: pointer; transition: all 0.2s; text-align: left;
-      ">
+        background: linear-gradient(135deg, rgba(90,160,70,0.1), rgba(120,185,85,0.08));
+        border: 1px solid rgba(90,160,70,0.22); border-radius: 16px;
+        padding: 14px 16px; margin-bottom: 12px; cursor: pointer; text-align:left;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div id="subPlanName" style="font-size:13px;font-weight:600;color:#2d6028;">✨ 开通会员</div>
@@ -602,24 +613,36 @@
         </div>
       </div>
 
-      <!-- 福利提示 -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px;">
-        <div style="font-size:11px;color:#7aaa7a;line-height:1.9;text-align:left;">
+      <!-- 福利说明 -->
+      <div style="background:rgba(255,255,255,0.6);backdrop-filter:blur(14px);border-radius:16px;
+        padding:14px 16px;border:1px solid rgba(255,255,255,0.85);margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:#1e3d20;margin-bottom:10px;">🎁 福利说明</div>
+        <div style="font-size:12px;color:#7aaa7a;line-height:2;">
           🎁 新用户注册免费赠送100条<br>
           📅 每日签到随机获得英镑或条数奖励<br>
           🏆 连续签到达里程碑额外赠条数
         </div>
-        <button onclick="showQQGroup()" style="flex-shrink:0;margin-left:10px;padding:8px 12px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);border-radius:16px;font-size:11px;color:#3a7a2a;cursor:pointer;font-family:inherit;line-height:1.4;text-align:center;">
-          💬<br>反馈群
-        </button>
       </div>
 
-      <button onclick="handleLogout()" style="
-        padding:10px 28px; border:1.5px solid #c8e0c0;
-        background:white; border-radius:20px; font-size:13px;
-        color:#7aaa7a; cursor:pointer;
-      ">退出登录</button>
+      <!-- 操作区 -->
+      <div style="background:rgba(255,255,255,0.6);backdrop-filter:blur(14px);border-radius:16px;
+        overflow:hidden;border:1px solid rgba(255,255,255,0.85);margin-bottom:12px;">
+        <div onclick="showQQGroup()" style="padding:14px 16px;border-bottom:1px solid rgba(140,190,100,0.15);
+          display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+          <div style="font-size:13px;font-weight:600;color:#1e3d20;">💬 反馈群</div>
+          <div style="font-size:13px;color:#aaa;">›</div>
+        </div>
+        <div onclick="handleLogout()" style="padding:14px 16px;
+          display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+          <div style="font-size:13px;font-weight:600;color:#e57373;">退出登录</div>
+          <div style="font-size:13px;color:#aaa;">›</div>
+        </div>
+      </div>
+
+      <!-- ID -->
+      <div id="main-account-email" style="display:none;"></div>
     </div>
+    <div style="height:72px;flex-shrink:0;"></div>
   </div>
 
   <!-- 聊天页 -->
@@ -1633,6 +1656,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+<script src="js/character.js"></script>
+<script src="js/keegan_persona.js"></script>
 <script src="js/api.js"></script>
 <script src="js/state.js"></script>
 <script src="js/persona.js"></script>
@@ -1658,6 +1683,127 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/sticker.js"></script>
 <script src="js/chat_init.js"></script>
 <script src="js/app.js"></script>
+
+<!-- ═══ 底部 Tab Bar ═══ -->
+<div id="mainTabBar" style="
+  position: fixed;
+  bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  height: calc(60px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(255,255,255,0.85);
+  box-shadow: 0 -4px 20px rgba(80,140,55,0.08);
+  display: none;
+  align-items: flex-start;
+  padding-top: 8px;
+  z-index: 200;
+">
+  <div class="tab-bar-item tab-active" onclick="switchTab('main')" id="tab-main">
+    <div class="tab-bar-icon">🏠</div>
+    <div class="tab-bar-label">主页</div>
+    <div class="tab-bar-dot" id="dot-main"></div>
+  </div>
+  <div class="tab-bar-item" onclick="switchTab('chat')" id="tab-chat">
+    <div class="tab-bar-icon">💬</div>
+    <div class="tab-bar-label">聊天</div>
+    <div class="tab-bar-dot" id="dot-chat" style="display:none;"></div>
+  </div>
+  <div class="tab-bar-item" onclick="switchTab('couple')" id="tab-couple">
+    <div class="tab-bar-icon">🌸</div>
+    <div class="tab-bar-label">情侣空间</div>
+    <div class="tab-bar-dot" id="dot-couple" style="display:none;"></div>
+  </div>
+  <div class="tab-bar-item" onclick="switchTab('me')" id="tab-me">
+    <div class="tab-bar-icon">👤</div>
+    <div class="tab-bar-label">我的</div>
+    <div class="tab-bar-dot" id="dot-me" style="display:none;"></div>
+  </div>
+</div>
+
+<style>
+.tab-bar-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 2px;
+  cursor: pointer; padding: 2px 0; transition: all 0.2s;
+}
+.tab-bar-item:active { transform: scale(0.92); }
+.tab-bar-icon { font-size: 22px; transition: transform 0.2s; }
+.tab-bar-label {
+  font-size: 10px; font-weight: 500;
+  color: rgba(50,100,40,0.38); letter-spacing: 0.2px; white-space: nowrap;
+}
+.tab-bar-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #5a9a46; margin-top: 1px;
+}
+.tab-active .tab-bar-label { color: #2d6028 !important; font-weight: 700; }
+.tab-active .tab-bar-icon { transform: scale(1.12); }
+/* 主页内容底部留白，不被 Tab Bar 遮住 */
+#mainScreen .main-content { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+</style>
+
+<script>
+let _currentTab = 'main';
+
+function switchTab(tab) {
+  if (tab === 'chat') { openScreen('chatScreen'); return; }
+  if (tab === 'couple') {
+    openScreen('coupleScreen');
+    if (typeof initCoupleFeed === 'function') setTimeout(initCoupleFeed, 80);
+    return;
+  }
+  _currentTab = tab;
+  ['mainScreen','meScreen'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  const targetId = tab === 'main' ? 'mainScreen' : 'meScreen';
+  const t = document.getElementById(targetId);
+  if (t) t.style.display = 'flex';
+  // 同步邮箱到「我的」
+  if (tab === 'me') {
+    const email = localStorage.getItem('sb_user_email') || localStorage.getItem('userEmail') || '';
+    const el = document.getElementById('me-account-email');
+    if (el) el.textContent = email;
+  }
+  // 更新高亮
+  ['main','chat','couple','me'].forEach(k => {
+    const el = document.getElementById('tab-' + k);
+    const dot = document.getElementById('dot-' + k);
+    if (el) { el.classList.toggle('tab-active', k === tab); }
+    if (dot) dot.style.display = (k === tab) ? 'block' : 'none';
+  });
+}
+
+// 显示 Tab Bar（登录后调用）
+function showTabBar() {
+  const tb = document.getElementById('mainTabBar');
+  if (tb) tb.style.display = 'flex';
+  switchTab('main');
+}
+
+// 进入子页时隐藏 Tab Bar，返回主页时恢复
+const _origOpenScreen = window.openScreen;
+window.openScreen = function(screenId) {
+  if (typeof _origOpenScreen === 'function') _origOpenScreen(screenId);
+  const tb = document.getElementById('mainTabBar');
+  if (!tb) return;
+  const hideFor = ['chatScreen','profileScreen','coupleScreen','walletScreen',
+    'workScreen','vocabScreen','marketScreen','takeoutScreen',
+    'achievementScreen','collectionScreen','calendarScreen','secretScreen'];
+  if (screenId === 'mainScreen') {
+    tb.style.display = 'flex';
+    switchTab(_currentTab === 'me' ? 'me' : 'main');
+  } else if (hideFor.includes(screenId)) {
+    tb.style.display = 'none';
+  } else {
+    tb.style.display = 'flex';
+  }
+};
+</script>
+
 <script>
 function checkAgeWarning() {
   if (!localStorage.getItem('ageConfirmed')) {
