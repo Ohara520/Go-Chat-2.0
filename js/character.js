@@ -221,6 +221,24 @@ async function switchCharacter(newCharId) {
   if (typeof renderWallet === 'function') renderWallet();
   if (typeof initMood === 'function') initMood();
 
+  // 9. 更新聊天 header 名字 + 头像
+  const _chatNameEl = document.getElementById('chatBotName');
+  if (_chatNameEl) {
+    const _nick = localStorage.getItem('botNickname') || '';
+    _chatNameEl.textContent = _nick || (newCharId === 'keegan' ? 'Keegan P. Russ' : 'Simon "Ghost" Riley');
+  }
+  // 更新聊天 header 头像
+  const _chatAvaEl = document.querySelector('#chatScreen .ghost-avatar img');
+  if (_chatAvaEl) {
+    const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
+    const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
+    const _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl : (_avaB64 || newConfig.defaultAvatar || '');
+    if (_avaSrc) _chatAvaEl.src = _avaSrc;
+  }
+
+  // 10. 更新主页信息条
+  if (typeof _updateMainCharInfo === 'function') setTimeout(_updateMainCharInfo, 100);
+
   // 9. 同步云端
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
 
@@ -363,11 +381,19 @@ function initCharacterSystem() {
 // ── 应用角色默认头像 ──────────────────────────────────────
 function applyCharacterAvatar(config) {
   if (!config) config = getCurrentCharacterConfig();
-  const customAvatar = localStorage.getItem('ghostAvatarUrl');
-  const customBase64 = localStorage.getItem('ghostAvatarBase64');
-  const avatarSrc = (customAvatar && !customAvatar.startsWith('data:'))
-    ? customAvatar
-    : (customBase64 || config.defaultAvatar || '');
+
+  // Ghost 用云端自定义头像，Keegan 用本地默认头像
+  let avatarSrc = '';
+  if (config.id === 'ghost') {
+    const customAvatar = localStorage.getItem('ghostAvatarUrl') || '';
+    const customBase64 = localStorage.getItem('ghostAvatarBase64') || '';
+    avatarSrc = (customAvatar && !customAvatar.startsWith('data:'))
+      ? customAvatar
+      : (customBase64 || config.defaultAvatar || '');
+  } else {
+    avatarSrc = config.defaultAvatar || '';
+  }
+
   if (!avatarSrc) return;
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
     el.src = avatarSrc;

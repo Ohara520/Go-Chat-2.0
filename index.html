@@ -529,10 +529,10 @@
               style="width:42px;height:42px;border-radius:50%;object-fit:cover;
               border:2px solid rgba(255,255,255,0.85);
               box-shadow:0 2px 8px rgba(80,140,55,0.15);display:none;"
-              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-            <div style="display:none;width:42px;height:42px;border-radius:50%;
+              onerror="this.style.display='none';document.getElementById('mainCharAvaFallback').style.display='flex'">
+            <div id="mainCharAvaFallback" style="width:42px;height:42px;border-radius:50%;
               background:linear-gradient(135deg,rgba(155,205,125,0.5),rgba(90,154,70,0.4));
-              align-items:center;justify-content:center;font-size:20px;
+              display:flex;align-items:center;justify-content:center;font-size:20px;
               border:2px solid rgba(255,255,255,0.85);">👤</div>
             <div id="mainCharOnline" style="position:absolute;bottom:1px;right:1px;
               width:10px;height:10px;border-radius:50%;background:#4ade80;
@@ -1875,13 +1875,23 @@ function _updateMainCharInfo() {
 
   if (nameEl) nameEl.textContent = config.name;
   if (subEl) subEl.textContent = config.fullName + ' · ' + config.location;
-  // 优先用云端自定义头像，没有才用角色默认头像
-  const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
-  const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
-  const _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl : (_avaB64 || config.defaultAvatar || '');
-  if (avatarEl) {
-    if (_avaSrc) { avatarEl.src = _avaSrc; avatarEl.style.display = 'block'; }
-    else { avatarEl.style.display = 'none'; }
+  // Ghost 用云端自定义头像，Keegan 用默认头像
+  let _avaSrc = '';
+  if (config.id === 'ghost') {
+    const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
+    const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
+    _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl : (_avaB64 || config.defaultAvatar || '');
+  } else {
+    _avaSrc = config.defaultAvatar || '';
+  }
+  const _avaFallback = document.getElementById('mainCharAvaFallback');
+  if (avatarEl && _avaSrc) {
+    avatarEl.src = _avaSrc;
+    avatarEl.style.display = 'block';
+    if (_avaFallback) _avaFallback.style.display = 'none';
+  } else {
+    if (avatarEl) avatarEl.style.display = 'none';
+    if (_avaFallback) _avaFallback.style.display = 'flex';
   }
   if (descEl) descEl.textContent = '与' + config.name + '聊天';
   if (onlineEl) onlineEl.style.background = config.id === 'keegan' ? '#60c4e0' : '#4ade80';
