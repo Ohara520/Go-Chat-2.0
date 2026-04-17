@@ -156,12 +156,19 @@ async function switchCharacter(newCharId) {
   _saveCharacterData(currentCharId);
 
   // 2. 重置 chatHistory 运行时变量（防止旧数据残留）
+  // 注意：必须完全清空，包括 _system 消息，否则旧角色的系统消息会污染新角色
   if (typeof chatHistory !== 'undefined') {
     window.chatHistory = [];
   }
   if (typeof _globalTurnCount !== 'undefined') {
     window._globalTurnCount = 0;
   }
+  // sessionStorage 里的临时状态也清掉（心声、吃醋状态等）
+  sessionStorage.removeItem('ghostState');
+  sessionStorage.removeItem('loveOverride');
+  sessionStorage.removeItem('jealousyReferent');
+  sessionStorage.removeItem('recentInnerThoughts');
+  sessionStorage.removeItem('thisRoundCareAction');
 
   // 3. 切换角色
   localStorage.setItem('currentCharacter', newCharId);
@@ -186,6 +193,12 @@ async function switchCharacter(newCharId) {
   applyCharacterAvatar(newConfig);
 
   // 8. 刷新 UI
+  // 切换角色需要强制清空聊天区域重新渲染，不能只追加
+  const _msgContainer = document.querySelector('#chatScreen .messages');
+  if (_msgContainer) _msgContainer.innerHTML = '';
+  // 重置渲染计数，让 refreshChatScreen 重新从头渲染
+  if (typeof _renderedMsgCount !== 'undefined') window._renderedMsgCount = 0;
+  if (typeof _chatInited !== 'undefined') window._chatInited = false;
   if (typeof refreshChatScreen === 'function') refreshChatScreen();
   if (typeof renderWallet === 'function') renderWallet();
   if (typeof initMood === 'function') initMood();

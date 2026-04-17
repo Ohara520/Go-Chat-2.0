@@ -525,10 +525,10 @@
           box-shadow:0 3px 12px rgba(80,140,55,0.08);
           display:flex;align-items:center;gap:12px;">
           <div style="position:relative;flex-shrink:0;">
-            <img id="mainCharAvatar" src="images/ghost-avatar.png"
+            <img id="mainCharAvatar" src=""
               style="width:42px;height:42px;border-radius:50%;object-fit:cover;
               border:2px solid rgba(255,255,255,0.85);
-              box-shadow:0 2px 8px rgba(80,140,55,0.15);"
+              box-shadow:0 2px 8px rgba(80,140,55,0.15);display:none;"
               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
             <div style="display:none;width:42px;height:42px;border-radius:50%;
               background:linear-gradient(135deg,rgba(155,205,125,0.5),rgba(90,154,70,0.4));
@@ -693,7 +693,7 @@
       <div class="chat-header">
         <div class="chat-header-left">
           <button class="chat-back-btn" onclick="openScreen('mainScreen')" title="返回">‹</button>
-          <div class="ghost-avatar" onclick="openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);" style="background:none;padding:0;overflow:visible;">
+          <div class="ghost-avatar" onclick="if(typeof getCurrentCharacter==='function'&&getCurrentCharacter()==='keegan'){if(typeof showToast==='function')showToast('🔒 Keegan 资料即将开放～');return;}openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);" style="background:none;padding:0;overflow:visible;">
             <img src="images/ghost-avatar.jpg" class="ghost-avatar-img" style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.7);">
             <div class="online-indicator"></div>
           </div>
@@ -922,7 +922,7 @@
   <div class="screen" id="coupleScreen">
 
     <div class="couple-page-header">
-      <button class="couple-back-btn" onclick="openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);">‹</button>
+      <button class="couple-back-btn" onclick="if(typeof getCurrentCharacter==='function'&&getCurrentCharacter()==='keegan'){if(typeof showToast==='function')showToast('🔒 Keegan 资料即将开放～');return;}openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);">‹</button>
       <div class="couple-page-title">Love Space</div>
     </div>
 
@@ -1762,9 +1762,12 @@ document.addEventListener('DOMContentLoaded', () => {
     transition:transform 0.15s;" ontouchstart=""
     onmousedown="this.style.transform='scale(0.98)'"
     onmouseup="this.style.transform=''">
-    <img src="images/ghost-avatar.png" style="width:48px;height:48px;border-radius:50%;
-      object-fit:cover;border:2px solid rgba(255,255,255,0.9);flex-shrink:0;"
-      onerror="this.style.display='none'">
+    <img id="charSelectGhostAva" src="" style="width:48px;height:48px;border-radius:50%;
+      object-fit:cover;border:2px solid rgba(255,255,255,0.9);flex-shrink:0;display:none;">
+    <div id="charSelectGhostAvaFallback" style="width:48px;height:48px;border-radius:50%;
+      background:linear-gradient(135deg,rgba(155,205,125,0.5),rgba(90,154,70,0.4));
+      display:flex;align-items:center;justify-content:center;font-size:22px;
+      border:2px solid rgba(255,255,255,0.9);flex-shrink:0;">👤</div>
     <div style="flex:1;">
       <div style="font-size:16px;font-weight:700;color:#1e3d20;">Ghost</div>
       <div style="font-size:11px;color:rgba(40,80,35,0.5);margin-top:2px;">Simon Riley · Manchester, UK</div>
@@ -1863,7 +1866,14 @@ function _updateMainCharInfo() {
 
   if (nameEl) nameEl.textContent = config.name;
   if (subEl) subEl.textContent = config.fullName + ' · ' + config.location;
-  if (avatarEl) avatarEl.src = config.defaultAvatar || '';
+  // 优先用云端自定义头像，没有才用角色默认头像
+  const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
+  const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
+  const _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl : (_avaB64 || config.defaultAvatar || '');
+  if (avatarEl) {
+    if (_avaSrc) { avatarEl.src = _avaSrc; avatarEl.style.display = 'block'; }
+    else { avatarEl.style.display = 'none'; }
+  }
   if (descEl) descEl.textContent = '与' + config.name + '聊天';
   if (onlineEl) onlineEl.style.background = config.id === 'keegan' ? '#60c4e0' : '#4ade80';
 
@@ -1879,7 +1889,7 @@ function _updateMainCharInfo() {
   }
 }
 
-// 更新弹窗里的天数
+// 更新弹窗里的天数 + Ghost 头像
 function _updateCharSelectDays() {
   const marriageDate = localStorage.getItem('marriageDate');
   const ghostDaysEl = document.getElementById('charDays-ghost');
@@ -1890,6 +1900,18 @@ function _updateCharSelectDays() {
   }
   if (keeganDaysEl) {
     keeganDaysEl.textContent = '点击开始 · 第一天';
+  }
+
+  // 更新弹窗里 Ghost 的头像
+  const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
+  const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
+  const _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl : _avaB64;
+  const ghostAvaEl = document.getElementById('charSelectGhostAva');
+  const ghostAvaFb = document.getElementById('charSelectGhostAvaFallback');
+  if (ghostAvaEl && _avaSrc) {
+    ghostAvaEl.src = _avaSrc;
+    ghostAvaEl.style.display = 'block';
+    if (ghostAvaFb) ghostAvaFb.style.display = 'none';
   }
 }
 
