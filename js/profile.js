@@ -1173,7 +1173,10 @@ function renderAlbum() {
 async function generatePhoneMemo() {
   const todayKey = new Date().toISOString().slice(0, 10);
   const cached = localStorage.getItem('phoneMemoDate');
-  if (cached === todayKey && localStorage.getItem('phoneMemoTasks')) return;
+  const cachedTasks = localStorage.getItem('phoneMemoTasks') || '';
+  // 旧的英文缓存（没有中文字符）强制重新生成
+  const isOldEnglish = cachedTasks.includes('—') && !/[一-龥]/.test(cachedTasks);
+  if (cached === todayKey && cachedTasks && !isOldEnglish) return;
 
   const location   = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locType    = localStorage.getItem('currentLocationType') || 'base';
@@ -1200,16 +1203,16 @@ async function generatePhoneMemo() {
     ? `He is on leave in ${location}.`
     : `He is at ${location}.`;
 
-  const prompt = `You are writing Ghost's phone memo/task list for today. ${locHint} ${stateHint}
+  const prompt = `你是Ghost，正在写今天的手机备忘录。${locHint} ${stateHint}
 
-Write exactly 3 short task items for his day. Rules:
-- Each item starts with "—"
-- Mix: 1-2 military/operational tasks, 1 personal/mundane task
-- Mark one already done with " ✓" at the end
-- One item may subtly reference her without being obvious (e.g. "pick up the thing she mentioned" or "call back" — not explicit)
-- Keep each item under 8 words
-- English only, lowercase
-- Output only the 3 lines, nothing else`;
+用第一人称写3条简短的备忘事项。规则：
+- 每条以"—"开头
+- 混合：1-2条军事/任务相关，1条日常/私人事项
+- 其中一条已完成，在末尾加"✓"
+- 可以有一条隐晦地提到她（比如"把她说的那个带回来"或"回个消息"——不要太直白）
+- 每条不超过10个字
+- 用第一人称，不要提自己的名字（不要写"Ghost"或"Simon"）
+- 只输出3行，不要其他内容`;
 
   try {
     const res = await fetch('/api/chat', {

@@ -1963,12 +1963,14 @@ function _updateCharSelectDays() {
   }
 
   // 更新弹窗里 Ghost 的头像
+  // 优先用 ghostAvatarUrl（Supabase云端），没有就用本地默认头像
   const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
   const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
-  const _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl : _avaB64;
+  const _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl
+    : (_avaB64 || 'images/ghost-avatar.png');
   const ghostAvaEl = document.getElementById('charSelectGhostAva');
   const ghostAvaFb = document.getElementById('charSelectGhostAvaFallback');
-  if (ghostAvaEl && _avaSrc) {
+  if (ghostAvaEl) {
     ghostAvaEl.src = _avaSrc;
     ghostAvaEl.style.display = 'block';
     if (ghostAvaFb) ghostAvaFb.style.display = 'none';

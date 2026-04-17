@@ -852,18 +852,18 @@ function openDeliveryComplaint() {
         </button>
       </div>`;
   } else {
+    // 用 data-id 替代内联 onclick，更兼容 Android
     const listHtml = eligible.map(d => `
-      <div onclick="window._selectComplaint('${d.id}')"
-        id="complaint_item_${d.id}"
+      <div data-complaint-id="${d.id}"
         style="background:rgba(255,255,255,0.7);border:1.5px solid rgba(100,170,70,0.25);border-radius:16px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all 0.15s;">
-        <div style="font-size:28px;">${d.emoji || '📦'}</div>
-        <div style="flex:1;">
+        <div style="font-size:28px;pointer-events:none;">${d.emoji || '📦'}</div>
+        <div style="flex:1;pointer-events:none;">
           <div style="font-size:14px;font-weight:600;color:#1e3d20;">${d.name}</div>
           <div style="font-size:11px;color:rgba(40,90,30,0.5);margin-top:2px;">
             丢失于 ${new Date(d.lostConfirmedAt || d.doneAt).toLocaleDateString('zh-CN')} · £${d.productData?.price || 0}
           </div>
         </div>
-        <div style="font-size:18px;color:rgba(60,130,40,0.4);">›</div>
+        <div style="font-size:18px;color:rgba(60,130,40,0.4);pointer-events:none;">›</div>
       </div>`).join('');
 
     overlay.innerHTML = `
@@ -882,17 +882,22 @@ function openDeliveryComplaint() {
       </div>`;
   }
 
-  // 修复：先定义函数再 appendChild，防止点击太快函数未注册
-  window._selectComplaint = (id) => {
-    const _ov = document.getElementById('complaintModalOverlay');
-    if (_ov) _ov.remove();
-    delete window._selectComplaint;
-    _runComplaintSearch(id, all);
-  };
-
-  // 修复：用事件委托替代内联 onclick，防止冒泡关闭弹窗
+  // 事件委托：统一在 overlay 上监听，用 data-complaint-id 识别点击目标
   overlay.addEventListener('click', e => {
-    // 只有点遮罩背景本身才关闭
+    // 找到最近的有 data-complaint-id 的父元素
+    const item = e.target.closest('[data-complaint-id]');
+    if (item) {
+      const id = item.getAttribute('data-complaint-id');
+      overlay.remove();
+      _runComplaintSearch(id, all);
+      return;
+    }
+    // 点击取消按钮
+    if (e.target.closest('button')) {
+      overlay.remove();
+      return;
+    }
+    // 点击遮罩背景关闭
     if (e.target === overlay) overlay.remove();
   });
 
