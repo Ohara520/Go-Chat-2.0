@@ -516,10 +516,52 @@
 
 <div class="screen" id="mainScreen">
     <div class="main-content">
+
+      <!-- 角色信息条 + 切换按钮 -->
+      <div style="display:flex;align-items:center;gap:10px;padding:4px 2px 8px;">
+        <div style="flex:1;background:rgba(255,255,255,0.62);backdrop-filter:blur(14px);
+          -webkit-backdrop-filter:blur(14px);border-radius:18px;padding:10px 14px;
+          border:1px solid rgba(255,255,255,0.85);
+          box-shadow:0 3px 12px rgba(80,140,55,0.08);
+          display:flex;align-items:center;gap:12px;">
+          <div style="position:relative;flex-shrink:0;">
+            <img id="mainCharAvatar" src="images/ghost-avatar.png"
+              style="width:42px;height:42px;border-radius:50%;object-fit:cover;
+              border:2px solid rgba(255,255,255,0.85);
+              box-shadow:0 2px 8px rgba(80,140,55,0.15);"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div style="display:none;width:42px;height:42px;border-radius:50%;
+              background:linear-gradient(135deg,rgba(155,205,125,0.5),rgba(90,154,70,0.4));
+              align-items:center;justify-content:center;font-size:20px;
+              border:2px solid rgba(255,255,255,0.85);">👤</div>
+            <div id="mainCharOnline" style="position:absolute;bottom:1px;right:1px;
+              width:10px;height:10px;border-radius:50%;background:#4ade80;
+              border:2px solid white;"></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div id="mainCharName" style="font-size:15px;font-weight:700;color:#1e3d20;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ghost</div>
+            <div id="mainCharSub" style="font-size:10px;color:rgba(40,80,35,0.5);margin-top:1px;">
+              Simon Riley · Manchester, UK</div>
+            <div id="mainCharDays" style="font-size:10px;color:rgba(40,80,35,0.38);margin-top:2px;"></div>
+          </div>
+        </div>
+        <!-- 切换按钮 -->
+        <button onclick="openCharacterSelect()" style="
+          width:42px;height:42px;border-radius:50%;flex-shrink:0;
+          background:rgba(255,255,255,0.62);backdrop-filter:blur(14px);
+          -webkit-backdrop-filter:blur(14px);
+          border:1px solid rgba(255,255,255,0.85);
+          box-shadow:0 3px 12px rgba(80,140,55,0.08);
+          font-size:18px;cursor:pointer;display:flex;
+          align-items:center;justify-content:center;
+          transition:transform 0.2s;" title="切换角色">⇄</button>
+      </div>
+
       <div class="card card-large" onclick="openScreen('chatScreen')">
         <div class="card-icon">💬</div>
         <div class="card-title">聊天</div>
-        <div class="card-desc">与Ghost聊天</div>
+        <div class="card-desc" id="mainChatDesc">与Ghost聊天</div>
       </div>
       <div class="card" id="calendarCard" onclick="openScreen('calendarScreen');setTimeout(()=>{if(typeof initCalendar==='function')initCalendar();},80);">
         <div class="card-icon" id="calendarCardIcon">📅</div>
@@ -1683,6 +1725,179 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/sticker.js"></script>
 <script src="js/chat_init.js"></script>
 <script src="js/app.js"></script>
+
+<!-- ═══ 选角弹窗 ═══ -->
+<div id="charSelectOverlay" style="
+  display:none;position:fixed;inset:0;z-index:9998;
+  background:rgba(0,0,0,0.45);backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);"
+  onclick="if(event.target===this)closeCharacterSelect()">
+</div>
+
+<div id="charSelectModal" style="
+  display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:480px;z-index:9999;
+  background:linear-gradient(160deg,#d8edd8,#e8f5e0);
+  border-radius:28px 28px 0 0;
+  padding:20px 20px calc(32px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 36px rgba(80,140,55,0.18);
+  border-top:1px solid rgba(255,255,255,0.85);
+  animation:slideUpModal 0.3s ease;">
+
+  <div style="width:36px;height:4px;background:rgba(120,180,90,0.35);
+    border-radius:2px;margin:0 auto 20px;"></div>
+
+  <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
+    color:rgba(40,80,35,0.4);text-align:center;margin-bottom:6px;">切换角色</div>
+  <div style="font-family:'Georgia',serif;font-size:18px;font-weight:400;
+    color:#1e3d20;text-align:center;margin-bottom:20px;">选择你的伴侣</div>
+
+  <!-- Ghost 卡片 -->
+  <div onclick="selectCharacterAndClose('ghost')" id="charCard-ghost" style="
+    background:linear-gradient(135deg,rgba(155,210,125,0.35),rgba(185,228,150,0.28));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-radius:20px;padding:14px 16px;margin-bottom:12px;
+    border:1.5px solid rgba(120,180,90,0.35);cursor:pointer;
+    box-shadow:0 4px 16px rgba(80,140,55,0.1);
+    display:flex;align-items:center;gap:14px;
+    transition:transform 0.15s;" ontouchstart=""
+    onmousedown="this.style.transform='scale(0.98)'"
+    onmouseup="this.style.transform=''">
+    <img src="images/ghost-avatar.png" style="width:48px;height:48px;border-radius:50%;
+      object-fit:cover;border:2px solid rgba(255,255,255,0.9);flex-shrink:0;"
+      onerror="this.style.display='none'">
+    <div style="flex:1;">
+      <div style="font-size:16px;font-weight:700;color:#1e3d20;">Ghost</div>
+      <div style="font-size:11px;color:rgba(40,80,35,0.5);margin-top:2px;">Simon Riley · Manchester, UK</div>
+      <div id="charDays-ghost" style="font-size:10px;color:rgba(40,80,35,0.38);margin-top:3px;"></div>
+    </div>
+    <div id="charCheck-ghost" style="font-size:18px;display:none;">✅</div>
+    <div style="font-size:16px;color:rgba(40,80,35,0.3);">›</div>
+  </div>
+
+  <!-- Keegan 卡片 -->
+  <div onclick="selectCharacterAndClose('keegan')" id="charCard-keegan" style="
+    background:linear-gradient(135deg,rgba(100,165,205,0.28),rgba(130,190,220,0.22));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-radius:20px;padding:14px 16px;margin-bottom:12px;
+    border:1.5px solid rgba(100,160,195,0.35);cursor:pointer;
+    box-shadow:0 4px 16px rgba(40,100,140,0.08);
+    display:flex;align-items:center;gap:14px;
+    transition:transform 0.15s;" ontouchstart=""
+    onmousedown="this.style.transform='scale(0.98)'"
+    onmouseup="this.style.transform=''">
+    <img src="images/keegan-avatar.png" style="width:48px;height:48px;border-radius:50%;
+      object-fit:cover;border:2px solid rgba(255,255,255,0.9);flex-shrink:0;"
+      onerror="this.style.display='none'">
+    <div style="flex:1;">
+      <div style="font-size:16px;font-weight:700;color:#1a3a50;">Keegan</div>
+      <div style="font-size:11px;color:rgba(26,58,80,0.5);margin-top:2px;">Keegan P. Russ · Texas, USA</div>
+      <div id="charDays-keegan" style="font-size:10px;color:rgba(40,80,35,0.38);margin-top:3px;"></div>
+    </div>
+    <div id="charCheck-keegan" style="font-size:18px;display:none;">✅</div>
+    <div style="font-size:16px;color:rgba(40,80,35,0.3);">›</div>
+  </div>
+
+  <button onclick="closeCharacterSelect()" style="
+    width:100%;padding:13px;border:none;border-radius:14px;
+    background:rgba(120,180,90,0.15);color:rgba(40,80,35,0.5);
+    font-size:13px;cursor:pointer;font-family:inherit;">取消</button>
+</div>
+
+<style>
+@keyframes slideUpModal {
+  from { transform:translateX(-50%) translateY(100%); opacity:0; }
+  to   { transform:translateX(-50%) translateY(0); opacity:1; }
+}
+</style>
+
+<script>
+// ── 选角弹窗 ──
+function openCharacterSelect() {
+  const overlay = document.getElementById('charSelectOverlay');
+  const modal = document.getElementById('charSelectModal');
+  if (!overlay || !modal) return;
+
+  // 更新当前角色勾选状态
+  const cur = typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : 'ghost';
+  ['ghost','keegan'].forEach(id => {
+    const check = document.getElementById('charCheck-' + id);
+    const card = document.getElementById('charCard-' + id);
+    if (check) check.style.display = id === cur ? 'block' : 'none';
+    if (card) card.style.border = id === cur
+      ? '1.5px solid rgba(90,160,70,0.5)'
+      : '1.5px solid rgba(255,255,255,0.9)';
+  });
+
+  // 更新天数
+  _updateCharSelectDays();
+
+  overlay.style.display = 'block';
+  modal.style.display = 'block';
+}
+
+function closeCharacterSelect() {
+  document.getElementById('charSelectOverlay').style.display = 'none';
+  document.getElementById('charSelectModal').style.display = 'none';
+}
+
+function selectCharacterAndClose(charId) {
+  closeCharacterSelect();
+  if (typeof switchCharacter === 'function') {
+    switchCharacter(charId);
+    // 更新主页信息条
+    setTimeout(_updateMainCharInfo, 300);
+  }
+}
+
+// 更新主页角色信息条
+function _updateMainCharInfo() {
+  const config = typeof getCurrentCharacterConfig === 'function'
+    ? getCurrentCharacterConfig() : null;
+  if (!config) return;
+
+  const nameEl = document.getElementById('mainCharName');
+  const subEl = document.getElementById('mainCharSub');
+  const daysEl = document.getElementById('mainCharDays');
+  const avatarEl = document.getElementById('mainCharAvatar');
+  const descEl = document.getElementById('mainChatDesc');
+  const onlineEl = document.getElementById('mainCharOnline');
+
+  if (nameEl) nameEl.textContent = config.name;
+  if (subEl) subEl.textContent = config.fullName + ' · ' + config.location;
+  if (avatarEl) avatarEl.src = config.defaultAvatar || '';
+  if (descEl) descEl.textContent = '与' + config.name + '聊天';
+  if (onlineEl) onlineEl.style.background = config.id === 'keegan' ? '#60c4e0' : '#4ade80';
+
+  // 相处天数
+  if (daysEl) {
+    const marriageDate = localStorage.getItem('marriageDate');
+    if (marriageDate) {
+      const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
+      daysEl.textContent = '已相处 · ' + days + '天';
+    } else {
+      daysEl.textContent = config.id === 'keegan' ? '点击开始 · 第一天' : '';
+    }
+  }
+}
+
+// 更新弹窗里的天数
+function _updateCharSelectDays() {
+  const marriageDate = localStorage.getItem('marriageDate');
+  const ghostDaysEl = document.getElementById('charDays-ghost');
+  const keeganDaysEl = document.getElementById('charDays-keegan');
+  if (ghostDaysEl && marriageDate) {
+    const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
+    ghostDaysEl.textContent = '已相处 · ' + days + '天';
+  }
+  if (keeganDaysEl) {
+    keeganDaysEl.textContent = '点击开始 · 第一天';
+  }
+}
+
+// 页面加载时初始化主页信息条
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(_updateMainCharInfo, 500);
+});
+</script>
 
 <!-- ═══ 底部 Tab Bar ═══ -->
 <div id="mainTabBar" style="
