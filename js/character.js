@@ -382,18 +382,8 @@ function initCharacterSystem() {
 function applyCharacterAvatar(config) {
   if (!config) config = getCurrentCharacterConfig();
 
-  // Ghost 用云端自定义头像，Keegan 用本地默认头像
-  let avatarSrc = '';
-  if (config.id === 'ghost') {
-    const customAvatar = localStorage.getItem('ghostAvatarUrl') || '';
-    const customBase64 = localStorage.getItem('ghostAvatarBase64') || '';
-    avatarSrc = (customAvatar && !customAvatar.startsWith('data:'))
-      ? customAvatar
-      : (customBase64 || config.defaultAvatar || '');
-  } else {
-    avatarSrc = config.defaultAvatar || '';
-  }
-
+  // 直接用本地头像文件
+  const avatarSrc = config.defaultAvatar || '';
   if (!avatarSrc) return;
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
     el.src = avatarSrc;

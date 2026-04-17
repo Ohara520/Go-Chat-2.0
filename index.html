@@ -518,7 +518,7 @@
     <div class="main-content">
 
       <!-- 角色信息条 + 切换按钮 -->
-      <div style="display:flex;align-items:center;gap:10px;padding:4px 2px 8px;">
+      <div style="display:flex;align-items:center;gap:10px;padding:4px 2px 8px;grid-column: 1 / -1;">
         <div style="flex:1;background:rgba(255,255,255,0.62);backdrop-filter:blur(14px);
           -webkit-backdrop-filter:blur(14px);border-radius:18px;padding:10px 14px;
           border:1px solid rgba(255,255,255,0.85);
@@ -1842,13 +1842,15 @@ function closeCharacterSelect() {
   document.getElementById('charSelectModal').style.display = 'none';
 }
 
-function selectCharacterAndClose(charId) {
-  closeCharacterSelect();
+async function selectCharacterAndClose(charId) {
+  // 先等 switchCharacter 完全执行完，再关弹窗
+  // 防止切换还没完成用户就进聊天页发消息
   if (typeof switchCharacter === 'function') {
-    switchCharacter(charId);
-    // 更新主页信息条
-    setTimeout(_updateMainCharInfo, 300);
+    await switchCharacter(charId);
   }
+  closeCharacterSelect();
+  // 更新主页信息条
+  setTimeout(_updateMainCharInfo, 200);
 }
 
 // 更新主页角色信息条
@@ -1877,13 +1879,8 @@ function _updateMainCharInfo() {
   if (subEl) subEl.textContent = config.fullName + ' · ' + config.location;
   // Ghost 用云端自定义头像，Keegan 用默认头像
   let _avaSrc = '';
-  if (config.id === 'ghost') {
-    const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
-    const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
-    _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl : (_avaB64 || config.defaultAvatar || '');
-  } else {
-    _avaSrc = config.defaultAvatar || '';
-  }
+  // 两个角色都直接用本地头像文件
+  _avaSrc = config.defaultAvatar || '';
   const _avaFallback = document.getElementById('mainCharAvaFallback');
   if (avatarEl && _avaSrc) {
     avatarEl.src = _avaSrc;
