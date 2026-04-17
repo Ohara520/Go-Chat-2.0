@@ -217,13 +217,14 @@ async function switchCharacter(newCharId) {
   applyCharacterAvatar(newConfig);
 
   // 8. 刷新 UI
-  // 切换角色需要强制清空聊天区域重新渲染，不能只追加
+  // 强制清空聊天区域 + 所有渲染状态，防止重复渲染
   const _msgContainer = document.querySelector('#chatScreen .messages');
   if (_msgContainer) _msgContainer.innerHTML = '';
-  // 重置渲染计数，让 refreshChatScreen 重新从头渲染
-  if (typeof _renderedMsgCount !== 'undefined') window._renderedMsgCount = 0;
-  if (typeof _chatInited !== 'undefined') window._chatInited = false;
-  if (typeof refreshChatScreen === 'function') refreshChatScreen();
+  // 完全重置渲染状态
+  window._renderedMsgCount = 0;
+  window._chatInited = false;
+  // 不主动调用 refreshChatScreen，等用户进入聊天页时自动触发 initChat
+  // 这样避免在主页时就渲染聊天内容导致重复
   if (typeof renderWallet === 'function') renderWallet();
   if (typeof initMood === 'function') initMood();
 

@@ -1777,26 +1777,29 @@ document.addEventListener('DOMContentLoaded', () => {
     <div style="font-size:16px;color:rgba(40,80,35,0.3);">›</div>
   </div>
 
-  <!-- Keegan 卡片 -->
-  <div onclick="selectCharacterAndClose('keegan')" id="charCard-keegan" style="
-    background:linear-gradient(135deg,rgba(100,165,205,0.28),rgba(130,190,220,0.22));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  <!-- Keegan 卡片 — 即将上线 -->
+  <div id="charCard-keegan" style="
+    background:linear-gradient(135deg,rgba(100,165,205,0.15),rgba(130,190,220,0.12));
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-radius:20px;padding:14px 16px;margin-bottom:12px;
-    border:1.5px solid rgba(100,160,195,0.35);cursor:pointer;
-    box-shadow:0 4px 16px rgba(40,100,140,0.08);
+    border:1.5px solid rgba(100,160,195,0.2);
+    box-shadow:0 4px 16px rgba(40,100,140,0.05);
     display:flex;align-items:center;gap:14px;
-    transition:transform 0.15s;" ontouchstart=""
-    onmousedown="this.style.transform='scale(0.98)'"
-    onmouseup="this.style.transform=''">
+    opacity:0.6;filter:grayscale(30%);cursor:default;">
     <img src="images/keegan-avatar.png" style="width:48px;height:48px;border-radius:50%;
-      object-fit:cover;border:2px solid rgba(255,255,255,0.9);flex-shrink:0;"
+      object-fit:cover;border:2px solid rgba(255,255,255,0.7);flex-shrink:0;"
       onerror="this.style.display='none'">
     <div style="flex:1;">
-      <div style="font-size:16px;font-weight:700;color:#1a3a50;">Keegan</div>
-      <div style="font-size:11px;color:rgba(26,58,80,0.5);margin-top:2px;">Keegan P. Russ · Texas, USA</div>
-      <div id="charDays-keegan" style="font-size:10px;color:rgba(40,80,35,0.38);margin-top:3px;"></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="font-size:16px;font-weight:700;color:#1a3a50;">Keegan</div>
+        <div style="font-size:9px;font-weight:700;color:white;
+          background:linear-gradient(135deg,#3a7a96,#5aaac6);
+          padding:2px 8px;border-radius:10px;letter-spacing:1px;">即将上线</div>
+      </div>
+      <div style="font-size:11px;color:rgba(26,58,80,0.4);margin-top:2px;">Keegan P. Russ · Texas, USA</div>
+      <div style="font-size:10px;color:rgba(26,58,80,0.3);margin-top:3px;">敬请期待</div>
     </div>
-    <div id="charCheck-keegan" style="font-size:18px;display:none;">✅</div>
-    <div style="font-size:16px;color:rgba(40,80,35,0.3);">›</div>
+    <div style="font-size:16px;color:rgba(26,58,80,0.2);">›</div>
   </div>
 
   <button onclick="closeCharacterSelect()" style="
