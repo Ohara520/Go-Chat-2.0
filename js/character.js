@@ -152,7 +152,20 @@ async function switchCharacter(newCharId) {
   const newConfig = CHARACTER_LIST.find(c => c.id === newCharId);
   if (!newConfig) { console.warn('[character] 未知角色:', newCharId); return; }
 
-  // 1. 保存当前角色数据
+  // 1. 先把内存里最新的 chatHistory 写进 localStorage，再保存
+  // 否则 _saveCharacterData 存的是旧的，最新消息会丢
+  if (typeof chatHistory !== 'undefined' && Array.isArray(chatHistory)) {
+    try {
+      const toSave = chatHistory
+        .filter(m => !m._recalled)
+        .slice(-300)
+        .map(m => ({ role: m.role, content: m.content,
+          ...(m._system ? { _system: true } : {}),
+          ...(m._intimate ? { _intimate: true } : {}),
+        }));
+      localStorage.setItem('chatHistory', JSON.stringify(toSave));
+    } catch(e) {}
+  }
   _saveCharacterData(currentCharId);
 
   // 2. 重置 chatHistory 运行时变量（防止旧数据残留）
@@ -173,16 +186,21 @@ async function switchCharacter(newCharId) {
   // 3. 切换角色
   localStorage.setItem('currentCharacter', newCharId);
 
-  // 4. 加载新角色数据
+  // 4. 先清空 localStorage 里的 chatHistory，防止加载新角色时读到旧的
+  localStorage.removeItem('chatHistory');
+
+  // 4b. 加载新角色数据
   _loadCharacterData(newCharId);
 
-  // 5. 重新读取 chatHistory 到内存
+  // 5. 重新读取 chatHistory 到内存（新角色的，可能是空的）
   try {
     const saved = localStorage.getItem('chatHistory');
-    if (saved && typeof chatHistory !== 'undefined') {
-      window.chatHistory = JSON.parse(saved);
+    if (typeof chatHistory !== 'undefined') {
+      window.chatHistory = saved ? JSON.parse(saved) : [];
     }
-  } catch(e) {}
+  } catch(e) {
+    if (typeof chatHistory !== 'undefined') window.chatHistory = [];
+  }
 
   // 6. 重新读取 globalTurnCount
   const tc = parseInt(localStorage.getItem('globalTurnCount') || '0');
