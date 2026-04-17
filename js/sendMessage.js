@@ -293,6 +293,11 @@ function autoUnlockFromReply(reply) {
 
 // ===== 历史保存 =====
 function saveHistory() {
+  // 切换角色过程中不允许自动保存，防止覆盖刚切换好的数据
+  if (window._characterSwitching) {
+    console.warn('[saveHistory] 跳过：角色切换中');
+    return;
+  }
   // 保护：空数组或只有系统消息时不写，防止覆盖真实记录
   const realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
   if (realMsgs.length === 0) {

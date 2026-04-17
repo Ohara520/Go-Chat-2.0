@@ -1843,14 +1843,55 @@ function closeCharacterSelect() {
 }
 
 async function selectCharacterAndClose(charId) {
-  // 先等 switchCharacter 完全执行完，再关弹窗
-  // 防止切换还没完成用户就进聊天页发消息
-  if (typeof switchCharacter === 'function') {
-    await switchCharacter(charId);
-  }
+  // 关弹窗
   closeCharacterSelect();
+
+  // 显示切换 loading
+  const _loading = document.getElementById('charSwitchLoading');
+  const _loadingAvatar = document.getElementById('switchLoadingAvatar');
+  const _loadingName = document.getElementById('switchLoadingName');
+  const _loadingRing = document.getElementById('switchLoadingRing');
+
+  // 找到目标角色配置
+  const _targetConfig = typeof CHARACTER_LIST !== 'undefined'
+    ? CHARACTER_LIST.find(c => c.id === charId) : null;
+
+  if (_loading) {
+    // 设置头像和名字
+    if (_loadingAvatar && _targetConfig) _loadingAvatar.src = _targetConfig.defaultAvatar || '';
+    if (_loadingName && _targetConfig) _loadingName.textContent = _targetConfig.name;
+    _loading.style.display = 'flex';
+
+    // 进度条动画
+    let _progress = 0;
+    const _ringInterval = setInterval(() => {
+      _progress = Math.min(_progress + 4, 90); // 最多到90%，等切换完成才到100%
+      if (_loadingRing) _loadingRing.style.strokeDashoffset = 251 - (251 * _progress / 100);
+    }, 80);
+
+    // 等切换完成
+    if (typeof switchCharacter === 'function') {
+      await switchCharacter(charId);
+    }
+
+    // 进度条冲到100%
+    clearInterval(_ringInterval);
+    if (_loadingRing) _loadingRing.style.strokeDashoffset = 0;
+
+    // 再等一点让用户看到完成状态
+    await new Promise(r => setTimeout(r, 400));
+
+    // 隐藏 loading
+    _loading.style.display = 'none';
+  } else {
+    // 没有 loading 元素就直接切换
+    if (typeof switchCharacter === 'function') {
+      await switchCharacter(charId);
+    }
+  }
+
   // 更新主页信息条
-  setTimeout(_updateMainCharInfo, 200);
+  setTimeout(_updateMainCharInfo, 100);
 }
 
 // 更新主页角色信息条
@@ -1936,6 +1977,46 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(_updateMainCharInfo, 500);
 });
 </script>
+
+<!-- ═══ 切换角色 Loading 遮罩 ═══ -->
+<div id="charSwitchLoading" style="
+  display:none; position:fixed; inset:0; z-index:99999;
+  background:rgba(255,255,255,0.85);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  flex-direction:column; align-items:center; justify-content:center; gap:20px;
+">
+  <!-- 头像过渡动画 -->
+  <div style="position:relative;width:80px;height:80px;">
+    <img id="switchLoadingAvatar" src="" style="
+      width:80px;height:80px;border-radius:50%;object-fit:cover;
+      border:3px solid rgba(255,255,255,0.9);
+      box-shadow:0 8px 24px rgba(0,0,0,0.15);
+      animation:switchAvatarPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+    ">
+    <!-- 进度圆环 -->
+    <svg style="position:absolute;inset:-6px;width:92px;height:92px;transform:rotate(-90deg);">
+      <circle cx="46" cy="46" r="40" fill="none" stroke="rgba(200,200,200,0.3)" stroke-width="3"/>
+      <circle id="switchLoadingRing" cx="46" cy="46" r="40" fill="none"
+        stroke="#5a9a46" stroke-width="3" stroke-linecap="round"
+        stroke-dasharray="251" stroke-dashoffset="251"
+        style="transition:stroke-dashoffset 0.1s linear;"/>
+    </svg>
+  </div>
+  <div style="text-align:center;">
+    <div id="switchLoadingName" style="font-size:18px;font-weight:700;color:#1e3d20;margin-bottom:4px;"></div>
+    <div id="switchLoadingStatus" style="font-size:12px;color:rgba(40,80,35,0.5);letter-spacing:0.5px;">正在切换中...</div>
+  </div>
+</div>
+
+<style>
+@keyframes switchAvatarPop {
+  from { transform:scale(0.7); opacity:0; }
+  to   { transform:scale(1); opacity:1; }
+}
+body.theme-keegan #switchLoadingRing { stroke:#3a7a96; }
+body.theme-keegan #switchLoadingName { color:#1a3a50; }
+body.theme-keegan #switchLoadingStatus { color:rgba(26,58,80,0.5); }
+</style>
 
 <!-- ═══ 底部 Tab Bar ═══ -->
 <div id="mainTabBar" style="

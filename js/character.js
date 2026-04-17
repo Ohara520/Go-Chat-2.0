@@ -145,12 +145,18 @@ function _loadCharacterData(charId) {
 }
 
 // ── 切换角色（核心函数）──────────────────────────────────
+// 切换锁：防止切换过程中自动保存干扰
+window._characterSwitching = false;
+
 async function switchCharacter(newCharId) {
   const currentCharId = getCurrentCharacter();
   if (currentCharId === newCharId) return; // 没有变化
 
   const newConfig = CHARACTER_LIST.find(c => c.id === newCharId);
   if (!newConfig) { console.warn('[character] 未知角色:', newCharId); return; }
+
+  // 加锁：防止 sendMessage.js 的自动保存在切换过程中干扰
+  window._characterSwitching = true;
 
   // 1. 先把内存里最新的 chatHistory 写进 localStorage，再保存
   // 否则 _saveCharacterData 存的是旧的，最新消息会丢
@@ -238,6 +244,9 @@ async function switchCharacter(newCharId) {
 
   // 10. 更新主页信息条
   if (typeof _updateMainCharInfo === 'function') setTimeout(_updateMainCharInfo, 100);
+
+  // 解锁：切换完成，允许自动保存
+  window._characterSwitching = false;
 
   // 9. 同步云端
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
