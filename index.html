@@ -1864,6 +1864,15 @@ function _updateMainCharInfo() {
   const descEl = document.getElementById('mainChatDesc');
   const onlineEl = document.getElementById('mainCharOnline');
 
+  // 同时更新聊天页顶部名字
+  const chatNameEl = document.getElementById('chatBotName');
+  if (chatNameEl) {
+    const nickname = localStorage.getItem('botNickname') || '';
+    chatNameEl.textContent = nickname || (config.id === 'keegan'
+      ? 'Keegan P. Russ'
+      : 'Simon "Ghost" Riley');
+  }
+
   if (nameEl) nameEl.textContent = config.name;
   if (subEl) subEl.textContent = config.fullName + ' · ' + config.location;
   // 优先用云端自定义头像，没有才用角色默认头像

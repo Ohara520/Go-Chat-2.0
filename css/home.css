@@ -98,3 +98,43 @@
     .card-title { font-size: 13px; }
     .card-desc  { font-size: 10px; }
 }
+
+
+/* ═══════════════════════════════════════
+   KEEGAN 主题 — home.css 蓝色覆盖
+═══════════════════════════════════════ */
+
+/* 卡片阴影和 hover 效果 */
+body.theme-keegan .card {
+  box-shadow: 0 6px 20px rgba(40,100,140,0.1), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+body.theme-keegan .card:hover {
+  box-shadow: 0 16px 36px rgba(40,100,140,0.16), inset 0 1px 0 rgba(255,255,255,0.9);
+  border-color: rgba(100,160,195,0.55);
+}
+body.theme-keegan .card:active {
+  box-shadow: 0 4px 12px rgba(40,100,140,0.12), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+/* 聊天大卡背景：绿 → 蓝 */
+body.theme-keegan .card-large {
+  background: linear-gradient(135deg, rgba(100,165,210,0.35), rgba(140,195,225,0.28));
+  box-shadow: 0 8px 28px rgba(40,100,140,0.14), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+/* 卡片文字颜色 */
+body.theme-keegan .card-title { color: #1a3a50; }
+body.theme-keegan .card-desc  { color: rgba(26,58,80,0.6); }
+
+/* 角色信息条在 Keegan 主题下 */
+body.theme-keegan #mainCharName { color: #1a3a50 !important; }
+body.theme-keegan #mainCharSub  { color: rgba(26,58,80,0.45) !important; }
+body.theme-keegan #mainCharDays { color: rgba(26,58,80,0.38) !important; }
+body.theme-keegan #mainCharOnline { background: #60c4e0 !important; }
+
+/* Tab Bar 文字 */
+body.theme-keegan .tab-bar-item.tab-active .tab-bar-label { color: #2a5870 !important; }
+body.theme-keegan .tab-bar-dot { background: #3a7a96 !important; }
+
+/* 切换按钮 ⇄ */
+body.theme-keegan .switch-btn-label { color: rgba(26,58,80,0.5) !important; }
