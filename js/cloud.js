@@ -72,7 +72,15 @@ async function loadFromCloud() {
       const setIfNewer = (key, val) => { if (val != null && val !== '' && cloudIsNewer) localStorage.setItem(key, val); };
       // 静态资料：本地没有才写（换设备恢复）
       setIfMissing('userName', p.userName);
-      setIfMissing('marriageDate', p.marriageDate);
+      // marriageDate 特殊保护：云端有值才用，本地有值不覆盖，两者都有取较早的
+      if (p.marriageDate && !localStorage.getItem('marriageDate')) {
+        localStorage.setItem('marriageDate', p.marriageDate);
+      } else if (p.marriageDate && localStorage.getItem('marriageDate')) {
+        // 两边都有值：保留较早的（防止被重置成今天）
+        const localDate = new Date(localStorage.getItem('marriageDate')).getTime();
+        const cloudDate = new Date(p.marriageDate).getTime();
+        if (cloudDate < localDate) localStorage.setItem('marriageDate', p.marriageDate);
+      }
       // Ghost生日：云端有值就用云端的，保证多设备一致
       if (p.ghostBirthday) {
         localStorage.setItem('ghostBirthday', p.ghostBirthday);
@@ -339,10 +347,15 @@ async function loadFromCloud() {
       // ── 合并类：无论新旧都合并 ──────────────────────────────
 
       // 已购商品：合并去重
+      // 安全保护：云端是空的但本地有数据时，不覆盖（防止不完整快照清空购买记录）
       if (Array.isArray(s.purchasedItems)) {
         const local = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
-        const merged = [...new Set([...local, ...s.purchasedItems])];
-        localStorage.setItem('purchasedItems', JSON.stringify(merged));
+        if (s.purchasedItems.length === 0 && local.length > 0) {
+          console.warn('[cloud] 云端 purchasedItems 为空但本地有数据，跳过覆盖');
+        } else {
+          const merged = [...new Set([...local, ...s.purchasedItems])];
+          localStorage.setItem('purchasedItems', JSON.stringify(merged));
+        }
       }
 
       // 购买次数：取最大值（防止倒退）
@@ -708,6 +721,25 @@ async function saveToCloud() {
       // 不被 saveChatHistoryNow 频繁更新 updated_at 所影响
       stateSavedAt: Date.now(),
     };
+    // ── 存档完整性检查（治本）──────────────────────────────
+    // 本地有购买记录但快照是空的 → 说明这次快照不完整，跳过存档防止覆盖云端好数据
+    const _localPurchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+    const _snapPurchased  = stateSnapshot.purchasedItems || [];
+    if (_localPurchased.length > 0 && _snapPurchased.length === 0) {
+      console.warn('[cloud] 快照不完整（purchasedItems 为空但本地有数据），跳过本次存档');
+      _isSavingToCloud = false;
+      return;
+    }
+    // 本地有婚姻日期但快照里 profile 没有 → 同样跳过
+    const _localMarriage = localStorage.getItem('marriageDate') || '';
+    const _snapMarriage  = profile.marriageDate || '';
+    if (_localMarriage && !_snapMarriage) {
+      console.warn('[cloud] 快照不完整（marriageDate 丢失），跳过本次存档');
+      _isSavingToCloud = false;
+      return;
+    }
+    // ──────────────────────────────────────────────────────
+
     const nowIso = new Date().toISOString();
     const upsertData = {
       user_id: userId,
