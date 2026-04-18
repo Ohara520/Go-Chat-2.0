@@ -79,12 +79,14 @@ function compressImageToBase64(dataUrl, maxWidth = 800, quality = 0.82) {
     const img = new Image();
     img.onload = async () => {
       try {
-        // 等待图片完全解码，防止canvas画出全黑（手机拍照/某些格式常见）
+        // 等待图片完全解码，防止canvas画出全黑（华为/手机拍照常见问题）
         if (img.decode) {
           try { await img.decode(); } catch(e) {}
         }
-        // 额外等一帧，确保解码完全
+        // 多等几帧，华为等机型一帧不够
         await new Promise(r => requestAnimationFrame(r));
+        await new Promise(r => requestAnimationFrame(r));
+        await new Promise(r => setTimeout(r, 150));
         const canvas = document.createElement('canvas');
         let w = img.naturalWidth || img.width;
         let h = img.naturalHeight || img.height;
@@ -570,19 +572,57 @@ function triggerPhotoUpload() {
 }
 
 async function handlePhotoInputChange(e) {
+  // 华为等机型兼容：files 可能延迟到位，等一帧再读
+  await new Promise(r => setTimeout(r, 100));
   const files = Array.from(e.target.files || []).slice(0, 3);
   e.target.value = '';
-  if (files.length === 0) return;
+  if (files.length === 0) {
+    if (typeof showToast === 'function') showToast('没有读取到图片，请重试');
+    return;
+  }
   try {
-    const fileDataList = await Promise.all(files.map(f => new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = ev => res({ base64: ev.target.result.split(',')[1], type: f.type, size: f.size });
-      reader.onerror = rej;
-      reader.readAsDataURL(f);
-    })));
+    const fileDataList = [];
+    for (const f of files) {
+      // 检查文件类型，不支持的格式给提示
+      const type = f.type || '';
+      if (type && !type.startsWith('image/')) {
+        if (typeof showToast === 'function') showToast('请选择图片文件');
+        return;
+      }
+      // HEIC/HEIF 格式华为常见，FileReader 可能读不到
+      if (type === 'image/heic' || type === 'image/heif' || f.name?.toLowerCase().endsWith('.heic')) {
+        if (typeof showToast === 'function') showToast('请先将图片转存为 JPG 格式再发送');
+        return;
+      }
+      const data = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        // 超时保护：5秒读不到就报错
+        const timeout = setTimeout(() => rej(new Error('读取超时')), 5000);
+        reader.onload = ev => {
+          clearTimeout(timeout);
+          const result = ev.target.result;
+          if (!result || !result.includes(',')) {
+            rej(new Error('文件内容为空'));
+            return;
+          }
+          res({ base64: result.split(',')[1], type: f.type || 'image/jpeg', size: f.size });
+        };
+        reader.onerror = () => {
+          clearTimeout(timeout);
+          rej(new Error('读取失败'));
+        };
+        reader.readAsDataURL(f);
+      });
+      fileDataList.push(data);
+    }
+    if (fileDataList.length === 0) {
+      if (typeof showToast === 'function') showToast('图片读取失败，请截图后重试');
+      return;
+    }
     handlePhotoUpload(fileDataList);
-  } catch(e) {
-    if (typeof showToast === 'function') showToast('读取图片失败，请重试');
+  } catch(err) {
+    console.error('[photo] 读取图片失败:', err);
+    if (typeof showToast === 'function') showToast('图片读取失败，请截图后重试 📸');
   }
 }
 
