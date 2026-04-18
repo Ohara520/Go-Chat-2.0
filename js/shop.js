@@ -905,26 +905,34 @@ function openDeliveryComplaint() {
       </div>`;
   }
 
-  // 事件委托：统一在 overlay 上监听，用 data-complaint-id 识别点击目标
-  overlay.addEventListener('click', e => {
-    // 找到最近的有 data-complaint-id 的父元素
-    const item = e.target.closest('[data-complaint-id]');
-    if (item) {
-      const id = item.getAttribute('data-complaint-id');
-      overlay.remove();
-      _runComplaintSearch(id, all);
-      return;
-    }
-    // 点击取消按钮
-    if (e.target.closest('button')) {
-      overlay.remove();
-      return;
-    }
-    // 点击遮罩背景关闭
-    if (e.target === overlay) overlay.remove();
-  });
-
   document.body.appendChild(overlay);
+
+  // appendChild 之后再绑定事件，确保 DOM 已存在
+  // 直接给每个卡片绑定 onclick，比事件委托更可靠
+  if (eligible.length > 0) {
+    eligible.forEach(d => {
+      const card = overlay.querySelector('[data-complaint-id="' + d.id + '"]');
+      if (card) {
+        card.addEventListener('click', () => {
+          overlay.remove();
+          _runComplaintSearch(d.id, all);
+        });
+        // 触摸反馈
+        card.addEventListener('touchstart', () => {
+          card.style.opacity = '0.75';
+        }, { passive: true });
+        card.addEventListener('touchend', () => {
+          card.style.opacity = '1';
+        }, { passive: true });
+      }
+    });
+  }
+
+  // 取消按钮和遮罩背景关闭
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove();
+    if (e.target.tagName === 'BUTTON' && !e.target.closest('[data-complaint-id]')) overlay.remove();
+  });
 }
 
 function _runComplaintSearch(id, allDeliveries) {
