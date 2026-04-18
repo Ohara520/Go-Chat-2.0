@@ -514,6 +514,11 @@ async function _processMergedMessage(text) {
     const handled = await checkPendingAvatarChoice(text);
     if (handled) return;
   }
+  // 新版：用户明确命令换头像（优先级高于旧版 checkAvatarReplace）
+  if (typeof checkAvatarCommand === 'function') {
+    const handled = await checkAvatarCommand(text);
+    if (handled) return;
+  }
   if (typeof checkAvatarReplace === 'function') {
     const handled = await checkAvatarReplace(text);
     if (handled) return;
@@ -1289,7 +1294,12 @@ async function _processMergedMessage(text) {
     }
 
     // 其他副作用
-    if (Math.random() < 0.25) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
+    // 特产触发：80%概率检测（有7天冷却不会频繁）
+    if (Math.random() < 0.8 && typeof checkLocationSpecialTrigger === 'function') {
+      checkLocationSpecialTrigger(text).catch(() => {});
+    }
+    // 情绪/商城触发：提高到45%（原25%太低）
+    if (Math.random() < 0.45) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (chatHistory.slice(-6).some(m => m._intimate)) {
       setTimeout(() => { try { checkIntimateHighlight(text, reply); } catch(e) {} }, 1500);
     }

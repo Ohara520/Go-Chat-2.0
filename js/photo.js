@@ -276,31 +276,13 @@ async function handlePhotoUpload(fileDataList) {
       cleanOldPhotosFromIDB().catch(() => {});
     }
 
-    // 4. photoHint 根据图片张数动态生成
-    // 单张：模型判断是否情头，是则加 AVATAR_SET，直接换
-    // 两张：模型判断是否情头，是则问 "which one's mine." + AVATAR_SET，等用户回答再换
+    // 4. photoHint — 模型只负责聊天，不判断头像，不自动换头像
+    // 换头像只通过用户明确命令触发（checkAvatarCommand）
     const isTwoPhotos = base64List.length > 1;
     const photoHint = `[You just received ${isTwoPhotos ? 'two photos' : 'a photo'} from her.
-
-FIRST — decide what kind of photo this is:
-
-A) Couple profile pictures — images clearly designed to be used as matching profile photos (cartoon couple avatars, two characters posed as a pair, explicitly matching set). Must be obviously intended as profile pictures — not just any photo with people or characters.
-B) Any other photo — selfie, food, scenery, meme, screenshot, random image, etc.
-
-If it's (A) — couple profile pictures:
-- React as Ghost. One line. Dry — say what you actually see, not "cute".
-${isTwoPhotos
-  ? `- You need to know which one is yours. End your reply with exactly: which one's mine.
-- Add AVATAR_SET on its own line at the very end.`
-  : `- He usually sets it — unless something about it genuinely puts him off.
-- If you set it: add AVATAR_SET on its own line at the very end. Nothing after it.
-- If you don't: do NOT add AVATAR_SET. Do not say you set it.`}
-
-If it's (B) — any other photo:
-- React as Ghost. One line — your first honest reaction.
-- Do NOT add AVATAR_SET.
-
-English only. No translation.]`;
+React as Ghost. One line. Your honest first reaction to what you see.
+If it looks like it could be couple profile pictures, you can say something dry about it — but do NOT promise to set it, do NOT say you're setting it.
+English only. No translation. No AVATAR_SET tag.]`;
 
     // 5. 发给模型看图回复
     if (typeof showTyping === 'function') showTyping();
@@ -382,8 +364,7 @@ English only. No translation.]`;
 
     if (!reply) reply = 'noted.';
 
-    // 检测 AVATAR_SET tag（由模型判断，前端只执行）
-    const shouldSetAvatar = /\bAVATAR_SET\b/i.test(reply);
+    // AVATAR_SET 已废弃，头像只由用户明确命令触发
     reply = reply.replace(/\n?AVATAR_SET\n?/gi, '').trim();
     if (!reply) reply = 'noted.';
 
@@ -423,34 +404,9 @@ English only. No translation.]`;
       if (typeof saveHistory === 'function') saveHistory();
     }
 
-    // 7. 换头像
-    if (shouldSetAvatar) {
-      if (isTwoPhotos) {
-        // 两张图：模型已问了 which one's mine，等用户回答
-        _pendingAvatarChoice = { base64List };
-      } else {
-        // 单张图：直接换
-        const ghostB64 = base64List[0];
-
-        // 只更新 DOM 显示，不写 localStorage
-        // 关键修复：data: URL 绝对不能写进 localStorage，
-        // 否则 saveToCloud 读到 data: 会存空字符串进云端，刷新后头像丢失
-        document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-          el.src = `data:image/jpeg;base64,${ghostB64}`;
-        });
-        localStorage.setItem('ghostAvatarBase64', ghostB64); // 上传失败时的备份
-
-        uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-          if (url) {
-            updateGhostAvatar(url); // 上传成功后才写 localStorage + 触发云端保存
-            localStorage.removeItem('ghostAvatarBase64');
-            if (typeof showToast === 'function') showToast('头像已更新并同步 ☁️');
-          }
-          // 上传失败：DOM 继续显示 base64，ghostAvatarBase64 留着
-          // restoreGhostAvatar 下次启动时会自动重试上传
-        });
-      }
-    }
+    // 7. 换头像由用户明确命令触发，发图时不自动执行
+    // 把最新的图片存到 _lastReceivedPhotos 供后续命令使用
+    window._lastReceivedPhotos = { base64List, isTwoPhotos };
 
     // 8. 异步上传所有图片到Storage，完成后更新历史记录和气泡
     const photoUrls = new Array(base64List.length).fill(null);
@@ -529,6 +485,82 @@ async function checkPendingAvatarChoice(userText) {
     if (typeof saveHistory === 'function') saveHistory();
   }
   return true;
+}
+
+// ===== 用户明确命令触发换头像（新版，替代模型自动判断）=====
+// 触发条件：用户说了明确的换头像命令
+// 宁可漏判，不能误换
+async function checkAvatarCommand(userText) {
+  const text = userText;
+
+  // 只认明确命令，不猜潜台词
+  const isCommand = /用这个当头像|设为头像|换成这个|这个当(你的?)?头像|帮我换头像|给你换头像|换(一下|个)?头像|set.*avatar|use.*avatar|change.*avatar/i.test(text);
+  if (!isCommand) return false;
+
+  // 有没有最近发过的图片
+  const lastPhotos = window._lastReceivedPhotos;
+  if (!lastPhotos || !lastPhotos.base64List || lastPhotos.base64List.length === 0) return false;
+
+  const { base64List, isTwoPhotos } = lastPhotos;
+
+  // 单张图 → 直接换
+  if (!isTwoPhotos) {
+    await _executeAvatarSet(base64List[0]);
+    return true;
+  }
+
+  // 两张图 → 看用户有没有指定哪张
+  let chosenIdx = -1;
+  if (/左|第一|1张|first|left|上面|黑|深色|暗/.test(text)) chosenIdx = 0;
+  else if (/右|第二|2张|second|right|下面|白|浅色|亮/.test(text)) chosenIdx = 1;
+
+  if (chosenIdx !== -1) {
+    // 用户指定了 → 直接换
+    await _executeAvatarSet(base64List[chosenIdx] || base64List[0]);
+    return true;
+  }
+
+  // 没有指定哪张 → Ghost 问 which one
+  _pendingAvatarChoice = { base64List };
+  if (typeof showTyping === 'function') showTyping();
+  await new Promise(r => setTimeout(r, 600));
+  if (typeof hideTyping === 'function') hideTyping();
+  const q = 'which one.';
+  if (typeof appendMessage === 'function') appendMessage('bot', q);
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({ role: 'assistant', content: q });
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+  return true;
+}
+
+// 执行头像更换
+async function _executeAvatarSet(ghostB64) {
+  window._lastReceivedPhotos = null; // 用完清掉
+
+  document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+    el.src = `data:image/jpeg;base64,${ghostB64}`;
+  });
+  localStorage.setItem('ghostAvatarBase64', ghostB64);
+
+  uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
+    if (url) {
+      updateGhostAvatar(url);
+      localStorage.removeItem('ghostAvatarBase64');
+      if (typeof showToast === 'function') showToast('头像已更新 ✅');
+    }
+  });
+
+  if (typeof showTyping === 'function') showTyping();
+  await new Promise(r => setTimeout(r, 600));
+  if (typeof hideTyping === 'function') hideTyping();
+  const reply = 'done.';
+  if (typeof appendMessage === 'function') appendMessage('bot', reply);
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({ role: 'assistant', content: reply });
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 // ===== 按钮触发 =====
