@@ -1227,7 +1227,9 @@ async function generatePhoneMemo() {
     });
     const data = await res.json();
     const text = (data.content?.[0]?.text || '').trim();
-    if (text && text.includes('—')) {
+    // 破防检测：如果包含 AI 身份声明，丢弃这次生成
+    const _isBreakout = /I'm Claude|I am Claude|Anthropic|AI assistant|roleplay|persona|identity guidelines/i.test(text);
+    if (text && text.includes('—') && !_isBreakout) {
       localStorage.setItem('phoneMemoTasks', text);
       localStorage.setItem('phoneMemoDate', todayKey);
       // 更新页面（如果资料页还开着）
