@@ -432,10 +432,9 @@ function checkEntertainerShow() {
   const type = getCareer();
   if (type !== 'entertainer') return 0;
 
-  // 每周只触发一次
-  const now = new Date();
-  const weekKey = `entertainerShow_${now.getFullYear()}_W${Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)}_${now.getMonth() + 1}`;
-  if (localStorage.getItem(weekKey)) return 0;
+  // 7天内只能触发一次
+  const lastShow = parseInt(localStorage.getItem('entertainerLastShow') || '0');
+  if (lastShow && Date.now() - lastShow < 7 * 24 * 3600 * 1000) return 0;
 
   // 每天 15% 概率触发（一周内大概率至少触发一次）
   if (Math.random() > 0.15) return 0;
@@ -467,7 +466,7 @@ function checkEntertainerShow() {
     });
   }
 
-  localStorage.setItem(weekKey, '1');
+  localStorage.setItem('entertainerLastShow', Date.now().toString());
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
   if (viral) {
