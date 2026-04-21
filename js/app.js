@@ -227,6 +227,8 @@ window.onload = async function() {
 
     // ── 职业系统每日检查（升级、工资、被动收入、打赏）──────────
     if (typeof dailyCareerCheck === 'function') dailyCareerCheck();
+    // ── Ghost日记每日生成 ─────────────────────────────────────
+    if (typeof dailyDiaryCheck === 'function') dailyDiaryCheck();
     // 更新主页职业卡片描述
     const _careerDesc = document.getElementById('careerCardDesc');
     if (_careerDesc && typeof getCareerSummary === 'function') {

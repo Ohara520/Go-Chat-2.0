@@ -98,6 +98,8 @@ async function loadFromCloud() {
       setIfMissing('careerLevel', p.careerLevel);
       setIfMissing('careerStartDate', p.careerStartDate);
       setIfMissing('careerLastSalaryMonth', p.careerLastSalaryMonth);
+      // Ghost日记
+      setIfMissing('ghostDiary', p.ghostDiary);
       // 用户设置：云端更新才覆盖；本地没有时也恢复（换设备场景）
       const setIfNewerOrMissing = (key, val) => {
         if (val == null || val === '') return;
@@ -610,6 +612,8 @@ async function saveToCloud() {
       careerLevel: localStorage.getItem('careerLevel') || '',
       careerStartDate: localStorage.getItem('careerStartDate') || '',
       careerLastSalaryMonth: localStorage.getItem('careerLastSalaryMonth') || '',
+      // Ghost日记
+      ghostDiary: localStorage.getItem('ghostDiary') || '[]',
       marriageType: localStorage.getItem('marriageType') || 'established',
       ghostAvatarUrl: (() => { const u = localStorage.getItem('ghostAvatarUrl') || ''; return u.startsWith('data:') ? '' : u; })(),
       ghostHeight: localStorage.getItem('ghostHeight') || '',
