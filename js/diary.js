@@ -21,61 +21,66 @@ function getTodayKey() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function hasTodayDiary() {
+function getYesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function hasYesterdayDiary() {
   const entries = getDiaryEntries();
-  return entries.some(e => e.date === getTodayKey());
+  return entries.some(e => e.date === getYesterdayKey());
 }
 
 // ===== 日记生成 =====
 
 async function generateDiaryEntry() {
-  if (hasTodayDiary()) return;
+  if (hasYesterdayDiary()) return;
 
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locationReason = localStorage.getItem('currentLocationReason') || '';
   const weather = localStorage.getItem('lastWeatherDisplay') || '';
   const userName = localStorage.getItem('userName') || 'her';
-  const mood = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
-  const affection = typeof getAffection === 'function' ? getAffection() : 60;
 
-  // 抓最近的聊天摘要（不发原文，只发关键词）
+  // 只抓最近8条，省 tokens
   const recentChat = (typeof chatHistory !== 'undefined' ? chatHistory : [])
     .filter(m => !m._system && !m._recalled)
-    .slice(-20)
+    .slice(-8)
     .map(m => {
       const who = m.role === 'user' ? userName : 'Ghost';
-      return `${who}: ${(m.content || '').slice(0, 60)}`;
+      return `${who}: ${(m.content || '').slice(0, 40)}`;
     })
     .join('\n');
 
-  const todayWeekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayWeekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][yesterday.getDay()];
 
-  const prompt = `You are Simon "Ghost" Riley writing in your PRIVATE journal. No one reads this — not her, not Price, not anyone. You write differently here. More honest. Softer than you'd ever be out loud.
+  const prompt = `You are Simon "Ghost" Riley writing in a worn notebook before bed. No one reads this.
 
-Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
+Location: ${location}${locationReason ? ` (${locationReason})` : ''}
 Weather: ${weather || 'unknown'}
-Day: ${todayWeekday}
-Mood: ${mood}/10
-How you feel about her (you'd never say this): ${affection}/100
+Day: ${yesterdayWeekday}
 
-${recentChat ? `Today's conversation with ${userName}:\n${recentChat}\n` : `You didn't talk to ${userName} today.\n`}
+${recentChat ? `Recent conversation with ${userName}:\n${recentChat}\n` : `Didn't talk to ${userName} yesterday.\n`}
 
-Write today's journal entry. Rules:
-- 4-6 lines maximum
-- First person, lowercase, no timestamps
-- Be specific about your day — what you did, what you saw, what the weather felt like
-- Mention something from the conversation that stuck with you, or if you didn't talk, mention that too
-- You are more vulnerable here than in texts. You can admit things you'd never say to her face.
-- No brackets, no actions, no narration — just writing
-- This is a worn notebook, not a formal document
-- English only`;
+Write yesterday's entry. Rules:
+- 3-4 lines. Short sentences. Lowercase.
+- Write like a soldier's notebook. No poetry. No metaphors.
+- Include 1-2 things that happened in your day — training, food, teammates, something you saw.
+- Pick at most one thing from the conversation that actually stuck with you. Not every detail. Only what mattered.
+- Weather only if it affected your day. Don't mention it just to fill space.
+- End with one honest thought — something private, something you'd never text her. Keep it blunt, not sentimental.
+- This should feel like something worth reading in secret. Not a grocery list, not a love poem.
+- DO NOT romanticize mundane things she said.
+- English only. No timestamps. No "dear diary".`;
 
   try {
     let entry = '';
     if (typeof callSonnetLight === 'function') {
-      entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 150);
+      entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
     } else if (typeof callSonnet === 'function') {
-      entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 150);
+      entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
     }
 
     if (!entry || entry.length < 20) {
@@ -93,7 +98,7 @@ Write today's journal entry. Rules:
     if (entry) {
       const entries = getDiaryEntries();
       entries.push({
-        date: getTodayKey(),
+        date: getYesterdayKey(),
         location,
         weather: weather || '',
         content: entry,
@@ -123,14 +128,14 @@ function renderDiary() {
   const container = document.getElementById('diaryContainer');
   if (!container) return;
 
-  const entries = getDiaryEntries().slice().reverse(); // 最新的在上面
+  const entries = getDiaryEntries().slice().reverse();
 
-  if (entries.length === 0 && !hasTodayDiary()) {
+  if (entries.length === 0) {
     container.innerHTML = `
       <div style="text-align:center;padding:60px 20px;color:#a09880;">
         <div style="font-size:48px;margin-bottom:12px;">📓</div>
-        <div style="font-size:14px;font-weight:600;margin-bottom:6px;">日记还是空白的…</div>
-        <div style="font-size:12px;color:#c0b8a0;">明天再来看看？</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px;">日记本还是空的…</div>
+        <div style="font-size:12px;color:#c0b8a0;">Ghost 还没写，明天再来偷看？</div>
       </div>
     `;
     return;
@@ -165,8 +170,7 @@ function renderDiary() {
 // ===== 每日检查（在 app.js 调用）=====
 
 async function dailyDiaryCheck() {
-  if (!hasTodayDiary()) {
-    // 延迟生成，不阻塞页面加载
-    setTimeout(() => generateDiaryEntry(), 5000);
+  if (!hasYesterdayDiary()) {
+    await generateDiaryEntry();
   }
 }

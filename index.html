@@ -598,7 +598,7 @@
         <div class="card-title">职业</div>
         <div class="card-desc" id="careerCardDesc">选择你的事业</div>
       </div>
-      <div class="card vocab-card" onclick="openScreen('diaryScreen');setTimeout(()=>{if(typeof renderDiary==='function')renderDiary();},80);">
+      <div class="card vocab-card" onclick="openScreen('diaryScreen');setTimeout(async()=>{if(typeof generateDiaryEntry==='function')await generateDiaryEntry();if(typeof renderDiary==='function')renderDiary();},80);">
         <div class="card-icon">📓</div>
         <div class="card-title">日记</div>
         <div class="card-desc">Ghost的私人日记</div>
