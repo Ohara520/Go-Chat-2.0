@@ -593,10 +593,10 @@
         <div class="card-title">秘密</div>
         <div class="card-desc">只有Ghost知道</div>
       </div>
-      <div class="card work-card" onclick="openScreen('workScreen')">
-        <div class="card-icon">⏱️</div>
-        <div class="card-title">打工</div>
-        <div class="card-desc" id="workCardDesc">赚点零花钱</div>
+      <div class="card work-card" onclick="openScreen('careerScreen');setTimeout(()=>{if(typeof renderCareerSelection==='function')renderCareerSelection();},80);">
+        <div class="card-icon">💼</div>
+        <div class="card-title">职业</div>
+        <div class="card-desc" id="careerCardDesc">选择你的事业</div>
       </div>
       <div class="card vocab-card" onclick="openScreen('vocabScreen')">
         <div class="card-icon">📖</div>
@@ -1087,106 +1087,13 @@
     </div>
   </div>
 
-  <!-- 打工页 -->
-  <div class="screen" id="workScreen">
+  <!-- 职业页 -->
+  <div class="screen" id="careerScreen">
     <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="if(pomodoroTimer){cancelPomodoro();}openScreen('mainScreen')">‹</button>
-      <div class="screen-title">⏱️ 打工赚钱</div>
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">💼 我的职业</div>
     </div>
-    <div class="work-container">
-      <div class="work-income-bar">
-        <span>💷 今日已赚</span>
-        <span id="workTodayIncome">£0</span>
-        <span class="work-quota" id="workQuotaText">（今日还可完成 4 个）</span>
-      </div>
-      <div class="pomodoro-card" id="pomodoroCard">
-        <div class="pomodoro-job-selector" id="jobSelector">
-          <div class="job-option active" data-job="study" data-minutes="25" data-pay="20" onclick="selectJob(this)">
-            <div class="job-emoji">📚</div>
-            <div class="job-name">学习</div>
-            <div class="job-detail">25分钟 · £20</div>
-          </div>
-          <div class="job-option" data-job="exercise" data-minutes="30" data-pay="25" onclick="selectJob(this)">
-            <div class="job-emoji">💪</div>
-            <div class="job-name">运动</div>
-            <div class="job-detail">30分钟 · £25</div>
-          </div>
-          <div class="job-option" data-job="create" data-minutes="45" data-pay="35" onclick="selectJob(this)">
-            <div class="job-emoji">🎨</div>
-            <div class="job-name">创作</div>
-            <div class="job-detail">45分钟 · £35</div>
-          </div>
-          <div class="job-option" data-job="slack" data-minutes="10" data-pay="5" onclick="selectJob(this)">
-            <div class="job-emoji">😴</div>
-            <div class="job-name">摸鱼</div>
-            <div class="job-detail">10分钟 · £5</div>
-          </div>
-        </div>
-        <div class="pomodoro-timer-wrap" id="timerWrap" style="display:none">
-          <div class="pomodoro-job-label" id="timerJobLabel">📚 学习中</div>
-          <div class="pomodoro-ring">
-            <svg viewBox="0 0 120 120" class="pomodoro-svg">
-              <circle cx="60" cy="60" r="52" class="ring-bg"/>
-              <circle cx="60" cy="60" r="52" class="ring-progress" id="ringProgress"/>
-            </svg>
-            <svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#5a9a46"/><stop offset="100%" style="stop-color:#7dba5a"/></linearGradient></defs></svg>
-            <div class="pomodoro-time" id="timerDisplay">25:00</div>
-          </div>
-          <button class="pomodoro-cancel-btn" onclick="cancelPomodoro()">放弃</button>
-        </div>
-        <button class="pomodoro-start-btn" id="startBtn" onclick="startPomodoro()">开始打工</button>
-        <div class="pomodoro-done" id="pomodoroDone" style="display:none">
-          <div class="done-emoji">🎉</div>
-          <div class="done-text">完成！工资已到账</div>
-          <div class="done-amount" id="doneAmount">+£20</div>
-        </div>
-      </div>
-      <div class="work-log" id="workLog"></div>
-
-      <!-- 氛围音乐折叠区 -->
-      <div class="ambient-section" id="ambientSection">
-        <div class="ambient-header" onclick="toggleAmbient()">
-          <div class="ambient-header-left">
-            <span class="ambient-icon">🎵</span>
-            <div>
-              <div class="ambient-title">氛围音乐</div>
-              <div class="ambient-subtitle" id="ambientSubtitle">点击开启专注氛围</div>
-            </div>
-          </div>
-          <div class="ambient-arrow" id="ambientArrow">▾</div>
-        </div>
-        <div class="ambient-body" id="ambientBody" style="display:none">
-          <div class="ambient-volume-row">
-            <span style="font-size:11px;opacity:0.45">🔈</span>
-            <div class="ambient-volume-track">
-              <div class="ambient-volume-fill" id="ambientVolumeFill" style="width:60%"></div>
-              <input type="range" min="0" max="100" value="60" class="ambient-volume-input"
-                oninput="setAmbientVolume(this.value)">
-            </div>
-            <span style="font-size:11px;opacity:0.45">🔊</span>
-          </div>
-          <div class="ambient-grid" id="ambientGrid">
-            <div class="ambient-track" data-id="rain"      data-file="/audio/rain.mp3"      data-color="#a78bfa" data-glow="#60a5fa" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🌧️</div><div class="ambient-track-name">雨声</div></div>
-            <div class="ambient-track" data-id="fireplace" data-file="/audio/fireplace.mp3" data-color="#f0abfc" data-glow="#fb923c" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🔥</div><div class="ambient-track-name">壁炉</div></div>
-            <div class="ambient-track" data-id="story"     data-file="/audio/story.mp3"     data-color="#f9a8d4" data-glow="#f472b6" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎙️</div><div class="ambient-track-name">哄睡</div></div>
-            <div class="ambient-track" data-id="piano"     data-file="/audio/piano.mp3"     data-color="#fde68a" data-glow="#fbbf24" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🎹</div><div class="ambient-track-name">钢琴</div></div>
-            <div class="ambient-track" data-id="cafe"      data-file="/audio/cafe.mp3"      data-color="#f9a8d4" data-glow="#b4835f" onclick="toggleTrack(this)"><div class="ambient-track-emoji">☕</div><div class="ambient-track-name">咖啡馆</div></div>
-            <div class="ambient-track" data-id="book"      data-file="/audio/book.mp3"      data-color="#d4b896" data-glow="#8b6f47" onclick="toggleTrack(this)"><div class="ambient-track-emoji">📖</div><div class="ambient-track-name">翻书声</div></div>
-            <div class="ambient-track" data-id="cricket"   data-file="/audio/cricket.mp3"   data-color="#86efac" data-glow="#22c55e" onclick="toggleTrack(this)"><div class="ambient-track-emoji">🌙</div><div class="ambient-track-name">深夜虫鸣</div></div>
-            <div class="ambient-track" data-id="sleep"     data-file="/audio/sleep.mp3"     data-color="#bae6fd" data-glow="#7dd3fc" onclick="toggleTrack(this)"><div class="ambient-track-emoji">😴</div><div class="ambient-track-name">深眠呼吸</div></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="noah-tag">👤 诺亚工作室 · 按时发薪，童叟无欺</div>
-    </div>
-  </div>
-
-  <!-- 光晕脉冲容器（打工页专用）-->
-  <div id="ambientPulse" style="display:none;pointer-events:none;position:fixed;inset:0;z-index:0;">
-    <div class="pulse-ring pulse-ring-1" id="pulseRing1"></div>
-    <div class="pulse-ring pulse-ring-2" id="pulseRing2"></div>
-    <div class="pulse-ring pulse-ring-3" id="pulseRing3"></div>
+    <div id="careerSelectionContainer" style="overflow-y:auto;height:calc(100vh - 60px);-webkit-overflow-scrolling:touch;"></div>
   </div>
 
   <!-- 单词页 -->
@@ -1723,6 +1630,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/ambient.js"></script>
 <script src="js/minigames.js"></script>
 <script src="js/sticker.js"></script>
+<script src="js/career.js"></script>
 <script src="js/chat_init.js"></script>
 <script src="js/app.js"></script>
 
@@ -2130,7 +2038,7 @@ window.openScreen = function(screenId) {
   const tb = document.getElementById('mainTabBar');
   if (!tb) return;
   const hideFor = ['chatScreen','profileScreen','coupleScreen','walletScreen',
-    'workScreen','vocabScreen','marketScreen','takeoutScreen',
+    'careerScreen','vocabScreen','marketScreen','takeoutScreen',
     'achievementScreen','collectionScreen','calendarScreen','secretScreen'];
   if (screenId === 'mainScreen') {
     tb.style.display = 'flex';
