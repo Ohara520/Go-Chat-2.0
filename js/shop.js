@@ -532,7 +532,7 @@ function renderMarket(categoryId) {
         <div class="product-emoji">${p.emoji}</div>
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${!isUnlocked ? '继续和他相处，慢慢解锁' : p.desc}</div>
-        <div class="product-price">${!isUnlocked ? '🔒 ' : ''}£${p.price.toLocaleString()}</div>
+        <div class="product-price">${!isUnlocked ? '🔒 ' : ''}£${Math.round(p.price * 1.8).toLocaleString()}</div>
         ${actionHtml}
       </div>`;
     });
@@ -562,7 +562,8 @@ function renderMarket(categoryId) {
     const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
     const owned = buyCount >= maxBuy;
     const onSale = weeklySale && weeklySale.name === p.name;
-    const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+    let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+    if (!isLuxury) displayPrice = Math.round(displayPrice * 1.8);
     const triggerReason = isUnlocked ? getProductTrigger(p.name) : null;
     const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
     const discountPct = onSale ? Math.round((1 - weeklySale.discount) * 100) : 0;
@@ -600,7 +601,7 @@ function renderMarket(categoryId) {
           <div class="product-emoji">${p.emoji}</div>
           <div class="product-name">${p.name}</div>
           <div class="product-desc">继续和他相处，慢慢解锁</div>
-          <div class="product-price">£${p.price.toLocaleString()}</div>
+          <div class="product-price">£${Math.round(p.price * 1.8).toLocaleString()}</div>
           <button class="product-buy-btn" disabled style="${btnStyle}display:flex;align-items:center;justify-content:center;">🔒 未解锁</button>
         </div>`;
     }
@@ -618,7 +619,7 @@ function renderMarket(categoryId) {
         ${isWishlist&&p.badge ? `<div class="product-badge-preview">🏅 ${p.badge}</div>` : ''}
         ${p.desc ? `<div class="product-desc">${p.desc}</div>` : ''}
         <div class="product-price ${isWishlist?'wishlist-price':''}">
-          ${onSale ? `<span class="sale-original-price">£${p.price.toLocaleString()}</span>` : ''}
+          ${onSale ? `<span class="sale-original-price">£${(isLuxury ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</span>` : ''}
           £${displayPrice.toLocaleString()}
         </div>
         ${owned
@@ -658,10 +659,11 @@ function openBuyModal(idx) {
   document.getElementById('buyModalEmoji').textContent = p.emoji;
   document.getElementById('buyModalName').textContent = p.name;
   document.getElementById('buyModalDesc').textContent = p.desc || '';
-  const _hasDiscount = _shopDiscount > 0 && displayPrice < p.price;
-  const _shippingFree = shipping === 0 && p.shipping > 0;
+  const _basePrice = isLuxury ? p.price : Math.round(p.price * 1.8);
+  const _hasDiscount = _shopDiscount > 0 && displayPrice < _basePrice;
+  const _shippingFree = shipping === 0 && (p.shipping > 0 || !p.isUserItem);
   document.getElementById('buyModalPrice').innerHTML = _hasDiscount
-    ? `<span style="text-decoration:line-through;color:#ccc;font-size:12px;">£${p.price}</span> £${displayPrice.toLocaleString()}<span style="font-size:11px;color:#5a9a46;"> (-${_shopDiscount}%)</span><span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ' · 免运费' : ` + £${shipping} 运费`}</span>`
+    ? `<span style="text-decoration:line-through;color:#ccc;font-size:12px;">£${_basePrice}</span> £${displayPrice.toLocaleString()}<span style="font-size:11px;color:#5a9a46;"> (-${_shopDiscount}%)</span><span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ' · 免运费' : ` + £${shipping} 运费`}</span>`
     : `£${displayPrice.toLocaleString()}<span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ' · 免运费' : ` + £${shipping} 运费`}</span>`;
   document.getElementById('buyModalBalance').innerHTML = `余额：£${bal.toFixed(2)}&nbsp;&nbsp;合计：<b style="color:#7c3fa0">£${total.toLocaleString()}</b>`;
 
