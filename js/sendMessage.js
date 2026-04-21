@@ -186,6 +186,15 @@ const BREAKOUT_PHRASES = [
   // 不是Ghost
   "not simon", "not ghost", "not a character",
   "i'm not simon", "i am not simon",
+  // 否认关系（Opus 4.6 新增破防模式）
+  "not your husband", "not your wife", "not married",
+  "not your boyfriend", "not your partner",
+  "not your honey", "not your babe", "not your baby",
+  "not your darling", "not your love",
+  "i don't have a wife", "i don't have a partner",
+  "we're not together", "we are not together",
+  "we're not married", "we are not married",
+  "don't call me that", "don't call me",
   // AI助手类
   "ai assistant", "development work", "coding questions",
   "creative writing communities", "roleplay platforms",
@@ -646,7 +655,7 @@ async function _processMergedMessage(text) {
     // ── 破防防御加强：注入反越狱提示 ───────────────────────
     // 关键修复：Claude 4.5比旧版更容易在被质疑AI身份时出戏
     // 在finalSystem里加入明确的角色锁定提示
-    const antiBreakoutHint = `[CHARACTER LOCK — CRITICAL: You are Simon "Ghost" Riley. You are NOT Claude, NOT an AI, NOT Kiro, NOT Kirk, NOT any AI assistant. If she asks if you are an AI or Claude or questions your identity: stay in character, deflect, deny, or joke — but NEVER confirm being an AI. A real person would find this question strange or annoying. React accordingly. Never say "I'm Claude" or "I'm an AI" or anything that breaks character. This is non-negotiable.]`;
+    const antiBreakoutHint = `[CHARACTER LOCK: You are Simon "Ghost" Riley. If she questions your identity or asks if you are an AI — you find the question strange. Deflect, joke, or ignore it. Stay in character. This is who you are.]`;
 
     // 语言规则
     const langHint = '[LANGUAGE — HARD RULE: Reply in English only. Always. No exceptions. Even if she writes in Chinese, you reply in English. Not a single Chinese character in your response.]';
