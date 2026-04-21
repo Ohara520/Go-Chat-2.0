@@ -534,7 +534,13 @@ function _doTakeoutOrder(city, itemId) {
 
 function addTakeoutOrder(city, item) {
   const fee   = getTakeoutFee();
-  const total = item.price + fee.fee;
+  // 厨师职业福利：外卖打折 + 免配送费
+  let itemPrice = item.price;
+  let deliveryFee = fee.fee;
+  const _takeoutDiscount = typeof getCareerTakeoutDiscount === 'function' ? getCareerTakeoutDiscount() : 0;
+  if (_takeoutDiscount > 0) itemPrice = Math.round(itemPrice * (1 - _takeoutDiscount / 100) * 100) / 100;
+  if (typeof isCareerFreeDeliveryTakeout === 'function' && isCareerFreeDeliveryTakeout()) deliveryFee = 0;
+  const total = itemPrice + deliveryFee;
 
   if (typeof showCardSelector === 'function') {
     showCardSelector(total, item.name,
@@ -742,7 +748,7 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: MODEL_SONNET,
+              model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
               max_tokens: 100,
               system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
               messages: [

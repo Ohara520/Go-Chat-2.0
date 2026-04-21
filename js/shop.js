@@ -645,7 +645,9 @@ function openBuyModal(idx) {
   // 花艺师职业福利：商店打折
   const _shopDiscount = typeof getCareerShopDiscount === 'function' ? getCareerShopDiscount() : 0;
   if (_shopDiscount > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount / 100));
-  const shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
+  let shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
+  // 快递员职业福利：免运费
+  if (typeof isCareerFreeShipping === 'function' && isCareerFreeShipping()) shipping = 0;
   const total = displayPrice + shipping;
   const bal = getBalance();
   const triggerReason = getProductTrigger(p.name);
@@ -714,7 +716,8 @@ function confirmPurchase() {
   let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
   const _shopDiscount2 = typeof getCareerShopDiscount === 'function' ? getCareerShopDiscount() : 0;
   if (_shopDiscount2 > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount2 / 100));
-  const shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
+  let shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
+  if (typeof isCareerFreeShipping === 'function' && isCareerFreeShipping()) shipping = 0;
   const total = displayPrice + shipping;
   const txLabel = isWishlist ? '心愿 · ' : p.isGhostGift ? '寄给Ghost · ' : p.isUserItem ? '购买 · ' : '寄给Ghost · ';
   const itemLabel = txLabel + p.name;
