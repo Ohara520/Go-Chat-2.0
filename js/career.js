@@ -18,14 +18,18 @@ const CAREER_DATA = {
     },
     speedMultiplier: 1,  // 正常升级速度
   },
-  courier: {
-    id: 'courier',
-    icon: '📦',
-    name: '快递员',
-    titles: ['分拣员','派件员','快递小哥','区域组长','站点主管','区域经理','运营总监','高级总监','副总裁','物流经理'],
-    salary: [80, 140, 230, 380, 560, 780, 1000, 1250, 1500, 1800],
-    perkDesc: '快递免运费/加速',
-    perkDetail: level => `快递加速 ${10 + level * 5}%${level >= 4 ? ' + 免运费' : ''}`,
+  entertainer: {
+    id: 'entertainer',
+    icon: '🎤',
+    name: '艺人',
+    titles: ['练习生','伴舞','替补歌手','驻场歌手','独立歌手','签约艺人','人气艺人','一线艺人','超级巨星','天王巨星'],
+    salary: [90, 180, 320, 520, 800, 1200, 1700, 2400, 3200, 4000],
+    perkDesc: '代言费 + 每周演出 + 快递加速',
+    perkDetail: level => {
+      const endorsement = [0, 0, 10, 15, 25, 35, 50, 70, 90, 120][level - 1] || 0;
+      const showMax = [50, 70, 100, 150, 200, 300, 450, 600, 700, 800][level - 1] || 50;
+      return `${endorsement > 0 ? `代言 £${endorsement}/天 + ` : ''}演出 ≤£${showMax}/周 + 快递加速${10 + level * 5}%`;
+    },
     speedMultiplier: 1,
   },
   florist: {
@@ -34,8 +38,8 @@ const CAREER_DATA = {
     name: '花艺师',
     titles: ['店员','花艺学徒','初级花艺师','花艺师','高级花艺师','花艺设计师','花店店长','区域经理','品牌总监','连锁老板'],
     salary: [70, 120, 200, 320, 480, 650, 850, 1100, 1350, 1600],
-    perkDesc: '商店打折 + 送礼加好感',
-    perkDetail: level => `商店 ${10 + level * 5}% 折扣${level >= 5 ? ' + 送礼好感度×1.5' : ''}`,
+    perkDesc: '商店打折 + 免运费 + 送礼加好感',
+    perkDetail: level => `商店 ${10 + level * 5}% 折扣${level >= 3 ? ' + 免运费' : ' + Lv.3解锁免运费'}${level >= 5 ? ' + 送礼好感度×1.5' : ''}`,
     speedMultiplier: 1,
   },
   barista: {
@@ -380,21 +384,98 @@ function isCareerFreeDeliveryTakeout() {
   return getCareer() === 'chef' && getCareerLevel() >= 3;
 }
 
-// 快递折扣/免运费（快递员 L4+）
+// 免运费（花艺师 L3+）
 function isCareerFreeShipping() {
-  return getCareer() === 'courier' && getCareerLevel() >= 4;
-}
-
-// 快递加速百分比（快递员）
-function getCareerDeliverySpeed() {
-  if (getCareer() !== 'courier') return 0;
-  return 10 + getCareerLevel() * 5; // L1: 15%, L10: 60%
+  return getCareer() === 'florist' && getCareerLevel() >= 3;
 }
 
 // 商店折扣（花艺师）
 function getCareerShopDiscount() {
   if (getCareer() !== 'florist') return 0;
   return 10 + getCareerLevel() * 5; // L1: 15%, L10: 60%
+}
+
+// 快递加速（艺人）— 明星效应，快递优先配送
+function getCareerDeliverySpeed() {
+  if (getCareer() !== 'entertainer') return 0;
+  return 10 + getCareerLevel() * 5; // L1: 15%, L10: 60%
+}
+
+// 艺人每日代言费（Lv3+）
+function checkEntertainerEndorsement() {
+  const type = getCareer();
+  if (type !== 'entertainer') return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  if (localStorage.getItem('entertainerEndorsementDate') === today) return 0;
+
+  const level = getCareerLevel();
+  const income = [0, 0, 10, 15, 25, 35, 50, 70, 90, 120][level - 1] || 0;
+  if (income <= 0) return 0;
+
+  if (typeof setBalance === 'function' && typeof getBalance === 'function') {
+    setBalance(getBalance() + income);
+  }
+  if (typeof addTransaction === 'function') {
+    addTransaction({ icon: '🎤', name: '代言费', amount: income });
+  }
+
+  localStorage.setItem('entertainerEndorsementDate', today);
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  _showCareerNotification(`🎤 今日代言费 £${income}`);
+  return income;
+}
+
+// ===== 艺人每周演出 =====
+
+function checkEntertainerShow() {
+  const type = getCareer();
+  if (type !== 'entertainer') return 0;
+
+  // 每周只触发一次
+  const now = new Date();
+  const weekKey = `entertainerShow_${now.getFullYear()}_W${Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)}_${now.getMonth() + 1}`;
+  if (localStorage.getItem(weekKey)) return 0;
+
+  // 每天 15% 概率触发（一周内大概率至少触发一次）
+  if (Math.random() > 0.15) return 0;
+
+  const level = getCareerLevel();
+  const showMin = [30, 40, 60, 80, 100, 150, 200, 300, 400, 500][level - 1] || 30;
+  const showMax = [50, 70, 100, 150, 200, 300, 450, 600, 700, 800][level - 1] || 50;
+  let income = Math.floor(Math.random() * (showMax - showMin + 1)) + showMin;
+
+  const showNames = ['商场暖场', '酒吧驻唱', '校园演出', '商业演出', '音乐节', '品牌活动', '跨年演出', '巡回演出', '演唱会', '巨星演唱会'];
+  let showName = showNames[level - 1] || '演出';
+
+  // 5% 概率爆红事件
+  let viral = false;
+  if (Math.random() < 0.05) {
+    const viralBonus = [100, 150, 200, 300, 500, 700, 900, 1200, 1500, 2000][level - 1] || 100;
+    income += viralBonus;
+    viral = true;
+  }
+
+  if (typeof setBalance === 'function' && typeof getBalance === 'function') {
+    setBalance(getBalance() + income);
+  }
+  if (typeof addTransaction === 'function') {
+    addTransaction({
+      icon: viral ? '🌟' : '🎤',
+      name: viral ? `爆红！${showName}` : showName,
+      amount: income,
+    });
+  }
+
+  localStorage.setItem(weekKey, '1');
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+
+  if (viral) {
+    _showCareerNotification(`🌟🌟🌟 爆红了！${showName}收入 £${income}！`);
+  } else {
+    _showCareerNotification(`🎤 ${showName}收入 £${income}`);
+  }
+  return income;
 }
 
 // 签到倍率（咖啡师）
@@ -583,7 +664,13 @@ function dailyCareerCheck() {
   // 5. 主播打赏
   checkStreamerTip();
 
-  // 6. 作家每日额外条数
+  // 6. 艺人代言费
+  checkEntertainerEndorsement();
+
+  // 7. 艺人每周演出
+  checkEntertainerShow();
+
+  // 8. 作家每日额外条数
   checkWriterBonus();
 }
 
