@@ -728,6 +728,8 @@ async function _processMergedMessage(text) {
 
     // 用户明显切换到日常话题时，强制退出调情状态
     const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|what r u doing|where are you|how was your day|how are you|what's up|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb|dinner|lunch|breakfast|for dinner|for lunch/i;
+    // 普通撒娇词：不是调情，直接走 Claude
+    const _normalAffection = /^(babe|baby|honey|darling|hubby|sweetie|love|hey babe|hey baby|hey honey|miss you|miss u|i miss you|想你|想你了|老公|宝贝|亲爱的|在吗|在不在|你在吗|babe\?|baby\?|honey\?)$/i;
     let _intimacyForceCleared = false;
     if (_clearIntimateKws.test(text) && chatHistory.slice(-6).some(m => m._intimate)) {
       isIntimate = false;
@@ -736,7 +738,7 @@ async function _processMergedMessage(text) {
 
     // 明确日常消息：跳过 Haiku 调情检测，直接走 Claude
     // 防止 Haiku 超时导致正常消息被错误路由到 Grok
-    const _isClearlyNormal = _clearIntimateKws.test(text) && !INTIMATE_PATTERNS.some(p => p.test(text));
+    const _isClearlyNormal = (_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text));
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
     // 明确日常消息跳过此步骤
