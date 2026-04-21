@@ -93,6 +93,11 @@ async function loadFromCloud() {
       }
       setIfMissing('meetType', p.meetType);
       setIfMissing('botNickname', p.botNickname);
+      // 职业系统
+      setIfMissing('careerType', p.careerType);
+      setIfMissing('careerLevel', p.careerLevel);
+      setIfMissing('careerStartDate', p.careerStartDate);
+      setIfMissing('careerLastSalaryMonth', p.careerLastSalaryMonth);
       // 用户设置：云端更新才覆盖；本地没有时也恢复（换设备场景）
       const setIfNewerOrMissing = (key, val) => {
         if (val == null || val === '') return;
@@ -600,6 +605,11 @@ async function saveToCloud() {
       metInPerson: localStorage.getItem('metInPerson') || 'false',
       meetType: localStorage.getItem('meetType') || '',
       botNickname: localStorage.getItem('botNickname') || '',
+      // 职业系统
+      careerType: localStorage.getItem('careerType') || '',
+      careerLevel: localStorage.getItem('careerLevel') || '',
+      careerStartDate: localStorage.getItem('careerStartDate') || '',
+      careerLastSalaryMonth: localStorage.getItem('careerLastSalaryMonth') || '',
       marriageType: localStorage.getItem('marriageType') || 'established',
       ghostAvatarUrl: (() => { const u = localStorage.getItem('ghostAvatarUrl') || ''; return u.startsWith('data:') ? '' : u; })(),
       ghostHeight: localStorage.getItem('ghostHeight') || '',

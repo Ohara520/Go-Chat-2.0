@@ -225,6 +225,15 @@ window.onload = async function() {
     // ── 包裹通知徽章更新 ─────────────────────────────────────
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
 
+    // ── 职业系统每日检查（升级、工资、被动收入、打赏）──────────
+    if (typeof dailyCareerCheck === 'function') dailyCareerCheck();
+    // 更新主页职业卡片描述
+    const _careerDesc = document.getElementById('careerCardDesc');
+    if (_careerDesc && typeof getCareerSummary === 'function') {
+      const _summary = getCareerSummary();
+      if (_summary !== '暂未选择职业') _careerDesc.textContent = _summary;
+    }
+
     // ── 恢复用户头像 ────────────────────────────────────────
     const savedAvatar = localStorage.getItem('userAvatarBase64');
     if (savedAvatar && typeof updateAvatarEverywhere === 'function') {
