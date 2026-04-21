@@ -44,7 +44,7 @@ function classifyJealousyContext(text) {
 
   const suggestiveSignals =
     /前任|暧昧|喜欢他|喜欢她|男模|点男模|陪酒|绿帽|戴绿帽|出轨|偷吃|约炮|睡别人|找别人睡|勾搭|撩别人/.test(t) ||
-    /flirt|flirting|close|touching|kiss|slept over|date|dating|male escort|escort|stripper|cheat|cheating|hook up|sleep with someone/.test(lower);
+    /flirt with|flirting with|slept over|dating|male escort|escort|stripper|cheat|cheating|hook up with|sleep with someone/.test(lower);
 
   const workOnly = workSignals && (workPeople || !hasExplicitPerson) && !suggestiveSignals;
 

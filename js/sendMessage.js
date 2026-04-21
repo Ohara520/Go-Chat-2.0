@@ -923,6 +923,11 @@ async function _processMergedMessage(text) {
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
     if (isIntimate) {
+      // 标记用户的消息为 _intimate，这样 cleanHistory 会过滤掉
+      // 防止 Claude 在余温阶段看到调情原文触发安全过滤
+      const lastUserMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0];
+      if (lastUserMsg) lastUserMsg._intimate = true;
+
       sessionStorage.removeItem('intimateSummarized');
       await _handleIntimateReply(text, rawHistory, _isSending);
       _isSending = false;
