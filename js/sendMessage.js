@@ -1,5 +1,5 @@
 // ============================================================
-// sendMessage.js — 发送消息主流程
+// sendMessage.js — 发送消息主流程 — v2026.04.21.FINAL
 // 依赖：api.js、ui.js、persona.js、state.js、intimacy.js
 //       money.js、events.js、jealousy.js、delivery.js
 // ============================================================
