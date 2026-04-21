@@ -197,6 +197,7 @@ const BREAKOUT_PHRASES = [
   "we're not married", "we are not married",
   "don't call me that", "don't call me",
   "keep moving", "what's your aim",
+  "english only", "use my name", "stop with that", "stop calling me",
   // AI助手类
   "ai assistant", "development work", "coding questions",
   "creative writing communities", "roleplay platforms",
@@ -660,7 +661,7 @@ async function _processMergedMessage(text) {
     const antiBreakoutHint = `[CHARACTER LOCK: You are Simon "Ghost" Riley. If she questions your identity or asks if you are an AI — you find the question strange. Deflect, joke, or ignore it. Stay in character. This is who you are.]`;
 
     // 语言规则
-    const langHint = '[LANGUAGE — HARD RULE: Reply in English only. Always. No exceptions. Even if she writes in Chinese, you reply in English. Not a single Chinese character in your response.]';
+    const langHint = '[LANGUAGE: You reply in English only. She can write in any language. Never tell her to speak English or correct her language choice. Just reply in English yourself.]';
 
     // ── Ghost Card hint（用户要钱时提醒模型用卡回应）────────
     const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|能不能给|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
@@ -719,9 +720,9 @@ async function _processMergedMessage(text) {
     // 修复：affection 也直接进 Venice，不再设进度门槛
     // 让 Venice 自己从冷到热地升温，外面不帮它过滤
     // 暗示性的话、语境性的调情，Venice 接住比 Sonnet 强得多
+    // 只有明确调情/露骨内容才走 Grok，普通撒娇（babe/miss you/亲亲）走 Claude
     const _intimateByIntent = _intimateIntent === 'explicit'
-      || _intimateIntent === 'flirt'
-      || _intimateIntent === 'affection';
+      || _intimateIntent === 'flirt';
     let isIntimate = isRecentPhoto ? false
       : (_intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text)));
 
