@@ -120,10 +120,12 @@ async function checkTriggersAndEmotion(userText, botText) {
   // ── 关键词预筛——没命中就直接走地点检测，跳过模型调用 ──
   const marketKeywords = [
     '冷','冻','暖','饿','吃','伙食','食物','累了','疲惫','想你','想念','思念',
-    'tired','cold','hungry','miss'
+    'tired','cold','hungry','miss','freezing','starving','exhausted','warm'
   ];
   const emotionKeywords = [
-    '开心','难过','委屈','饿','累','压力','生病','冷','热','想你','哭','不舒服','心情'
+    '开心','难过','委屈','饿','累','压力','生病','冷','热','想你','哭','不舒服','心情',
+    'sad','miss','hurt','tired','sick','lonely','cry','crying','upset','depressed',
+    'exhausted','cold','hungry','stressed','worried','scared','angry','miss you','love you'
   ];
   const moneyContextKeywords = [
     '买','钱','贵','便宜','省','花','穷','价格','折扣','划算','预算','负担',
@@ -203,13 +205,13 @@ emotion强度：轻/中/重`,
       const type      = result.emotion.type;
       const intensity = result.emotion.intensity;
 
-      // 7天冷却
+      // 2天冷却
       const coolKey  = 'reverseShipCool_' + type;
       const lastTime = parseInt(localStorage.getItem(coolKey) || '0');
-      if (Date.now() - lastTime < 3 * 24 * 3600 * 1000) return;
+      if (Date.now() - lastTime < 2 * 24 * 3600 * 1000) return;
 
-      // 概率：轻5% 中10% 重15%
-      const probMap = { '轻': 0.30, '中': 0.45, '重': 0.65 };
+      // 概率：轻35% 中55% 重75%
+      const probMap = { '轻': 0.35, '中': 0.55, '重': 0.75 };
       const prob = probMap[intensity] || 0.08;
       if (Math.random() > prob) return;
 
@@ -238,14 +240,14 @@ emotion强度：轻/中/重`,
       saveHistory();
 
       // 写入持久队列（替代 setTimeout，关页面不丢失）
-      // 3-5天后触发
-      const triggerAt = Date.now() + (Math.floor(Math.random() * 3) + 1) * 24 * 3600 * 1000;
+      // 30分钟-1小时后触发
+      const triggerAt = Date.now() + (30 + Math.floor(Math.random() * 30)) * 60 * 1000;
       const pending = getPendingReversePackages ? getPendingReversePackages() : JSON.parse(localStorage.getItem('pendingReversePackages') || '[]');
       pending.push({
         item,
         emotionType: type,
         triggerAt,
-        triggerAtTurn: _globalTurnCount + 2, // 至少再聊2轮才触发，避免太突兀
+        triggerAtTurn: _globalTurnCount + 1, // 至少再聊1轮才触发
         contextSnapshot: (typeof chatHistory !== 'undefined' ? chatHistory.filter(m => !m._system).slice(-4) : []),
         motive: type === '思念' ? 'longing' : type === '难过' || type === '委屈' ? 'compensation' : 'practical_care',
       });

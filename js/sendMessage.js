@@ -197,7 +197,7 @@ const BREAKOUT_PHRASES = [
   "we're not married", "we are not married",
   "don't call me that", "don't call me",
   "keep moving", "what's your aim",
-  "english only", "use my name", "stop with that", "stop calling me",
+  "english only", "english.", "use my name", "stop with that", "stop calling me",
   // AI助手类
   "ai assistant", "development work", "coding questions",
   "creative writing communities", "roleplay platforms",
@@ -730,8 +730,10 @@ async function _processMergedMessage(text) {
 
     // 保险1：连续3条Grok回复后，强制回到Claude（防止卡在调情循环）
     const _recentIntimateCount = chatHistory.slice(-6).filter(m => m._intimate && m.role === 'assistant').length;
+    let _forcedExitIntimate = false;
     if (_recentIntimateCount >= 3 && !INTIMATE_PATTERNS.some(p => p.test(text))) {
       isIntimate = false;
+      _forcedExitIntimate = true; // 标记：跳过后续 Haiku 检测
     }
 
     // 保险2：用户明显切换到日常话题时，强制退出
@@ -740,9 +742,11 @@ async function _processMergedMessage(text) {
     const _normalAffection = /^(babe|baby|honey|darling|hubby|sweetie|love|hey babe|hey baby|hey honey|miss you|miss u|i miss you|想你|想你了|老公|宝贝|亲爱的|在吗|在不在|你在吗|babe\?|baby\?|honey\?)$/i;
 
     // 保险3：用户愤怒/负面情绪时，强制退出调情（用户骂人不是在调情）
-    const _angryPatterns = /fuck you|fuck u|滚|go away|leave me alone|别烦我|烦死了|讨厌你|我生气了|i'm angry|i'm mad|i hate you|恨你|不想理你|闭嘴|shut up/i;
+    const _angryPatterns = /fuck you|fuck u|滚|go away|leave me alone|别烦我|烦死了|讨厌你|我生气了|i'm angry|i'm mad|i hate you|恨你|不想理你|闭嘴|shut up|生气|不开心/i;
+    let _angryForceExit = false;
     if (_angryPatterns.test(text)) {
       isIntimate = false;
+      _angryForceExit = true;
     }
 
     let _intimacyForceCleared = false;
@@ -752,8 +756,10 @@ async function _processMergedMessage(text) {
     }
 
     // 明确日常消息：跳过 Haiku 调情检测，直接走 Claude
-    // 防止 Haiku 超时导致正常消息被错误路由到 Grok
-    const _isClearlyNormal = (_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text));
+    // 也在强制退出/愤怒退出时跳过，防止 Haiku 把刚退出的又拉回去
+    const _isClearlyNormal = ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text)))
+      || _forcedExitIntimate
+      || _angryForceExit;
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
     // 明确日常消息跳过此步骤
@@ -1153,7 +1159,7 @@ async function _processMergedMessage(text) {
               .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`).join('\n');
             reply2 = await callVeniceForCurrentChar(
               (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nYou just sent a message and took it back. Send another — different angle, same tension. Flat delivery. English only. Short.',
-              recentMsgs2, 35
+              recentMsgs2, 60
             );
           } else {
             reply2 = await callHaiku(
@@ -1272,7 +1278,7 @@ async function _processMergedMessage(text) {
       checkLocationSpecialTrigger(text).catch(() => {});
     }
     // 情绪/商城触发：提高到45%（原25%太低）
-    if (Math.random() < 0.45) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
+    if (Math.random() < 0.70) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (chatHistory.slice(-6).some(m => m._intimate)) {
       setTimeout(() => { try { checkIntimateHighlight(text, reply); } catch(e) {} }, 1500);
     }
@@ -1382,7 +1388,7 @@ One or two lines. English only. lowercase.`;
     const geminiReply = await callVeniceForCurrentChar(
       (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + _memorySection,
       recentMsgs + '\nHer: ' + text,
-      35,
+      60,
       _intimateMemoryCtx
     );
 
@@ -1427,17 +1433,28 @@ One or two lines. English only. lowercase.`;
         }
       }
       cleanedReply = cleanedReply.replace(/\{[^}]*"unlock"[^}]*\}/g, '').trim();
-      // 只取第一段，防止 Grok 多段输出导致重复消息
-      const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
-      const firstPart = parts[0];
-      if (firstPart) appendMessage('bot', firstPart.trim());
-      chatHistory.push({ role: 'assistant', content: firstPart ? firstPart.trim() : cleanedReply, _intimate: true });
-      saveHistory();
-      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-      if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
-      incrementTodayCount();
-      if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
-      return;
+
+      // 复读检测：如果 Grok 回复跟最近3条 bot 消息相似，放弃走 Claude
+      const _recentBotMsgs = chatHistory.filter(m => m.role === 'assistant').slice(-3).map(m => (m.content || '').toLowerCase().trim());
+      const _cleanLower = cleanedReply.toLowerCase().trim();
+      const _isDuplicate = _recentBotMsgs.some(prev => prev === _cleanLower || (prev.length > 10 && _cleanLower.includes(prev.slice(0, 20))));
+
+      if (_isDuplicate) {
+        console.warn('[Grok] 复读检测触发，改走 Claude');
+        // 不 return，落到下面的 Claude 路径
+      } else {
+        // 只取第一段，防止 Grok 多段输出导致重复消息
+        const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
+        const firstPart = parts[0];
+        if (firstPart) appendMessage('bot', firstPart.trim());
+        chatHistory.push({ role: 'assistant', content: firstPart ? firstPart.trim() : cleanedReply, _intimate: true });
+        saveHistory();
+        if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+        if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
+        incrementTodayCount();
+        if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+        return;
+      }
     }
 
     // Venice失败，Haiku兜底（同样过滤图片消息）
