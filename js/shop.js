@@ -641,7 +641,10 @@ function openBuyModal(idx) {
   const isLuxury = currentCategory === 'luxury';
   const weeklySale = isLuxury ? getWeeklySale() : null;
   const onSale = weeklySale && weeklySale.name === p.name;
-  const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+  let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+  // 花艺师职业福利：商店打折
+  const _shopDiscount = typeof getCareerShopDiscount === 'function' ? getCareerShopDiscount() : 0;
+  if (_shopDiscount > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount / 100));
   const shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
   const total = displayPrice + shipping;
   const bal = getBalance();
@@ -708,7 +711,9 @@ function confirmPurchase() {
   const isLuxury = pendingCategory === 'luxury';
   const weeklySale = isLuxury ? getWeeklySale() : null;
   const onSale = weeklySale && weeklySale.name === p.name;
-  const displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+  let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+  const _shopDiscount2 = typeof getCareerShopDiscount === 'function' ? getCareerShopDiscount() : 0;
+  if (_shopDiscount2 > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount2 / 100));
   const shipping = p.isUserItem ? (isLuxury ? 25 : 10) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 35 : 15));
   const total = displayPrice + shipping;
   const txLabel = isWishlist ? '心愿 · ' : p.isGhostGift ? '寄给Ghost · ' : p.isUserItem ? '购买 · ' : '寄给Ghost · ';
