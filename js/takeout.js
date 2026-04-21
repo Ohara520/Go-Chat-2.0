@@ -22,11 +22,11 @@
 
 function getTakeoutFee() {
   const h = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }));
-  if (h >= 2  && h < 6)  return { fee: 7.0,  label: '凌晨配送费', time: '02–06' };
-  if (h >= 6  && h < 11) return { fee: 2.0,  label: '早间配送费', time: '06–11' };
-  if (h >= 11 && h < 18) return { fee: 2.0,  label: '日常配送费', time: '11–18' };
-  if (h >= 18 && h < 22) return { fee: 3.0,  label: '晚高峰配送费', time: '18–22' };
-  return                         { fee: 5.5,  label: '深夜配送费',  time: '22–02' };
+  if (h >= 2  && h < 6)  return { fee: 18.0, label: '凌晨配送费', time: '02–06' };
+  if (h >= 6  && h < 11) return { fee: 8.0,  label: '早间配送费', time: '06–11' };
+  if (h >= 11 && h < 18) return { fee: 8.0,  label: '日常配送费', time: '11–18' };
+  if (h >= 18 && h < 22) return { fee: 12.0, label: '晚高峰配送费', time: '18–22' };
+  return                         { fee: 15.0, label: '深夜配送费',  time: '22–02' };
 }
 
 
@@ -534,8 +534,9 @@ function _doTakeoutOrder(city, itemId) {
 
 function addTakeoutOrder(city, item) {
   const fee   = getTakeoutFee();
-  // 厨师职业福利：外卖打折 + 免配送费
-  let itemPrice = item.price;
+  // 全局价格倍率（菜品涨价，让厨师折扣有感）
+  const BASE_PRICE_MULTIPLIER = 2.5;
+  let itemPrice = Math.round(item.price * BASE_PRICE_MULTIPLIER);
   let deliveryFee = fee.fee;
   const _takeoutDiscount = typeof getCareerTakeoutDiscount === 'function' ? getCareerTakeoutDiscount() : 0;
   if (_takeoutDiscount > 0) itemPrice = Math.round(itemPrice * (1 - _takeoutDiscount / 100) * 100) / 100;
