@@ -771,6 +771,7 @@ If she speaks as if physically present, you stay grounded in the actual distance
 }
 
 Mood: ${getMoodLevel()}/10 | Affection: ${getAffection()}/100 | Together: ${marriageDaysTotal} days
+${localStorage.getItem('userMood') ? `Her mood right now: ${localStorage.getItem('userMoodEmoji') || ''} ${localStorage.getItem('userMoodLabel') || localStorage.getItem('userMood')}. She set this herself. Don't ask "what's wrong" directly — just be aware of it and respond accordingly.` : ''}
 ${localStorage.getItem('coldWarMode') === 'true'
   ? `Cold war: yes (stage ${localStorage.getItem('coldWarStage') || '1'})`
   : 'Cold war: no'}

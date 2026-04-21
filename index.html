@@ -231,6 +231,18 @@
     }
 
     /* ===== 氛围音乐系统 ===== */
+    /* ===== 心情选择器 ===== */
+    .mood-chip {
+      display:flex;align-items:center;gap:4px;
+      padding:6px 12px;border-radius:20px;
+      background:rgba(90,154,70,0.08);border:1px solid rgba(90,154,70,0.15);
+      cursor:pointer;transition:all 0.2s;
+    }
+    .mood-chip:active { transform:scale(0.95); }
+    .mood-chip.selected {
+      background:rgba(90,154,70,0.2);border-color:rgba(90,154,70,0.4);
+      box-shadow:0 0 8px rgba(90,154,70,0.15);
+    }
     .ambient-section {
       background: rgba(255,255,255,0.65);
       backdrop-filter: blur(20px);
@@ -842,52 +854,55 @@
       <!-- 手机内容卡片 -->
       <div class="profile-info-table" style="margin-bottom:14px;">
 
-        <!-- 最近通话 -->
+        <!-- 我的心情 -->
         <div style="padding:10px 16px 2px;border-bottom:1px solid rgba(140,190,100,0.18);">
-          <div style="font-size:10px;color:rgba(50,100,40,0.45);letter-spacing:1.5px;margin-bottom:6px;">最近通话</div>
-          <div id="profileCallLog">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(140,190,100,0.1);">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:34px;height:34px;border-radius:50%;background:rgba(90,154,70,0.12);border:1px solid rgba(90,154,70,0.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2d6028;">P</div>
-                <div>
-                  <div style="font-size:13px;color:#1e3d20;font-weight:500;">Price</div>
-                  <div style="font-size:11px;color:rgba(50,100,40,0.5);">已接听 · 4分12秒</div>
-                </div>
-              </div>
-              <div style="font-size:11px;color:rgba(50,100,40,0.4);" id="profileCallTime1"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(140,190,100,0.1);">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:34px;height:34px;border-radius:50%;background:rgba(220,80,80,0.08);border:1px solid rgba(220,80,80,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#b04040;">S</div>
-                <div>
-                  <div style="font-size:13px;color:#1e3d20;font-weight:500;">Soap</div>
-                  <div style="font-size:11px;color:rgba(180,60,60,0.7);">未接来电</div>
-                </div>
-              </div>
-              <div style="font-size:11px;color:rgba(50,100,40,0.4);">昨天 23:47</div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:34px;height:34px;border-radius:50%;background:rgba(90,154,70,0.12);border:1px solid rgba(90,154,70,0.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2d6028;">K</div>
-                <div>
-                  <div style="font-size:13px;color:#1e3d20;font-weight:500;">Kilter</div>
-                  <div style="font-size:11px;color:rgba(50,100,40,0.5);">已接听 · 1分07秒</div>
-                </div>
-              </div>
-              <div style="font-size:11px;color:rgba(50,100,40,0.4);">昨天 19:22</div>
-            </div>
+          <div style="font-size:10px;color:rgba(50,100,40,0.45);letter-spacing:1.5px;margin-bottom:8px;">我的心情</div>
+          <div id="moodSelector" style="display:flex;flex-wrap:wrap;gap:8px;padding-bottom:10px;">
+            <div class="mood-chip" data-mood="happy" onclick="setUserMood('happy','😊','开心')"><span>😊</span><span style="font-size:11px;">开心</span></div>
+            <div class="mood-chip" data-mood="sad" onclick="setUserMood('sad','😢','难过')"><span>😢</span><span style="font-size:11px;">难过</span></div>
+            <div class="mood-chip" data-mood="angry" onclick="setUserMood('angry','😤','生气')"><span>😤</span><span style="font-size:11px;">生气</span></div>
+            <div class="mood-chip" data-mood="miss" onclick="setUserMood('miss','🥰','想你了')"><span>🥰</span><span style="font-size:11px;">想你了</span></div>
+            <div class="mood-chip" data-mood="sleepy" onclick="setUserMood('sleepy','😴','困了')"><span>😴</span><span style="font-size:11px;">困了</span></div>
+            <div class="mood-chip" data-mood="sick" onclick="setUserMood('sick','🤒','不舒服')"><span>🤒</span><span style="font-size:11px;">不舒服</span></div>
+            <div class="mood-chip" data-mood="anxious" onclick="setUserMood('anxious','😰','焦虑')"><span>😰</span><span style="font-size:11px;">焦虑</span></div>
+            <div class="mood-chip" data-mood="bored" onclick="setUserMood('bored','🥱','无聊')"><span>🥱</span><span style="font-size:11px;">无聊</span></div>
           </div>
         </div>
 
-        <!-- 备忘录 -->
+        <!-- 氛围音乐 -->
         <div style="padding:10px 16px;border-bottom:1px solid rgba(140,190,100,0.18);">
-          <div style="font-size:10px;color:rgba(50,100,40,0.45);letter-spacing:1.5px;margin-bottom:8px;">备忘录</div>
-          <div style="background:rgba(220,245,210,0.45);border-radius:8px;padding:10px 12px;margin-bottom:8px;border-left:3px solid rgba(100,170,70,0.4);">
-            <div style="font-size:11px;color:rgba(45,90,35,0.5);margin-bottom:4px;">任务</div>
-            <div style="font-size:12px;color:rgba(45,90,35,0.85);line-height:1.7;" id="profileTaskList">— 装备检查 ✓<br>— Price 协调会 ✓<br>— 夜间巡逻</div>
+          <div onclick="toggleAmbient()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">🎵</span>
+              <div>
+                <div style="font-size:13px;color:#1e3d20;font-weight:600;">氛围音乐</div>
+                <div style="font-size:11px;color:rgba(50,100,40,0.5);" id="ambientSubtitle">点击开启专注氛围</div>
+              </div>
+            </div>
+            <span id="ambientArrow" style="font-size:12px;color:rgba(50,100,40,0.4);transition:transform 0.3s;">▼</span>
           </div>
-          <div id="profileMemoWrap" style="display:none;background:rgba(220,245,210,0.45);border-radius:8px;padding:10px 12px;border-left:3px solid rgba(100,170,70,0.4);">
-            <div style="font-size:12px;color:rgba(45,90,35,0.8);font-style:italic;" id="profileMemoLine"></div>
+          <div id="ambientBody" style="display:none;padding-top:10px;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+              <div class="ambient-track" data-id="rain" data-file="audio/rain.mp3" data-color="#5a9a46" data-glow="#5a9a46" onclick="toggleTrack(this)">
+                <div class="ambient-track-emoji">🌧️</div><div class="ambient-track-name">雨声</div>
+              </div>
+              <div class="ambient-track" data-id="fire" data-file="audio/fire.mp3" data-color="#d4880f" data-glow="#d4880f" onclick="toggleTrack(this)">
+                <div class="ambient-track-emoji">🔥</div><div class="ambient-track-name">壁炉</div>
+              </div>
+              <div class="ambient-track" data-id="wind" data-file="audio/wind.mp3" data-color="#6b8fa3" data-glow="#6b8fa3" onclick="toggleTrack(this)">
+                <div class="ambient-track-emoji">🌬️</div><div class="ambient-track-name">风声</div>
+              </div>
+              <div class="ambient-track" data-id="night" data-file="audio/night.mp3" data-color="#4a5568" data-glow="#4a5568" onclick="toggleTrack(this)">
+                <div class="ambient-track-emoji">🌙</div><div class="ambient-track-name">夜晚</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+              <span style="font-size:11px;color:rgba(50,100,40,0.4);">🔈</span>
+              <div style="flex:1;height:4px;background:rgba(90,154,70,0.15);border-radius:2px;cursor:pointer;position:relative;" onclick="setAmbientVolume(Math.round(event.offsetX/this.offsetWidth*100))">
+                <div id="ambientVolumeFill" style="height:100%;width:60%;background:rgba(90,154,70,0.5);border-radius:2px;"></div>
+              </div>
+              <span style="font-size:11px;color:rgba(50,100,40,0.4);">🔊</span>
+            </div>
           </div>
         </div>
 
@@ -2091,29 +2106,34 @@ function toggleStickerFromPlus() {
       weatherEl.textContent = w || '—';
     }
 
-    // 通话时间：基于 UK 当前时间往前推
-    const _ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Europe/London', hour: 'numeric', hour12: false
-    }).format(new Date()));
-    const _pastTime = (minAgo, maxAgo) => {
-      const ago = minAgo + Math.floor(Math.random() * (maxAgo - minAgo));
-      let h = _ukHour - ago;
-      const isToday = h >= 0;
-      if (h < 0) h += 24;
-      const m = Math.floor(Math.random() * 60);
-      const t = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
-      return (isToday ? '今天 ' : '昨天 ') + t;
-    };
-    const t1 = document.getElementById('profileCallTime1');
-    if (t1) t1.textContent = _pastTime(1, 4);
-
-    // 备忘录任务：读缓存，触发后台生成
-    const cachedMemo = localStorage.getItem('phoneMemoTasks');
-    const memoEl = document.getElementById('profileTaskList');
-    if (memoEl && cachedMemo) {
-      memoEl.innerHTML = cachedMemo.replace(/\n/g, '<br>');
+    // 心情选择器：恢复已选状态
+    const savedMood = localStorage.getItem('userMood');
+    if (savedMood) {
+      document.querySelectorAll('.mood-chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.mood === savedMood);
+      });
     }
-    if (typeof generatePhoneMemo === 'function') generatePhoneMemo();
+  }
+
+  // 设置用户心情
+  function setUserMood(mood, emoji, label) {
+    const current = localStorage.getItem('userMood');
+    if (current === mood) {
+      // 取消选择
+      localStorage.removeItem('userMood');
+      localStorage.removeItem('userMoodEmoji');
+      localStorage.removeItem('userMoodLabel');
+      document.querySelectorAll('.mood-chip').forEach(c => c.classList.remove('selected'));
+      if (typeof showToast === 'function') showToast('心情已清除');
+    } else {
+      localStorage.setItem('userMood', mood);
+      localStorage.setItem('userMoodEmoji', emoji);
+      localStorage.setItem('userMoodLabel', label);
+      document.querySelectorAll('.mood-chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.mood === mood);
+      });
+      if (typeof showToast === 'function') showToast(`${emoji} 心情已设为「${label}」`);
+    }
   }
   </script>
 </body>
