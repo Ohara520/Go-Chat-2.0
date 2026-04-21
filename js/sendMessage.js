@@ -726,10 +726,25 @@ async function _processMergedMessage(text) {
     let isIntimate = isRecentPhoto ? false
       : (_intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text)));
 
-    // 用户明显切换到日常话题时，强制退出调情状态
-    const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|what r u doing|where are you|how was your day|how are you|what's up|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb|dinner|lunch|breakfast|for dinner|for lunch/i;
+    // ── 强制退出调情模式的三道保险 ──
+
+    // 保险1：连续3条Grok回复后，强制回到Claude（防止卡在调情循环）
+    const _recentIntimateCount = chatHistory.slice(-6).filter(m => m._intimate && m.role === 'assistant').length;
+    if (_recentIntimateCount >= 3 && !INTIMATE_PATTERNS.some(p => p.test(text))) {
+      isIntimate = false;
+    }
+
+    // 保险2：用户明显切换到日常话题时，强制退出
+    const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|what r u doing|where are you|how was your day|how are you|what's up|what's going on|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb|dinner|lunch|breakfast|for dinner|for lunch|part.time|job|school|class|homework|study|shopping|cooking|cleaning/i;
     // 普通撒娇词：不是调情，直接走 Claude
     const _normalAffection = /^(babe|baby|honey|darling|hubby|sweetie|love|hey babe|hey baby|hey honey|miss you|miss u|i miss you|想你|想你了|老公|宝贝|亲爱的|在吗|在不在|你在吗|babe\?|baby\?|honey\?)$/i;
+
+    // 保险3：用户愤怒/负面情绪时，强制退出调情（用户骂人不是在调情）
+    const _angryPatterns = /fuck you|fuck u|滚|go away|leave me alone|别烦我|烦死了|讨厌你|我生气了|i'm angry|i'm mad|i hate you|恨你|不想理你|闭嘴|shut up/i;
+    if (_angryPatterns.test(text)) {
+      isIntimate = false;
+    }
+
     let _intimacyForceCleared = false;
     if (_clearIntimateKws.test(text) && chatHistory.slice(-6).some(m => m._intimate)) {
       isIntimate = false;
@@ -848,9 +863,11 @@ async function _processMergedMessage(text) {
     }
 
     // ── 余温状态判断 ─────────────────────────────────────────
-    const _recentMsgsPlain = chatHistory.filter(m => !m._system && !m._recalled).slice(-10);
-    const _lastIntimateIdx = [..._recentMsgsPlain].reverse().findIndex(m => m._intimate);
-    const _recentIntimate = _lastIntimateIdx !== -1;
+    // 修复：只看用户消息的距离，不看 Grok 的回复
+    // 原因：Grok 回复都标记 _intimate:true，导致距离永远是0，永远退不出
+    const _recentUserMsgsForGlow = chatHistory.filter(m => m.role === 'user' && !m._system && !m._recalled).slice(-8);
+    const _lastIntimateUserIdx = [..._recentUserMsgsForGlow].reverse().findIndex(m => m._intimate);
+    const _recentIntimate = _lastIntimateUserIdx !== -1 || chatHistory.slice(-4).some(m => m._intimate);
 
     // 修复：有图片时强制关闭余温调情流程
     // 原因：余温期 _recentIntimate=true 会触发 _handleIntimateReply，
@@ -862,7 +879,7 @@ async function _processMergedMessage(text) {
       chatHistory.indexOf(_recentPhotoExists) >= chatHistory.length - 6;
 
     if (!isIntimate && _recentIntimate && !_hasRecentPhoto) {
-      const _dailyAfterIntimate = _lastIntimateIdx;
+      const _dailyAfterIntimate = _lastIntimateUserIdx === -1 ? 99 : _lastIntimateUserIdx;
       const _dailyKws = /吃饭|睡觉|今天|训练|任务|怎么样|好了|行了|不说了|换个话题|算了|随便|工作|上班|下班|累了|饿了|喝水|天气|无聊|在干嘛|在哪|几点|时间|回来了|出门|到了|好冷|好热|what.*day|how.*day|ate|sleep|training|mission|anyway|work|tired|hungry|weather|boring|where are you|what time|got home|heading out/i;
       const _isShiftingAway = _dailyKws.test(text) && _dailyAfterIntimate >= 1;
 
@@ -1395,6 +1412,7 @@ One or two lines. English only. lowercase.`;
       cleanedReply = cleanedReply
         .replace(/^still here[.,]?\s*\n?/i, '')
         .replace(/^still thinking[^.]*\.?\s*\n?/i, '')
+        .replace(/^screen'?s?\s*(quiet|dark|low|still|says|glowing|down|at)[^.]*\.?\s*\n?/i, '')
         .replace(/^yeah[.,]?\s*\n?/i, '')
         .replace(/^,\s*/i, '')
         .trim();
