@@ -6,8 +6,8 @@
 // ============================================================
 
 // ===== 模型常量 =====
-const MODEL_OPUS   = 'claude-opus-4-6';       // 主聊天
-const MODEL_SONNET = 'claude-sonnet-4-6';     // 心声/检测等轻量调用
+const MODEL_OPUS   = 'claude-sonnet-4-5-20250929';   // 主聊天
+const MODEL_SONNET = 'claude-sonnet-4-5-20250929';   // 心声/快递/外卖等
 const MODEL_HAIKU  = 'claude-haiku-4-5-20251001';
 
 function getMainModel() {
@@ -344,6 +344,15 @@ function isBreakout(text) {
     "regardless of how the request is framed",
     "the elaborate character",
     "i'm not simon", "i am not simon",
+    // 否认关系
+    "not your husband", "not your wife", "not married",
+    "not your honey", "not your babe", "not your baby",
+    "not your darling", "not your love", "not your boyfriend",
+    "not your simon", "not your ghost",
+    "i don't have a wife", "we're not together", "we're not married",
+    "don't call me that", "don't call me",
+    "keep moving", "what's your aim",
+    //
     "i need to pause here",
     "i need to be direct with you",
     "i need to be straight with you",

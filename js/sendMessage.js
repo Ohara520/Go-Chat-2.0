@@ -191,10 +191,12 @@ const BREAKOUT_PHRASES = [
   "not your boyfriend", "not your partner",
   "not your honey", "not your babe", "not your baby",
   "not your darling", "not your love",
+  "not your simon", "not your ghost",
   "i don't have a wife", "i don't have a partner",
   "we're not together", "we are not together",
   "we're not married", "we are not married",
   "don't call me that", "don't call me",
+  "keep moving", "what's your aim",
   // AI助手类
   "ai assistant", "development work", "coding questions",
   "creative writing communities", "roleplay platforms",
@@ -1124,7 +1126,7 @@ async function _processMergedMessage(text) {
               .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`).join('\n');
             reply2 = await callVeniceForCurrentChar(
               (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nYou just sent a message and took it back. Send another — different angle, same tension. Flat delivery. English only. Short.',
-              recentMsgs2, 150
+              recentMsgs2, 60
             );
           } else {
             reply2 = await callHaiku(
@@ -1316,7 +1318,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef) {
   try {
     // 图片消息替换为占位符传给Grok——Grok看不到图，用占位符保留上下文
     // 这样余温期调情可以正常进行，不会因为Grok看不到图而破防说Kirk
-    const recentMsgs = rawHistory.slice(-15).map(m => {
+    const recentMsgs = rawHistory.slice(-8).map(m => {
       const who = m.role === 'user' ? 'Her' : 'Ghost';
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
       if (hasPhoto) return `${who}: [sent a photo]`;
@@ -1353,7 +1355,7 @@ One or two lines. English only. lowercase.`;
     const geminiReply = await callVeniceForCurrentChar(
       (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + _memorySection,
       recentMsgs + '\nHer: ' + text,
-      120,
+      60,
       _intimateMemoryCtx
     );
 
