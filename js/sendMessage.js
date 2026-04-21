@@ -250,46 +250,7 @@ function parseAssistantTags(reply) {
   return { cleanedReply, giveMoney, coldWarStart, sendGift };
 }
 
-// ===== 辅助：自动检测并解锁Ghost资料字段 =====
-// 兜底：模型说了但忘打tag时，扫描文字内容自动解锁
-function autoUnlockFromReply(reply) {
-  const lower = reply.toLowerCase();
-  const birthday = localStorage.getItem('ghostBirthday') || '';
-  const zodiacZh = localStorage.getItem('ghostZodiac') || '';
-  const zodiacEn = (localStorage.getItem('ghostZodiacEn') || '').toLowerCase();
-  const height = (localStorage.getItem('ghostHeight') || '188cm').toLowerCase();
-  const weight = (localStorage.getItem('ghostWeight') || '95kg').toLowerCase();
-  const blood = (localStorage.getItem('ghostBloodType') || 'o').toLowerCase();
-  const hometown = (localStorage.getItem('ghostHometown') || 'manchester').toLowerCase();
-
-  const toUnlock = [];
-  const monthMap = {'1':'january','2':'february','3':'march','4':'april','5':'may','6':'june',
-    '7':'july','8':'august','9':'september','10':'october','11':'november','12':'december'};
-
-  // 生日：支持中英文格式
-  if (birthday && !localStorage.getItem('ghostUnlocked_birthday')) {
-    let matched = lower.includes(birthday);
-    if (!matched) {
-      const m = birthday.match(/(\d+)月(\d+)日/);
-      if (m) {
-        const enMonth = monthMap[m[1]] || '';
-        if (enMonth && lower.includes(enMonth) && lower.includes(m[2])) matched = true;
-      }
-    }
-    if (matched) toUnlock.push('birthday');
-  }
-  if (zodiacZh && lower.includes(zodiacZh) && !localStorage.getItem('ghostUnlocked_zodiac')) toUnlock.push('zodiac');
-  if (zodiacEn && lower.includes(zodiacEn) && !localStorage.getItem('ghostUnlocked_zodiac')) toUnlock.push('zodiac');
-  if (height && lower.includes(height.replace('cm','')) && !localStorage.getItem('ghostUnlocked_height')) toUnlock.push('height');
-  if (weight && lower.includes(weight.replace('kg','')) && !localStorage.getItem('ghostUnlocked_weight')) toUnlock.push('weight');
-  if (blood && lower.includes(blood) && lower.includes('blood') && !localStorage.getItem('ghostUnlocked_blood_type')) toUnlock.push('blood_type');
-  if (hometown && lower.includes('manchester') && !localStorage.getItem('ghostUnlocked_hometown')) toUnlock.push('hometown');
-
-  if (toUnlock.length > 0) {
-    toUnlock.forEach(f => localStorage.setItem('ghostUnlocked_' + f, 'true'));
-    if (typeof renderGhostProfile === 'function') renderGhostProfile();
-  }
-}
+// autoUnlockFromReply — REMOVED (旧 unlock 系统已移除)
 
 // ===== 历史保存 =====
 function saveHistory() {
@@ -483,21 +444,8 @@ async function _processMergedMessage(text) {
 
       const _comebackPrompt = `[She has been away for ${_timeDesc}. She just came back and sent a message. Ghost noticed the absence. ${_styleGuide} Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay in Ghost's voice — dry, real, lowercase.]`;
 
-      setTimeout(() => {
-        if (_isSending) return;
-        showTyping();
-        callHaiku((typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()), [
-          ...chatHistory.filter(m => !m._system).slice(-6),
-          { role: 'user', content: _comebackPrompt }
-        ], 80).then(r => {
-          hideTyping();
-          if (r && !isBreakout(r) && r.length < 120) {
-            appendMessage('bot', r);
-            chatHistory.push({ role: 'assistant', content: r });
-            saveHistory();
-          }
-        }).catch(() => hideTyping());
-      }, 3500); // 延迟加大，确保主回复先完成
+      // 存储 comeback 意图，等主回复结束后再触发（修复竞态）
+      sessionStorage.setItem('pendingComebackPrompt', _comebackPrompt);
     }
   }
 
@@ -790,7 +738,8 @@ async function _processMergedMessage(text) {
             `用户说：${text}`,
             100
           ),
-          new Promise(resolve => setTimeout(() => resolve(''), 2500))
+          // 超时兜底：拿不准就当调情处理（走 Grok 比 Claude 破防更安全）
+          new Promise(resolve => setTimeout(() => resolve('{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'), 3000))
         ]);
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
@@ -1097,9 +1046,7 @@ async function _processMergedMessage(text) {
       }
     } catch(e) {}
 
-    // ── Step 5: unlock tag处理 + 资料自动解锁 ───────────────
-    // cleanBotText已在appendMessage里处理unlock，这里只做自动检测
-    autoUnlockFromReply(reply);
+    // ── Step 5: 文本清理 ───────────────────────────────────
     reply = reply.replace(/\s*—\s*/g, '\n').trim();
 
     // ── Step 6: 渲染消息 ─────────────────────────────────────
@@ -1205,20 +1152,8 @@ async function _processMergedMessage(text) {
     }
     if (coldWarStart) startColdWar();
 
-    // ── 好感度更新 ───────────────────────────────────────────
-    if (['爱你','想你','好想你','么么','亲亲'].some(k => text.includes(k))) {
-      changeMood(1); changeAffection(1);
-    }
-    const nicknameKey = 'nicknameAffection_' + getTodayDateStr();
-    if (!localStorage.getItem(nicknameKey)) {
-      if (['老公','hubby','宝贝','babe','老公大人','亲爱的','baby','honey','darling'].some(k => text.toLowerCase().includes(k))) {
-        changeAffection(1); localStorage.setItem(nicknameKey, '1');
-      }
-    }
-    const dailyTalkKey = 'dailyTalkAffection_' + getTodayDateStr();
-    if (!localStorage.getItem(dailyTalkKey) && getTodayCount() >= 10) {
-      changeAffection(1); localStorage.setItem(dailyTalkKey, '1');
-    }
+    // ── 好感度更新（已移至 updateStateFromUserInput 统一处理，此处不再重复）──
+    // 仅保留 updateStateFromUserInput 未覆盖的逻辑：连续登录奖励
     const streakAffKey = 'streakAffection_' + getTodayDateStr();
     if (!localStorage.getItem(streakAffKey)) {
       if (parseInt(localStorage.getItem('visitStreak') || '1') >= 2) {
@@ -1342,6 +1277,28 @@ async function _processMergedMessage(text) {
     if (_currentAbortController) {
       _currentAbortController = null;
     }
+    // BUG-2 FIX: comeback 回复在主回复完成后才触发，避免竞态
+    const _pendingComeback = sessionStorage.getItem('pendingComebackPrompt');
+    if (_pendingComeback) {
+      sessionStorage.removeItem('pendingComebackPrompt');
+      setTimeout(async () => {
+        if (_isSending) return;
+        showTyping();
+        try {
+          const r = await callHaiku(
+            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()),
+            [...chatHistory.filter(m => !m._system).slice(-6), { role: 'user', content: _pendingComeback }],
+            80
+          );
+          hideTyping();
+          if (r && !isBreakout(r) && r.length < 120) {
+            appendMessage('bot', r);
+            chatHistory.push({ role: 'assistant', content: r });
+            saveHistory();
+          }
+        } catch(e) { hideTyping(); }
+      }, 2000);
+    }
   }
 }
 
@@ -1428,7 +1385,7 @@ One or two lines. English only. lowercase.`;
       const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
       const firstPart = parts[0];
       if (firstPart) appendMessage('bot', firstPart.trim());
-      chatHistory.push({ role: 'assistant', content: cleanedReply, _intimate: true });
+      chatHistory.push({ role: 'assistant', content: firstPart ? firstPart.trim() : cleanedReply, _intimate: true });
       saveHistory();
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
       if (typeof resetSilenceTimer === 'function') resetSilenceTimer();

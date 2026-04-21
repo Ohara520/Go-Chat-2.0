@@ -467,7 +467,7 @@ One or two lines. Lowercase. English only.]`;
       const res2  = await fetchWithTimeout('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+          model: MODEL_SONNET,
           max_tokens: 150,
           system: buildDeliverySystem(),
           messages: [...chatHistory.slice(-10), {
@@ -527,7 +527,7 @@ He doesn't make a show of it. But he keeps it. English only. Lowercase.]`;
           const res = await fetchWithTimeout('/api/chat', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+              model: MODEL_SONNET,
               max_tokens: 150,
               system: buildDeliverySystem(),
               messages: [...chatHistory.slice(-10), { role: 'user', content: _deliveryUserContent }]
@@ -557,7 +557,7 @@ He doesn't make a show of it. But he keeps it. English only. Lowercase.]`;
           const res2  = await fetchWithTimeout('/api/chat', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+              model: MODEL_SONNET,
               max_tokens: 400,
               system: buildDeliverySystem(),
               messages: [...chatHistory.slice(-15), {
@@ -654,7 +654,7 @@ async function showMysteryPackage(delivery) {
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+        model: MODEL_SONNET,
         max_tokens: 60,
         system: buildDeliverySystem(),
         messages: [...chatHistory.slice(-6), {
@@ -750,7 +750,7 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+        model: MODEL_SONNET,
         max_tokens: 400,
         system: buildDeliverySystem(),
         messages: chatHistory.slice(-20)

@@ -742,7 +742,7 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+              model: MODEL_SONNET,
               max_tokens: 100,
               system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
               messages: [

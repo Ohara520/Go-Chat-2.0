@@ -586,7 +586,7 @@ async function sendSticker(id) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: getMainModel(),
+        model: MODEL_SONNET,
         max_tokens: 300,
         system: stickerSystem,
         systemParts: buildSystemPromptParts(_stickerBase),

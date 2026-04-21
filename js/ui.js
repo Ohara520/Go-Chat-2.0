@@ -92,27 +92,7 @@ function cleanBotText(text, scene = 'normal') {
   // 2. 清除系统控制tag
   text = text.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
 
-  // 3. 解析并处理 unlock tag（解锁资料，然后从文本里删掉）
-  // 数组格式：{"unlock": ["height","weight"]}
-  const unlockArr = text.match(/"unlock"\s*:\s*\[([^\]]+)\]/);
-  if (unlockArr) {
-    const fields = (unlockArr[1].match(/"([^"]+)"/g) || []).map(f => f.replace(/"/g, ''));
-    fields.forEach(f => {
-      if (_UNLOCK_VALID_FIELDS.includes(f)) localStorage.setItem(`ghostUnlocked_${f}`, 'true');
-    });
-    if (typeof renderGhostProfile === 'function') renderGhostProfile();
-  } else {
-    // 单个格式：{"unlock": "height"} 或 {'unlock': null}
-    const unlockSingle = text.match(/"unlock"\s*:\s*"([^"]+)"/);
-    if (unlockSingle) {
-      const f = unlockSingle[1].trim();
-      if (_UNLOCK_VALID_FIELDS.includes(f)) {
-        localStorage.setItem(`ghostUnlocked_${f}`, 'true');
-        if (typeof renderGhostProfile === 'function') renderGhostProfile();
-      }
-    }
-  }
-  // 全格式清除（含null、数组、单个、夹在中间的）
+  // 3. 清除 unlock tag 残留（旧系统已移除，仅做清理防止模型偶尔输出）
   text = text.replace(/\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
   text = text.replace(/\{\s*"unlock"\s*:\s*null\s*\}/g, '').trim();
   text = text.replace(/\{\s*'unlock'\s*:\s*null\s*\}/g, '').trim();

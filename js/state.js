@@ -998,12 +998,16 @@ async function ghostApologize() {
         model: getMainModel(),
         max_tokens: 500,
         system: sys,
-        messages: typeof chatHistory !== 'undefined' ? chatHistory.slice(-20) : []
+        messages: typeof chatHistory !== 'undefined'
+          ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => ({ role: m.role, content: m.content }))
+          : []
       })
     });
     const data = await res.json();
     if (typeof hideTyping === 'function') hideTyping();
     const reply = data.content?.[0]?.text || '...';
+    // BUG-9 FIX: 破防检测
+    if (isBreakout(reply)) { endColdWar(false); return; }
     if (typeof emitGhostNarrativeEvent === 'function') {
       await emitGhostNarrativeEvent(reply.trim(), { storyId: 'cold_war_apology', delayMs: 0 });
     }
@@ -1031,7 +1035,9 @@ async function ghostSendMakeupMoney() {
         model: getMainModel(),
         max_tokens: 300,
         system: sys,
-        messages: typeof chatHistory !== 'undefined' ? chatHistory.slice(-20) : []
+        messages: typeof chatHistory !== 'undefined'
+          ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => ({ role: m.role, content: m.content }))
+          : []
       })
     });
     const data = await res.json();

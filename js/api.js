@@ -6,11 +6,12 @@
 // ============================================================
 
 // ===== 模型常量 =====
-const MODEL_SONNET = 'claude-sonnet-4-6';
+const MODEL_OPUS   = 'claude-opus-4-6';       // 主聊天
+const MODEL_SONNET = 'claude-sonnet-4-6';     // 心声/检测等轻量调用
 const MODEL_HAIKU  = 'claude-haiku-4-5-20251001';
 
 function getMainModel() {
-  return MODEL_SONNET;
+  return MODEL_OPUS;
 }
 
 // ===== 基础网络工具 =====
@@ -117,12 +118,36 @@ async function callSonnet(system, messages, maxTokens = 400) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: MODEL_SONNET,
+        model: MODEL_OPUS,
         max_tokens: maxTokens,
         system,
         messages: cleanMessages(messages),
       }),
     }, 25000);
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.content?.[0]?.text?.trim() || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * 调用 Sonnet 4.6（轻量调用：心声、检测、非主聊天场景）
+ * 比 Opus 便宜，质量对一两句话的生成足够
+ */
+async function callSonnetLight(system, messages, maxTokens = 100) {
+  try {
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL_SONNET,
+        max_tokens: maxTokens,
+        system,
+        messages: cleanMessages(messages),
+      }),
+    }, 15000);
     if (!res.ok) return '';
     const data = await res.json();
     return data.content?.[0]?.text?.trim() || '';
@@ -194,15 +219,14 @@ async function callGrok(user, maxTokens = 300, imageBase64 = null, scene = 'norm
 
 /**
  * 调用 Grok（带自定义 system）
- * 用于心声、调情总结等需要专用 prompt 的场景
- * @param {string} system      专用系统提示
- * @param {string} user        用户消息或上下文
- * @param {number} maxTokens   默认300
- * @returns {string} 回复文本，失败返回空字符串
+ * 修复：后端 /api/gemini 不读 system 字段，合并到 user 消息里
  */
 async function callGrokWithSystem(system, user, maxTokens = 300) {
   try {
-    const body = { system, user, max_tokens: maxTokens };
+    // 后端 gemini.js 有自己的内建人设，不读请求里的 system
+    // 把自定义 system 合并进 user，确保 Grok 看得到
+    const combinedUser = system ? (system + '\n\n' + user) : user;
+    const body = { user: combinedUser, max_tokens: maxTokens };
     const res = await fetchWithTimeout('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -283,7 +307,7 @@ async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 10
   // 中转节点不透传 anthropic-beta header，暂时不用 cache_control
   // 等中转支持透传后再开启缓存
   const body = {
-    model: MODEL_SONNET,
+    model: MODEL_OPUS,
     max_tokens: maxTokens,
     system: finalSystem,
     messages: messages,

@@ -973,7 +973,7 @@ async function ghostSendInitMessage(offlineHours) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+        model: MODEL_SONNET,
         max_tokens: 150,
         ...(() => { const s = buildSystemPrompt(); return { system: s, systemParts: buildSystemPromptParts(s) }; })(),
         messages: [...(typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []),
@@ -1171,7 +1171,7 @@ async function _ghostCardReaction(amount, itemName, category, card) {
     const _sys = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
     const _res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514', max_tokens: 60, system: _sys, messages: [...(chatHistory||[]).filter(m=>!m._system).slice(-4), { role:'user', content: prompt }] })
+      body: JSON.stringify({ model: MODEL_SONNET, max_tokens: 60, system: _sys, messages: [...(chatHistory||[]).filter(m=>!m._system).slice(-4), { role:'user', content: prompt }] })
     }, 10000);
     const _data = await _res.json();
     const _reply = (_data.content?.[0]?.text || '').trim();

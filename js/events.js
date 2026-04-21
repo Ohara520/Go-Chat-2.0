@@ -119,7 +119,7 @@ async function generateLifePing() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: MODEL_HAIKU,
         max_tokens: 60,
         system: buildGhostStyleCore() + '\n' + buildLifePingPrompt(scene),
         messages: [{ role: 'user', content: 'Send your message.' }]
@@ -181,7 +181,9 @@ async function callGrokWithCtx(systemPrompt, writePrompt, n = 4) {
   const userContent = recentCtx
     ? `Recent chat:\n${recentCtx}\n\n${writePrompt}`
     : writePrompt;
-  return await callGrok(systemPrompt, userContent, 100);
+  // BUG-10 FIX: 旧版把 systemPrompt 和 userContent 拆开传给 callGrok，参数错位
+  // 后端 /api/gemini 有自己的内建人设，这里把 styleCore + userContent 合并成 user 消息
+  return await callGrok(systemPrompt + '\n\n' + userContent, 100);
 }
 
 // ── 事件冷却管理 ──────────────────────────────────
@@ -1446,11 +1448,15 @@ function triggerSeriousTalk() {
       model: getMainModel(),
       max_tokens: 1000,
       system: sys,
-      messages: typeof chatHistory !== 'undefined' ? chatHistory.slice(-20) : []
+      messages: typeof chatHistory !== 'undefined'
+        ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => ({ role: m.role, content: m.content }))
+        : []
     })
   }).then(r => r.json()).then(data => {
     if (typeof hideTyping === 'function') hideTyping();
     const reply = data.content?.[0]?.text || '...';
+    // BUG-9 FIX: 破防检测
+    if (typeof isBreakout === 'function' && isBreakout(reply)) return;
     if (typeof appendMessage === 'function') appendMessage('bot', reply.trim());
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({ role: 'assistant', content: reply });

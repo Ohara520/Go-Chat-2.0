@@ -1064,7 +1064,7 @@ async function triggerHomeItemMoment(product) {
 
   try {
     const sys = buildSystemPrompt();
-    const reply = await callSonnet(
+    const reply = await callSonnetLight(
       sys,
       [...chatHistory.slice(-6), {
         role: 'user',
@@ -1219,7 +1219,7 @@ async function generatePhoneMemo() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: MODEL_HAIKU,
         max_tokens: 80,
         system: 'You write brief, realistic memo items. Output only the list.',
         messages: [{ role: 'user', content: prompt }]

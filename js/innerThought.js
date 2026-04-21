@@ -209,8 +209,9 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
 
     if (_isIntimateThought) {
       // Grok生成调情心声
+      // 修复：callGrokWithSystem 的 system 参数后端不读，把 prompt 合并到 user 消息里
       try {
-        const grokRaw = await callGrokWithSystem(thoughtPrompt, 'inner thought now.', 80);
+        const grokRaw = await callGrok(thoughtPrompt + '\n\nWrite his inner thought now.', 80);
         const kirkPhrases = ["kirk","kiro","ai assistant","i'm an ai","development work","coding questions","step out of character","can't roleplay"];
         if (grokRaw) {
           // 直接取纯文字
@@ -236,10 +237,10 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
       }
 
     } else {
-      // 普通场景：Sonnet（质量更高，心声更有人味）
+      // 普通场景：Sonnet 4.6（质量够用，比 Opus 省钱）
       try {
         const badPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","claude","step out of character","can't roleplay"];
-        const sonnetRaw = await callSonnet(thoughtPrompt, [{ role: 'user', content: 'inner thought now.' }], 60);
+        const sonnetRaw = await callSonnetLight(thoughtPrompt, [{ role: 'user', content: 'inner thought now.' }], 60);
         if (sonnetRaw) {
           const cleaned = sonnetRaw
             .replace(/```[\s\S]*?```/g, '')
@@ -252,7 +253,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
           }
         }
       } catch(e) {
-        console.warn('[心声] Sonnet调用失败:', e);
+        console.warn('[心声] SonnetLight调用失败:', e);
       }
 
       // Sonnet 失败 → Haiku 兜底

@@ -85,10 +85,11 @@ async function loadFromCloud() {
       if (p.ghostBirthday) {
         localStorage.setItem('ghostBirthday', p.ghostBirthday);
         localStorage.setItem('ghostZodiac', p.ghostZodiac || localStorage.getItem('ghostZodiac') || '');
+        setIfMissing('ghostZodiacEn', p.ghostZodiacEn);
       } else {
         setIfMissing('ghostBirthday', p.ghostBirthday);
         setIfMissing('ghostZodiac', p.ghostZodiac);
-      setIfMissing('ghostZodiacEn', p.ghostZodiacEn);
+        setIfMissing('ghostZodiacEn', p.ghostZodiacEn);
       }
       setIfMissing('meetType', p.meetType);
       setIfMissing('botNickname', p.botNickname);
