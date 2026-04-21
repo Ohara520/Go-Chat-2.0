@@ -726,18 +726,29 @@ async function _processMergedMessage(text) {
       : (_intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text)));
 
     // 用户明显切换到日常话题时，强制退出调情状态
-    const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|where are you|how was your day|how are you|what's up|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb/i;
+    const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|what r u doing|where are you|how was your day|how are you|what's up|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb|dinner|lunch|breakfast|for dinner|for lunch/i;
     let _intimacyForceCleared = false;
     if (_clearIntimateKws.test(text) && chatHistory.slice(-6).some(m => m._intimate)) {
       isIntimate = false;
       _intimacyForceCleared = true;
     }
 
+    // 明确日常消息：跳过 Haiku 调情检测，直接走 Claude
+    // 防止 Haiku 超时导致正常消息被错误路由到 Grok
+    const _isClearlyNormal = _clearIntimateKws.test(text) && !INTIMATE_PATTERNS.some(p => p.test(text));
+
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
-    // 情绪判断用 Haiku——每条消息都跑，速度优先
-    let _emotionLabel = '平淡'; // 供第二层判断用
-    if (!isIntimate && !isRecentPhoto) {
+    // 明确日常消息跳过此步骤
+    let _emotionLabel = '平淡';
+    if (!isIntimate && !isRecentPhoto && !_isClearlyNormal) {
       try {
+        // 判断超时时是否应该默认走调情：
+        // 只有在最近有调情上下文时才默认 flirt=true，否则默认 flirt=false
+        const _hasRecentIntimateForTimeout = chatHistory.slice(-6).some(m => m._intimate);
+        const _timeoutDefault = _hasRecentIntimateForTimeout
+          ? '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'
+          : '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
+
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
             '你是一个消息分类器。你的唯一任务是分析用户消息并返回JSON。不要代入任何角色，不要回复用户，不要扮演任何人。\n' +
@@ -749,8 +760,8 @@ async function _processMergedMessage(text) {
             `用户说：${text}`,
             100
           ),
-          // 超时兜底：拿不准就当调情处理（走 Grok 比 Claude 破防更安全）
-          new Promise(resolve => setTimeout(() => resolve('{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'), 3000))
+          // 超时兜底：有调情上下文时才默认走 Grok，否则走 Claude
+          new Promise(resolve => setTimeout(() => resolve(_timeoutDefault), 3000))
         ]);
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
@@ -1380,6 +1391,11 @@ One or two lines. English only. lowercase.`;
       let cleanedReply = geminiReply
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
+        .trim();
+      // 清理 Grok 常见的重复开头（"still here. yeah." 卡带问题）
+      cleanedReply = cleanedReply
+        .replace(/^still here\.?\s*\n?/i, '')
+        .replace(/^yeah\.?\s*\n?/i, '')
         .trim();
       // 处理 unlock tag（解锁资料后从文本删掉）
       const _unlockMatch = cleanedReply.match(/"unlock"\s*:\s*"([^"]+)"/);
