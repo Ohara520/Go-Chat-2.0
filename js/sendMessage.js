@@ -728,12 +728,13 @@ async function _processMergedMessage(text) {
 
     // ── 强制退出调情模式的三道保险 ──
 
-    // 保险1：连续3条Grok回复后，强制回到Claude（防止卡在调情循环）
-    const _recentIntimateCount = chatHistory.slice(-6).filter(m => m._intimate && m.role === 'assistant').length;
+    // 保险1：上一条是Grok且用户这条不含调情内容 → 直接回Claude
+    // 只有用户明确继续调情（正则命中）才留在Grok
+    const _lastBotIntimate = chatHistory.slice(-2).some(m => m._intimate && m.role === 'assistant');
     let _forcedExitIntimate = false;
-    if (_recentIntimateCount >= 3 && !INTIMATE_PATTERNS.some(p => p.test(text))) {
+    if (_lastBotIntimate && !INTIMATE_PATTERNS.some(p => p.test(text))) {
       isIntimate = false;
-      _forcedExitIntimate = true; // 标记：跳过后续 Haiku 检测
+      _forcedExitIntimate = true;
     }
 
     // 保险2：用户明显切换到日常话题时，强制退出
