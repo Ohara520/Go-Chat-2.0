@@ -1,6 +1,8 @@
 // ===================================================
 // takeout.js — 外卖系统
 //
+// 外卖价格倍率（让厨师折扣有体感）
+const TAKEOUT_PRICE_MULTIPLIER = 2.5;
 // 职责：
 // - TAKEOUT_MENUS         各城市菜单（11个城市）
 // - getTakeoutFee()       时段配送费
@@ -310,7 +312,7 @@ function _renderShopTab(body, city) {
     : '';
 
   const cards = items.map(item => {
-    const total     = item.price + fee.fee;
+    const total     = Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER) + fee.fee;
     const canAfford = bal >= total;
     const disabled  = !canOrder || !canAfford;
     return `
@@ -325,7 +327,7 @@ function _renderShopTab(body, city) {
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
-        <div style="font-size:16px;font-weight:700;color:#c47010;">£${item.price}</div>
+        <div style="font-size:16px;font-weight:700;color:#c47010;">£${Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER)}</div>
         <button onclick="_confirmTakeout('${city}','${item.id}')" ${disabled ? 'disabled' : ''}
           style="background:${disabled ? '#e8d8b0' : '#c47010'};color:${disabled ? '#a08050' : '#fff'};
             border:none;border-radius:20px;padding:8px 16px;font-size:12px;font-weight:700;
@@ -488,7 +490,8 @@ function _confirmTakeout(city, itemId) {
   const item = (TAKEOUT_MENUS[city] || []).find(m => m.id === itemId);
   if (!item) return;
   const fee   = getTakeoutFee();
-  const total = item.price + fee.fee;
+  const _menuPrice = Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER);
+  const total = _menuPrice + fee.fee;
 
   document.getElementById('_takeoutConfirm')?.remove();
   const conf = document.createElement('div');
@@ -501,7 +504,7 @@ function _confirmTakeout(city, itemId) {
       <div style="font-size:11px;color:#a07020;margin-bottom:14px;line-height:1.5;">${item.desc}</div>
       <div style="background:#fff8e8;border-radius:10px;padding:10px;margin-bottom:18px;">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;">
-          <span style="color:#a07020;">菜品</span><span style="color:#3a2000;font-weight:600;">£${item.price.toFixed(2)}</span>
+          <span style="color:#a07020;">菜品</span><span style="color:#3a2000;font-weight:600;">£${_menuPrice.toFixed(2)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:7px;">
           <span style="color:#a07020;">${fee.label}</span><span style="color:#3a2000;font-weight:600;">£${fee.fee.toFixed(2)}</span>
@@ -534,9 +537,8 @@ function _doTakeoutOrder(city, itemId) {
 
 function addTakeoutOrder(city, item) {
   const fee   = getTakeoutFee();
-  // 全局价格倍率（菜品涨价，让厨师折扣有感）
-  const BASE_PRICE_MULTIPLIER = 2.5;
-  let itemPrice = Math.round(item.price * BASE_PRICE_MULTIPLIER);
+  // 全局价格倍率
+  let itemPrice = Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER);
   let deliveryFee = fee.fee;
   const _takeoutDiscount = typeof getCareerTakeoutDiscount === 'function' ? getCareerTakeoutDiscount() : 0;
   if (_takeoutDiscount > 0) itemPrice = Math.round(itemPrice * (1 - _takeoutDiscount / 100) * 100) / 100;

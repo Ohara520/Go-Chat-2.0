@@ -11,8 +11,11 @@ const CAREER_DATA = {
     name: '厨师',
     titles: ['洗碗工','帮厨','三厨','二厨','主厨','高级主厨','行政主厨','餐厅主理人','星级主厨','米其林主厨'],
     salary: [80, 150, 250, 400, 600, 850, 1100, 1400, 1700, 2000],
-    perkDesc: '外卖免配送费 + 打折',
-    perkDetail: level => `外卖 ${10 + level * 5}% 折扣 + ${level >= 3 ? '免配送费' : `Lv.3解锁免配送费`}`,
+    perkDesc: '外卖打折 + 每日做饭收入',
+    perkDetail: level => {
+      const income = [8, 12, 16, 20, 25, 30, 33, 37, 42, 45][level - 1] || 8;
+      return `外卖 ${10 + level * 5}% 折扣${level >= 3 ? ' + 免配送费' : ''} + 每日 £${income}`;
+    },
     speedMultiplier: 1,  // 正常升级速度
   },
   courier: {
@@ -142,12 +145,28 @@ function chooseCareer(careerType) {
   if (!CAREER_DATA[careerType]) return false;
   const oldCareer = getCareer();
 
+  // 已有职业时：检查30天冷却期
+  if (oldCareer) {
+    const lastSwitch = parseInt(localStorage.getItem('careerLastSwitch') || '0');
+    const daysSinceSwitch = (Date.now() - lastSwitch) / (24 * 60 * 60 * 1000);
+    if (lastSwitch > 0 && daysSinceSwitch < 30) {
+      const daysLeft = Math.ceil(30 - daysSinceSwitch);
+      if (typeof _showCareerNotification === 'function') {
+        _showCareerNotification(`⏳ 转行冷却中，还需等待 ${daysLeft} 天`);
+      }
+      return false;
+    }
+  }
+
   // 切换职业 → 等级清零
   localStorage.setItem('careerType', careerType);
   localStorage.setItem('careerLevel', '1');
   localStorage.setItem('careerStartDate', new Date().toISOString().split('T')[0]);
+  localStorage.setItem('careerLastSwitch', Date.now().toString());
   localStorage.removeItem('careerLastSalaryMonth');
   localStorage.removeItem('streamerTipDate');
+  localStorage.removeItem('programmerIncomeDate');
+  localStorage.removeItem('writerBonusDate');
 
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
@@ -233,9 +252,9 @@ function checkStreamerTip() {
 
   // 打赏概率：L1 50% → L10 95%
   const tipChance = 0.45 + level * 0.05;
-  // 打赏范围
-  const tipMin = [0, 1, 3, 5, 10, 15, 20, 30, 50, 50][level - 1] || 0;
-  const tipMax = [5, 10, 20, 35, 50, 80, 120, 180, 250, 300][level - 1] || 5;
+  // 打赏范围（高等级大幅提升）
+  const tipMin = [0, 2, 5, 8, 15, 25, 35, 50, 70, 80][level - 1] || 0;
+  const tipMax = [8, 15, 30, 50, 80, 120, 180, 250, 350, 500][level - 1] || 8;
 
   let totalTip = 0;
 
@@ -248,8 +267,17 @@ function checkStreamerTip() {
   const rocketChance = 0.05;
   let rocket = false;
   if (Math.random() < rocketChance) {
-    const rocketAmount = [20, 30, 50, 80, 100, 150, 200, 300, 400, 500][level - 1] || 20;
+    const rocketAmount = [20, 30, 50, 80, 120, 180, 250, 350, 500, 800][level - 1] || 20;
     totalTip += rocketAmount;
+    rocket = true;
+  }
+
+  // 超级大火箭（1% 概率，Lv7+ 才有，最高 £1000）
+  let megaRocket = false;
+  if (level >= 7 && Math.random() < 0.01) {
+    const megaAmount = [0, 0, 0, 0, 0, 0, 500, 600, 800, 1000][level - 1] || 500;
+    totalTip += megaAmount;
+    megaRocket = true;
     rocket = true;
   }
 
@@ -269,13 +297,13 @@ function checkStreamerTip() {
     }
     if (typeof addTransaction === 'function') {
       addTransaction({
-        icon: giftIcon,
-        name: rocket ? `大哥刷了${giftName}` : `粉丝送了${giftName}`,
+        icon: megaRocket ? '🚀' : giftIcon,
+        name: megaRocket ? '超级大火箭!!!' : (rocket ? `大哥刷了${giftName}` : `粉丝送了${giftName}`),
         amount: totalTip,
       });
     }
     if (rocket) {
-      _showCareerNotification(`${giftIcon} 神秘大哥刷了${giftName}！+£${totalTip}`);
+      _showCareerNotification(`${megaRocket ? '🚀🚀🚀' : giftIcon} ${megaRocket ? '超级大火箭！！！' : `大哥刷了${giftName}`} +£${totalTip}`);
     } else {
       _showCareerNotification(`${giftIcon} 今日直播收入 £${totalTip}`);
     }
@@ -308,6 +336,33 @@ function checkProgrammerIncome() {
   localStorage.setItem('programmerIncomeDate', today);
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   _showCareerNotification(`💻 今日接单收入 £${income}`);
+  return income;
+}
+
+// ===== 厨师被动收入 =====
+
+function checkChefIncome() {
+  const type = getCareer();
+  if (type !== 'chef') return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  if (localStorage.getItem('chefIncomeDate') === today) return 0;
+
+  const level = getCareerLevel();
+  const income = [8, 12, 16, 20, 25, 30, 33, 37, 42, 45][level - 1] || 8;
+  const jobName = ['摆摊卖煎饼', '食堂帮厨', '私房菜接单', '私房菜接单', '私房菜接单',
+    '餐厅值班', '餐厅值班', '主厨接单', '主厨接单', '米其林接单'][level - 1] || '摆摊';
+
+  if (typeof setBalance === 'function' && typeof getBalance === 'function') {
+    setBalance(getBalance() + income);
+  }
+  if (typeof addTransaction === 'function') {
+    addTransaction({ icon: '👩‍🍳', name: jobName, amount: income });
+  }
+
+  localStorage.setItem('chefIncomeDate', today);
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  _showCareerNotification(`👩‍🍳 ${jobName}收入 £${income}`);
   return income;
 }
 
@@ -449,7 +504,13 @@ function renderCareerSelection() {
             <div style="width:${progressPct}%;height:100%;background:linear-gradient(90deg,#5a9a46,#7dba5a);border-radius:4px;transition:width 0.3s;"></div>
           </div>
         ` : `<div style="font-size:12px;color:#5a9a46;font-weight:600;">✨ 满级！</div>`}
-        <button onclick="_confirmSwitchCareer()" style="margin-top:14px;background:none;border:1px solid #ccc;color:#999;padding:6px 16px;border-radius:16px;font-size:12px;cursor:pointer;">转行（等级清零）</button>
+        ${(() => {
+          const _ls = parseInt(localStorage.getItem('careerLastSwitch') || '0');
+          const _ds = _ls > 0 ? (Date.now() - _ls) / (86400000) : 999;
+          const _ok = _ds >= 30;
+          const _dl = Math.ceil(30 - _ds);
+          return `<button onclick="${_ok ? `_confirmSwitchCareer()` : ``}" style="margin-top:14px;background:none;border:1px solid #ccc;color:#999;padding:6px 16px;border-radius:16px;font-size:12px;cursor:${_ok ? 'pointer' : 'default'};opacity:${_ok ? '1' : '0.5'};">${_ok ? '转行（等级清零）' : `转行冷却中（${_dl}天后）`}</button>`;
+        })()}
       </div>
     `;
   }
@@ -459,13 +520,17 @@ function renderCareerSelection() {
 
   Object.values(CAREER_DATA).forEach(career => {
     const isCurrent = career.id === current;
+    const perkLv1 = career.perkDetail(1);
+    const perkLv10 = career.perkDetail(10);
     html += `
       <div onclick="${isCurrent ? '' : `_selectCareer('${career.id}')`}" 
-        style="background:${isCurrent ? '#f0f7ec' : 'white'};border:1px solid ${isCurrent ? '#5a9a46' : '#e8e8e8'};border-radius:12px;padding:14px;cursor:${isCurrent ? 'default' : 'pointer'};opacity:${isCurrent ? '0.6' : '1'};transition:transform 0.15s;${isCurrent ? '' : 'active:transform:scale(0.97);'}">
+        style="background:${isCurrent ? '#f0f7ec' : 'white'};border:1px solid ${isCurrent ? '#5a9a46' : '#e8e8e8'};border-radius:12px;padding:14px;cursor:${isCurrent ? 'default' : 'pointer'};opacity:${isCurrent ? '0.6' : '1'};transition:transform 0.15s;">
         <div style="font-size:28px;margin-bottom:6px;">${career.icon}</div>
         <div style="font-size:14px;font-weight:600;color:#333;margin-bottom:3px;">${career.name}</div>
         <div style="font-size:11px;color:#999;margin-bottom:6px;">${career.titles[0]} → ${career.titles[9]}</div>
-        <div style="font-size:11px;color:#5a9a46;">🎁 ${career.perkDesc}</div>
+        <div style="font-size:11px;color:#5a9a46;margin-bottom:2px;">🎁 ${career.perkDesc}</div>
+        <div style="font-size:10px;color:#78a86a;margin-bottom:3px;">Lv1: ${perkLv1}</div>
+        <div style="font-size:10px;color:#78a86a;margin-bottom:3px;">Lv10: ${perkLv10}</div>
         <div style="font-size:11px;color:#888;margin-top:3px;">💰 £${career.salary[0]} → £${career.salary[9]}/月</div>
         ${career.speedMultiplier > 1 ? `<div style="font-size:10px;color:#d4880f;margin-top:3px;">⚠️ 升级较慢</div>` : ''}
         ${isCurrent ? '<div style="font-size:10px;color:#5a9a46;margin-top:3px;">✅ 当前职业</div>' : ''}
@@ -512,10 +577,13 @@ function dailyCareerCheck() {
   // 3. 程序员被动收入
   checkProgrammerIncome();
 
-  // 4. 主播打赏
+  // 4. 厨师被动收入
+  checkChefIncome();
+
+  // 5. 主播打赏
   checkStreamerTip();
 
-  // 5. 作家每日额外条数
+  // 6. 作家每日额外条数
   checkWriterBonus();
 }
 
