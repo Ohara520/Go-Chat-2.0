@@ -11,8 +11,8 @@ const CAREER_DATA = {
     name: '厨师',
     titles: ['洗碗工','帮厨','三厨','二厨','主厨','高级主厨','行政主厨','餐厅主理人','星级主厨','米其林主厨'],
     salary: [80, 150, 250, 400, 600, 850, 1100, 1400, 1700, 2000],
-    perkDesc: '外卖打折',
-    perkDetail: level => `外卖 ${5 + level * 5}% 折扣${level >= 5 ? ' + 免配送费' : ''}`,
+    perkDesc: '外卖免配送费 + 打折',
+    perkDetail: level => `外卖 ${10 + level * 5}% 折扣 + ${level >= 3 ? '免配送费' : `Lv.3解锁免配送费`}`,
     speedMultiplier: 1,  // 正常升级速度
   },
   courier: {
@@ -31,8 +31,8 @@ const CAREER_DATA = {
     name: '花艺师',
     titles: ['店员','花艺学徒','初级花艺师','花艺师','高级花艺师','花艺设计师','花店店长','区域经理','品牌总监','连锁老板'],
     salary: [70, 120, 200, 320, 480, 650, 850, 1100, 1350, 1600],
-    perkDesc: '商店打折',
-    perkDetail: level => `商店商品 ${5 + level * 4}% 折扣`,
+    perkDesc: '商店打折 + 送礼加好感',
+    perkDetail: level => `商店 ${10 + level * 5}% 折扣${level >= 5 ? ' + 送礼好感度×1.5' : ''}`,
     speedMultiplier: 1,
   },
   barista: {
@@ -84,8 +84,8 @@ const CAREER_DATA = {
     name: '作家',
     titles: ['自由撰稿人','专栏写手','签约作者','小说家','畅销作者','知名作家','大神作者','文学奖提名','文学奖得主','畅销作家'],
     salary: [60, 110, 190, 320, 500, 720, 1000, 1400, 1900, 2500],
-    perkDesc: '故事书额外内容',
-    perkDetail: level => `解锁额外故事 ${Math.floor(level / 2)} 篇`,
+    perkDesc: '每日额外消息条数',
+    perkDetail: level => `每天额外 +${Math.ceil(level / 2)} 条消息`,
     speedMultiplier: 1,
   },
 };
@@ -307,12 +307,12 @@ function checkProgrammerIncome() {
 function getCareerTakeoutDiscount() {
   if (getCareer() !== 'chef') return 0;
   const level = getCareerLevel();
-  return 5 + level * 5; // L1: 10%, L10: 55%
+  return 10 + level * 5; // L1: 15%, L10: 60%
 }
 
-// 外卖免配送费（厨师 L5+）
+// 外卖免配送费（厨师 L3+）
 function isCareerFreeDeliveryTakeout() {
-  return getCareer() === 'chef' && getCareerLevel() >= 5;
+  return getCareer() === 'chef' && getCareerLevel() >= 3;
 }
 
 // 快递折扣/免运费（快递员 L4+）
@@ -329,7 +329,7 @@ function getCareerDeliverySpeed() {
 // 商店折扣（花艺师）
 function getCareerShopDiscount() {
   if (getCareer() !== 'florist') return 0;
-  return 5 + getCareerLevel() * 4; // L1: 9%, L10: 45%
+  return 10 + getCareerLevel() * 5; // L1: 15%, L10: 60%
 }
 
 // 签到倍率（咖啡师）
@@ -342,6 +342,26 @@ function getCareerCheckinMultiplier() {
 function getCareerGhostCardBonus() {
   if (getCareer() !== 'finance') return 0;
   return 100 + getCareerLevel() * 100; // L1: +200, L10: +1100
+}
+
+// 作家每日额外条数
+function checkWriterBonus() {
+  const type = getCareer();
+  if (type !== 'writer') return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  if (localStorage.getItem('writerBonusDate') === today) return 0;
+
+  const level = getCareerLevel();
+  const bonus = Math.ceil(level / 2); // L1: 1, L5: 3, L10: 5
+
+  if (typeof applyCheckinBonusMessages === 'function') {
+    applyCheckinBonusMessages(bonus);
+  }
+
+  localStorage.setItem('writerBonusDate', today);
+  _showCareerNotification(`✍️ 今日稿费到账：+${bonus}条消息`);
+  return bonus;
 }
 
 // ===== 通知弹窗 =====
@@ -484,6 +504,9 @@ function dailyCareerCheck() {
 
   // 4. 主播打赏
   checkStreamerTip();
+
+  // 5. 作家每日额外条数
+  checkWriterBonus();
 }
 
 // ===== 升级进度文字（供 profile 等模块显示）=====
