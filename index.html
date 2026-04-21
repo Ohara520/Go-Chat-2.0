@@ -598,10 +598,10 @@
         <div class="card-title">职业</div>
         <div class="card-desc" id="careerCardDesc">选择你的事业</div>
       </div>
-      <div class="card vocab-card" onclick="openScreen('vocabScreen')">
-        <div class="card-icon">📖</div>
-        <div class="card-title">单词</div>
-        <div class="card-desc" id="vocabCardDesc">跟Ghost学英语</div>
+      <div class="card vocab-card" onclick="openScreen('diaryScreen');setTimeout(()=>{if(typeof renderDiary==='function')renderDiary();},80);">
+        <div class="card-icon">📓</div>
+        <div class="card-title">日记</div>
+        <div class="card-desc">Ghost的私人日记</div>
       </div>
       <div class="card" onclick="openScreen('takeoutScreen')" style="background:linear-gradient(135deg,rgba(255,220,150,0.45),rgba(255,200,100,0.32)) !important;border:1px solid rgba(220,160,50,0.35) !important;">
         <div class="card-icon">🛵</div>
@@ -1096,75 +1096,13 @@
     <div id="careerSelectionContainer" style="overflow-y:auto;height:calc(100vh - 60px);-webkit-overflow-scrolling:touch;"></div>
   </div>
 
-  <!-- 单词页 -->
-  <div class="screen" id="vocabScreen">
+  <!-- Ghost日记页 -->
+  <div class="screen" id="diaryScreen">
     <div class="screen-header">
       <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
-      <div class="screen-title">📖 跟Ghost学英语</div>
+      <div class="screen-title">📓 Ghost的日记</div>
     </div>
-    <div class="vocab-container">
-      <div id="vocabHome">
-        <div class="vocab-stats-row">
-          <div class="vocab-stat-card">
-            <div class="vocab-stat-num" id="vocabStreakCount">0</div>
-            <div class="vocab-stat-label">🔥 连续天数</div>
-          </div>
-          <div class="vocab-stat-card">
-            <div class="vocab-stat-num" id="vocabLearnedCount">0/5</div>
-            <div class="vocab-stat-label">📚 今日进度</div>
-          </div>
-        </div>
-        <div class="vocab-today-title">今日单词</div>
-        <div class="vocab-preview-list" id="vocabPreviewList"></div>
-        <div class="vocab-action-btns">
-          <button class="vocab-btn-learn" onclick="openVocabLearn(); showVocabMode('learn');">📖 开始学习</button>
-          <button class="vocab-btn-test" id="vocabTestBtn" onclick="startVocabTest()">✏️ 开始测验</button>
-        </div>
-        <div class="vocab-ghost-quote" id="vocabGhostQuote">
-          "The more words you know, the less you have to say. Use them well."
-          <span class="vocab-ghost-quote-zh">词汇量越大，需要说的越少。好好用。</span>
-        </div>
-      </div>
-
-      <!-- 学习模式 -->
-      <div id="vocabLearnMode" style="display:none;flex-direction:column;align-items:center;gap:16px;padding-top:8px;">
-        <div class="vocab-mode-progress" id="vocabCardProgress">1 / 5</div>
-        <div class="vocab-flip-card" id="vocabFlipCard" onclick="flipVocabCard()">
-          <div class="vocab-flip-inner">
-            <div class="vocab-flip-front">
-              <div class="vocab-front-word" id="vocabCardFront"></div>
-              <div class="vocab-flip-hint">点击翻转</div>
-            </div>
-            <div class="vocab-flip-back" id="vocabCardBack"></div>
-          </div>
-        </div>
-        <div class="vocab-learn-btns">
-          <button class="vocab-btn-next" onclick="nextVocabCard()">下一个 →</button>
-          <button class="vocab-btn-back-home" onclick="showVocabMode('home'); renderVocabScreen();">返回</button>
-        </div>
-      </div>
-
-      <!-- 测验模式 -->
-      <div id="vocabTestMode" style="display:none;flex-direction:column;align-items:center;gap:14px;padding-top:8px;width:100%;">
-        <div class="vocab-mode-progress" id="vocabTestProgress">1 / 5</div>
-        <div class="vocab-test-word" id="vocabTestWord">Word</div>
-        <div class="vocab-test-question">这个单词的意思是？</div>
-        <div class="vocab-test-options" id="vocabTestOptions"></div>
-        <div class="vocab-feedback" id="vocabTestFeedback"></div>
-        <div class="vocab-dot-row" id="vocabDotRow"></div>
-        <div class="vocab-ghost-hint">
-          <div class="vocab-ghost-avatar">👻</div>
-          <div class="vocab-ghost-hint-text" id="vocabGhostHint">一次机会。想清楚再选。</div>
-        </div>
-      </div>
-
-      <!-- 完成 -->
-      <div id="vocabDoneMode" style="display:none;flex-direction:column;align-items:center;gap:12px;padding-top:40px;">
-        <div style="font-size:48px">👻</div>
-        <div class="vocab-done-msg" id="vocabDoneMsg">Good work.</div>
-        <button class="vocab-btn-back-home" onclick="showVocabMode('home'); renderVocabScreen();">返回</button>
-      </div>
-    </div>
+    <div id="diaryContainer" style="overflow-y:auto;height:calc(100vh - 60px);-webkit-overflow-scrolling:touch;background:linear-gradient(180deg,rgba(245,240,230,0.3),rgba(240,235,220,0.2));"></div>
   </div>
 
   <!-- 商城页 -->
@@ -1631,6 +1569,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/minigames.js"></script>
 <script src="js/sticker.js"></script>
 <script src="js/career.js"></script>
+<script src="js/diary.js"></script>
 <script src="js/chat_init.js"></script>
 <script src="js/app.js"></script>
 
@@ -2038,7 +1977,7 @@ window.openScreen = function(screenId) {
   const tb = document.getElementById('mainTabBar');
   if (!tb) return;
   const hideFor = ['chatScreen','profileScreen','coupleScreen','walletScreen',
-    'careerScreen','vocabScreen','marketScreen','takeoutScreen',
+    'careerScreen','diaryScreen','marketScreen','takeoutScreen',
     'achievementScreen','collectionScreen','calendarScreen','secretScreen'];
   if (screenId === 'mainScreen') {
     tb.style.display = 'flex';
