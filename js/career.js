@@ -254,20 +254,30 @@ function checkStreamerTip() {
   }
 
   if (totalTip > 0) {
+    // 根据金额选择礼物名称
+    let giftName = '棒棒糖';
+    let giftIcon = '🍭';
+    if (totalTip >= 200) { giftName = '火箭'; giftIcon = '🚀'; }
+    else if (totalTip >= 100) { giftName = '跑车'; giftIcon = '🏎️'; }
+    else if (totalTip >= 50) { giftName = '皇冠'; giftIcon = '👑'; }
+    else if (totalTip >= 20) { giftName = '小星星'; giftIcon = '⭐'; }
+    else if (totalTip >= 10) { giftName = '玫瑰花'; giftIcon = '🌹'; }
+    else { giftName = '棒棒糖'; giftIcon = '🍭'; }
+
     if (typeof setBalance === 'function' && typeof getBalance === 'function') {
       setBalance(getBalance() + totalTip);
     }
     if (typeof addTransaction === 'function') {
       addTransaction({
-        icon: rocket ? '🚀' : '🎁',
-        name: rocket ? '神秘大哥刷火箭' : '粉丝打赏',
+        icon: giftIcon,
+        name: rocket ? `大哥刷了${giftName}` : `粉丝送了${giftName}`,
         amount: totalTip,
       });
     }
     if (rocket) {
-      _showCareerNotification(`🚀 神秘大哥刷了火箭！+£${totalTip}`);
+      _showCareerNotification(`${giftIcon} 神秘大哥刷了${giftName}！+£${totalTip}`);
     } else {
-      _showCareerNotification(`🎁 今日直播收入 £${totalTip}`);
+      _showCareerNotification(`${giftIcon} 今日直播收入 £${totalTip}`);
     }
   }
 

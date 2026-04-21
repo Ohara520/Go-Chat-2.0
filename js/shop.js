@@ -656,7 +656,11 @@ function openBuyModal(idx) {
   document.getElementById('buyModalEmoji').textContent = p.emoji;
   document.getElementById('buyModalName').textContent = p.name;
   document.getElementById('buyModalDesc').textContent = p.desc || '';
-  document.getElementById('buyModalPrice').innerHTML = `£${displayPrice.toLocaleString()}<span style="font-size:12px;color:#a07bc0;font-weight:500"> + £${shipping} 运费</span>`;
+  const _hasDiscount = _shopDiscount > 0 && displayPrice < p.price;
+  const _shippingFree = shipping === 0 && p.shipping > 0;
+  document.getElementById('buyModalPrice').innerHTML = _hasDiscount
+    ? `<span style="text-decoration:line-through;color:#ccc;font-size:12px;">£${p.price}</span> £${displayPrice.toLocaleString()}<span style="font-size:11px;color:#5a9a46;"> (-${_shopDiscount}%)</span><span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ' · 免运费' : ` + £${shipping} 运费`}</span>`
+    : `£${displayPrice.toLocaleString()}<span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ' · 免运费' : ` + £${shipping} 运费`}</span>`;
   document.getElementById('buyModalBalance').innerHTML = `余额：£${bal.toFixed(2)}&nbsp;&nbsp;合计：<b style="color:#7c3fa0">£${total.toLocaleString()}</b>`;
 
   const reasonEl = document.getElementById('buyModalReason');

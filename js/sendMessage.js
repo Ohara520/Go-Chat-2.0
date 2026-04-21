@@ -745,12 +745,8 @@ async function _processMergedMessage(text) {
     let _emotionLabel = '平淡';
     if (!isIntimate && !isRecentPhoto && !_isClearlyNormal) {
       try {
-        // 判断超时时是否应该默认走调情：
-        // 只有在最近有调情上下文时才默认 flirt=true，否则默认 flirt=false
-        const _hasRecentIntimateForTimeout = chatHistory.slice(-6).some(m => m._intimate);
-        const _timeoutDefault = _hasRecentIntimateForTimeout
-          ? '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'
-          : '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
+        // 超时兜底：一律走 Claude，只有 Haiku 明确回复 flirt=true 才走 Grok
+        const _timeoutDefault = '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
 
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
@@ -1397,8 +1393,9 @@ One or two lines. English only. lowercase.`;
         .trim();
       // 清理 Grok 常见的重复开头（"still here. yeah." 卡带问题）
       cleanedReply = cleanedReply
-        .replace(/^still here\.?\s*\n?/i, '')
-        .replace(/^yeah\.?\s*\n?/i, '')
+        .replace(/^still here[.,]?\s*\n?/i, '')
+        .replace(/^yeah[.,]?\s*\n?/i, '')
+        .replace(/^,\s*/i, '')
         .trim();
       // 处理 unlock tag（解锁资料后从文本删掉）
       const _unlockMatch = cleanedReply.match(/"unlock"\s*:\s*"([^"]+)"/);
