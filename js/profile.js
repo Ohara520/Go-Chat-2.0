@@ -670,8 +670,8 @@ function uploadCoverImage(input) {
         restoreCoupleCover();
         if (typeof showToast === 'function') showToast('封面已更新 ✅');
         if (typeof touchLocalState === 'function') touchLocalState();
-        if (typeof saveToCloud === 'function') {
-          saveToCloud()
+        if (typeof scheduleCloudSave === 'function') {
+          scheduleCloudSave()
             .then(() => showToast('已同步到云端 ☁️'))
             .catch(() => showToast('同步失败，请检查网络'));
         }
@@ -720,8 +720,8 @@ function uploadAvatar(input) {
         updateAvatarEverywhere(base64);
         showToast('头像已更新 ✅');
         // 强制立刻写云端，不走防抖
-        if (typeof saveToCloud === 'function') {
-          saveToCloud()
+        if (typeof scheduleCloudSave === 'function') {
+          scheduleCloudSave()
             .then(() => showToast('已同步到云端 ☁️'))
             .catch(() => showToast('同步失败，请检查网络'));
         }

@@ -34,8 +34,8 @@ function setBalance(val) {
   if (balEl) balEl.textContent = '£' + Math.floor(safeVal);
   const walletBalEl = document.getElementById('walletBalance');
   if (walletBalEl) walletBalEl.textContent = '£' + safeVal.toFixed(2);
-  touchLocalState();
-  if (typeof saveToCloud === 'function') saveToCloud().catch(()=>{}); // 余额变动立即写云端
+  if (typeof touchLocalState === 'function') touchLocalState();
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave(); // 走防抖，不直接存
 }
 function getTransactions() {
   return JSON.parse(localStorage.getItem('transactions') || '[]');
@@ -53,8 +53,8 @@ function addTransaction(tx) {
   const list = getTransactions();
   list.unshift(tx);
   localStorage.setItem('transactions', JSON.stringify(list));
-  // 交易是重要操作，立即写云端，不走防抖
-  if (typeof saveToCloud === 'function') saveToCloud().catch(()=>{});
+  // 交易数据已写入 localStorage，走防抖统一存云端，不再每笔都直连数据库
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 function formatTxTime(timeStr) {

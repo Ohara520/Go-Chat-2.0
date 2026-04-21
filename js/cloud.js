@@ -553,6 +553,12 @@ async function saveToCloud() {
     return;
   }
 
+  // 安全锁：如果本次启动时云端加载失败/超时，不允许保存，防止本地旧数据覆盖云端新数据
+  if (sessionStorage.getItem('cloudLoadFailed') === '1') {
+    console.warn('[cloud] 跳过保存：本次启动云端加载未成功，防止数据覆盖');
+    return;
+  }
+
   // 5秒节流：如果距上次写入不足5秒，等到5秒后再写（且只写最后一次）
   const now = Date.now();
   const sinceLastSave = now - _lastSyncTime;

@@ -329,7 +329,7 @@ function checkDeliveryUpdates() {
             history.unshift(d);
             localStorage.setItem('deliveryHistory', JSON.stringify(history));
             if (typeof touchLocalState === 'function') touchLocalState();
-            if (typeof saveToCloud     === 'function') saveToCloud().catch(() => {});
+            if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
           }
 
           if (d.productData?.isUserItem) {
@@ -946,7 +946,7 @@ function _addDeliveryNotice(notice) {
   notices.unshift({ ...notice, read: false, createdAt: Date.now() });
   localStorage.setItem('deliveryNotices', JSON.stringify(notices.slice(0, 20)));
   _updateMarketCardBadge();
-  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 function _getUnreadNotices() {
@@ -959,7 +959,7 @@ function _markNoticeRead(id) {
   if (n) n.read = true;
   localStorage.setItem('deliveryNotices', JSON.stringify(notices));
   _updateMarketCardBadge();
-  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 function _updateMarketCardBadge() {

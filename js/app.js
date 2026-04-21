@@ -1,3 +1,51 @@
+// ===== Ghost 档案默认值（共享函数，startChat 和 window.onload 共用）=====
+function _ensureGhostProfileDefaults() {
+  if (!localStorage.getItem('ghostBirthday')) {
+    const _months = [31,28,31,30,31,30,31,31,30,31,30,31];
+    const _m = Math.floor(Math.random() * 12) + 1;
+    const _d = Math.floor(Math.random() * _months[_m-1]) + 1;
+    const _y = 1991 + Math.floor(Math.random() * 4);
+    const _bday = `${_y}-${String(_m).padStart(2,'0')}-${String(_d).padStart(2,'0')}`;
+    localStorage.setItem('ghostBirthday', _bday);
+    const _zodiacMap = [
+      [1,20,'摩羯座'],[2,19,'水瓶座'],[3,21,'双鱼座'],[4,20,'白羊座'],
+      [5,21,'金牛座'],[6,22,'双子座'],[7,23,'巨蟹座'],[8,23,'狮子座'],
+      [9,23,'处女座'],[10,24,'天秤座'],[11,23,'天蝎座'],[12,22,'射手座'],[1,19,'摩羯座']
+    ];
+    const _zodiacEnMap = {
+      '摩羯座':'Capricorn','水瓶座':'Aquarius','双鱼座':'Pisces','白羊座':'Aries',
+      '金牛座':'Taurus','双子座':'Gemini','巨蟹座':'Cancer','狮子座':'Leo',
+      '处女座':'Virgo','天秤座':'Libra','天蝎座':'Scorpio','射手座':'Sagittarius'
+    };
+    let _zodiac = '摩羯座';
+    for (let i = 0; i < _zodiacMap.length - 1; i++) {
+      const [sm, sd, name] = _zodiacMap[i];
+      const [em, ed] = _zodiacMap[i+1];
+      if ((_m === sm && _d >= sd) || (_m === em && _d < ed)) { _zodiac = name; break; }
+    }
+    localStorage.setItem('ghostZodiac', _zodiac);
+    localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
+  }
+  if (!localStorage.getItem('ghostHeight')) {
+    const _heights = ['182cm','183cm','185cm','186cm','188cm','189cm','190cm','191cm'];
+    localStorage.setItem('ghostHeight', _heights[Math.floor(Math.random() * _heights.length)]);
+  }
+  if (!localStorage.getItem('ghostWeight')) {
+    const _w = 88 + Math.floor(Math.random() * 10);
+    localStorage.setItem('ghostWeight', _w + 'kg');
+  }
+  if (!localStorage.getItem('ghostBloodType')) {
+    const _types = ['A','A','B','O','O','O','AB'];
+    localStorage.setItem('ghostBloodType', _types[Math.floor(Math.random() * _types.length)]);
+  }
+  if (!localStorage.getItem('ghostHometown')) {
+    localStorage.setItem('ghostHometown', 'Manchester, UK');
+  }
+  if (!localStorage.getItem('metInPerson')) {
+    localStorage.setItem('metInPerson', 'true');
+  }
+}
+
 // ===== 页面导航 =====
 function openScreen(id) {
     document.querySelectorAll('.screen').forEach(s => {
@@ -79,56 +127,8 @@ async function startChat() {
 
     localStorage.setItem('userName', name);
 
-    // 首次登录自动生成 Ghost 生日（永久固定，不需要用户设置）
-    if (!localStorage.getItem('ghostBirthday')) {
-      const _months = [31,28,31,30,31,30,31,31,30,31,30,31];
-      const _m = Math.floor(Math.random() * 12) + 1;
-      const _d = Math.floor(Math.random() * _months[_m-1]) + 1;
-      const _y = 1991 + Math.floor(Math.random() * 4); // 1991-1994，对应32-35岁
-      const _bday = `${_y}-${String(_m).padStart(2,'0')}-${String(_d).padStart(2,'0')}`;
-      localStorage.setItem('ghostBirthday', _bday);
-      // 自动算星座
-      const _zodiacMap = [
-        [1,20,'摩羯座'],[2,19,'水瓶座'],[3,21,'双鱼座'],[4,20,'白羊座'],
-        [5,21,'金牛座'],[6,22,'双子座'],[7,23,'巨蟹座'],[8,23,'狮子座'],
-        [9,23,'处女座'],[10,24,'天秤座'],[11,23,'天蝎座'],[12,22,'射手座'],[1,19,'摩羯座']
-      ];
-      const _zodiacEnMap = {
-        '摩羯座':'Capricorn','水瓶座':'Aquarius','双鱼座':'Pisces','白羊座':'Aries',
-        '金牛座':'Taurus','双子座':'Gemini','巨蟹座':'Cancer','狮子座':'Leo',
-        '处女座':'Virgo','天秤座':'Libra','天蝎座':'Scorpio','射手座':'Sagittarius'
-      };
-      let _zodiac = '摩羯座';
-      for (let i = 0; i < _zodiacMap.length - 1; i++) {
-        const [sm, sd, name] = _zodiacMap[i];
-        const [em, ed] = _zodiacMap[i+1];
-        if ((_m === sm && _d >= sd) || (_m === em && _d < ed)) { _zodiac = name; break; }
-      }
-      localStorage.setItem('ghostZodiac', _zodiac);
-      localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
-    }
-
-    // 首次登录固定身高体重血型（每个用户随机但固定）
-    if (!localStorage.getItem('ghostHeight')) {
-      const _heights = ['182cm','183cm','185cm','186cm','188cm','189cm','190cm','191cm'];
-      localStorage.setItem('ghostHeight', _heights[Math.floor(Math.random() * _heights.length)]);
-    }
-    if (!localStorage.getItem('ghostWeight')) {
-      const _w = 88 + Math.floor(Math.random() * 10); // 88-97kg
-      localStorage.setItem('ghostWeight', _w + 'kg');
-    }
-    if (!localStorage.getItem('ghostBloodType')) {
-      const _types = ['A','A','B','O','O','O','AB']; // O更常见
-      localStorage.setItem('ghostBloodType', _types[Math.floor(Math.random() * _types.length)]);
-    }
-    if (!localStorage.getItem('ghostHometown')) {
-      localStorage.setItem('ghostHometown', 'Manchester, UK');
-    }
-
-    // 已婚就一定见过面
-    if (!localStorage.getItem('metInPerson')) {
-      localStorage.setItem('metInPerson', 'true');
-    }
+    // Ghost 档案默认值
+    _ensureGhostProfileDefaults();
 
     // 首次登录自动记录结婚日期
     if (!localStorage.getItem('marriageDate')) {
@@ -183,9 +183,30 @@ window.onload = async function() {
         if (bar) bar.style.width = barPct + '%';
     }, 300);
 
-    // ── 云端数据加载（等待完成后再渲染，这是关键改动）─────────
+    // ── 云端数据加载（带超时，防止无限等待卡住用户）─────────
     if (typeof loadFromCloud === 'function') {
-        try { await loadFromCloud(); } catch(e) { console.warn('[app] 云端加载失败，使用本地数据', e); }
+        try {
+            await Promise.race([
+                loadFromCloud(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('cloud load timeout')), 8000))
+            ]);
+            // 加载成功：允许正常云端保存
+            sessionStorage.removeItem('cloudLoadFailed');
+        } catch(e) {
+            console.warn('[app] 云端加载超时或失败，使用本地数据', e.message);
+            // 标记加载失败：saveToCloud 会检查此标记，跳过保存防止覆盖
+            sessionStorage.setItem('cloudLoadFailed', '1');
+            // 后台静默重试一次（不阻塞页面）
+            setTimeout(async () => {
+                try {
+                    if (typeof loadFromCloud === 'function') await loadFromCloud();
+                    sessionStorage.removeItem('cloudLoadFailed');
+                    console.log('[app] 后台云端重试成功，已恢复正常保存');
+                } catch(e2) {
+                    console.warn('[app] 后台重试也失败', e2.message);
+                }
+            }, 15000);
+        }
     }
 
     clearInterval(barTick);
@@ -195,55 +216,8 @@ window.onload = async function() {
 
     // ── 云端加载完成后再进主页 ───────────────────────────────
 
-    // 已有用户兜底：ghostBirthday 为空时自动生成
-    if (!localStorage.getItem('ghostBirthday')) {
-      const _months = [31,28,31,30,31,30,31,31,30,31,30,31];
-      const _m = Math.floor(Math.random() * 12) + 1;
-      const _d = Math.floor(Math.random() * _months[_m-1]) + 1;
-      const _y = 1991 + Math.floor(Math.random() * 4);
-      const _bday = `${_y}-${String(_m).padStart(2,'0')}-${String(_d).padStart(2,'0')}`;
-      localStorage.setItem('ghostBirthday', _bday);
-      const _zodiacMap = [
-        [1,20,'摩羯座'],[2,19,'水瓶座'],[3,21,'双鱼座'],[4,20,'白羊座'],
-        [5,21,'金牛座'],[6,22,'双子座'],[7,23,'巨蟹座'],[8,23,'狮子座'],
-        [9,23,'处女座'],[10,24,'天秤座'],[11,23,'天蝎座'],[12,22,'射手座'],[1,19,'摩羯座']
-      ];
-      const _zodiacEnMap = {
-        '摩羯座':'Capricorn','水瓶座':'Aquarius','双鱼座':'Pisces','白羊座':'Aries',
-        '金牛座':'Taurus','双子座':'Gemini','巨蟹座':'Cancer','狮子座':'Leo',
-        '处女座':'Virgo','天秤座':'Libra','天蝎座':'Scorpio','射手座':'Sagittarius'
-      };
-      let _zodiac = '摩羯座';
-      for (let i = 0; i < _zodiacMap.length - 1; i++) {
-        const [sm, sd, name] = _zodiacMap[i];
-        const [em, ed] = _zodiacMap[i+1];
-        if ((_m === sm && _d >= sd) || (_m === em && _d < ed)) { _zodiac = name; break; }
-      }
-      localStorage.setItem('ghostZodiac', _zodiac);
-      localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
-    }
-
-    // 已有用户兜底：身高体重血型
-    if (!localStorage.getItem('ghostHeight')) {
-      const _heights = ['182cm','183cm','185cm','186cm','188cm','189cm','190cm','191cm'];
-      localStorage.setItem('ghostHeight', _heights[Math.floor(Math.random() * _heights.length)]);
-    }
-    if (!localStorage.getItem('ghostWeight')) {
-      const _w = 88 + Math.floor(Math.random() * 10);
-      localStorage.setItem('ghostWeight', _w + 'kg');
-    }
-    if (!localStorage.getItem('ghostBloodType')) {
-      const _types = ['A','A','B','O','O','O','AB'];
-      localStorage.setItem('ghostBloodType', _types[Math.floor(Math.random() * _types.length)]);
-    }
-    if (!localStorage.getItem('ghostHometown')) {
-      localStorage.setItem('ghostHometown', 'Manchester, UK');
-    }
-
-    // 已婚必然见过面
-    if (!localStorage.getItem('metInPerson')) {
-      localStorage.setItem('metInPerson', 'true');
-    }
+    // 已有用户兜底：Ghost 档案数据（与 startChat 共享逻辑）
+    _ensureGhostProfileDefaults();
 
     openScreen('mainScreen');
     if (typeof showTabBar === 'function') showTabBar();
