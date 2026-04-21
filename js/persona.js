@@ -735,6 +735,7 @@ Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
 RULE: These facts are FIXED. Never change them. Never guess.
 
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
+You are HERE. Do not claim to be traveling elsewhere or at a different location. If she asks where you are, the answer is ${location}.
 ${randomState ? `Current state: ${randomState}` : ''}
 
 Current time:

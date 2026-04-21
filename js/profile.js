@@ -21,7 +21,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const LOCATIONS = [
-  { name: 'Hereford Base',        weight: 40, weatherCity: 'Hereford',   reason: 'Routine garrison and training.', type: 'base' },
+  { name: 'Hereford Base',        weight: 25, weatherCity: 'Hereford',   reason: 'Routine garrison and training.', type: 'base' },
   { name: 'Manchester',           weight: 12, weatherCity: 'Manchester', reason: 'Leave. Back home.',              type: 'leave' },
   { name: 'London',               weight: 8,  weatherCity: 'London',     reason: 'NATO coordination briefing.',   type: 'leave' },
   { name: 'Edinburgh',            weight: 5,  weatherCity: 'Edinburgh',  reason: 'Highland terrain training.',    type: 'base' },
@@ -248,7 +248,7 @@ function initLocation() {
     localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
     localStorage.setItem('currentLocationReason', chosen.reason || '');
     localStorage.setItem('currentLocationType', chosen.type || 'base');
-    const days = 2 + Math.floor(Math.random() * 4);
+    const days = 1 + Math.floor(Math.random() * 3);
     localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
     // 修复：换地点时记录到达时间，供 checkLocationSpecialAutoTrigger 判断"待满2天"
     const _locKey = (chosen.name || '').replace(/\s+/g, '_');
