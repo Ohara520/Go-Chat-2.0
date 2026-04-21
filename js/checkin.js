@@ -203,7 +203,11 @@ function doCheckin() {
     if (typeof renderWallet  === 'function') renderWallet();
     rewardMsg = `💰 签到奖励：£${coins}`;
   } else {
-    const msgCount = Math.floor(Math.random() * 6) + 3;
+    let msgCount = Math.floor(Math.random() * 3) + 1;
+    // 咖啡师职业福利：签到条数翻倍（仅每日奖励，里程碑不算）
+    if (typeof getCareerCheckinMultiplier === 'function') {
+      msgCount = Math.round(msgCount * getCareerCheckinMultiplier());
+    }
     applyCheckinBonusMessages(msgCount);
     rewardMsg = `💬 签到奖励：+${msgCount}条`;
   }
@@ -224,7 +228,7 @@ function doCheckin() {
   renderCheckin();
   if (typeof initCalendar === 'function') initCalendar();
   launchCheckinFlowers();
-  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 
