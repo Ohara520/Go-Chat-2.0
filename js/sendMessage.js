@@ -1136,7 +1136,7 @@ async function _processMergedMessage(text) {
               .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`).join('\n');
             reply2 = await callVeniceForCurrentChar(
               (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nYou just sent a message and took it back. Send another — different angle, same tension. Flat delivery. English only. Short.',
-              recentMsgs2, 60
+              recentMsgs2, 35
             );
           } else {
             reply2 = await callHaiku(
@@ -1365,7 +1365,7 @@ One or two lines. English only. lowercase.`;
     const geminiReply = await callVeniceForCurrentChar(
       (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + _memorySection,
       recentMsgs + '\nHer: ' + text,
-      60,
+      35,
       _intimateMemoryCtx
     );
 
@@ -1391,9 +1391,10 @@ One or two lines. English only. lowercase.`;
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
         .trim();
-      // 清理 Grok 常见的重复开头（"still here. yeah." 卡带问题）
+      // 清理 Grok 常见的重复开头
       cleanedReply = cleanedReply
         .replace(/^still here[.,]?\s*\n?/i, '')
+        .replace(/^still thinking[^.]*\.?\s*\n?/i, '')
         .replace(/^yeah[.,]?\s*\n?/i, '')
         .replace(/^,\s*/i, '')
         .trim();
