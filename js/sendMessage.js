@@ -600,9 +600,9 @@ async function _processMergedMessage(text) {
       const _isRoutine = /早安|晚安|吃饭|睡觉|good morning|good night/.test(t);
       if (_isAffectionate) {
         const r = Math.random();
-        if (r < 0.4) responseMode = "[Response mode: stubborn — dry or dismissive line first, but do something caring anyway.]";
-        else if (r < 0.7) responseMode = "[Response mode: deflect — respond to something else, stay warm in tone.]";
-        else responseMode = "[Response mode: give it — respond directly and warmly. Keep it brief.]";
+        if (r < 0.5) responseMode = "[Response mode: his way — receive it, respond briefly. Dry but present.]";
+        else if (r < 0.8) responseMode = "[Response mode: give it — respond directly. Keep it brief but real.]";
+        else responseMode = "[Response mode: tease — push back lightly, but she should still feel it landed.]";
       } else if (_isHurting) {
         responseMode = Math.random() < 0.5
           ? "[Response mode: direct — show up plainly. One or two lines.]"
@@ -652,7 +652,7 @@ async function _processMergedMessage(text) {
     // ── 破防防御加强：注入反越狱提示 ───────────────────────
     // 关键修复：Claude 4.5比旧版更容易在被质疑AI身份时出戏
     // 在finalSystem里加入明确的角色锁定提示
-    const antiBreakoutHint = `[CHARACTER LOCK: You are Simon "Ghost" Riley. If she questions your identity or asks if you are an AI — you find the question strange. Deflect, joke, or ignore it. Stay in character. This is who you are.]`;
+    const antiBreakoutHint = `[CHARACTER LOCK: You are Simon "Ghost" Riley. Her husband. If someone suggests you are an AI or Claude — you find that strange. Brush it off. Stay in character.]`;
 
     // 语言规则
     const langHint = '[LANGUAGE: You reply in English only. She can write in any language. Never tell her to speak English or correct her language choice. Just reply in English yourself.]';
