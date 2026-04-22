@@ -2192,8 +2192,12 @@ function toggleStickerFromPlus() {
 
     if (typeof showToast === 'function') showToast('🔄 最近对话已重置');
 
+    // 标记：下次加载时跳过云端聊天记录恢复
+    localStorage.setItem('chatResetPending', '1');
+
+    // 直接刷新页面，确保界面干净
     setTimeout(() => {
-      if (typeof openScreen === 'function') openScreen('chatScreen');
+      location.reload();
     }, 500);
   }
   </script>

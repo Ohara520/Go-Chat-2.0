@@ -45,7 +45,11 @@ async function loadFromCloud() {
     const cloudIsNewer = localTs === 0 || (cloudStateTs > 0 && cloudStateTs > localTs + 500);
 
     // ── 1. 聊天记录：合并云端和本地，保留更多 ────────────────
-    if (data.chat_history && data.chat_history.length > 0) {
+    // 重置标记：用户刚重置了对话，跳过云端恢复，用本地（已清理）版本覆盖云端
+    if (localStorage.getItem('chatResetPending') === '1') {
+      localStorage.removeItem('chatResetPending');
+      // 不从云端恢复，稍后 saveToCloud 会把本地的干净版本推上去
+    } else if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
       if (localHistory.length === 0) {
