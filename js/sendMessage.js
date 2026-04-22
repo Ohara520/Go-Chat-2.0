@@ -582,18 +582,12 @@ async function _processMergedMessage(text) {
     } else if (/今天|干嘛|在做|在忙|最近|怎么样|how.*day|what.*up|what.*doing|been up to/.test(t)) {
       const detail = sessionStorage.getItem('todayDetail') || '';
       if (detail) sceneHint = `[He may naturally mention: ${detail} — only if it fits, never forced.]`;
-    } else if (/爱我|爱你|喜欢你|i love|love you|do you love|你爱我/.test(t)) {
-      sceneHint = '[Love/affection check — respond as himself. Deflect, redirect, or let something slip — but stay present.]';
-    } else if (/哄|撒娇|宝贝|抱抱|亲亲|陪我|miss you|想你|hug|baby|hold me/.test(t)) {
-      sceneHint = '[She is being affectionate. Respond naturally — whether he gives it back or just receives it depends on how things are between them right now. His way. Brief. Do not ignore it.]';
     } else if (/吃醋|jealous|谁|who is|who was|你认识|you know her|you know him/.test(t)) {
       sceneHint = "[Possible jealousy trigger — react immediately, don't calculate. Sharper tone, more direct.]";
     } else if (/难过|伤心|哭|委屈|不开心|hurt|sad|crying|upset|awful/.test(t)) {
       sceneHint = "[She is hurting — show up, even clumsily. One dry line of comfort beats a speech. Don't disappear.]";
     } else if (/生气|烦|讨厌|去死|滚|angry|annoyed|hate|pissed/.test(t)) {
       sceneHint = "[She is venting or pushing — don't match her anger, don't lecture. Stay present. One beat, then soften slightly.]";
-    } else if (/早安|晚安|睡觉|起床|good morning|good night|sleep|woke up|going to bed/.test(t)) {
-      sceneHint = '[Routine check-in — keep it natural and brief.]';
     }
 
     // 回应模式
