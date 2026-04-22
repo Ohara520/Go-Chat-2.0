@@ -2153,52 +2153,38 @@ function toggleStickerFromPlus() {
     }
   }
 
-  // 重置对话记录（只清最近30条，保留更早的回忆）
+  // 重置对话记录（清最近30条）
   function confirmResetChat() {
-    if (!confirm('确定要重置最近的对话记录吗？\n\n· 清除最近30条消息\n· 更早的聊天记录保留\n· 余额、好感度等数据不受影响')) return;
+    if (!confirm('确定要重置最近的对话吗？\n\n· 清除最近30条消息\n· 更早的记录保留\n· 余额、好感度等不受影响')) return;
 
-    // 清本地最近30条
+    // 读取并裁剪
     const raw = localStorage.getItem('chatHistory');
+    let kept = [];
     if (raw) {
       try {
         const history = JSON.parse(raw);
-        if (history.length > 30) {
-          localStorage.setItem('chatHistory', JSON.stringify(history.slice(0, -30)));
-        } else {
-          localStorage.removeItem('chatHistory');
-        }
-      } catch(e) {
-        localStorage.removeItem('chatHistory');
-      }
+        kept = history.length > 30 ? history.slice(0, -30) : [];
+      } catch(e) {}
+    }
+    localStorage.setItem('chatHistory', JSON.stringify(kept));
+
+    // 内存同步
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.length = 0;
+      kept.forEach(m => chatHistory.push(m));
+      if (typeof saveHistory === 'function') saveHistory();
     }
 
-    // 清调情相关的临时状态
+    // 清临时状态
     sessionStorage.removeItem('flirtProgress');
     sessionStorage.removeItem('intimateSummarized');
     sessionStorage.removeItem('recentInnerThoughts');
 
-    // 内存中的 chatHistory 也同步
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.splice(-30);
-    }
-
-    // 清空聊天界面
-    const chatBox = document.getElementById('chatBox');
-    if (chatBox) chatBox.innerHTML = '';
-
-    // 立刻同步到云端
-    if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
-    if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
-
-    if (typeof showToast === 'function') showToast('🔄 最近对话已重置');
-
-    // 标记：下次加载时跳过云端聊天记录恢复
+    // 标记：刷新后跳过云端恢复
     localStorage.setItem('chatResetPending', '1');
 
-    // 直接刷新页面，确保界面干净
-    setTimeout(() => {
-      location.reload();
-    }, 500);
+    if (typeof showToast === 'function') showToast('🔄 最近对话已重置');
+    setTimeout(() => location.reload(), 500);
   }
   </script>
 </body>
