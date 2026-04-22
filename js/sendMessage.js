@@ -1391,8 +1391,11 @@ One or two lines. English only. lowercase.`;
     const _memorySection = _intimateMemoryCtx
       ? `\n\n[Your memory from previous intimate moments with her:\n${_intimateMemoryCtx}\nStay consistent with this — don't repeat what already happened, build on it naturally. If she revisits a topic, remember how it went.]`
       : '';
+    // 注入调情等级人设（这才是关键！Level 0-4 的行为引导）
+    const _intimacyBlock = typeof buildIntimacyBlock === 'function' ? buildIntimacyBlock(text) : '';
+
     const geminiReply = await callVeniceForCurrentChar(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + _memorySection,
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + _memorySection,
       recentMsgs + '\nHer: ' + text,
       60,
       _intimateMemoryCtx
@@ -1422,12 +1425,17 @@ One or two lines. English only. lowercase.`;
         .trim();
       // 清理 Grok 常见的重复开头
       cleanedReply = cleanedReply
-        .replace(/^still here[.,]?\s*\n?/i, '')
-        .replace(/^still thinking[^.]*\.?\s*\n?/i, '')
+        .replace(/^still (here|got|waiting|reading|thinking|holding|looking|sitting)[^.]*\.?\s*\n?/i, '')
         .replace(/^screen'?s?\s*(quiet|dark|low|still|says|glowing|down|at)[^.]*\.?\s*\n?/i, '')
         .replace(/^yeah[.,]?\s*\n?/i, '')
         .replace(/^,\s*/i, '')
         .trim();
+
+      // 强制截断：最多3行（Grok 经常无视 max_tokens）
+      const _lines = cleanedReply.split('\n').filter(l => l.trim());
+      if (_lines.length > 3) {
+        cleanedReply = _lines.slice(0, 3).join('\n');
+      }
       // 处理 unlock tag（解锁资料后从文本删掉）
       const _unlockMatch = cleanedReply.match(/"unlock"\s*:\s*"([^"]+)"/);
       if (_unlockMatch) {
