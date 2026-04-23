@@ -700,6 +700,8 @@ async function _processMergedMessage(text) {
     // 有图片时强制跳过——Grok看不到图，会破防说Kirk
     const INTIMATE_PATTERNS = [
       /摸摸|蹭蹭|贴贴|咬我|舔我|撩你/,
+      // 补充：咬/舔/亲 的自然变体（旧版只有"咬我"，"咬一口""咬你"全漏）
+      /咬你|咬一口|舔你|舔一下|舔那|亲你|亲一口|亲一下/,
       /你好坏|坏死了|流氓/,
       /touch me|want you|naughty|tease me/i,
       /床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|一起.*床/,
@@ -708,13 +710,19 @@ async function _processMergedMessage(text) {
       /intimate|turn.*on|turned.*on/i,
       // 生理问题也走G，但由 intimacy.js 的 anti-spike 控制节奏
       /勃起|硬了|几厘米|尺寸|几寸|进去|cock|dick|pussy|erect|inches/i,
+      // 补充：中文生理/露骨词（旧版只覆盖英文）
+      /射了|高潮|湿了|好湿|好深/,
+      /想要你|想被你|骑你|骑上来/,
       // 穿搭/服装亲密场景
       /浴巾|裹着.*巾|只.*浴巾/,
       /真空穿|不穿.*内|内衣.*不穿|没穿.*内|裸睡/,
       /睡裙.*给你|给你.*睡裙|睡衣.*给你|你看.*睡衣|睡衣.*你看/,
       /穿.*我的.*衫|穿你的.*衬衫|穿我.*衣服/,
       /穿搭.*排行|排行.*穿搭|心动.*穿|穿.*心动|穿.*等级|rating.*outfit|outfit.*rank/i,
-      /内衣|内裤|胸罩|bra|underwear|lingerie/i,
+      /内衣|内裤|胸罩|bra|underwear|lingerie|蕾丝/i,
+      // 补充：BDSM / 道具类（收紧：绑→绑住/捆住，惩罚→惩罚我，跪→跪下/跪好，避免日常误伤）
+      /乳夹|乳头|奶头|绑住|绑起|捆住|捆起|调教|惩罚我|跪下|跪好|项圈|皮鞭/,
+      /跳蛋|按摩棒|情趣用品/,
     ];
 
     // 使用 intimacy.js 的 intent 系统决定是否调情
@@ -736,17 +744,24 @@ async function _processMergedMessage(text) {
 
     // ── 强制退出调情模式的三道保险 ──
 
-    // 保险1：上一条是Grok且用户这条不含调情内容 → 直接回Claude
-    // 只有用户明确继续调情（正则命中）才留在Grok
+    // 保险2的关键词（提前定义，保险1也要用）
+    const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|what r u doing|where are you|how was your day|how are you|what's up|what's going on|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb|dinner|lunch|breakfast|for dinner|for lunch|part.time|job|school|class|homework|study|shopping|cooking|cleaning/i;
+
+    // 保险1：上一条是Grok → 只有用户明确切换到日常才退出
+    // 修复：旧逻辑要求每条消息都命中正则才能留在Grok，
+    // 但"咬一口""嗯...""继续"这种自然延续不命中 → 被误踢到Claude → 破防
+    // 新逻辑：默认留在调情通道，只有日常关键词才退出
     const _lastBotIntimate = chatHistory.slice(-2).some(m => m._intimate && m.role === 'assistant');
     let _forcedExitIntimate = false;
-    if (_lastBotIntimate && !INTIMATE_PATTERNS.some(p => p.test(text))) {
-      isIntimate = false;
-      _forcedExitIntimate = true;
+    if (_lastBotIntimate) {
+      if (_clearIntimateKws.test(text) && !INTIMATE_PATTERNS.some(p => p.test(text))) {
+        // 明确日常话题 + 不含调情内容 → 退出
+        isIntimate = false;
+        _forcedExitIntimate = true;
+      }
+      // else: 不退出，让 Haiku 或余温系统自然判断
     }
 
-    // 保险2：用户明显切换到日常话题时，强制退出
-    const _clearIntimateKws = /吃饭了吗|吃了吗|在干嘛|你在哪|几点了|今天怎么样|上班|下班|工作|任务|训练|好累|好饿|好冷|好热|天气|睡觉|晚安|早安|起床|出门|回来了|随便聊|换个话题|算了不说|不聊这个|have you eaten|what are you doing|what r u doing|where are you|how was your day|how are you|what's up|what's going on|work|mission|training|so tired|exhausted|hungry|cold|hot|weather|good night|good morning|woke up|heading out|just got home|back home|anyway|never mind|forget it|change the subject|talk about something else|what time is it|going to sleep|gotta go|gtg|brb|dinner|lunch|breakfast|for dinner|for lunch|part.time|job|school|class|homework|study|shopping|cooking|cleaning/i;
     // 普通撒娇词：不是调情，直接走 Claude
     const _normalAffection = /^(babe|baby|honey|darling|hubby|sweetie|love|hey babe|hey baby|hey honey|miss you|miss u|i miss you|想你|想你了|老公|宝贝|亲爱的|在吗|在不在|你在吗|babe\?|baby\?|honey\?)$/i;
 
@@ -765,9 +780,9 @@ async function _processMergedMessage(text) {
     }
 
     // 明确日常消息：跳过 Haiku 调情检测，直接走 Claude
-    // 也在强制退出/愤怒退出时跳过，防止 Haiku 把刚退出的又拉回去
+    // 修复：去掉 _forcedExitIntimate — 保险1退出后仍让 Haiku 有机会救回来
+    // 场景："咬一口"不命中日常词 → 保险1不触发 → Haiku 判 flirt → 留在 Grok
     const _isClearlyNormal = ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text)))
-      || _forcedExitIntimate
       || _angryForceExit;
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
