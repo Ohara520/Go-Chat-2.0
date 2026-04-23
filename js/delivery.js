@@ -77,9 +77,14 @@ const DELIVERY_STAGES_SELF = [
 
 function addDelivery(product, isGhostSend, isLuxury) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const totalMs = isGhostSend
+  let totalMs = isGhostSend
     ? (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000
     : (Math.floor(Math.random() * 2) + 2) * 24 * 3600 * 1000;
+
+  // 艺人职业快递加速（#6 bug fix）
+  const _speedPct = typeof getCareerDeliverySpeed === 'function' ? getCareerDeliverySpeed() : 0;
+  if (_speedPct > 0) totalMs = Math.round(totalMs * (1 - _speedPct / 100));
+
   const stages   = isGhostSend ? DELIVERY_STAGES_GHOST
                    : product.isUserItem ? DELIVERY_STAGES_SELF
                    : DELIVERY_STAGES_USER;
@@ -204,7 +209,12 @@ function addGhostReverseDelivery(item, emotionType) {
   localStorage.setItem('lastAnyReverseAt', Date.now().toString());
 
   const deliveries  = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const totalMs     = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000;
+  let totalMs       = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000;
+
+  // 艺人职业快递加速（#6 bug fix）
+  const _speedPct2 = typeof getCareerDeliverySpeed === 'function' ? getCareerDeliverySpeed() : 0;
+  if (_speedPct2 > 0) totalMs = Math.round(totalMs * (1 - _speedPct2 / 100));
+
   const now         = Date.now();
   const interval    = totalMs / DELIVERY_STAGES_GHOST.length;
   const isSecret    = !!item._secretDelivery;
