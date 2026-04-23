@@ -183,6 +183,10 @@ function showPurchaseReceipt(delivery) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function addGhostReverseDelivery(item, emotionType) {
+  // 统一冷却：3天内只寄一次（不管哪种反寄系统）
+  const lastAnyReverse = parseInt(localStorage.getItem('lastAnyReverseAt') || '0');
+  if (Date.now() - lastAnyReverse < 3 * 24 * 3600 * 1000) return;
+
   // 读统一状态
   const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
 
@@ -195,6 +199,9 @@ function addGhostReverseDelivery(item, emotionType) {
 
   if (typeof canTriggerReverseDelivery  === 'function' && !canTriggerReverseDelivery()) return;
   if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
+
+  // 记录统一冷却时间
+  localStorage.setItem('lastAnyReverseAt', Date.now().toString());
 
   const deliveries  = JSON.parse(localStorage.getItem('deliveries') || '[]');
   const totalMs     = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000;

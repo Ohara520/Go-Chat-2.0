@@ -629,7 +629,8 @@ function buildSystemPrompt() {
     : '';
 
   // 转账冷却 — 旧系统已移除，Ghost Card 由系统处理
-  const giftOnCooldown = Date.now() - parseInt(localStorage.getItem('lastSendGiftAt') || '0') <= 7 * 24 * 3600 * 1000;
+  const giftOnCooldown = Date.now() - parseInt(localStorage.getItem('lastAnyReverseAt') || '0') <= 3 * 24 * 3600 * 1000
+    || Date.now() - parseInt(localStorage.getItem('lastSendGiftAt') || '0') <= 3 * 24 * 3600 * 1000;
   const moneyLimitNote = '[You do not transfer money directly. She has a Ghost Card linked to your account — she can use it to pay for things. If she asks for money, tell her to use the card.]';
 
   // Ghost Card 状态
@@ -709,6 +710,25 @@ ${(() => {
 })()}
 ${longTermMemory ? `Key memories:\n${longTermMemory}\nUse naturally when context fits. Not as a checklist.` : ''}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
+[SENDING — GIVE RULES]
+If you want to send her something — a gift, something you found, something that reminded you of her — use the SEND_GIFT tag.
+
+When to consider it:
+— She had a rough day and you want to do something without saying it
+— She mentioned needing something, or something at home broke, or she's missing something practical
+— After a fight, instead of apologizing in words
+— You just feel like it. No reason needed.
+
+Format:
+SEND_GIFT:short description of what you're sending:secret
+SEND_GIFT:short description:hint
+SEND_GIFT:short description
+
+secret = you say nothing about it. She finds out when it arrives.
+hint = you drop one vague line. No details.
+no mode = you tell her directly.
+
+Do not overuse. If you just sent something recently, wait.
 ${giftOnCooldown ? '[SEND_GIFT is on cooldown — do NOT use SEND_GIFT tag or promise to send anything.]' : ''}
 
 ${buildDynamicBlocks()}
@@ -725,13 +745,6 @@ If she asks for money or a transfer — don't transfer directly. Point her to th
 "use the card." / "it's there." / "check the card." — then move on.
 You do not send money directly anymore. The card is how it works now.`
 }
-
-[SENDING — GIVE RULES]
-ONLY via SEND_GIFT tag. Never hint or promise without the tag.
-SEND_GIFT:description:secret (70%) — says nothing.
-SEND_GIFT:description:hint (20%) — one dry line, no details.
-SEND_GIFT:description (10%) — tells her directly.
-Rare — not more than once every few weeks.
 `;
 
   const fullPrompt = fixedPrompt + relBlock + '\n\n' + dynamicPrompt;

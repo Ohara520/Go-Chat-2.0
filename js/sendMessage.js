@@ -1249,8 +1249,10 @@ async function _processMergedMessage(text) {
 
     // SEND_GIFT处理
     if (sendGift) {
+      // 统一冷却：3天内有任何反寄就不触发
+      const lastAnyReverse = parseInt(localStorage.getItem('lastAnyReverseAt') || '0');
       const lastSendGiftAt = parseInt(localStorage.getItem('lastSendGiftAt') || '0');
-      if (Date.now() - lastSendGiftAt > 7 * 24 * 3600 * 1000) {
+      if (Date.now() - lastAnyReverse > 3 * 24 * 3600 * 1000 && Date.now() - lastSendGiftAt > 3 * 24 * 3600 * 1000) {
         localStorage.setItem('lastSendGiftAt', Date.now());
         const giftDesc = sendGift.description || sendGift;
         const giftMode = sendGift.mode || 'secret';
