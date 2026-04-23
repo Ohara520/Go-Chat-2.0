@@ -80,8 +80,62 @@ function updateToRead() {
 
 const _UNLOCK_VALID_FIELDS = ['birthday', 'zodiac', 'height', 'weight', 'blood_type', 'hometown'];
 
+// ─────────────────────────────────────────────────────────
+// API错误JSON检测（最终兜底）
+// 中转站/上游API返回的错误结构绝不应该以Ghost消息的形式显示
+// 例: {"code":"Some resource has been exhausted","error":"Too many requests..."}
+// 无论哪条调用路径漏了错误JSON过来，这里是最后一道防线
+// ─────────────────────────────────────────────────────────
+function looksLikeApiError(text) {
+  if (!text || typeof text !== 'string') return false;
+  const s = text.trim();
+  if (s.length < 30) return false;  // 太短的不太可能是错误体
+
+  // 1. 特征关键词快路径（命中任一即判定为错误）
+  const signatures = [
+    'Too many requests',
+    'rate limit',
+    'Rate limit',
+    'resource has been exhausted',
+    'api.anthropic.com',
+    'console.x.ai',
+    'console.anthropic.com',
+    'quota exceeded',
+    'insufficient_quota',
+    'Requests per Second',
+    'Requests per Minute',
+    "team's rate limit",
+    'invalid_request_error',
+    'authentication_error',
+    'overloaded_error',
+    'model claude-haiku-',
+    'model claude-sonnet-',
+    'model claude-opus-',
+    '"code":"',
+  ];
+  for (const sig of signatures) {
+    if (s.includes(sig)) return true;
+  }
+
+  // 2. JSON结构兜底：开头 { 结尾 }，且含 error/code 字段
+  if (s.startsWith('{') && s.endsWith('}')) {
+    try {
+      const obj = JSON.parse(s);
+      if (obj && (obj.error || obj.code || obj.type === 'error')) return true;
+    } catch (_) { /* 不是合法JSON,跳过 */ }
+  }
+
+  return false;
+}
+
 function cleanBotText(text, scene = 'normal') {
   if (!text) return '';
+
+  // 0. 最终兜底：API错误JSON直接清空，不渲染到聊天
+  if (looksLikeApiError(text)) {
+    console.warn('[cleanBotText] 过滤API错误泄露:', text.slice(0, 120));
+    return '';
+  }
 
   // 破防检测由各调用方（sendMessage/sticker/photo/money）同步处理
   // cleanBotText 只负责文本清洗，不做破防兜底

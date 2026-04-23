@@ -14,6 +14,107 @@ function getMainModel() {
   return MODEL_OPUS;
 }
 
+// ═══════════════════════════════════════════════════════════
+// 共享工具：API错误body检测
+// 中转站有时返回HTTP 200但body是错误(code/error字段)
+// !res.ok 拦不住这种情况，需要读body后二次检查
+// 用于所有callXxx封装的统一处理
+// ═══════════════════════════════════════════════════════════
+function _isApiErrorBody(data) {
+  if (!data || typeof data !== 'object') return false;
+  // Anthropic/中转站常见错误结构
+  if (data.error) return true;
+  if (data.code && typeof data.code === 'string' && !data.content) return true;
+  if (data.type === 'error') return true;
+  return false;
+}
+
+function _apiErrorMsg(data) {
+  if (!data) return 'unknown';
+  if (typeof data.error === 'string') return data.error.slice(0, 120);
+  if (data.error?.message) return String(data.error.message).slice(0, 120);
+  if (data.code) return String(data.code).slice(0, 80);
+  return 'unknown';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Haiku调用节流 + 去重缓存
+// 解决Haiku被打爆 (79/60 per minute) 的根源问题
+//   - 最多_HAIKU_MAX_CONCURRENT个并发in-flight
+//   - 超出的排队,_HAIKU_QUEUE_TIMEOUT_MS后放弃(返回空串)
+//   - 相同调用参数_HAIKU_CACHE_TTL_MS内命中缓存,直接返回
+// 仅Haiku模型使用(Sonnet/Grok/Venice额度宽松,不走节流)
+// ═══════════════════════════════════════════════════════════
+const _HAIKU_MAX_CONCURRENT    = 5;
+const _HAIKU_QUEUE_TIMEOUT_MS  = 5000;
+const _HAIKU_CACHE_TTL_MS      = 60000;
+const _HAIKU_CACHE_MAX_SIZE    = 200;
+
+let _haikuInFlight = 0;
+const _haikuWaitQueue = [];   // { resolve, timedOut }
+const _haikuCache = new Map(); // hash -> { result, ts }
+
+function _hashHaikuCall(system, messages, maxTokens) {
+  const payload = JSON.stringify({ s: system || '', m: messages || [], t: maxTokens || 0 });
+  let h = 0;
+  for (let i = 0; i < payload.length; i++) {
+    h = ((h << 5) - h + payload.charCodeAt(i)) | 0;
+  }
+  return h.toString(36) + '_' + payload.length;
+}
+
+function _haikuCacheGet(key) {
+  const entry = _haikuCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > _HAIKU_CACHE_TTL_MS) {
+    _haikuCache.delete(key);
+    return null;
+  }
+  return entry.result;
+}
+
+function _haikuCacheSet(key, result) {
+  // 空串不缓存,失败调用不该阻挡下次重试
+  if (result === '' || result == null) return;
+  _haikuCache.set(key, { result, ts: Date.now() });
+  if (_haikuCache.size > _HAIKU_CACHE_MAX_SIZE) {
+    const firstKey = _haikuCache.keys().next().value;
+    _haikuCache.delete(firstKey);
+  }
+}
+
+async function _haikuGateAcquire() {
+  if (_haikuInFlight < _HAIKU_MAX_CONCURRENT) {
+    _haikuInFlight++;
+    return true;
+  }
+  return new Promise(resolve => {
+    const ticket = { resolve, timedOut: false };
+    _haikuWaitQueue.push(ticket);
+    setTimeout(() => {
+      if (ticket.timedOut) return;
+      ticket.timedOut = true;
+      const idx = _haikuWaitQueue.indexOf(ticket);
+      if (idx !== -1) _haikuWaitQueue.splice(idx, 1);
+      resolve(false); // 排队超时,放弃调用
+    }, _HAIKU_QUEUE_TIMEOUT_MS);
+  });
+}
+
+function _haikuGateRelease() {
+  _haikuInFlight = Math.max(0, _haikuInFlight - 1);
+  // 唤醒下一个等待者
+  while (_haikuWaitQueue.length > 0) {
+    const next = _haikuWaitQueue.shift();
+    if (!next.timedOut) {
+      next.timedOut = true;  // 占位,防止超时回调重复resolve
+      _haikuInFlight++;
+      next.resolve(true);
+      break;
+    }
+  }
+}
+
 // ===== 基础网络工具 =====
 
 /**
@@ -80,12 +181,28 @@ function cleanMessages(messages) {
 
 /**
  * 调用 Claude Haiku（快速检测/判断/短文本生成）
+ * 走Haiku节流闸门：最多3并发 + 60秒相同调用缓存 + 5秒排队超时
+ * 排队超时/失败统一返回空串，调用方已按空串兜底处理
  * @param {string} system  系统提示词
  * @param {Array}  messages  消息数组（原始格式，会自动cleanMessages）
  * @param {number} maxTokens  默认200
  * @returns {string} 模型回复文本，失败返回空字符串
  */
 async function callHaiku(system, messages, maxTokens = 200) {
+  const cleanMsgs = cleanMessages(messages);
+  const cacheKey = _hashHaikuCall(system, cleanMsgs, maxTokens);
+
+  // 1. 查缓存
+  const cached = _haikuCacheGet(cacheKey);
+  if (cached !== null) return cached;
+
+  // 2. 进闸门
+  const acquired = await _haikuGateAcquire();
+  if (!acquired) {
+    console.warn('[callHaiku] 排队超时,放弃调用');
+    return '';
+  }
+
   try {
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
@@ -94,14 +211,22 @@ async function callHaiku(system, messages, maxTokens = 200) {
         model: MODEL_HAIKU,
         max_tokens: maxTokens,
         system,
-        messages: cleanMessages(messages),
+        messages: cleanMsgs,
       }),
     }, 10000);
     if (!res.ok) return '';
     const data = await res.json();
-    return data.content?.[0]?.text?.trim() || '';
+    if (_isApiErrorBody(data)) {
+      console.warn('[callHaiku] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
+    const result = data.content?.[0]?.text?.trim() || '';
+    _haikuCacheSet(cacheKey, result);
+    return result;
   } catch (e) {
     return '';
+  } finally {
+    _haikuGateRelease();
   }
 }
 
@@ -126,6 +251,10 @@ async function callSonnet(system, messages, maxTokens = 400) {
     }, 25000);
     if (!res.ok) return '';
     const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callSonnet] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
     return data.content?.[0]?.text?.trim() || '';
   } catch (e) {
     return '';
@@ -150,6 +279,10 @@ async function callSonnetLight(system, messages, maxTokens = 100) {
     }, 15000);
     if (!res.ok) return '';
     const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callSonnetLight] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
     return data.content?.[0]?.text?.trim() || '';
   } catch (e) {
     return '';
@@ -167,6 +300,20 @@ async function callSonnetLight(system, messages, maxTokens = 100) {
  * @returns {string} 回复文本，失败返回空字符串
  */
 async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
+  const messages = [{ role: 'user', content: userContent }];
+  const cacheKey = _hashHaikuCall(systemPrompt, messages, maxTokens);
+
+  // 查缓存
+  const cached = _haikuCacheGet(cacheKey);
+  if (cached !== null) return cached;
+
+  // 进Haiku闸门
+  const acquired = await _haikuGateAcquire();
+  if (!acquired) {
+    console.warn('[fetchDeepSeek] 排队超时,放弃调用');
+    return '';
+  }
+
   try {
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
@@ -175,14 +322,22 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
         model: MODEL_HAIKU,
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userContent }],
+        messages,
       }),
     }, 8000);
     if (!res.ok) return '';
     const data = await res.json();
-    return data.content?.[0]?.text || '';
+    if (_isApiErrorBody(data)) {
+      console.warn('[fetchDeepSeek] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
+    const result = data.content?.[0]?.text || '';
+    _haikuCacheSet(cacheKey, result);
+    return result;
   } catch (e) {
     return '';
+  } finally {
+    _haikuGateRelease();
   }
 }
 
@@ -211,6 +366,10 @@ async function callGrok(user, maxTokens = 300, imageBase64 = null, scene = 'norm
     }, 10000);
     if (!res.ok) return '';
     const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callGrok] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
     return data.text?.trim() || '';
   } catch (e) {
     return '';
@@ -234,6 +393,10 @@ async function callGrokWithSystem(system, user, maxTokens = 300) {
     }, 10000);
     if (!res.ok) return '';
     const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callGrokWithSystem] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
     return data.text?.trim() || '';
   } catch (e) {
     return '';
@@ -260,6 +423,10 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
     }, 22000);  // 延长超时：Grok响应慢，12s经常silent fail
     if (!res.ok) return '';
     const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callVenice] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
     return data.text?.trim() || '';
   } catch (e) {
     return '';
@@ -285,6 +452,10 @@ async function callDeepSeek(prompt, maxTokens = 200) {
     }, 12000);
     if (!res.ok) return '';
     const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callDeepSeek] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
     return data.text?.trim() || '';
   } catch (e) {
     return '';
@@ -407,6 +578,10 @@ async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateM
     }, 22000);
     if (!res.ok) return '';
     const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callVeniceForCurrentChar] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
     return data.text?.trim() || '';
   } catch (e) {
     return '';
