@@ -138,7 +138,7 @@ function decideMainIntent(text, pendingEvent) {
   return 'routine';
 }
 
-async function handlePostReplyActions(text, reply, intent) {
+async function handlePostReplyActions(text, reply, intent, pendingEvent) {
   try {
     consumeQuota().catch(() => {});
     localStorage.setItem('lastUserMessageAt', Date.now().toString());
@@ -159,6 +159,11 @@ async function handlePostReplyActions(text, reply, intent) {
       const lastBot = [...chatHistory].reverse().find(m => m.role === 'assistant' && !m._recalled);
       if (lastBot) lastBot._intimate = true;
       if (typeof saveHistory === 'function') saveHistory();
+    }
+    // 调用 events.js 的事件处理（反寄/转账/质问/签到）
+    // pendingEvent 是对象 {type: 'reverse_package', motive: ...}，直接传过去
+    if (typeof handlePostReplyEvents === 'function' && pendingEvent) {
+      handlePostReplyEvents(text, reply, pendingEvent).catch(e => console.warn('事件处理出错:', e));
     }
   } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
 }
@@ -199,7 +204,8 @@ const BREAKOUT_PHRASES = [
   "keep moving", "what's your aim",
   "english only", "english.", "use my name", "stop with that", "stop calling me",
   // AI助手类
-  "ai assistant", "development work", "coding questions",
+  "ai assistant", "development work", "coding questions", "coding problems",
+  "here to help you", "what are you working on", "build something", "24/7",
   "creative writing communities", "roleplay platforms",
   // 明确跳出
   "i need to be straight with you",
@@ -1276,7 +1282,7 @@ async function _processMergedMessage(text) {
       checkLocationSpecialTrigger(text).catch(() => {});
     }
     // 情绪/商城触发：提高到45%（原25%太低）
-    if (Math.random() < 0.70) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
+    if (Math.random() < 0.85) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (chatHistory.slice(-6).some(m => m._intimate)) {
       setTimeout(() => { try { checkIntimateHighlight(text, reply); } catch(e) {} }, 1500);
     }
@@ -1299,7 +1305,7 @@ async function _processMergedMessage(text) {
     }
 
     try { handleLostPackageClaim(text); } catch(e) {}
-    handlePostReplyActions(text, reply, intent).catch(e => console.warn('副行为出错:', e));
+    handlePostReplyActions(text, reply, intent, pendingEvent).catch(e => console.warn('副行为出错:', e));
 
     _isSending = false;
 

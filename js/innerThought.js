@@ -237,7 +237,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
       }
 
     } else {
-      // 普通场景：Sonnet 4.6（质量够用，比 Opus 省钱）
+      // 普通场景：SonnetLight（质量够用，比主模型省钱）
       try {
         const badPhrases = ["kirk","kiro","ai assistant","i'm an ai","i am an ai","claude","step out of character","can't roleplay"];
         const sonnetRaw = await callSonnetLight(thoughtPrompt, [{ role: 'user', content: 'inner thought now.' }], 60);
@@ -357,7 +357,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
               const t = d.content?.[0]?.text?.trim();
               if (t && !isBreakout(t)) {
                 appendMessage('bot', t);
-                chatHistory.push({ role: 'assistant', content: t });
+                chatHistory.push({ role: 'assistant', content: t, _goodnight: true });
                 saveHistory();
                 if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
               }
@@ -387,8 +387,12 @@ function toggleThought() {
     if (thoughtTimer) clearTimeout(thoughtTimer);
 
     if (_thoughtQueue.length > 0) {
-      // 队列有下一条：300ms后重新亮起按钮提示
-      _thoughtQueue.shift(); // 消费队列
+      // 队列有下一条：取出内容，300ms后重新亮起按钮提示
+      const next = _thoughtQueue.shift();
+      // 把下一条心声写入localStorage，用户点按钮时能读到
+      if (next.en) {
+        localStorage.setItem('lastInnerThought', JSON.stringify({ en: next.en }));
+      }
       setTimeout(() => {
         if (btn) {
           btn.dataset.hasThought = '1';

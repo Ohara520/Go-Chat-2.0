@@ -119,7 +119,7 @@ async function generateLifePing() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: MODEL_HAIKU,
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 60,
         system: buildGhostStyleCore() + '\n' + buildLifePingPrompt(scene),
         messages: [{ role: 'user', content: 'Send your message.' }]
@@ -181,9 +181,7 @@ async function callGrokWithCtx(systemPrompt, writePrompt, n = 4) {
   const userContent = recentCtx
     ? `Recent chat:\n${recentCtx}\n\n${writePrompt}`
     : writePrompt;
-  // BUG-10 FIX: 旧版把 systemPrompt 和 userContent 拆开传给 callGrok，参数错位
-  // 后端 /api/gemini 有自己的内建人设，这里把 styleCore + userContent 合并成 user 消息
-  return await callGrok(systemPrompt + '\n\n' + userContent, 100);
+  return await callGrok(systemPrompt, userContent, 100);
 }
 
 // ── 事件冷却管理 ──────────────────────────────────
@@ -610,7 +608,7 @@ async function emitGhostNarrativeEvent(text, options = {}) {
 // ── handlePostReplyActions ───────────────────────
 // 只做"回复后状态结算"，不做内容决策
 
-async function handlePostReplyActions(userText, reply, intent) {
+async function handlePostReplyEvents(userText, reply, intent) {
   switch (intent.type) {
     case 'confront':
       if (Math.random() < 0.35) await emitGhostEvent('confront');
@@ -664,10 +662,10 @@ async function checkLocationSpecialTrigger(userText) {
     const specials = LOCATION_SPECIALS?.[locationKey];
     if (!specials || specials.length === 0) return;
 
-    // ── 7天冷却（同地点每7天最多触发一次）────
+    // ── 2天冷却（同地点每2天最多触发一次）────
     const sentKey  = 'locationSpecialSent_' + locationKey;
     const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
-    if (lastSent && Date.now() - lastSent < 7 * 24 * 3600 * 1000) return;
+    if (lastSent && Date.now() - lastSent < 2 * 24 * 3600 * 1000) return;
 
     // ── 关系门槛检查 ─────────────────────────────
     const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
@@ -682,7 +680,7 @@ async function checkLocationSpecialTrigger(userText) {
     const input = (userText || '').toLowerCase();
 
     const locationWords = [
-      '当地','英国','曼城','伦敦','苏格兰','那边','你们那边',
+      '当地','英国','曼城','伦敦','苏格兰','那边','你们那边','你那边',
       'local','manchester','uk','british','edinburgh','norway','germany',
       'poland','hereford','london','amsterdam','paris','dublin','tokyo',
       'japan','france','ireland','netherlands',
@@ -692,23 +690,26 @@ async function checkLocationSpecialTrigger(userText) {
       '吃','馋','羡慕','茶','巧克力','围巾','明信片','小物','挂件','香薰',
       'curious','want','like','bring back','local thing','food','chocolate',
       'scarf','souvenir','miss','try','taste',
+      // 扩展：关心地点生活的日常用语
+      '怎么样','好不好','冷不冷','热不热','天气','下雨','下雪','那里',
+      '习惯吗','适应','好玩','无聊','有什么','什么样','风景',
+      'how is it','what\'s it like','is it cold','is it nice','how\'s the weather',
+      'what\'s there','do you like it','having fun','boring','beautiful',
+      'raining','snowing','how are things','what do you do there',
     ];
 
     const hasLocation = locationWords.some(w => input.includes(w));
     const hasInterest = interestWords.some(w => input.includes(w));
-    // 改为 OR：命中其一就进入语义判断
-    if (!hasLocation && !hasInterest) return;
+    // 放宽预筛：命中任意一组就进 Haiku，或者消息够长也进（让模型判断）
+    if (!hasLocation && !hasInterest && input.length < 8) return;
 
     // ── Haiku 语义判断 ───────────────────────────
     let triggered = false;
     try {
       const raw = await callHaiku(
-        `判断用户的消息是否包含以下任意一种意图：
-1. 提到想吃、馋、好奇当地食物或特产
-2. 对当地文化、天气、生活习惯、小店表现出兴趣
-3. 提到想要某件当地小物件（围巾、明信片、茶、小挂件等）
-4. 问"你那边是不是有这种…""当地会不会有…"之类
-只返回JSON：{"triggered":true} 或 {"triggered":false}，不要其他文字。`,
+        `Ghost 目前在 ${rawLocation}。判断用户的消息是否跟他所在的地方、他的生活状况、或当地的事物有任何关联。
+不需要用户明确提到地名或特产——只要她在关心他那边的情况、问他过得怎样、聊到天气环境、或者表达想念/好奇，都算。
+宁可判 true。只返回JSON：{"triggered":true} 或 {"triggered":false}`,
         [{ role: 'user', content: userText }]
       );
       const result = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
@@ -725,8 +726,8 @@ async function checkLocationSpecialTrigger(userText) {
     // ── 写入冷却时间戳 ────────────────────────────
     localStorage.setItem(sentKey, Date.now().toString());
 
-    // ── 2-4天后出现包裹 ──────────────────────────
-    const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+    // ── 30-60分钟后出现包裹 ──────────────────────
+    const delay = (30 + Math.floor(Math.random() * 30)) * 60 * 1000;
     setTimeout(() => {
       if (typeof addGhostReverseDelivery === 'function') {
         addGhostReverseDelivery({ ...item, isLocationSpecial: true }, 'location_special');
@@ -752,10 +753,10 @@ function checkLocationSpecialAutoTrigger() {
     const specials = LOCATION_SPECIALS?.[locationKey];
     if (!specials || specials.length === 0) return;
 
-    // 同地点7天冷却
+    // 同地点2天冷却
     const sentKey  = 'locationSpecialSent_' + locationKey;
     const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
-    if (lastSent && Date.now() - lastSent < 7 * 24 * 3600 * 1000) return;
+    if (lastSent && Date.now() - lastSent < 2 * 24 * 3600 * 1000) return;
 
     // 关系门槛（主动寄比对话触发更亲密，门槛更高）
     const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
@@ -776,13 +777,13 @@ function checkLocationSpecialAutoTrigger() {
     const daysHere = (Date.now() - arrivedAt) / (24 * 3600 * 1000);
     if (daysHere < 2) return; // 修复：待满2天才触发
 
-    // 40%概率主动触发（不是每次都触发，保留随机感）
-    if (Math.random() > 0.4) return;
+    // 50%概率主动触发
+    if (Math.random() > 0.5) return;
 
     const item = specials[Math.floor(Math.random() * specials.length)];
     localStorage.setItem(sentKey, Date.now().toString());
 
-    const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
+    const delay = (30 + Math.floor(Math.random() * 30)) * 60 * 1000;
     setTimeout(() => {
       if (typeof addGhostReverseDelivery === 'function') {
         addGhostReverseDelivery({ ...item, isLocationSpecial: true }, 'location_special');
@@ -1448,15 +1449,11 @@ function triggerSeriousTalk() {
       model: getMainModel(),
       max_tokens: 1000,
       system: sys,
-      messages: typeof chatHistory !== 'undefined'
-        ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => ({ role: m.role, content: m.content }))
-        : []
+      messages: typeof chatHistory !== 'undefined' ? chatHistory.slice(-20) : []
     })
   }).then(r => r.json()).then(data => {
     if (typeof hideTyping === 'function') hideTyping();
     const reply = data.content?.[0]?.text || '...';
-    // BUG-9 FIX: 破防检测
-    if (typeof isBreakout === 'function' && isBreakout(reply)) return;
     if (typeof appendMessage === 'function') appendMessage('bot', reply.trim());
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({ role: 'assistant', content: reply });

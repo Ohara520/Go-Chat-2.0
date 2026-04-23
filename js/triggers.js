@@ -117,30 +117,8 @@ Did Ghost show clear desire or wanting — through implication, tension, or cont
 
 async function checkTriggersAndEmotion(userText, botText) {
 
-  // ── 关键词预筛——没命中就直接走地点检测，跳过模型调用 ──
-  const marketKeywords = [
-    '冷','冻','暖','饿','吃','伙食','食物','累了','疲惫','想你','想念','思念',
-    'tired','cold','hungry','miss','freezing','starving','exhausted','warm'
-  ];
-  const emotionKeywords = [
-    '开心','难过','委屈','饿','累','压力','生病','冷','热','想你','哭','不舒服','心情',
-    'sad','miss','hurt','tired','sick','lonely','cry','crying','upset','depressed',
-    'exhausted','cold','hungry','stressed','worried','scared','angry','miss you','love you'
-  ];
-  const moneyContextKeywords = [
-    '买','钱','贵','便宜','省','花','穷','价格','折扣','划算','预算','负担',
-    '工资','发薪','想要','喜欢','看中','订单',
-    'pay','afford','expensive','cheap','price','buy','want','sale'
-  ];
-
-  const combined = userText + botText;
-  const hasMarketHint    = marketKeywords.some(k => combined.includes(k));
-  const hasEmotionHint   = emotionKeywords.some(k => userText.includes(k));
-  const hasMoneyContext  = moneyContextKeywords.some(k => userText.toLowerCase().includes(k));
-
-  // 预筛没命中：跳过三重判断，只跑地点检测
-  if (!hasMarketHint && !hasEmotionHint && !hasMoneyContext) {
-    // 【修复】原来传 botText，现在只传 userText，判断更准确
+  // ── 跳过太短的消息 ──
+  if (userText.length < 4) {
     if (typeof checkLocationSpecialTrigger === 'function') {
       checkLocationSpecialTrigger(userText).catch(() => {});
     }
@@ -148,11 +126,11 @@ async function checkTriggersAndEmotion(userText, botText) {
   }
 
   try {
-    // ── 三重判断：用 Haiku（fetchDeepSeek），判断器场景不破防 ──
+    // ── 三重判断：用 Haiku，不再预筛关键词，直接让模型判断 ──
     const raw = await fetchDeepSeek(
       `你是一个三重判断器。只返回JSON，不要其他文字。
 1. 判断Ghost的回复是否暗示他需要/缺少某样东西，返回market字段
-2. 判断用户的消息透露了什么情绪，返回emotion字段
+2. 判断用户的消息透露了什么情绪，返回emotion字段。宁可判true——只要用户有任何情绪波动（开心、难过、累、想念、焦虑、生病等），都算triggered。不需要用户明确说出关键词。
 3. 判断这次对话后Ghost的心情变化，返回mood_change字段
 
 mood_change规则：
@@ -186,7 +164,7 @@ emotion强度：轻/中/重`,
         const cooldownMs = 3 * 24 * 3600 * 1000;
 
         const availableProducts = cat.products.filter(name => !purchased.includes(name));
-        if (availableProducts.length === 0) return; // 全买完了不再触发
+        if (availableProducts.length === 0) return;
 
         const alreadyTriggered = availableProducts.some(
           name => triggered[name] && now - triggered[name].timestamp < cooldownMs
@@ -205,14 +183,14 @@ emotion强度：轻/中/重`,
       const type      = result.emotion.type;
       const intensity = result.emotion.intensity;
 
-      // 2天冷却
+      // 3天冷却（同类型情绪）
       const coolKey  = 'reverseShipCool_' + type;
       const lastTime = parseInt(localStorage.getItem(coolKey) || '0');
-      if (Date.now() - lastTime < 2 * 24 * 3600 * 1000) return;
+      if (Date.now() - lastTime < 3 * 24 * 3600 * 1000) return;
 
-      // 概率：轻35% 中55% 重75%
-      const probMap = { '轻': 0.35, '中': 0.55, '重': 0.75 };
-      const prob = probMap[intensity] || 0.08;
+      // 概率：轻60% 中80% 重95%
+      const probMap = { '轻': 0.60, '中': 0.80, '重': 0.95 };
+      const prob = probMap[intensity] || 0.50;
       if (Math.random() > prob) return;
 
       // 从礼物池抽取，去重

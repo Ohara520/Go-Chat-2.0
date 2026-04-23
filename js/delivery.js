@@ -337,15 +337,6 @@ function checkDeliveryUpdates() {
           } else if (d.isGhostSend) {
             showMysteryPackage(d);
           } else {
-            // 【改】系统私信改成英文简化版
-            if (typeof chatHistory !== 'undefined') {
-              chatHistory.push({
-                role: 'user',
-                content: `[the item she sent — 「${d.name}」— just arrived. you have it now. if she asks, confirm it naturally.]`,
-                _system: true
-              });
-              _safeDeliverySaveHistory(); // 防止空 chatHistory 覆盖真实记录
-            }
             // 写进长期记忆，防止Ghost否认收到
             try {
               const _ltm = localStorage.getItem('longTermMemory') || '';
