@@ -664,9 +664,18 @@ async function _processMergedMessage(text) {
     const langHint = '[LANGUAGE: You reply in English only. She can write in any language. Never tell her to speak English or correct her language choice. Just reply in English yourself.]';
 
     // ── Ghost Card hint（用户要钱时提醒模型用卡回应）────────
-    const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|能不能给|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
+    const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
     const _cardHint = _moneyKws.test(text)
       ? '[She is asking for money. Do not transfer directly — the card you gave her handles that. Refer her to the card if needed. "use the card." / "it\'s there." — dry and brief. Do not promise a direct transfer.]'
+      : '';
+
+    // ── 特产请求 hint（用户开口要物品时:禁止画饼,不立即触发寄出）────────
+    // 保守关键词,只抓强烈显式的请求;更宽松的检测由 triggers.js 的 Haiku 事后处理
+    // 不跟 cardHint 互斥 —— 关键词有模糊地带(如"能不能给我寄点咖喱"两个都命中),
+    // 允许两个 hint 并存,模型看具体物品自行判断走哪条
+    const _specialtyKws = /带点|寄点|给我带|给我寄|寄给我|从你那.{0,5}[寄带买]|你那边.{0,5}寄|bring.{0,15}me|send.{0,25}me|from.{0,5}your.{0,5}side/i;
+    const _specialtyHint = _specialtyKws.test(text)
+      ? '[She is asking for something from your location. Do NOT verbally promise to send anything. Do NOT commit to shipping it. Do NOT say "I\'ll sort it" / "yeah sounds good" / "next time" / any hedged commitment. Acknowledge softly ("mm" / "yeah" / one flat line) or move on — restraint is more like you. The system decides if/when to actually send. Your only job: stay natural and never make promises.]'
       : '';
 
     const finalSystem = [
@@ -674,6 +683,7 @@ async function _processMergedMessage(text) {
       antiBreakoutHint,
       emotionHint,
       _cardHint,
+      _specialtyHint,
       _timeGapHint,
       sceneHint || '[React directly to what she just said. Take it at face value.]',
       responseMode,

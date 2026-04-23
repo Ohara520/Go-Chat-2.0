@@ -342,6 +342,23 @@ function checkDeliveryUpdates() {
           if (d.productData?.isUserItem) {
             showToast(`✅ ${d.emoji} ${d.name} 已送达！`);
           } else if (d.isGhostSend) {
+            // 写进长期记忆，防止 Ghost 否认自己寄过(跟"她寄给你"机制对称)
+            try {
+              const _ltm = localStorage.getItem('longTermMemory') || '';
+              const _d = new Date(d.doneAt);
+              const _dateStr = `${_d.getMonth()+1}/${_d.getDate()}`;
+              const _reasonTag = d.emotionType === 'location_special'
+                ? ' (a specialty from where you were)'
+                : (d.emotionType === 'longing' || d.emotionType === 'compensation' || d.emotionType === 'practical_care')
+                ? ' (when she needed it)'
+                : '';
+              const _note = `You sent her 「${d.name}」 on ${_dateStr}${_reasonTag}. She received it. If she brings it up, acknowledge — this was from you. Do not deny sending it.`;
+              if (!_ltm.includes(d.name)) {
+                localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
+                if (typeof touchLocalState === 'function') touchLocalState();
+                if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+              }
+            } catch(e) {}
             showMysteryPackage(d);
           } else {
             // 写进长期记忆，防止Ghost否认收到

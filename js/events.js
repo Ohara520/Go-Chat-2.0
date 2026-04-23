@@ -674,7 +674,13 @@ async function checkLocationSpecialTrigger(userText) {
     const mode      = localStorage.getItem('marriageType') || 'established';
     // slowBurn 阶段不触发对话版（克制期不主动寄东西）
     if (mode === 'slowBurn') return;
-    if (trust < 50 || affection < 60) return;
+
+    // pending 信号加成:有 pending 时关系门槛降低
+    const _pendingSignals = (typeof getPendingSpecialtySignals === 'function') ? getPendingSpecialtySignals() : [];
+    const _hasPending = _pendingSignals.length > 0;
+    const _trustMin     = _hasPending ? 40 : 50;
+    const _affectionMin = _hasPending ? 50 : 60;
+    if (trust < _trustMin || affection < _affectionMin) return;
 
     // ── 关键词前筛（改为 OR，命中其一即可）────────
     const input = (userText || '').toLowerCase();
@@ -703,28 +709,60 @@ async function checkLocationSpecialTrigger(userText) {
     // 放宽预筛：命中任意一组就进 Haiku，或者消息够长也进（让模型判断）
     if (!hasLocation && !hasInterest && input.length < 8) return;
 
-    // ── Haiku 语义判断 ───────────────────────────
+    // ── Haiku 语义判断(扩展:同时检测是否明确在要东西) ───
     let triggered = false;
+    let askingForItem = false;
+    let itemHint = '';
     try {
       const raw = await callHaiku(
-        `Ghost 目前在 ${rawLocation}。判断用户的消息是否跟他所在的地方、他的生活状况、或当地的事物有任何关联。
-不需要用户明确提到地名或特产——只要她在关心他那边的情况、问他过得怎样、聊到天气环境、或者表达想念/好奇，都算。
-宁可判 true。只返回JSON：{"triggered":true} 或 {"triggered":false}`,
+        `Ghost 目前在 ${rawLocation}。判断用户消息:
+1. triggered: 是否跟他所在地、他的生活状况、当地事物有任何关联?(宽泛判断,宁可 true)
+2. askingForItem: 是否在明确请求/希望他寄某样东西给她?(如 "给我带点 XX"/"能不能寄 XX"/"我想要你那边的 XX",必须是实际请求不是泛聊)
+3. item: 如果 askingForItem=true,提取具体物品词(2-10 字,如"咖喱"/"茶叶"/"围巾"),提取不到就空串
+
+只返回 JSON: {"triggered":true/false,"askingForItem":true/false,"item":"xxx"}`,
         [{ role: 'user', content: userText }]
       );
       const result = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
-      triggered = result.triggered === true;
+      triggered     = result.triggered === true;
+      askingForItem = result.askingForItem === true;
+      itemHint      = (result.item || '').toString().slice(0, 20);
     } catch(e) {
       // 模型失败：前筛两个都命中才保守触发
       triggered = hasLocation && hasInterest;
     }
+
+    // 用户明确在要东西 → 记 pending 信号(不立即寄,由反寄系统决定节奏)
+    if (askingForItem && typeof addSpecialtyPendingSignal === 'function') {
+      addSpecialtyPendingSignal(itemHint);
+    }
+
     if (!triggered) return;
 
-    // ── 随机抽一件特产 ────────────────────────────
-    const item = specials[Math.floor(Math.random() * specials.length)];
+    // ── 抽一件特产:优先匹配 pending 的物品 ─────────
+    let item = null;
+    if (_hasPending) {
+      for (const p of _pendingSignals) {
+        if (!p.itemHint) continue;
+        const h = p.itemHint.toLowerCase();
+        const match = specials.find(s => {
+          const n = (s.name || '').toLowerCase();
+          return n.includes(h) || h.includes(n);
+        });
+        if (match) { item = match; break; }
+      }
+    }
+    if (!item) {
+      item = specials[Math.floor(Math.random() * specials.length)];
+    }
 
     // ── 写入冷却时间戳 ────────────────────────────
     localStorage.setItem(sentKey, Date.now().toString());
+
+    // 寄出 → 清 pending
+    if (typeof consumeSpecialtyPendingMatching === 'function') {
+      consumeSpecialtyPendingMatching(item.name);
+    }
 
     // ── 30-60分钟后出现包裹 ──────────────────────
     const delay = (30 + Math.floor(Math.random() * 30)) * 60 * 1000;
@@ -777,11 +815,34 @@ function checkLocationSpecialAutoTrigger() {
     const daysHere = (Date.now() - arrivedAt) / (24 * 3600 * 1000);
     if (daysHere < 2) return; // 修复：待满2天才触发
 
-    // 50%概率主动触发
-    if (Math.random() > 0.5) return;
+    // pending 信号加成:有 pending 时概率 50% → 80%
+    const _pendingSignals = (typeof getPendingSpecialtySignals === 'function') ? getPendingSpecialtySignals() : [];
+    const _prob = _pendingSignals.length > 0 ? 0.80 : 0.50;
+    if (Math.random() > _prob) return;
 
-    const item = specials[Math.floor(Math.random() * specials.length)];
+    // 抽特产:优先匹配 pending 的物品
+    let item = null;
+    if (_pendingSignals.length > 0) {
+      for (const p of _pendingSignals) {
+        if (!p.itemHint) continue;
+        const h = p.itemHint.toLowerCase();
+        const match = specials.find(s => {
+          const n = (s.name || '').toLowerCase();
+          return n.includes(h) || h.includes(n);
+        });
+        if (match) { item = match; break; }
+      }
+    }
+    if (!item) {
+      item = specials[Math.floor(Math.random() * specials.length)];
+    }
+
     localStorage.setItem(sentKey, Date.now().toString());
+
+    // 寄出 → 清 pending
+    if (typeof consumeSpecialtyPendingMatching === 'function') {
+      consumeSpecialtyPendingMatching(item.name);
+    }
 
     const delay = (30 + Math.floor(Math.random() * 30)) * 60 * 1000;
     setTimeout(() => {
@@ -1464,4 +1525,82 @@ function triggerSeriousTalk() {
   }).catch(() => {
     if (typeof hideTyping === 'function') hideTyping();
   });
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// Pending 特产请求信号系统
+// ───────────────────────────────────────────────────────────
+// 用户开口要特产时,不立即寄,而是记一个 pending 信号。
+// 这个信号会:
+//   - 提高反寄系统的概率(自动版)
+//   - 降低反寄系统的门槛(对话版)
+//   - 让特产抽取时优先匹配用户提过的物品
+// 真正的寄出时机由反寄系统自己决定,用户感受不到确定性。
+// 14 天无寄出则过期清除。
+// ═══════════════════════════════════════════════════════════
+
+const _SPECIALTY_PENDING_TTL_MS = 14 * 24 * 3600 * 1000;
+const _SPECIALTY_PENDING_DEDUP_MS = 2 * 24 * 3600 * 1000;
+
+function getPendingSpecialtySignals() {
+  try {
+    const now = Date.now();
+    const arr = JSON.parse(localStorage.getItem('pendingSpecialtyRequests') || '[]');
+    return arr.filter(p => now - (p.requestedAt || 0) < _SPECIALTY_PENDING_TTL_MS);
+  } catch(e) { return []; }
+}
+
+function addSpecialtyPendingSignal(itemHint) {
+  try {
+    const now = Date.now();
+    const arr = getPendingSpecialtySignals(); // 自动过滤过期
+    // 去重:2 天内有同物品请求 → 不重复记
+    if (itemHint) {
+      const recent = arr.find(p => p.itemHint === itemHint && now - p.requestedAt < _SPECIALTY_PENDING_DEDUP_MS);
+      if (recent) return false;
+    }
+    // 单一用户短期内最多 3 个 pending,防止堆积
+    if (arr.length >= 3) {
+      arr.sort((a, b) => a.requestedAt - b.requestedAt);
+      arr.shift();
+    }
+    arr.push({ id: 'sp_' + now, requestedAt: now, itemHint: itemHint || '' });
+    localStorage.setItem('pendingSpecialtyRequests', JSON.stringify(arr));
+    if (typeof touchLocalState === 'function') touchLocalState();
+    return true;
+  } catch(e) { return false; }
+}
+
+function consumeOldestSpecialtyPending() {
+  try {
+    const arr = getPendingSpecialtySignals();
+    if (arr.length === 0) return null;
+    arr.sort((a, b) => a.requestedAt - b.requestedAt);
+    const consumed = arr.shift();
+    localStorage.setItem('pendingSpecialtyRequests', JSON.stringify(arr));
+    if (typeof touchLocalState === 'function') touchLocalState();
+    return consumed;
+  } catch(e) { return null; }
+}
+
+function consumeSpecialtyPendingMatching(itemName) {
+  // 寄出物匹配某 pending 的物品 hint → 清掉那一条;否则清最旧的
+  try {
+    const arr = getPendingSpecialtySignals();
+    if (arr.length === 0) return null;
+    const lowerName = (itemName || '').toLowerCase();
+    const matchIdx = arr.findIndex(p => {
+      const hint = (p.itemHint || '').toLowerCase();
+      return hint && (lowerName.includes(hint) || hint.includes(lowerName));
+    });
+    if (matchIdx !== -1) {
+      const consumed = arr.splice(matchIdx, 1)[0];
+      localStorage.setItem('pendingSpecialtyRequests', JSON.stringify(arr));
+      if (typeof touchLocalState === 'function') touchLocalState();
+      return consumed;
+    }
+    // 没匹配 → 清最旧的(她提过但没明确物品名)
+    return consumeOldestSpecialtyPending();
+  } catch(e) { return null; }
 }
