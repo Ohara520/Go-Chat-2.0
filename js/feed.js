@@ -5,6 +5,13 @@ function switchCoupleTab(tab) {
   document.getElementById('tabFeed').classList.toggle('active', tab === 'feed');
   document.getElementById('tabMemory').classList.toggle('active', tab === 'memory');
   if (tab === 'memory') renderSharedMemories();
+  if (tab === 'feed') {
+    // 看了朋友圈就清红点
+    localStorage.removeItem('feedHasNew');
+    localStorage.setItem('feedLastViewedAt', String(Date.now()));
+    const _b = document.getElementById('feedNewBadge');
+    if (_b) _b.style.display = 'none';
+  }
 }
 
 // ===== 共同回忆区渲染 =====
@@ -134,8 +141,40 @@ function renderMemoryCard(m, isHighlight) {
 
 // ===== 页面加载时初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
-  // 不再需要MutationObserver，由app.js的openScreen统一控制
+  // 页面加载时检查红点
+  setTimeout(checkFeedBadge, 1000);
 });
+
+// ===== 红点准确性检查 =====
+// 页面加载时调用，防止假红点
+function checkFeedBadge() {
+  const badge = document.getElementById('feedNewBadge');
+  if (!badge) return;
+
+  const hasNewFlag = localStorage.getItem('feedHasNew') === '1';
+  if (!hasNewFlag) {
+    badge.style.display = 'none';
+    return;
+  }
+
+  // 有 flag，但检查是否真的有新内容（最近帖子时间 > 上次查看时间）
+  const lastViewed = parseInt(localStorage.getItem('feedLastViewedAt') || '0');
+  if (lastViewed === 0) {
+    // 从没看过 → 只要有帖子就算新
+    badge.style.display = 'block';
+    return;
+  }
+
+  const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+  const hasNewerPost = history.some(h => (h.post?.time || 0) > lastViewed);
+  if (hasNewerPost) {
+    badge.style.display = 'block';
+  } else {
+    // 没有比上次查看更新的帖子 → 假红点，清掉
+    localStorage.removeItem('feedHasNew');
+    badge.style.display = 'none';
+  }
+}
 
 // beforeunload 已在 app.js 统一处理，此处已移除重复绑定
 
@@ -178,6 +217,12 @@ const COUPLE_POSTS = [
 ];
 
 function initCoupleSpace() {
+  // ── 清除"有动态"红点 + 记录查看时间 ──
+  localStorage.removeItem('feedHasNew');
+  localStorage.setItem('feedLastViewedAt', String(Date.now()));
+  const _badge = document.getElementById('feedNewBadge');
+  if (_badge) _badge.style.display = 'none';
+
   // 恢复自定义封面
   if (typeof restoreCoupleCover === 'function') restoreCoupleCover();
   // 事件委托：在朋友圈容器上监听点赞，避免动态DOM的onclick失效问题
@@ -261,7 +306,7 @@ async function generateCoupleFeed() {
   const mood     = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
 
   // 今天已生成过就直接渲染
-  const today = new Date().toDateString();
+  const today = new Date().toISOString().slice(0, 10); // ISO 格式，和 insertFeedPost 一致
   const cachedDate = localStorage.getItem('coupleFeedDate');
   if (cachedDate === today) {
     const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
@@ -329,11 +374,13 @@ ${toneHint ? `- ${toneHint}` : ''}
 
     // 存进30天历史记录
     let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    posts.forEach(p => history.push({ date: today, post: p }));
-    // 只保留最近30天
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    history = history.filter(p => new Date(p.date) >= thirtyDaysAgo);
+    posts.forEach(p => history.push({ date: today, post: { ...p, time: Date.now() } }));
+    // 只保留最近30天（用时间戳比较）
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 3600 * 1000;
+    history = history.filter(p => {
+      const t = Date.parse(p.date) || (p.post?.time || 0);
+      return t > thirtyDaysAgo || isNaN(t);
+    });
     localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
 
     // 同步一份简洁摘要进prompt用（只保留最近3条，省token）
@@ -374,14 +421,23 @@ function renderCoupleFeed(posts) {
     const commentsHTML = (item.comments || []).map((c, ci) => {
       const commentId = `comment_${idx}_${ci}`;
       const zhText = c.zh || '';
-      // 有存储的中文就直接用，没有就用 Gemini 异步翻译
+      // 有存储的中文就直接用，没有就用 Gemini 异步翻译并存回历史
       if (!zhText && c.text) {
         setTimeout(async () => {
           const el = document.getElementById(commentId);
-          if (!el) return;
+          if (!el || el.dataset.translated === '1') return; // 已翻译过，跳过
           try {
             const translated = await fetchDeepSeek('只返回中文翻译，不要其他内容。', c.text, 40);
-            if (translated?.trim()) el.textContent = translated.trim();
+            if (translated?.trim()) {
+              el.textContent = translated.trim();
+              el.dataset.translated = '1';
+              // 存回历史数据，下次不再请求
+              c.zh = translated.trim();
+              try {
+                const _hist = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+                localStorage.setItem('coupleFeedHistory', JSON.stringify(_hist));
+              } catch(e) {}
+            }
           } catch(e) {}
         }, 200 + ci * 100);
       }
@@ -397,10 +453,11 @@ function renderCoupleFeed(posts) {
       `;
     }).join('');
 
-    const postKey = 'like_post_' + idx;
+    // 稳定 key：基于作者+内容+时间，不随数组位置变化
+    const _likeId = (item.author || '') + '_' + (item.en || '').slice(0, 20).replace(/[^a-zA-Z0-9]/g, '') + '_' + (item.time || idx);
+    const postKey = 'like_' + _likeId;
     const isLiked = localStorage.getItem(postKey) === '1';
-    // 点赞数存在localStorage里，防止每次随机变化
-    const likeCountKey = 'likeCount_post_' + idx;
+    const likeCountKey = 'likeC_' + _likeId;
     if (!localStorage.getItem(likeCountKey)) {
       localStorage.setItem(likeCountKey, String(item.likes || Math.floor(Math.random()*60+5)));
     }
@@ -423,7 +480,7 @@ function renderCoupleFeed(posts) {
       <div class="couple-post-footer" style="display:flex;align-items:center;gap:10px;">
         <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}" 
           data-key="${postKey}" data-count="${likeCount}"
-          onclick="(function(btn){var k=btn.dataset.key;if(!k)return;var liked=localStorage.getItem(k)==='1';var c=parseInt(btn.dataset.count||'0');if(liked){localStorage.removeItem(k);c=Math.max(0,c-1);btn.classList.remove('couple-liked');btn.innerHTML='🤍 <span class=\\'like-num\\'>'+c+'</span>';}else{localStorage.setItem(k,'1');c++;btn.classList.add('couple-liked');btn.innerHTML='❤️ <span class=\\'like-num\\'>'+c+'</span>';}btn.dataset.count=c;})(this)" style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
+          style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
 
       </div>
     `;
@@ -564,8 +621,185 @@ function feedEvent_dailyMoment() {
   });
 }
 
+// ── 新增事件类型 ──────────────────────────────────
+
+// 收到外卖：Ghost 发条关于食物的帖子
+function feedEvent_takeoutReceived(itemName, itemNameEn) {
+  pushFeedEvent({
+    type: 'takeout_received', actor: 'ghost', mood: 'neutral',
+    intensity: 2, shareability: 0.4, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(15, 60),
+    expiresAt: Date.now() + 4 * 3600 * 1000,
+    meta: { itemName, itemNameEn }
+  });
+}
+
+// 收到快递包裹：Ghost 发条关于包裹的帖子
+function feedEvent_deliveryReceived(itemName, emoji) {
+  pushFeedEvent({
+    type: 'delivery_received', actor: 'ghost', mood: 'soft',
+    intensity: 3, shareability: 0.5, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(20, 90),
+    expiresAt: Date.now() + 8 * 3600 * 1000,
+    meta: { itemName, emoji }
+  });
+}
+
+// 聊得开心：一次对话轮数多或内容有意思
+function feedEvent_goodConversation(turnCount, hint) {
+  // 轮数不够多就不触发，防止频繁
+  if (turnCount < 12) return;
+  pushFeedEvent({
+    type: 'good_conversation', actor: 'ghost', mood: 'warm',
+    intensity: turnCount > 30 ? 4 : 3, shareability: 0.35, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(30, 120),
+    expiresAt: Date.now() + 6 * 3600 * 1000,
+    meta: { turnCount, hint: hint || '' }
+  });
+}
+
+// 深夜聊天：凌晨还在说话
+function feedEvent_lateNightChat() {
+  pushFeedEvent({
+    type: 'late_night_chat', actor: 'ghost', mood: 'quiet',
+    intensity: 3, shareability: 0.45, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(10, 40),
+    expiresAt: Date.now() + 3 * 3600 * 1000,
+    meta: {}
+  });
+}
+
+// 她回来了：用户离线很久后回来
+function feedEvent_sheIsBack(absentHours) {
+  if (absentHours < 6) return; // 6小时以上才算"回来了"
+  pushFeedEvent({
+    type: 'she_is_back', actor: 'ghost', mood: 'relieved',
+    intensity: absentHours > 24 ? 4 : 3, shareability: 0.3, privacy: 'semi',
+    dueAt: Date.now() + randMinutes(5, 30),
+    expiresAt: Date.now() + 2 * 3600 * 1000,
+    meta: { absentHours: Math.round(absentHours) }
+  });
+}
+
+// ── 用户在聊天里要求 Ghost 发朋友圈 ──────────────────
+// 每天最多1次，超过了 Ghost 会拒绝
+// 返回: { ok: true } 或 { ok: false, reply: '拒绝文案' }
+async function handleUserFeedRequest() {
+  const todayKey = 'ghostFeedReqToday_' + (typeof getTodayDateStr === 'function' ? getTodayDateStr() : new Date().toISOString().slice(0, 10));
+
+  // 今天已经发过了 → Ghost 拒绝
+  if (localStorage.getItem(todayKey)) {
+    const declines = [
+      "already posted today. once is enough.",
+      "no. i don't post that much.",
+      "said what i had to say already.",
+      "not doing two in one day.",
+      "one's my limit. you know that.",
+    ];
+    return { ok: false, reply: declines[Math.floor(Math.random() * declines.length)] };
+  }
+
+  // 收集最近聊天上下文，让 Ghost 基于真实对话发帖
+  const recentChat = (typeof chatHistory !== 'undefined' ? chatHistory : [])
+    .filter(m => !m._system && !m._recalled && m.content)
+    .slice(-10)
+    .map(m => `${m.role === 'user' ? 'her' : 'ghost'}: ${(m.content || '').slice(0, 80)}`)
+    .join('\n');
+
+  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+  const _ghostAvUrl = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
+  const GHOST_AV = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+
+  // 取历史帖子做反重复
+  const _recentPosts = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]')
+    .slice(-6).map(p => `"${p.post?.en}"`).join('\n');
+
+  try {
+    const systemPrompt = `You are Simon "Ghost" Riley. She asked you to post something. You wouldn't normally, but you do it — your way. Dry, minimal, lowercase English. Return JSON only.`;
+    const userPrompt = `She just asked you to post on your feed. Here's what you two were just talking about:
+
+${recentChat || '(nothing specific)'}
+
+Location: ${location}
+
+Write one post. It should feel like it came from the conversation — but obliquely. Don't quote anything she said. Don't explain. Just one line that only makes sense to the two of you.
+
+${_recentPosts ? `Do NOT echo these recent posts:\n${_recentPosts}` : ''}
+
+Return JSON only: {"en":"...","zh":"..."}`;
+
+    let raw = '';
+    if (typeof callHaiku === 'function') {
+      raw = await callHaiku(systemPrompt, [{ role: 'user', content: userPrompt }]);
+    } else {
+      const res = await fetchWithTimeout('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 150, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+      }, 8000);
+      const d = await res.json();
+      raw = d.content?.[0]?.text || '';
+    }
+
+    const post = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
+    if (!post?.en) return { ok: false, reply: "couldn't think of anything." };
+
+    // 生成评论
+    const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
+    let comments = [];
+    if (Math.random() < 0.7) {
+      comments = await generateFeedCommentChain(
+        { author: localStorage.getItem('botNickname') || 'Simon Riley', en: post.en },
+        { type: 'user_requested', actor: 'ghost' },
+        avatarMap
+      );
+    }
+
+    const entry = {
+      date: new Date().toISOString().slice(0, 10),
+      post: {
+        en: post.en, zh: post.zh,
+        avatar: GHOST_AV,
+        author: localStorage.getItem('botNickname') || 'Simon Riley',
+        name: localStorage.getItem('botNickname') || 'Simon Riley',
+        comments, time: Date.now(),
+        likes: Math.floor(Math.random() * 30 + 3),
+        sourceEvent: 'user_requested'
+      }
+    };
+    insertFeedPost(entry);
+    localStorage.setItem(todayKey, '1');
+    localStorage.setItem('lastFeedPostAt', String(Date.now()));
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+
+    // 红点
+    localStorage.setItem('feedHasNew', '1');
+    const badge = document.getElementById('feedNewBadge');
+    if (badge) badge.style.display = 'block';
+
+    // 如果情侣空间开着就刷新
+    const coupleScreen = document.getElementById('coupleScreen');
+    if (coupleScreen?.classList.contains('active')) renderCoupleFeedFromHistory();
+
+    return { ok: true, postEn: post.en, postZh: post.zh };
+  } catch(e) {
+    console.warn('[feed] 用户要求发帖失败:', e);
+    return { ok: false, reply: "not now." };
+  }
+}
+
 // ----- 调度器核心 -----
+let _feedPostLock = false;
 async function maybeTriggerFeedPost(triggerSource = 'unknown') {
+  if (_feedPostLock) return null;
+  _feedPostLock = true;
+  try {
+    return await _maybeTriggerFeedPostInner(triggerSource);
+  } finally {
+    _feedPostLock = false;
+  }
+}
+
+async function _maybeTriggerFeedPostInner(triggerSource) {
   const now = Date.now();
 
   // 用户主动要求：每天最多1次绕过冷却
@@ -638,7 +872,9 @@ function selectBestFeedEvent(pool, triggerSource) {
   const now = Date.now();
   const typeWeight = {
     made_up: 10, cold_war_started: 9, missed_you: 8,
-    bought_big_item: 7, gift_received: 6, teammate_teasing: 5,
+    bought_big_item: 7, gift_received: 6, delivery_received: 6,
+    good_conversation: 5, she_is_back: 5, teammate_teasing: 5,
+    takeout_received: 4, late_night_chat: 4,
     daily_moment: 3
   };
   const scored = pool.map(evt => {
@@ -666,6 +902,11 @@ function shouldEventBecomePost(evt) {
     if (type === 'cold_war_started') return Math.random() < 0.55;
     if (type === 'made_up') return Math.random() < 0.45;
     if (type === 'gift_received') return Math.random() < 0.35;
+    if (type === 'takeout_received') return Math.random() < 0.3;
+    if (type === 'delivery_received') return Math.random() < 0.4;
+    if (type === 'good_conversation') return Math.random() < 0.25;
+    if (type === 'late_night_chat') return Math.random() < 0.35;
+    if (type === 'she_is_back') return Math.random() < 0.2;
     return Math.random() < 0.4;
   }
   if (actor === 'soap') return Math.random() < 0.7;
@@ -873,7 +1114,15 @@ async function generateFeedPostFromEvent(evt) {
   };
   const posterInfo = posterMap[evt.actor] || posterMap['ghost'];
 
-  // ── Ghost 发帖角度池 ──────────────────────────────
+  // ── 类型冷却检查（提前，避免浪费 API 调用）────────
+  const _postTypeKey = 'lastFeedType_' + (evt.actor || 'ghost');
+  const _lastTypeInfo = JSON.parse(localStorage.getItem(_postTypeKey) || '{}');
+  if (_lastTypeInfo.type === evt.type && Date.now() - (_lastTypeInfo.at || 0) < 6 * 3600 * 1000) {
+    console.log('[feed] 类型冷却中，跳过:', evt.actor, evt.type);
+    return null;
+  }
+
+  // ── Ghost 发帖角度池（扩展版）──────────────────────
   const GHOST_POST_TYPES = [
     'physical_state',      // 身体状态：手还是冷、睡得不好、肩膀酸
     'environment',         // 环境：又在下雨、雾、走廊很静
@@ -881,6 +1130,12 @@ async function generateFeedPostFromEvent(evt) {
     'teammate_friction',   // 队友摩擦：Soap太吵、Gaz注意到了什么
     'subtle_her_presence', // 她的影子：没她更静、老看手机、时区问题
     'dry_humor',           // 干幽默：蹩脚的咖啡还是喝了、简报侥幸撑过去
+    'food_or_drink',       // 吃喝：食堂难吃、难得一杯好咖啡、半夜泡面
+    'night_thought',       // 深夜：睡不着、窗外的声音、某件小事留在脑子里
+    'object_detail',       // 物件：旧手套、桌上的东西、装备磨损
+    'mission_aftermath',   // 任务余韵：回来了、比预想的快、安静下来了
+    'time_awareness',      // 时间感知：又到周五了、天亮得晚了、几点了
+    'body_language',       // 身体语言：站了一天、手指头僵了、走了很远
   ];
 
   // ── Ghost 核心发帖人设（固定层）────────────────────
@@ -909,18 +1164,20 @@ He feels like: someone who rarely posts, but when he does, it comes from a real 
 
   // ── 按事件类型拼 prompt ─────────────────────────────
   const buildGhostDailyPrompt = () => {
-    // 去重：取最近3条 Ghost 帖子
+    // 去重：取最近6条 Ghost 帖子
     const feedHistory = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
     const recentGhostPosts = feedHistory
       .filter(p => p.post?.author === 'Ghost' || p.post?.author === posterMap.ghost.name)
-      .slice(-3)
-      .map(p => p.post.en)
+      .slice(-6)
+      .map(p => `"${p.post.en}"`)
       .join('\n');
 
-    // 随机选一个角度，避免连续同角度
+    // 随机选一个角度，避免连续同角度（排除最近2个）
     const lastType = localStorage.getItem('lastGhostPostType') || '';
-    const available = GHOST_POST_TYPES.filter(t => t !== lastType);
+    const lastType2 = localStorage.getItem('lastGhostPostType2') || '';
+    const available = GHOST_POST_TYPES.filter(t => t !== lastType && t !== lastType2);
     const postType  = available[Math.floor(Math.random() * available.length)];
+    localStorage.setItem('lastGhostPostType2', lastType);
     localStorage.setItem('lastGhostPostType', postType);
 
     // 各角度的写作提示
@@ -931,6 +1188,12 @@ He feels like: someone who rarely posts, but when he does, it comes from a real 
       teammate_friction:   `Focus on a teammate: Soap too loud, Gaz noticed something annoying, Price said one word.`,
       subtle_her_presence: `Something that implies her without naming her: quieter without her, checked the phone again, time zone math.`,
       dry_humor:           `Dry complaint or blunt observation. Takes something small too seriously. Deadpan.`,
+      food_or_drink:       `Focus on food or drink: terrible mess hall, decent coffee for once, instant noodles at 2am, someone brought something edible.`,
+      night_thought:       `Late night moment: can't sleep, a sound outside, something stuck in his head, the base is different at night.`,
+      object_detail:       `A specific object caught his attention: worn gloves, something on the desk, a scratch on the kit, a photo he won't explain.`,
+      mission_aftermath:   `Just got back or just finished something. Not about the mission itself — about the stillness after. The quiet.`,
+      time_awareness:      `A note about time passing: Friday again, sun setting earlier, lost track of the hour, how long has it been.`,
+      body_language:       `Physical sensation: stood too long, fingers stiff, walked further than expected, cold got through the jacket.`,
     };
 
     return `Write one Ghost social media post.
@@ -944,7 +1207,7 @@ Current context:
 - Angle hint: ${typeHints[postType]}
 ${isColdWar ? '- Mood note: something is off. Do not explain it.' : ''}
 
-${recentGhostPosts ? `Recent Ghost posts — do NOT echo their wording, sentence shape, or emotional angle:\n${recentGhostPosts}` : ''}
+${recentGhostPosts ? `CRITICAL — these are Ghost's recent posts. Your post MUST be completely different in wording, sentence structure, emotional angle, and topic. Do NOT reuse any word or phrase from these:\n${recentGhostPosts}` : ''}
 
 Return JSON only: {"en":"...","zh":"..."}`;
   };
@@ -976,15 +1239,48 @@ Good angles: "good man." / "that matters." / "keep it that way." / "solid."
 Feels like: he decided it was worth saying. Nothing more.
 Return JSON only: {"en":"...","zh":"..."}`;
 
+  // ── 取最近帖子用于所有角色的反重复 ──────────────
+  const _allRecentPosts = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]')
+    .slice(-8).map(p => `${p.post?.author}: "${p.post?.en}"`).join('\n');
+  const _antiRepeat = _allRecentPosts
+    ? `\n\nDo NOT reuse wording, structure, or angle from these recent posts:\n${_allRecentPosts}`
+    : '';
+
   const promptMap = {
-    cold_war_started: `You are Simon Riley. Just had a fight with your wife. One line, lowercase English — something is off but you are not saying what. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
-    made_up:          `You are Simon Riley. Just made up with your wife. One line, lowercase English — do not say you made up, but you are visibly looser. Something casual. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
-    gift_received:    `You are Simon Riley. Just received ${evt.meta?.itemName || 'something'} from your wife. One line, lowercase English — not saying anything about it, but you posted this anyway. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}`,
+    cold_war_started: `You are Simon Riley. Just had a fight with your wife. One line, lowercase English — something is off but you are not saying what. Be specific: mention a place, object, or body sensation. Do NOT write vague mood statements. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+    made_up:          `You are Simon Riley. Just made up with your wife. One line, lowercase English — do not say you made up, but you are visibly looser. Mention something concrete you're doing right now. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+    gift_received:    `You are Simon Riley. Just received "${evt.meta?.itemName || 'something'}" from your wife. One line, lowercase English — react to the specific object, not the gesture. What does it look like, feel like, smell like? Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    takeout_received: `You are Simon Riley. She just ordered takeout for you — "${evt.meta?.itemNameEn || evt.meta?.itemName || 'food'}". You have it now.
+One line, lowercase English. React to the FOOD itself: the smell, the taste, the temperature, or how it looks. Be specific and concrete. Do NOT thank her, do NOT mention the gesture. Just the food.
+Examples of good posts: "whoever made this curry knew what they were doing." / "still warm. she timed it." / "the chips are better than they should be."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    delivery_received: `You are Simon Riley. A package just arrived from her — "${evt.meta?.itemName || 'something'}".
+One line, lowercase English. React to the OBJECT: what it looks like, where you put it, how it feels in your hands. Do NOT say thank you, do NOT get emotional about the gesture. Just notice the thing.
+Examples of good posts: "fits. didn't expect that." / "it's on the desk now. keeps catching my eye." / "heavier than it looks."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    good_conversation: `You are Simon Riley. You just had a long conversation with your wife — ${evt.meta?.turnCount || 'many'} messages back and forth.${evt.meta?.hint ? ' Topic: ' + evt.meta.hint : ''}
+One line, lowercase English. Do NOT mention the conversation directly. Post something that shows your state AFTER talking to her — what you're doing now, what you notice, how quiet it is. The post should feel like the afterglow of a good talk, without ever saying you talked.
+Examples of good posts: "quiet again. not the bad kind." / "forgot what i was doing before that." / "three hours. felt like ten minutes."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    late_night_chat: `You are Simon Riley. It's very late — past midnight in the UK. You were talking to her.
+One line, lowercase English. Do NOT say you were talking or chatting. Post about the specific late-night moment: the dark, the screen light, the tiredness you don't mind, the time itself.
+Examples of good posts: "0347. should probably stop." / "screen's the only light left." / "eyes are going but not yet."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    she_is_back: `You are Simon Riley. She was away/offline for ${evt.meta?.absentHours || 'a while'} hours. She just came back.
+One line, lowercase English. Do NOT say "she's back" or "missed you". Post something that only makes sense if you were waiting — but frame it as something else entirely. A dry observation, a small thing you noticed, the shift in atmosphere.
+Examples of good posts: "phone's useful again." / "right. where was i." / "louder in here all of a sudden."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
     daily_moment: (() => {
       const actor = evt.actor;
-      if (actor === 'soap')  return SOAP_PROMPT;
-      if (actor === 'gaz')   return GAZ_PROMPT;
-      if (actor === 'price') return PRICE_PROMPT;
+      if (actor === 'soap')  return SOAP_PROMPT + _antiRepeat;
+      if (actor === 'gaz')   return GAZ_PROMPT + _antiRepeat;
+      if (actor === 'price') return PRICE_PROMPT + _antiRepeat;
       return buildGhostDailyPrompt();
     })(),
   };
@@ -1011,6 +1307,28 @@ Return JSON only: {"en":"...","zh":"..."}`;
     const post = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
     if (!post?.en) return null;
 
+    // ── 生成后去重：和最近帖子比较，太像就丢弃 ──────────
+    const _recentHistory = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    const _newWords = new Set(post.en.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 3));
+    const isTooSimilar = _recentHistory.slice(-10).some(h => {
+      const oldWords = new Set((h.post?.en || '').toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 3));
+      if (oldWords.size === 0 || _newWords.size === 0) return false;
+      const overlap = [..._newWords].filter(w => oldWords.has(w)).length;
+      const similarity = overlap / Math.min(_newWords.size, oldWords.size);
+      return similarity > 0.6; // 60%以上词重叠 → 太像
+    });
+    if (isTooSimilar) {
+      console.log('[feed] 生成的帖子和历史太像，丢弃:', post.en.slice(0, 30));
+      return null;
+    }
+
+    // ── 硬过滤：模型经常无视 prompt 禁令，代码兜底 ────────
+    const _banned = ['still here', 'long day', 'worth it', 'not bad', 'could be worse', 'she knows', 'she gets it', 'good man'];
+    if (_banned.some(b => post.en.toLowerCase().includes(b))) {
+      console.log('[feed] 命中禁用词，丢弃:', post.en.slice(0, 30));
+      return null;
+    }
+
     // ── 链式评论生成 ──────────────────────────────
     // 评论最多3条，Ghost 评论低频（30%），后面的评论能看到前面的
     const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
@@ -1023,14 +1341,8 @@ Return JSON only: {"en":"...","zh":"..."}`;
       );
     }
 
-    // 朋友圈类型冷却：同类型6小时内不重复
-    const _postTypeKey = 'lastFeedType_' + (evt.actor || 'ghost');
-    const _lastTypeInfo = JSON.parse(localStorage.getItem(_postTypeKey) || '{}');
-    const _postSubType = evt.type === 'daily_moment' ? (post.en.length < 20 ? 'trivial' : 'normal') : evt.type;
-    if (_lastTypeInfo.type === _postSubType && Date.now() - (_lastTypeInfo.at || 0) < 6 * 3600 * 1000) {
-      return null; // 同类型太近，跳过
-    }
-    localStorage.setItem(_postTypeKey, JSON.stringify({ type: _postSubType, at: Date.now() }));
+    // 记录类型冷却（检查已在上面做过了）
+    localStorage.setItem(_postTypeKey, JSON.stringify({ type: evt.type, at: Date.now() }));
 
     return {
       date: new Date().toISOString().slice(0, 10),
@@ -1048,9 +1360,27 @@ Return JSON only: {"en":"...","zh":"..."}`;
 // ----- 插入帖子到历史 -----
 function insertFeedPost(entry) {
   let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+
+  // 去重：同一天 + 同作者 + 内容前30字符相同 → 跳过
+  const newEn = (entry.post?.en || '').slice(0, 30);
+  const newAuthor = entry.post?.author || '';
+  const isDupe = history.some(h =>
+    h.date === entry.date &&
+    (h.post?.author || '') === newAuthor &&
+    (h.post?.en || '').slice(0, 30) === newEn
+  );
+  if (isDupe) {
+    console.log('[feed] 跳过重复帖子:', newAuthor, newEn.slice(0, 20));
+    return;
+  }
+
   history.unshift(entry);
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  history = history.filter(h => h.date >= sevenDaysAgo).slice(0, 25);
+  // 清理：只保留最近7天（用时间戳比较，兼容各种日期格式）
+  const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  history = history.filter(h => {
+    const t = Date.parse(h.date) || (h.post?.time || 0);
+    return t > sevenDaysAgo || isNaN(t); // 解析失败的保留不误删
+  }).slice(0, 25);
   localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
   const summary = history.slice(0, 3).map(h => `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`).join('\n');
   localStorage.setItem('coupleFeedSummary', summary);

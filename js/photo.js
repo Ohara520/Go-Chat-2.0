@@ -208,6 +208,52 @@ function updateGhostAvatar(url) {
   }
 }
 
+// ===== 轻量头像刷新（切页面时调用，不查数据库）=====
+// 解决：切到个人资料/朋友圈再回来，DOM 重建后头像变回默认
+function refreshGhostAvatar() {
+  const url = localStorage.getItem('ghostAvatarUrl');
+  if (!url || url.startsWith('data:')) {
+    // 没有正式URL，检查base64备份
+    const b64 = localStorage.getItem('ghostAvatarBase64');
+    if (b64) {
+      const dataUrl = `data:image/jpeg;base64,${b64}`;
+      document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+        if (!el.src || el.src.includes('ghost-avatar') || el.src === window.location.href) {
+          el.src = dataUrl;
+        }
+      });
+    }
+    return;
+  }
+  document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+    // 只更新还是默认头像的元素（避免闪烁）
+    if (!el.src || el.src.includes('ghost-avatar') || el.src === window.location.href || !el.src.includes(url.split('?')[0])) {
+      el.src = url + '?t=' + Date.now();
+    }
+  });
+}
+
+// ===== 自动监听：新的 .ghost-avatar-img 出现时自动填充正确头像 =====
+if (typeof MutationObserver !== 'undefined') {
+  const _avatarObserver = new MutationObserver(() => {
+    const url = localStorage.getItem('ghostAvatarUrl');
+    if (!url) return;
+    document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+      if (el.src && el.src.includes('ghost-avatar.jpg')) {
+        el.src = url + '?t=' + Date.now();
+      }
+    });
+  });
+  // 等 DOM ready 再挂
+  if (document.body) {
+    _avatarObserver.observe(document.body, { childList: true, subtree: true });
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      _avatarObserver.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+}
+
 // ===== 恢复Ghost头像（优先从数据库读，保证多设备同步）=====
 async function restoreGhostAvatar() {
   // 先用localStorage快速显示（避免白屏）

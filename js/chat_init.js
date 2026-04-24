@@ -137,7 +137,8 @@ async function maybeProactiveMessage() {
 // ===== 工资系统 =====
 function checkSalaryDay() {
   const today = new Date();
-  if (today.getDate() !== 25) return;
+  if (today.getDate() < 25) return; // 25号及以后都可以补发
+
   const salaryKey = 'salaryPaid_' + today.getFullYear() + '_' + (today.getMonth() + 1);
 
   // 自动修复：key存在但本月没有工资交易记录，说明之前存了key但钱没到，清掉重来
@@ -162,65 +163,73 @@ function checkSalaryDay() {
   const _noRecord = !localStorage.getItem(_monthKey);
   let _salaryMin, _salaryMax;
   if (_noRecord || (_deployRatio < 0.3 && _locDays.leave < 1)) {
-    // 无记录 或 主要在基地 → 正常档
     _salaryMin = 15; _salaryMax = 25;
   } else if (_deployRatio >= 0.6) {
-    _salaryMin = 22; _salaryMax = 32; // 出差多：任务津贴拉满 £2200-£3200
+    _salaryMin = 22; _salaryMax = 32;
   } else if ((_locDays.leave || 0) / _total >= 0.5) {
-    _salaryMin = 15; _salaryMax = 18; // 休假为主 £1500-£1800
+    _salaryMin = 15; _salaryMax = 18;
   } else {
-    _salaryMin = 15; _salaryMax = 25; // 正常月 £1500-£2500
+    _salaryMin = 15; _salaryMax = 25;
   }
   const salary = (Math.floor(Math.random() * (_salaryMax - _salaryMin + 1)) + _salaryMin) * 100;
   localStorage.setItem('lastSalaryAmount', salary);
   localStorage.setItem('lastSalaryMonth', today.getFullYear() + '-' + (today.getMonth() + 1));
 
   setTimeout(() => {
-    setBalance(getBalance() + salary);
-    addTransaction({ icon: '💷', name: 'Ghost 月度工资', amount: salary });
+    // 直接入账，不走转账卡片
+    if (typeof addTransaction === 'function') {
+      addTransaction({ icon: '💷', name: 'Ghost 月度工资', amount: salary });
+    }
     localStorage.setItem(salaryKey, salary.toString());
     if (typeof renderWallet === 'function') renderWallet();
-    changeAffection(1);
-    setRelationshipFlag('firstSalary', true);
+    if (typeof changeAffection === 'function') changeAffection(1);
+    if (typeof setRelationshipFlag === 'function') setRelationshipFlag('firstSalary', true);
 
-    chatHistory.push({
-      role: 'user',
-      content: `[System: Today is the 25th. You just sent her your monthly salary £${salary}. It has arrived in her account. You can mention this naturally in conversation.]`,
-      _system: true
-    });
+    // 告诉模型工资已发
+    if (typeof chatHistory !== 'undefined') {
+      chatHistory.push({
+        role: 'user',
+        content: `[System: Today is payday. You sent her your monthly salary £${salary}. It has been deposited into her account automatically. You can mention this naturally — keep it brief, matter-of-fact.]`,
+        _system: true
+      });
+    }
 
-    const container = document.getElementById('messagesContainer');
-    const salaryFallbacks = [
-      `it's yours. £${salary}.`,
-      `sent. use it.`,
-      `check it. £${salary}. be smart.`,
-      `£${salary}. don't waste it.`,
-      `sent. don't argue.`,
-    ];
-    const fallbackLine = salaryFallbacks[Math.floor(Math.random() * salaryFallbacks.length)];
-
+    // Ghost 说一句
     const _deployHint = _deployRatio >= 0.6 ? ' Been away most of the month.' : _deployRatio < 0.3 ? ' Quiet month.' : '';
-    callGrokWithSystem(
-      `You are Simon Riley.\n\nYou just sent her your monthly salary: £${salary}.${_deployHint}\n\nOne line. lowercase. No explanation. No extra context. Keep it short. Like he wouldn't make a thing out of it.`,
-      'say something.',
-      80
-    ).then(async line => {
-      // 破防检测已在 cleanBotText 出口统一处理
-      const finalLine = (line && line.trim()) ? line : fallbackLine;
-      if (container && typeof showGhostTransferCard === 'function') {
-        showGhostTransferCard(container, salary, finalLine, false);
-      }
-      chatHistory.push({ role: 'assistant', content: finalLine, _transfer: { amount: salary, isRefund: false } });
-      saveHistory();
-    }).catch(() => {
-      if (container && typeof showGhostTransferCard === 'function') {
-        showGhostTransferCard(container, fallbackLine, salary, false);
-      }
-      chatHistory.push({ role: 'assistant', content: fallbackLine, _transfer: { amount: salary, isRefund: false } });
-      saveHistory();
-    });
+    const fallbacks = [
+      `this month's in. £${salary}.`,
+      `£${salary}. check your account.`,
+      `salary's in. £${salary}.`,
+      `sent. £${salary}. don't waste it.`,
+      `it's in your account. £${salary}.`,
+    ];
+    const fallbackLine = fallbacks[Math.floor(Math.random() * fallbacks.length)];
 
-    showToast('💷 Ghost 本月工资已到账 £' + salary + '！');
+    if (typeof showTyping === 'function') showTyping();
+    setTimeout(async () => {
+      let line = '';
+      try {
+        line = await callGrokWithSystem(
+          `You are Simon Riley.\n\nYou just deposited your monthly salary into her account: £${salary}.${_deployHint}\n\nOne line. lowercase. This is routine — you do this every month. Not making a big deal. Just letting her know it's there.\n\nDo NOT say "transfer" or "sent you money". It's already in her account. Just confirm it landed.`,
+          'let her know.',
+          80
+        );
+        if (typeof isBreakout === 'function' && isBreakout(line)) line = '';
+      } catch(e) {}
+
+      if (!line || !line.trim()) line = fallbackLine;
+      line = line.trim().split('\n')[0];
+
+      if (typeof hideTyping === 'function') hideTyping();
+      if (typeof appendMessage === 'function') appendMessage('bot', line);
+      if (typeof chatHistory !== 'undefined') {
+        chatHistory.push({ role: 'assistant', content: line });
+        if (typeof saveHistory === 'function') saveHistory();
+      }
+    }, 1500);
+
+    if (typeof showToast === 'function') showToast('💷 Ghost 本月工资已到账 £' + salary + '！');
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
   }, 2000);
 }
 
@@ -340,6 +349,19 @@ async function initChat() {
 
   // 工资检查
   checkSalaryDay();
+
+  // 如果现在是24号，设定午夜定时器：0点自动触发工资检查
+  // 这样0点还在聊天的用户也能收到工资
+  const _today = new Date();
+  if (_today.getDate() === 24) {
+    const _midnight = new Date(_today);
+    _midnight.setDate(25);
+    _midnight.setHours(0, 0, 5, 0); // 0:00:05，留5秒确保日期翻转
+    const _msToMidnight = _midnight.getTime() - _today.getTime();
+    if (_msToMidnight > 0 && _msToMidnight < 24 * 3600 * 1000) {
+      setTimeout(() => checkSalaryDay(), _msToMidnight);
+    }
+  }
 
   // 剧情解锁检查（sessionStart类型）
   setTimeout(() => { if (typeof checkStoryOnSessionStart === 'function') checkStoryOnSessionStart(); }, 1500);
