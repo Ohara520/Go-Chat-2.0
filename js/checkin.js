@@ -201,35 +201,40 @@ function doCheckin() {
   const luckyChance = getLuckyChance(streak);
   const rand        = Math.random();
   let rewardMsg     = '';
+  const _baristaMulti = (typeof getCareerCheckinMultiplier === 'function') ? getCareerCheckinMultiplier() : 1;
+  const _isBarista = _baristaMulti > 1;
 
   if (rand < luckyChance) {
-    let coins = Math.random() < 0.5 ? 100 : 150;
-    // 咖啡师职业福利：签到金钱翻倍
-    if (typeof getCareerCheckinMultiplier === 'function') {
-      coins = Math.round(coins * getCareerCheckinMultiplier());
-    }
+    let baseCoins = Math.random() < 0.5 ? 100 : 150;
+    let coins = _isBarista ? Math.round(baseCoins * _baristaMulti) : baseCoins;
     if (typeof setBalance    === 'function') setBalance(getBalance() + coins);
     if (typeof addTransaction === 'function') addTransaction({ icon: '🎰', name: '欧气签到！', amount: coins });
     if (typeof renderWallet  === 'function') renderWallet();
-    rewardMsg = `🎰 欧气签到！£${coins}！`;
+    rewardMsg = _isBarista
+      ? `🎰 欧气签到！£${baseCoins} × ${_baristaMulti.toFixed(1)} = £${coins}！`
+      : `🎰 欧气签到！£${coins}！`;
   } else if (rand < luckyChance + 0.475) {
-    let coins = [5, 8, 10, 15, 20][Math.floor(Math.random() * 5)];
-    // 咖啡师职业福利：签到金钱翻倍
-    if (typeof getCareerCheckinMultiplier === 'function') {
-      coins = Math.round(coins * getCareerCheckinMultiplier());
-    }
+    let baseCoins = [5, 8, 10, 15, 20][Math.floor(Math.random() * 5)];
+    let coins = _isBarista ? Math.round(baseCoins * _baristaMulti) : baseCoins;
     if (typeof setBalance    === 'function') setBalance(getBalance() + coins);
     if (typeof addTransaction === 'function') addTransaction({ icon: '🎁', name: '签到奖励', amount: coins });
     if (typeof renderWallet  === 'function') renderWallet();
-    rewardMsg = `💰 签到奖励：£${coins}`;
+    rewardMsg = _isBarista
+      ? `💰 签到奖励：£${baseCoins} × ${_baristaMulti.toFixed(1)} = £${coins}`
+      : `💰 签到奖励：£${coins}`;
   } else {
-    let msgCount = Math.floor(Math.random() * 3) + 1;
-    // 咖啡师职业福利：签到条数翻倍（仅每日奖励，里程碑不算）
-    if (typeof getCareerCheckinMultiplier === 'function') {
-      msgCount = Math.round(msgCount * getCareerCheckinMultiplier());
-    }
+    let baseMsgCount = Math.floor(Math.random() * 3) + 1;
+    let msgCount = _isBarista ? Math.round(baseMsgCount * _baristaMulti) : baseMsgCount;
     applyCheckinBonusMessages(msgCount);
-    rewardMsg = `💬 签到奖励：+${msgCount}条`;
+    rewardMsg = _isBarista
+      ? `💬 签到奖励：+${baseMsgCount}条 × ${_baristaMulti.toFixed(1)} = +${msgCount}条`
+      : `💬 签到奖励：+${msgCount}条`;
+  }
+
+  // 咖啡师加成提示
+  let baristaMsg = '';
+  if (_isBarista) {
+    baristaMsg = `\n☕ 咖啡师加成 ×${_baristaMulti.toFixed(1)}`;
   }
 
   // ── 里程碑额外奖励 ──
@@ -244,7 +249,7 @@ function doCheckin() {
   if (streak === 7)  streakMsg = '\n🔥 连续签到7天！';
   if (streak === 30) streakMsg = '\n👑 连续签到30天！';
 
-  showCheckinResult(rewardMsg + milestoneMsg + streakMsg, streak);
+  showCheckinResult(rewardMsg + baristaMsg + milestoneMsg + streakMsg, streak);
   renderCheckin();
   if (typeof initCalendar === 'function') initCalendar();
   launchCheckinFlowers();
@@ -261,10 +266,11 @@ function showCheckinResult(msg, streak) {
 
   const lines           = msg.split('\n').filter(Boolean);
   const mainReward      = lines[0] || '';
-  const milestoneReward = lines[1] || '';
-  const streakReward    = lines[2] || '';
+  const baristaReward   = lines.find(l => l.includes('☕')) || '';
+  const milestoneReward = lines.find(l => l.includes('🏆')) || '';
+  const streakReward    = lines.find(l => l.includes('🔥') || l.includes('👑')) || '';
   const isLucky         = mainReward.includes('🎰');
-  const hasExtra        = milestoneReward || streakReward;
+  const hasExtra        = baristaReward || milestoneReward || streakReward;
 
   const modal = document.createElement('div');
   modal.id    = 'checkinResultModal';
@@ -277,6 +283,7 @@ function showCheckinResult(msg, streak) {
       <div style="background:${isLucky ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : 'rgba(168,85,247,0.08)'};border:1.5px solid ${isLucky ? 'rgba(251,191,36,0.5)' : 'rgba(168,85,247,0.2)'};border-radius:14px;padding:14px;margin-bottom:${hasExtra ? '10px' : '20px'};">
         <div style="font-size:20px;font-weight:800;color:${isLucky ? '#b45309' : '#7c3aed'}">${mainReward.replace(/[💰💬🎰]/g, '').trim()}</div>
       </div>
+      ${baristaReward ? `<div style="background:rgba(139,90,43,0.08);border:1px solid rgba(139,90,43,0.2);border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#8b5a2b;font-weight:600;">${baristaReward}</div>` : ''}
       ${milestoneReward ? `<div style="background:rgba(236,72,153,0.08);border:1px solid rgba(236,72,153,0.2);border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#be185d;font-weight:600;">${milestoneReward}</div>` : ''}
       ${streakReward    ? `<div style="background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2);border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#ea580c;font-weight:600;">${streakReward}</div>` : ''}
       <div style="margin-top:${hasExtra ? '0' : '0'}">
