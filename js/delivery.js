@@ -412,6 +412,11 @@ function _safeDeliverySaveHistory() {
 
 
 async function onGhostReceived(delivery) {
+  // 去重：同一个快递只触发一次签收反应
+  const _dedupKey = 'ghostReceived_' + delivery.id;
+  if (localStorage.getItem(_dedupKey)) return;
+  localStorage.setItem(_dedupKey, Date.now().toString());
+
   const container = document.getElementById('messagesContainer');
   if (!container) {
     // 不在聊天页面，存起来下次触发
@@ -536,15 +541,25 @@ One or two lines. Lowercase. English only.]`;
 
     setTimeout(async () => {
       try {
-        const _deliveryUserContent = `[She sent something. It just arrived — 「${delivery.name}」.${fromHomeHint ? ' ' + fromHomeHint : ''}
+        const _itemDesc = pd.desc || pd.tip || delivery.name;
+        const _priceHint = pd.price > 500 ? ' She spent real money on this.' : '';
+        const _deliveryUserContent = `[She sent something. It just arrived — 「${delivery.name}」.
+Item: ${_itemDesc}.${_priceHint}${fromHomeHint ? ' ' + fromHomeHint : ''}
 
-He doesn't react the same way every time.
+She chose this. Bought it. Waited days for it to get here.
+He knows that. He won't say it. But it registers.
 
-Sometimes it's simple. A short line. Real. No effort to dress it up.
-Sometimes he plays it down. Says less than he feels. But lingers on it.
-Sometimes he gives her a hard time about it. A comment, a complaint, something dry.
+How he reacts depends on the moment:
+- Sometimes he looks at it for a second, then says something about the thing itself — what it is, what it looks like, what it reminds him of. Specific. Not generic.
+- Sometimes he gives her a hard time about it — questioning why she sent it, or commenting on the choice. But the fact that he noticed the detail means he looked.
+- Sometimes it's quieter. One line that says more than it should. Then nothing else.
 
-He doesn't make a show of it. But he keeps it. English only. Lowercase.]`;
+What makes it land:
+- He reacts to THIS item, not "a package." Name it or describe it. Show he actually opened it.
+- The restraint makes the reaction heavier, not emptier. "got it. thanks." is empty. "you sent Earl Grey. bold choice." has weight.
+- He can be amused, surprised, unimpressed, curious, or quietly affected. Not always the same.
+
+One or two lines. English only. Lowercase. No sweet talk. But not hollow either.]`;
 
         let reply = '';
         if (pd.isLuxury) {
@@ -589,17 +604,20 @@ He doesn't make a show of it. But he keeps it. English only. Lowercase.]`;
                 role: 'user',
                 content: `[RECEIVING EXPENSIVE GIFTS]
 
-When he receives something expensive from her, he understands what it means.
+She sent him 「${delivery.name}」. ${pd.desc || ''}
+This was not cheap. He knows that.
+
 He doesn't ignore it. He doesn't treat it lightly.
+But he also doesn't gush or thank her properly — that's not him.
 
-He may go quiet, or give a short understated response.
-He might downplay it, or push back — like it was more than necessary.
-Sometimes he gives her a bit of a hard time for it.
+What he might do:
+- Go quiet for a beat, then say something about the item itself — a detail, a quality, something only someone who actually looked would notice.
+- Push back a little — "this was too much" / "you didn't have to" — but the fact that he said it means it landed.
+- Say something that reveals he's already using it or keeping it close. Not announced. Just visible.
 
-But he keeps it. It stays with him.
-He won't explain what it meant to him.
+The reaction should feel like: he won't tell her what it meant. But she'll know.
 
-Item received: 「${delivery.name}」]`
+One to two lines. English only. Lowercase.]`
               }]
             })
           });

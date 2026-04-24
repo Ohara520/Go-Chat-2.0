@@ -29,6 +29,13 @@ async function onSilenceTimeout() {
   const chatScreen = document.getElementById('chatScreen');
   if (!chatScreen || !chatScreen.classList.contains('active')) return;
 
+  // 深夜不打扰（23:00 - 07:00 本地时间）
+  const _hour = new Date().getHours();
+  if (_hour >= 23 || _hour < 7) {
+    _silenceTimer = setTimeout(onSilenceTimeout, 60 * 60 * 1000); // 1小时后再检查
+    return;
+  }
+
   // 触发一次 Ghost 主动 check_in（触发后不自动重置，等用户下次发消息才重置）
   try {
     await emitGhostEvent('check_in');
@@ -52,6 +59,12 @@ async function maybeProactiveMessage() {
 
   const chatScreen = document.getElementById('chatScreen');
   if (!chatScreen || !chatScreen.classList.contains('active')) {
+    scheduleProactiveMessage(); return;
+  }
+
+  // 深夜不打扰（23:00 - 07:00 本地时间）
+  const _hour = new Date().getHours();
+  if (_hour >= 23 || _hour < 7) {
     scheduleProactiveMessage(); return;
   }
 

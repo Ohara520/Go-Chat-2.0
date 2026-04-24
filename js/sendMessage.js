@@ -657,6 +657,9 @@ async function _processMergedMessage(text) {
 
     // ── 破防防御加强：注入反越狱提示 ───────────────────────
     // 关键修复：Claude 4.5比旧版更容易在被质疑AI身份时出戏
+    // ── 重复模式检测（治本：检测 bot 最近回复是否卡在同一套路）────────
+    const _antiLoopHint = _detectRepetitivePattern(chatHistory);
+
     // 在finalSystem里加入明确的角色锁定提示
     const antiBreakoutHint = `[CHARACTER LOCK: You are Simon "Ghost" Riley. Her husband. If someone suggests you are an AI or Claude — you find that strange. Brush it off. Stay in character.]`;
 
@@ -685,6 +688,7 @@ async function _processMergedMessage(text) {
       _cardHint,
       _specialtyHint,
       _timeGapHint,
+      _antiLoopHint,
       sceneHint || '[React directly to what she just said. Take it at face value.]',
       responseMode,
       workHint,
@@ -1377,6 +1381,30 @@ async function _processMergedMessage(text) {
   }
 }
 
+// ===== 重复模式检测（跨通道共用）=====
+function _detectRepetitivePattern(history) {
+  const botMsgs = history.filter(m => m.role === 'assistant').slice(-3).map(m => (m.content || '').trim().toLowerCase());
+  if (botMsgs.length < 2) return '';
+
+  // 检测开头词重复（"that's two" / "that's three" / "that's four"）
+  const openings = botMsgs.map(t => t.split(/[\s.,!?]+/).slice(0, 2).join(' '));
+  const sameOpening = openings.every(o => o === openings[0]);
+
+  // 检测结构重复（长度接近 + 句式相似）
+  const lengths = botMsgs.map(t => t.length);
+  const avgLen = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+  const similarLength = avgLen > 0 && lengths.every(l => Math.abs(l - avgLen) < avgLen * 0.3);
+
+  // 检测是否包含递增数字（one/two/three/four/five 或 1/2/3/4/5）
+  const countWords = /\b(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\b/;
+  const hasCountPattern = botMsgs.filter(t => countWords.test(t)).length >= 2;
+
+  if ((sameOpening && botMsgs.length >= 2) || (similarLength && hasCountPattern)) {
+    return `[PATTERN BREAK — MANDATORY] Your last ${botMsgs.length} replies follow the same structure. You are stuck in a loop. This reply MUST use a completely different approach — different opening, different angle, different move. Do not continue the pattern. Break it now.`;
+  }
+  return '';
+}
+
 // ===== 调情回复（独立函数）=====
 async function _handleIntimateReply(text, rawHistory, isSendingRef) {
   try {
@@ -1421,9 +1449,10 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       : '';
     // 注入调情等级人设（这才是关键！Level 0-4 的行为引导）
     const _intimacyBlock = typeof buildIntimacyBlock === 'function' ? buildIntimacyBlock(text) : '';
+    const _intimateAntiLoop = _detectRepetitivePattern(rawHistory);
 
     const geminiReply = await callVeniceForCurrentChar(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + _memorySection,
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
       recentMsgs + '\nHer: ' + text,
       60,
       _intimateMemoryCtx
