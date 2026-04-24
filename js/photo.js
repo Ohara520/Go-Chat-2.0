@@ -80,16 +80,33 @@ function compressImageToBase64(dataUrl, maxWidth = 800, quality = 0.82) {
     img.onload = async () => {
       try {
         // 等待图片完全解码，防止canvas画出全黑（华为/手机拍照常见问题）
+        // 最多重试3次，每次间隔递增
+        let decoded = false;
         if (img.decode) {
-          try { await img.decode(); } catch(e) {}
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              await img.decode();
+              decoded = true;
+              break;
+            } catch(e) {
+              console.warn(`[photo] img.decode() 第${attempt+1}次失败:`, e.message || e);
+              // 递增等待：200ms, 500ms, 1000ms
+              await new Promise(r => setTimeout(r, [200, 500, 1000][attempt]));
+            }
+          }
         }
         // 多等几帧，华为等机型一帧不够
         await new Promise(r => requestAnimationFrame(r));
         await new Promise(r => requestAnimationFrame(r));
-        await new Promise(r => setTimeout(r, 150));
+        await new Promise(r => setTimeout(r, decoded ? 150 : 500));
         const canvas = document.createElement('canvas');
         let w = img.naturalWidth || img.width;
         let h = img.naturalHeight || img.height;
+        // 宽高为0说明图片没加载成功
+        if (w === 0 || h === 0) {
+          reject(new Error('图片尺寸为0，加载失败'));
+          return;
+        }
         if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
@@ -97,11 +114,46 @@ function compressImageToBase64(dataUrl, maxWidth = 800, quality = 0.82) {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
+
+        // 黑图检测：采样中心区域像素，如果全黑就报错
+        try {
+          const sampleSize = Math.min(32, w, h);
+          const sx = Math.floor((w - sampleSize) / 2);
+          const sy = Math.floor((h - sampleSize) / 2);
+          const pixels = ctx.getImageData(sx, sy, sampleSize, sampleSize).data;
+          let totalBrightness = 0;
+          const pixelCount = pixels.length / 4;
+          for (let i = 0; i < pixels.length; i += 4) {
+            totalBrightness += pixels[i] + pixels[i+1] + pixels[i+2]; // R+G+B
+          }
+          const avgBrightness = totalBrightness / (pixelCount * 3); // 0-255
+          if (avgBrightness < 3) {
+            // 几乎纯黑（avg < 3），很可能是decode失败导致的全黑canvas
+            console.warn('[photo] 检测到黑图，avgBrightness:', avgBrightness.toFixed(1));
+            // 不直接reject，尝试用原始dataUrl的base64（未经canvas处理）
+            // 这样至少传原图给模型，虽然可能大一点但不会是全黑
+            const fallbackB64 = dataUrl.split(',')[1];
+            if (fallbackB64 && fallbackB64.length > 100) {
+              console.log('[photo] 黑图降级：使用原始base64');
+              resolve(fallbackB64);
+              return;
+            }
+            reject(new Error('图片渲染全黑，decode可能失败'));
+            return;
+          }
+        } catch(pixelErr) {
+          // getImageData可能因跨域失败，忽略检测继续
+          console.warn('[photo] 黑图检测跳过:', pixelErr.message);
+        }
+
         const compressed = canvas.toDataURL('image/jpeg', quality);
         resolve(compressed.split(',')[1]);
       } catch(e) { reject(e); }
     };
-    img.onerror = reject;
+    img.onerror = (e) => {
+      console.error('[photo] img.onerror 图片加载失败:', e);
+      reject(new Error('图片加载失败'));
+    };
     img.src = dataUrl;
   });
 }
@@ -245,7 +297,7 @@ async function handlePhotoUpload(fileDataList) {
     for (const item of items) {
       const mimeType = item.type || 'image/jpeg';
       const dataUrl = `data:${mimeType};base64,${item.base64 || item}`;
-      const b64 = await compressImageToBase64(dataUrl, 1200, 0.90);
+      const b64 = await compressImageToBase64(dataUrl, 800, 0.78);
       base64List.push(b64);
     }
 
@@ -283,7 +335,7 @@ async function handlePhotoUpload(fileDataList) {
     const isTwoPhotos = base64List.length > 1;
     const photoHint = `[You just received ${isTwoPhotos ? 'two photos' : 'a photo'} from her.
 React as Ghost. One line. Your honest first reaction to what you see.
-If it looks like it could be couple profile pictures, you can say something dry about it — but do NOT promise to set it, do NOT say you're setting it.
+IMPORTANT: You have NO ability to change avatars or profile pictures. You CANNOT set, update, or switch any avatar. Only she can trigger that by telling you to use it as an avatar. Do NOT say "I'll set this", "done, changed it", "avatar updated", or anything implying you performed an action. If the photo looks like a couple avatar, you may comment on it — but NEVER claim you are setting it.
 English only. No translation. No AVATAR_SET tag.]`;
 
     // 5. 发给模型看图回复
@@ -332,14 +384,18 @@ English only. No translation. No AVATAR_SET tag.]`;
             }
           ]
         })
-      }, 20000);
+      }, 30000);
       if (sRes.ok) {
         const sData = await sRes.json();
         const text = sData.content?.[0]?.text?.trim() || '';
         // 使用全局 isBreakout，不用局部变量（局部变量会遮蔽全局函数）
         if (!isBreakout(text) && text) reply = text;
+      } else {
+        console.warn('[photo] 主模型返回非200:', sRes.status, await sRes.text().catch(() => ''));
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('[photo] 主模型请求失败:', e.message || e);
+    }
 
     // 主模型失败或破防，走Grok兜底（支持识图）
     if (!reply || isBreakout(reply)) {
@@ -360,8 +416,12 @@ English only. No translation. No AVATAR_SET tag.]`;
           const grokText = grokData.text?.trim();
           // Grok 兜底也需要破防检测
           if (grokText && !isBreakout(grokText)) reply = grokText;
+        } else {
+          console.warn('[photo] Grok兜底返回非200:', grokPhotoRes.status);
         }
-      } catch(e) {}
+      } catch(e) {
+        console.warn('[photo] Grok兜底请求失败:', e.message || e);
+      }
     }
 
     if (!reply) reply = 'noted.';
@@ -489,20 +549,61 @@ async function checkPendingAvatarChoice(userText) {
   return true;
 }
 
-// ===== 用户明确命令触发换头像（新版，替代模型自动判断）=====
-// 触发条件：用户说了明确的换头像命令
-// 宁可漏判，不能误换
+// ===== 用户明确命令触发换头像（三层判断）=====
+// 第一层：强正则 → 直接换（扩词版，覆盖常见口语）
+// 第二层：弱信号（含头像相关词）+ 模型确认 → 确认后再换
+// 第三层：零信号 → 完全不触发，不碰头像逻辑
 async function checkAvatarCommand(userText) {
   const text = userText;
 
-  // 只认明确命令，不猜潜台词
-  const isCommand = /用这个当头像|设为头像|换成这个|这个当(你的?)?头像|帮我换头像|给你换头像|换(一下|个)?头像|set.*avatar|use.*avatar|change.*avatar/i.test(text);
-  if (!isCommand) return false;
-
-  // 有没有最近发过的图片
+  // 有没有最近发过的图片（三层都需要，提前判断）
   const lastPhotos = window._lastReceivedPhotos;
   if (!lastPhotos || !lastPhotos.base64List || lastPhotos.base64List.length === 0) return false;
 
+  // ── 第一层：强正则，明确意图直接换 ──
+  const isStrongCommand = /用这个当头像|设为头像|换成这个|这个当(你的?)?头像|帮我换头像|给你换头像|换(一下|个)?头像|头像(就)?用这|做(你的?)?头像|当(你的?)?头像吧?|就这张|用上吧?|头像换了|头像换一下|就它了|用它吧|头像就这个|拿来当头像|当作头像|这张当头像|头像用这张|这个做头像|set.*avatar|use.*avatar|change.*avatar|make.*avatar|update.*avatar|this.*as.*avatar|avatar.*this/i.test(text);
+
+  if (isStrongCommand) {
+    return await _handleAvatarSet(lastPhotos, text);
+  }
+
+  // ── 第二层：弱信号门槛 + 模型确认 ──
+  // 消息里至少沾了头像/avatar相关词，才值得问模型
+  const hasWeakSignal = /头像|avatar|profile\s*pic|pfp|icon|大头|换.{0,2}(上|掉|了)|用.{0,3}(这|它|上)/i.test(text);
+  if (!hasWeakSignal) return false; // 第三层：零信号，彻底跳过
+
+  // 问模型：这句话是不是在要求换头像？
+  try {
+    const confirmRes = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        system: `You are a binary classifier. The user just sent a photo in a chat app. Now they sent a follow-up text message. Determine if they are asking to SET/CHANGE their avatar/profile picture to the photo they just sent.
+Reply ONLY "yes" or "no". When in doubt, say "no".
+Examples of YES: "头像用这个吧", "can this be my pfp", "帮我换上", "当头像", "就用它"
+Examples of NO: "这个头像好丑", "你的头像是什么", "好看吗", "帮我看看这个", "头像在哪改"`,
+        messages: [{ role: 'user', content: text }]
+      })
+    }, 8000);
+    if (confirmRes.ok) {
+      const confirmData = await confirmRes.json();
+      const answer = (confirmData.content?.[0]?.text || '').trim().toLowerCase();
+      console.log('[photo] 头像意图模型判断:', answer, '原文:', text);
+      if (answer.startsWith('yes')) {
+        return await _handleAvatarSet(lastPhotos, text);
+      }
+    }
+  } catch(e) {
+    console.warn('[photo] 头像意图判断请求失败:', e.message || e);
+  }
+
+  return false;
+}
+
+// 内部：执行换头像流程（单张直接换，多张选或问）
+async function _handleAvatarSet(lastPhotos, text) {
   const { base64List, isTwoPhotos } = lastPhotos;
 
   // 单张图 → 直接换
@@ -517,7 +618,6 @@ async function checkAvatarCommand(userText) {
   else if (/右|第二|2张|second|right|下面|白|浅色|亮/.test(text)) chosenIdx = 1;
 
   if (chosenIdx !== -1) {
-    // 用户指定了 → 直接换
     await _executeAvatarSet(base64List[chosenIdx] || base64List[0]);
     return true;
   }
