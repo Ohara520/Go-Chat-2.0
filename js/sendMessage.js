@@ -666,6 +666,9 @@ async function _processMergedMessage(text) {
     // 语言规则
     const langHint = '[LANGUAGE: You reply in English only. She can write in any language. Never tell her to speak English or correct her language choice. Just reply in English yourself.]';
 
+    // 禁止计数行为——模型喜欢数用户说了几次然后评论"twice"/"that's three times"
+    const antiCountHint = '[DO NOT count her messages or actions. Never say "twice", "again", "that\'s the second time", "third time", "checking in again", or any variation. Each message from her is its own moment — treat it fresh. Respond to WHAT she said, not HOW MANY TIMES she said something.]';
+
     // ── Ghost Card hint（用户要钱时提醒模型用卡回应）────────
     const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
     const _cardHint = _moneyKws.test(text)
@@ -684,6 +687,7 @@ async function _processMergedMessage(text) {
     const finalSystem = [
       _baseSystem,
       antiBreakoutHint,
+      antiCountHint,
       emotionHint,
       _cardHint,
       _specialtyHint,

@@ -509,32 +509,10 @@ async function sendSticker(id) {
   _isSending = true;
   showTyping();
 
-  // kiss 猫猫走 Grok（亲密内容，Sonnet 会破防）
-  if (meta.type === 'intimate') {
-    try {
-      const recentCtx = chatHistory
-        .filter(m => !m._system && !m._recalled)
-        .slice(-6)
-        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 150)}`)
-        .join('\n');
-      const grokReply = await callGrok(
-        recentCtx + '\n[She sent a kiss/affection sticker. Respond as Ghost — dry but not cold. One line. May include an emoji.]',
-        100, null, 'normal'
-      );
-      hideTyping();
-      if (grokReply && !isBreakout(grokReply)) {
-        appendMessage('bot', grokReply.trim());
-        chatHistory.push({ role: 'assistant', content: grokReply.trim() });
-        saveHistory();
-      }
-    } catch(e) { hideTyping(); }
-    _isSending = false;
-    return;
-  }
-
+  // 所有表情包统一走 Sonnet，破防才降 Grok
   try {
     const cleanHistory = chatHistory
-      .filter(m => !m._system && !m._recalled)
+      .filter(m => !m._system && !m._recalled && !m._intimate)
       .slice(-30)
       .map(m => ({
         role: m.role,
@@ -625,6 +603,19 @@ async function sendSticker(id) {
   } catch(e) {
     hideTyping();
     console.warn('表情包回复失败:', e);
+    // 兜底：至少说一句
+    const _fb = {
+      vulnerable: ['hey.', 'i\'m here.', 'come on.'],
+      conflict:   ['alright.', 'fine.', 'noted.'],
+      distance:   ['okay.', 'sure.', '.'],
+      approach:   ['mm.', 'go on.', 'what.'],
+      neutral:    ['mm.', 'okay.', '.'],
+    };
+    const _opts = _fb[meta.type] || _fb.neutral;
+    const _line = _opts[Math.floor(Math.random() * _opts.length)];
+    appendMessage('bot', _line);
+    chatHistory.push({ role: 'assistant', content: _line });
+    saveHistory();
   } finally {
     _isSending = false;
   }

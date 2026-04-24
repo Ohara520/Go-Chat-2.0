@@ -764,35 +764,87 @@ React to the food and to what just happened — dry, real, a little caught off g
 You don't perform gratitude. But you don't act like it means nothing.
 The fact she did this — that stays with you.
 Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
-          const _res = await fetchWithTimeout('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
-              max_tokens: 100,
-              system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
-              messages: [
-                ...(chatHistory || []).filter(m => !m._system).slice(-6),
-                { role: 'user', content: _prompt }
-              ]
-            })
-          }, 15000);
-          const _data = await _res.json();
-          const _reply = (_data.content?.[0]?.text || '').trim();
+          // 优先 Sonnet（质量好），超时降级 Haiku（快），都失败走兜底
+          let _reply = '';
+          try {
+            const _res = await fetchWithTimeout('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+                max_tokens: 100,
+                system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
+                messages: [
+                  ...(chatHistory || []).filter(m => !m._system).slice(-6),
+                  { role: 'user', content: _prompt }
+                ]
+              })
+            }, 25000);
+            const _data = await _res.json();
+            _reply = (_data.content?.[0]?.text || '').trim();
+          } catch(e) {
+            console.warn('[外卖] Sonnet超时，降级Haiku:', e.message || e);
+          }
+
+          // Sonnet 失败或破防 → Haiku 兜底
           const _bad = ["i'm claude","i am claude","as an ai","can't roleplay","anthropic"];
-          if (_reply && !_bad.some(p => _reply.toLowerCase().includes(p))) {
-            const _line = _reply.split('\n').slice(0, 2).join('\n');
-            if (typeof appendMessage === 'function') appendMessage('bot', _line);
-            // 存入防重复池
-            const _pool = _getTakeoutPool(); _pool.push(_line); _saveTakeoutPool(_pool);
-            if (typeof chatHistory !== 'undefined') {
-              chatHistory.push({ role: 'assistant', content: _line });
-              const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
-              if (_realMsgs.length > 0 && typeof saveHistory === 'function') saveHistory();
-              if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+          if (!_reply || _bad.some(p => _reply.toLowerCase().includes(p))) {
+            try {
+              const _res2 = await fetchWithTimeout('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  model: 'claude-haiku-4-5-20251001',
+                  max_tokens: 80,
+                  system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
+                  messages: [
+                    ...(chatHistory || []).filter(m => !m._system).slice(-4),
+                    { role: 'user', content: _prompt }
+                  ]
+                })
+              }, 10000);
+              const _data2 = await _res2.json();
+              const _r2 = (_data2.content?.[0]?.text || '').trim();
+              if (_r2 && !_bad.some(p => _r2.toLowerCase().includes(p))) _reply = _r2;
+            } catch(e2) {
+              console.warn('[外卖] Haiku也失败:', e2.message || e2);
             }
           }
-        } catch(e) { console.warn('[外卖] 回复生成失败:', e); }
+          let _line = '';
+          if (_reply && !_bad.some(p => _reply.toLowerCase().includes(p))) {
+            _line = _reply.split('\n').slice(0, 2).join('\n');
+          }
+          // API 失败或破防时兜底
+          if (!_line) {
+            const _fallbacks = [
+              `got it. ${order.nameEn || order.name}.`,
+              `it's here. thanks.`,
+              `just arrived. not bad.`,
+              `${order.nameEn || order.name}. still warm.`,
+              `noted. eating.`,
+            ];
+            _line = _fallbacks[Math.floor(Math.random() * _fallbacks.length)];
+          }
+          if (typeof appendMessage === 'function') appendMessage('bot', _line);
+          // 存入防重复池
+          const _pool = _getTakeoutPool(); _pool.push(_line); _saveTakeoutPool(_pool);
+          if (typeof chatHistory !== 'undefined') {
+            chatHistory.push({ role: 'assistant', content: _line });
+            const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
+            if (_realMsgs.length > 0 && typeof saveHistory === 'function') saveHistory();
+            if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+          }
+        } catch(e) {
+          console.warn('[外卖] 回复生成失败:', e);
+          // 网络错误也兜底
+          const _fb = [`got it.`, `it's here.`, `eating.`];
+          const _fallbackLine = _fb[Math.floor(Math.random() * _fb.length)];
+          if (typeof appendMessage === 'function') appendMessage('bot', _fallbackLine);
+          if (typeof chatHistory !== 'undefined') {
+            chatHistory.push({ role: 'assistant', content: _fallbackLine });
+            if (typeof saveHistory === 'function') saveHistory();
+          }
+        }
       }
 
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();

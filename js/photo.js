@@ -681,18 +681,42 @@ async function _handleAvatarSet(lastPhotos, text) {
 async function _executeAvatarSet(ghostB64) {
   window._lastReceivedPhotos = null; // 用完清掉
 
+  // 立刻显示（不等上传）
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
     el.src = `data:image/jpeg;base64,${ghostB64}`;
   });
-  localStorage.setItem('ghostAvatarBase64', ghostB64);
 
-  uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-    if (url) {
-      updateGhostAvatar(url);
-      localStorage.removeItem('ghostAvatarBase64');
-      if (typeof showToast === 'function') showToast('头像已更新 ✅');
+  // base64 备份（上传成功前保底）
+  try {
+    localStorage.setItem('ghostAvatarBase64', ghostB64);
+  } catch(e) {
+    console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
+  }
+
+  // 上传到 Supabase Storage（重试1次）
+  let uploadOk = false;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const url = await uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
+      if (url) {
+        updateGhostAvatar(url); // 写 localStorage.ghostAvatarUrl + 云端
+        localStorage.removeItem('ghostAvatarBase64'); // URL 存好了，base64 可以删
+        uploadOk = true;
+        if (typeof showToast === 'function') showToast('头像已更新 ✅');
+        break;
+      }
+    } catch(e) {
+      console.warn(`[avatar] 上传第${attempt + 1}次失败:`, e);
     }
-  });
+    if (attempt === 0) await new Promise(r => setTimeout(r, 2000)); // 2秒后重试
+  }
+
+  if (!uploadOk) {
+    // 上传失败：base64 已存 localStorage，切页面时 refreshGhostAvatar 能恢复
+    // 但告诉用户网络有问题，下次打开会自动重试
+    if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
+    console.warn('[avatar] 上传失败，使用本地 base64 备份');
+  }
 
   if (typeof showTyping === 'function') showTyping();
   await new Promise(r => setTimeout(r, 600));
