@@ -174,6 +174,21 @@ const TAKEOUT_MENUS = {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 统一计价（菜品倍率 + 职业折扣 + 配送费减免）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function _calcTakeoutPrice(item) {
+  const fee = getTakeoutFee();
+  let itemPrice = Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER);
+  let deliveryFee = fee.fee;
+  const discount = typeof getCareerTakeoutDiscount === 'function' ? getCareerTakeoutDiscount() : 0;
+  if (discount > 0) itemPrice = Math.round(itemPrice * (1 - discount / 100) * 100) / 100;
+  if (typeof isCareerFreeDeliveryTakeout === 'function' && isCareerFreeDeliveryTakeout()) deliveryFee = 0;
+  return { itemPrice, deliveryFee, total: itemPrice + deliveryFee, fee };
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 每日次数
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -312,8 +327,9 @@ function _renderShopTab(body, city) {
     : '';
 
   const cards = items.map(item => {
-    const total     = Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER) + fee.fee;
-    const canAfford = bal >= total;
+    const calc      = _calcTakeoutPrice(item);
+    const canAfford = bal >= calc.total;
+    const hasDiscount = calc.itemPrice < Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER);
     const disabled  = !canOrder || !canAfford;
     return `
     <div style="background:#fff;border-radius:16px;padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 6px rgba(180,120,0,0.08);">
@@ -324,10 +340,11 @@ function _renderShopTab(body, city) {
         <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">
           <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fde8c0;color:#8a4800;font-weight:600;">${cats[item.cat]}</span>
           ${item.hot ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#ffe0c0;color:#b03000;font-weight:600;">常点</span>` : ''}
+          ${hasDiscount ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#e0f0d0;color:#3a7020;font-weight:600;">厨师折扣</span>` : ''}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
-        <div style="font-size:16px;font-weight:700;color:#c47010;">£${Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER)}</div>
+        <div style="font-size:16px;font-weight:700;color:#c47010;">${hasDiscount ? `<span style="text-decoration:line-through;font-size:12px;color:#b09060;">£${Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER)}</span> ` : ''}£${calc.itemPrice}</div>
         <button onclick="_confirmTakeout('${city}','${item.id}')" ${disabled ? 'disabled' : ''}
           style="background:${disabled ? '#e8d8b0' : '#c47010'};color:${disabled ? '#a08050' : '#fff'};
             border:none;border-radius:20px;padding:8px 16px;font-size:12px;font-weight:700;
@@ -489,9 +506,7 @@ function _renderHistoryTab(body) {
 function _confirmTakeout(city, itemId) {
   const item = (TAKEOUT_MENUS[city] || []).find(m => m.id === itemId);
   if (!item) return;
-  const fee   = getTakeoutFee();
-  const _menuPrice = Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER);
-  const total = _menuPrice + fee.fee;
+  const calc = _calcTakeoutPrice(item);
 
   document.getElementById('_takeoutConfirm')?.remove();
   const conf = document.createElement('div');
@@ -504,13 +519,13 @@ function _confirmTakeout(city, itemId) {
       <div style="font-size:11px;color:#a07020;margin-bottom:14px;line-height:1.5;">${item.desc}</div>
       <div style="background:#fff8e8;border-radius:10px;padding:10px;margin-bottom:18px;">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;">
-          <span style="color:#a07020;">菜品</span><span style="color:#3a2000;font-weight:600;">£${_menuPrice.toFixed(2)}</span>
+          <span style="color:#a07020;">菜品</span><span style="color:#3a2000;font-weight:600;">£${calc.itemPrice.toFixed(2)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:7px;">
-          <span style="color:#a07020;">${fee.label}</span><span style="color:#3a2000;font-weight:600;">£${fee.fee.toFixed(2)}</span>
+          <span style="color:#a07020;">${calc.fee.label}${calc.deliveryFee === 0 ? ' (免)' : ''}</span><span style="color:#3a2000;font-weight:600;">£${calc.deliveryFee.toFixed(2)}</span>
         </div>
         <div style="border-top:1px dashed #e8c97a;padding-top:8px;display:flex;justify-content:space-between;font-size:14px;">
-          <span style="color:#5a3000;font-weight:700;">合计</span><span style="color:#c47010;font-weight:700;">£${total.toFixed(2)}</span>
+          <span style="color:#5a3000;font-weight:700;">合计</span><span style="color:#c47010;font-weight:700;">£${calc.total.toFixed(2)}</span>
         </div>
       </div>
       <div style="display:flex;gap:8px;">
@@ -535,43 +550,41 @@ function _doTakeoutOrder(city, itemId) {
 // 下单
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+let _isOrdering = false; // 防连点锁
+
 function addTakeoutOrder(city, item) {
-  const fee   = getTakeoutFee();
-  // 全局价格倍率
-  let itemPrice = Math.round(item.price * TAKEOUT_PRICE_MULTIPLIER);
-  let deliveryFee = fee.fee;
-  const _takeoutDiscount = typeof getCareerTakeoutDiscount === 'function' ? getCareerTakeoutDiscount() : 0;
-  if (_takeoutDiscount > 0) itemPrice = Math.round(itemPrice * (1 - _takeoutDiscount / 100) * 100) / 100;
-  if (typeof isCareerFreeDeliveryTakeout === 'function' && isCareerFreeDeliveryTakeout()) deliveryFee = 0;
-  const total = itemPrice + deliveryFee;
+  if (_isOrdering) return false;
+  _isOrdering = true;
+  setTimeout(() => { _isOrdering = false; }, 2000); // 2秒后解锁
+
+  const calc = _calcTakeoutPrice(item);
+  const total = calc.total;
 
   if (typeof showCardSelector === 'function') {
     showCardSelector(total, item.name,
       () => {
         const bal = getBalance();
-        if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); return false; }
+        if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); _isOrdering = false; return false; }
         addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
         if (typeof renderWallet === 'function') renderWallet();
-        if (typeof showToast === 'function') showToast(`🛵 ${item.name} 已下单！`);
-        _finishTakeoutOrder(city, item, fee);
+        _finishTakeoutOrder(city, item, calc);
       },
       () => {
-        if (!spendGhostCard(total, item.name, 'daily')) { if (typeof showToast === 'function') showToast('Ghost Card 额度不足'); return false; }
-        if (typeof showToast === 'function') showToast(`🛵 ${item.name} 已下单！`);
-        _finishTakeoutOrder(city, item, fee);
+        if (!spendGhostCard(total, item.name, 'daily')) { if (typeof showToast === 'function') showToast('Ghost Card 额度不足'); _isOrdering = false; return false; }
+        _finishTakeoutOrder(city, item, calc);
       }
     );
   } else {
     const bal = getBalance();
-    if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); return false; }
+    if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); _isOrdering = false; return false; }
     addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
     if (typeof renderWallet === 'function') renderWallet();
-    _finishTakeoutOrder(city, item, fee);
+    _finishTakeoutOrder(city, item, calc);
   }
   return true;
 }
 
-function _finishTakeoutOrder(city, item, fee) {
+function _finishTakeoutOrder(city, item, calc) {
   // 配送时间按品类区分
   const deliverMins = item.cat === 'drink' ? 15 + Math.floor(Math.random() * 11)
                     : item.cat === 'side'  ? 20 + Math.floor(Math.random() * 16)
@@ -584,9 +597,9 @@ function _finishTakeoutOrder(city, item, fee) {
     name:      item.name,
     nameEn:    item.nameEn || item.name,
     emoji:     item.emoji,
-    price:     item.price,
-    fee:       fee.fee,
-    feeLabel:  fee.label,
+    price:     calc.itemPrice,       // 实际菜品价（含倍率+折扣）
+    fee:       calc.deliveryFee,     // 实际配送费（含减免）
+    feeLabel:  calc.fee.label,
     desc:      item.desc || '',
     city,
     cityLabel: _getCityLabel(),
@@ -612,6 +625,9 @@ function _finishTakeoutOrder(city, item, fee) {
   _renderTabBar();
   const body = document.getElementById('takeoutBody');
   if (body) _renderTrackingTab(body);
+
+  // 定时自动检查送达（到时间 +3秒 主动触发，不依赖外部轮询）
+  setTimeout(() => checkTakeoutUpdates(), deliverInMs + 3000);
 
   return true;
 }
@@ -665,10 +681,11 @@ async function onGhostReceivedTakeout(order) {
     ? `\n\nDo not reuse or echo these recent lines: ${_recentTakeoutLines}. Vary your phrasing, angle, and reaction completely.`
     : '';
 
-  // 判断用户有没有提前说过
-  const kw = [order.name.toLowerCase(), (order.nameEn || '').toLowerCase(), 'takeout', 'food', 'ordered', '外卖', '点了', '送'];
+  // 判断用户有没有提前说过要点外卖
+  // 关键词收紧：避免 '送'/'点了' 这种日常词误判
+  const kw = [(order.nameEn || '').toLowerCase(), '外卖', '点外卖', '给你点', '给你买', '点了吃的', 'takeout', 'ordered food', 'ordered you'];
   const told = (chatHistory || []).filter(m => m.role === 'user' && !m._system).slice(-20)
-    .some(m => kw.some(k => (m.content || '').toLowerCase().includes(k)));
+    .some(m => kw.some(k => k && (m.content || '').toLowerCase().includes(k)));
 
   if (typeof chatHistory !== 'undefined') {
     chatHistory.push({
@@ -875,9 +892,17 @@ function checkPendingTakeoutReactions() {
   } catch(e) {}
 }
 
-// 用户切回聊天页时自动触发 pending
+// 用户切回聊天页时自动触发 pending + 检查送达
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) setTimeout(checkPendingTakeoutReactions, 1000);
+    if (!document.hidden) {
+      setTimeout(checkTakeoutUpdates, 500);
+      setTimeout(checkPendingTakeoutReactions, 1000);
+    }
   });
+  // 每60秒检查一次送达（防止setTimeout因页面休眠被吞）
+  setInterval(() => {
+    const hasActive = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').some(o => !o.done);
+    if (hasActive) checkTakeoutUpdates();
+  }, 60000);
 }
