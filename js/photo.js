@@ -233,26 +233,21 @@ function refreshGhostAvatar() {
   });
 }
 
-// ===== 自动监听：新的 .ghost-avatar-img 出现时自动填充正确头像 =====
-if (typeof MutationObserver !== 'undefined') {
-  const _avatarObserver = new MutationObserver(() => {
-    const url = localStorage.getItem('ghostAvatarUrl');
-    if (!url) return;
-    document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-      if (el.src && el.src.includes('ghost-avatar.jpg')) {
-        el.src = url + '?t=' + Date.now();
-      }
-    });
-  });
-  // 等 DOM ready 再挂
-  if (document.body) {
-    _avatarObserver.observe(document.body, { childList: true, subtree: true });
-  } else {
-    document.addEventListener('DOMContentLoaded', () => {
-      _avatarObserver.observe(document.body, { childList: true, subtree: true });
-    });
-  }
-}
+// ===== 自动修复：切屏幕后刷新头像 =====
+// openScreen 切屏只改 CSS class，不增删 DOM，所以用 hook 而不是 MutationObserver
+document.addEventListener('DOMContentLoaded', () => {
+  // 等所有 JS 加载完，openScreen 已被 app.js 和 index.html 定义/包装
+  setTimeout(() => {
+    const _prevOpenScreen = window.openScreen;
+    if (typeof _prevOpenScreen === 'function') {
+      window.openScreen = function(screenId) {
+        _prevOpenScreen(screenId);
+        // 切屏后刷新所有 ghost 头像（延迟一帧，等 DOM 更新完）
+        requestAnimationFrame(() => refreshGhostAvatar());
+      };
+    }
+  }, 0);
+});
 
 // ===== 恢复Ghost头像（优先从数据库读，保证多设备同步）=====
 async function restoreGhostAvatar() {
