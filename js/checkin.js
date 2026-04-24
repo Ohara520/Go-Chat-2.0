@@ -60,9 +60,11 @@ function getCheckinStreak() {
   return streak;
 }
 
-// 欧气概率：基础5%，每连续7天+1%，最高12%
+// 欧气概率：基础5%，每连续7天+1%，最高12%；咖啡师基础15%，最高20%
 function getLuckyChance(streak) {
-  return Math.min(0.05 + Math.floor(streak / 7) * 0.01, 0.12);
+  const base = (typeof getCareer === 'function' && getCareer() === 'barista') ? 0.15 : 0.05;
+  const max = (typeof getCareer === 'function' && getCareer() === 'barista') ? 0.20 : 0.12;
+  return Math.min(base + Math.floor(streak / 7) * 0.01, max);
 }
 
 // 月初新月提示（每月只显示一次）
@@ -143,6 +145,11 @@ function renderCheckin() {
 function applyCheckinBonusMessages(count) {
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (email) {
+    // 立即生效：先乐观更新本地缓存，不等 API 返回
+    if (typeof _subCache !== 'undefined' && _subCache && _subCache.remaining !== undefined) {
+      _subCache.remaining += count;
+    }
+    // 同步到后端持久化
     fetch('/api/checkin-bonus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -150,8 +157,13 @@ function applyCheckinBonusMessages(count) {
     }).then(r => r.json()).then(d => {
       if (d.ok && typeof _subCache !== 'undefined' && _subCache) {
         _subCache.remaining = d.remaining;
+      } else {
+        console.warn('[checkin] bonus API 返回异常:', d);
       }
-    }).catch(() => {});
+    }).catch(e => {
+      console.warn('[checkin] bonus API 调用失败:', e);
+      // API 失败但乐观更新已生效，用户当前 session 不受影响
+    });
   } else {
     applyLocalBonusMessages(count);
   }
@@ -191,13 +203,21 @@ function doCheckin() {
   let rewardMsg     = '';
 
   if (rand < luckyChance) {
-    const coins = Math.random() < 0.5 ? 100 : 150;
+    let coins = Math.random() < 0.5 ? 100 : 150;
+    // 咖啡师职业福利：签到金钱翻倍
+    if (typeof getCareerCheckinMultiplier === 'function') {
+      coins = Math.round(coins * getCareerCheckinMultiplier());
+    }
     if (typeof setBalance    === 'function') setBalance(getBalance() + coins);
     if (typeof addTransaction === 'function') addTransaction({ icon: '🎰', name: '欧气签到！', amount: coins });
     if (typeof renderWallet  === 'function') renderWallet();
     rewardMsg = `🎰 欧气签到！£${coins}！`;
   } else if (rand < luckyChance + 0.475) {
-    const coins = [5, 8, 10, 15, 20][Math.floor(Math.random() * 5)];
+    let coins = [5, 8, 10, 15, 20][Math.floor(Math.random() * 5)];
+    // 咖啡师职业福利：签到金钱翻倍
+    if (typeof getCareerCheckinMultiplier === 'function') {
+      coins = Math.round(coins * getCareerCheckinMultiplier());
+    }
     if (typeof setBalance    === 'function') setBalance(getBalance() + coins);
     if (typeof addTransaction === 'function') addTransaction({ icon: '🎁', name: '签到奖励', amount: coins });
     if (typeof renderWallet  === 'function') renderWallet();

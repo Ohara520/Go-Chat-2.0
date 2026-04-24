@@ -122,14 +122,7 @@ async function loadFromCloud() {
       setIfNewerOrMissing('userFavColor', p.userFavColor);
       setIfNewerOrMissing('userBio', p.userBio);
       setIfNewerOrMissing('metInPerson', p.metInPerson != null ? String(p.metInPerson) : null);
-      // visitStreak 取较大值，防止换设备后连续天数倒退
-      if (p.visitStreak) {
-        const _localStreak = parseInt(localStorage.getItem('visitStreak') || '0');
-        const _cloudStreak = parseInt(p.visitStreak || '0');
-        if (_cloudStreak > _localStreak) {
-          localStorage.setItem('visitStreak', String(_cloudStreak));
-        }
-      }
+      // visitStreak：延迟到签到记录恢复后再重算（见下方 3.5 之后）
       // vocabStreak + vocabLastDay 必须一起恢复，否则连续天数算不准
       if (p.vocabStreak) {
         const _localVS = parseInt(localStorage.getItem('vocabStreak') || '0');
@@ -247,6 +240,24 @@ async function loadFromCloud() {
       if (cloudCount > localCount) {
         localStorage.setItem(data.profile.monthlyCheckinKey, String(cloudCount));
       }
+    }
+
+    // ── 3.6 visitStreak 从签到记录反算（必须在 checkin keys 恢复之后）──
+    // 修复：旧版 sendMessage.js 会污染 visitStreak（聊天天数 ≠ 签到天数）
+    {
+      let _realStreak = 0;
+      const _today = new Date();
+      for (let i = 0; i < 365; i++) {
+        const d = new Date(_today);
+        d.setDate(d.getDate() - i);
+        const k = `checkin_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        if (localStorage.getItem(k)) {
+          _realStreak++;
+        } else if (i > 0) {
+          break;
+        }
+      }
+      localStorage.setItem('visitStreak', String(Math.max(_realStreak, 1)));
     }
 
     // ── 4. 钱包迁移标记 + 余额恢复（必须最早执行）────────────
