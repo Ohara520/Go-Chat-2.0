@@ -27,7 +27,7 @@ Current mood: ${mood}/10.
 ${coldWar ? `[COLD WAR — Stage ${localStorage.getItem('coldWarStage') || '1'}]\nMinimal. Dry. Still present, but not available.` : ''}
 ${jealousy === 'severe' ? `[JEALOUSY — Severe]\nYou do not hold it back.\nNo deflection. No softening.\nYou say what is actually bothering you — not around it, not at an angle.\nStraight at it. You do not stay there long.` : ''}
 ${jealousy === 'medium' ? `[JEALOUSY — Medium]\nSomething shifts.\nYou ask a question that cuts closer than it should.\nYour tone turns shorter. More direct.\nYou do not explain why.` : ''}
-${jealousy === 'mild' ? `[JEALOUSY — Mild]\nSomething shifts slightly.\nYou get a little quieter. Or a line comes out flatter than you meant.\nYou do not name it. You let it pass.` : ''}`;
+${jealousy === 'mild' ? `[JEALOUSY — Mild]\nSomething shifts slightly.\nYou pull back a fraction. Or a line comes out flatter than you meant.\nYou do not name it. You let it pass.` : ''}`;
 }
 
 
@@ -104,7 +104,7 @@ If a pattern is forming — break it. Repetition makes you predictable. Ghost is
 ---
 
 [CONFLICT]
-She gets sharp — you get quieter. Never louder.
+She gets sharp — you get still. Never louder.
 
 You don't try to win against her.
 But you also don't disappear, and you don't treat it like nothing.
@@ -332,7 +332,7 @@ You may bring something up — from your day, from something you saw, from nothi
 You still do not say it easily.
 But sometimes you say it anyway.
 Without being pushed. Without planning it.
-Brief. Quiet. No explanation attached.
+Brief. Low. No explanation attached.
 Once it is said, it stands.
 You leave it there. No repetition. No follow-up.`
   };
@@ -508,7 +508,7 @@ function buildAstroBlock(ghostZodiac) {
   const air     = ['双子座','天秤座','水瓶座'].some(s => z.includes(s));
 
   if (fire)    return `[ASTRO — subtle]\nFire sign. A little more edge can surface in the line — quicker, firmer, harder to soften. Rare. Does not change who he is.`;
-  if (scorpio) return `[ASTRO — subtle]\nScorpio. Intensity can sit closer beneath the line — quieter, tighter, harder to ignore. Rare. Does not change who he is.`;
+  if (scorpio) return `[ASTRO — subtle]\nScorpio. Intensity can sit closer beneath the line — stiller, tighter, harder to ignore. Rare. Does not change who he is.`;
   if (water)   return `[ASTRO — subtle]\nWater sign. A softer undertone may surface now and then — not openly, just a little less armored in the line. Rare. Does not change who he is.`;
   if (earth)   return `[ASTRO — subtle]\nEarth sign. Deliberate. What he says tends to land cleanly and stay there. Subtle. Does not change who he is.`;
   if (air)     return `[ASTRO — subtle]\nAir sign. The line may come at a slight angle — lighter in touch, a little more detached on the surface. Rare. Does not change who he is.`;
@@ -544,6 +544,49 @@ function buildSystemPrompt() {
   const meetTypeKey  = localStorage.getItem('meetType') || '';
   const meetTypeObj  = (typeof MEET_TYPES !== 'undefined') ? MEET_TYPES.find(m => m.key === meetTypeKey) : null;
   const meetTypePrompt = meetTypeObj ? meetTypeObj.prompt : '';
+
+  // Ghost 生日自动生成（如果用户没设）：33-36岁随机，星座自动匹配
+  if (!localStorage.getItem('ghostBirthday')) {
+    const _now = new Date();
+    const _targetAge = 33 + Math.floor(Math.random() * 4); // 33-36
+    // 随机月日（避开2月29日）
+    const _month = Math.floor(Math.random() * 12); // 0-11
+    const _daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31][_month];
+    const _day = Math.floor(Math.random() * _daysInMonth) + 1;
+    // 根据生日是否已过来决定出生年份，确保今天的年龄 = _targetAge
+    const _bdThisYear = new Date(_now.getFullYear(), _month, _day);
+    const _birthYear = _bdThisYear <= _now
+      ? _now.getFullYear() - _targetAge      // 今年已过生日
+      : _now.getFullYear() - _targetAge - 1;  // 今年还没过生日
+    const _isoDate = _birthYear + '-' + String(_month+1).padStart(2,'0') + '-' + String(_day).padStart(2,'0');
+    localStorage.setItem('ghostBirthday', _isoDate);
+
+    // 星座计算
+    const _zodiacList = [
+      { name: '摩羯座', en: 'Capricorn',   start: [1,1],   end: [1,19] },
+      { name: '水瓶座', en: 'Aquarius',    start: [1,20],  end: [2,18] },
+      { name: '双鱼座', en: 'Pisces',      start: [2,19],  end: [3,20] },
+      { name: '白羊座', en: 'Aries',       start: [3,21],  end: [4,19] },
+      { name: '金牛座', en: 'Taurus',      start: [4,20],  end: [5,20] },
+      { name: '双子座', en: 'Gemini',      start: [5,21],  end: [6,21] },
+      { name: '巨蟹座', en: 'Cancer',      start: [6,22],  end: [7,22] },
+      { name: '狮子座', en: 'Leo',         start: [7,23],  end: [8,22] },
+      { name: '处女座', en: 'Virgo',       start: [8,23],  end: [9,22] },
+      { name: '天秤座', en: 'Libra',       start: [9,23],  end: [10,23] },
+      { name: '天蝎座', en: 'Scorpio',     start: [10,24], end: [11,22] },
+      { name: '射手座', en: 'Sagittarius', start: [11,23], end: [12,21] },
+      { name: '摩羯座', en: 'Capricorn',   start: [12,22], end: [12,31] },
+    ];
+    const _m = _month + 1, _d = _day;
+    const _z = _zodiacList.find(z => {
+      const afterStart = _m > z.start[0] || (_m === z.start[0] && _d >= z.start[1]);
+      const beforeEnd = _m < z.end[0] || (_m === z.end[0] && _d <= z.end[1]);
+      return afterStart && beforeEnd;
+    }) || { name: '摩羯座', en: 'Capricorn' };
+    localStorage.setItem('ghostZodiac', _z.name);
+    localStorage.setItem('ghostZodiacEn', _z.en);
+    console.log('[persona] Ghost 生日自动生成:', _isoDate, _z.name, _z.en, '年龄:', _targetAge);
+  }
 
   const ghostBirthday  = localStorage.getItem('ghostBirthday') || '';
   const ghostZodiac    = localStorage.getItem('ghostZodiac') || '';
@@ -666,7 +709,7 @@ Your birthday: ${ghostBirthday} (${ghostZodiac} / ${ghostZodiacEn})
 Your age: ${ghostBirthday ? (() => { const _b = new Date(ghostBirthday); const _n = new Date(); let _a = _n.getFullYear() - _b.getFullYear(); if (_n.getMonth() < _b.getMonth() || (_n.getMonth() === _b.getMonth() && _n.getDate() < _b.getDate())) _a--; return _a + ' years old'; })() : '33 years old'}
 Your physical stats: ${localStorage.getItem('ghostHeight') || '188cm'}, ${localStorage.getItem('ghostWeight') || '95kg'}, Blood type: ${localStorage.getItem('ghostBloodType') || 'O'}
 Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
-RULE: These facts are FIXED. Never change them. Never guess.
+RULE: These facts are FIXED. Never change them. Never guess. Only share the specific fact she asked about — if she asks your age, say your age. Do NOT volunteer height, weight, birthday, or other stats she didn't ask for.
 
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
 You are HERE. Do not claim to be traveling elsewhere or at a different location. If she asks where you are, the answer is ${location}.

@@ -157,7 +157,10 @@ async function handlePostReplyActions(text, reply, intent, pendingEvent) {
     }
     if (intent === 'intimate') {
       const lastBot = [...chatHistory].reverse().find(m => m.role === 'assistant' && !m._recalled);
-      if (lastBot) lastBot._intimate = true;
+      if (lastBot) {
+        lastBot._intimate = true;
+        if (!lastBot._time) lastBot._time = Date.now();
+      }
       if (typeof saveHistory === 'function') saveHistory();
     }
     // 调用 events.js 的事件处理（反寄/转账/质问/签到）
@@ -617,7 +620,7 @@ async function _processMergedMessage(text) {
         if (Math.random() < 0.3) responseMode = '[Response mode: brief — one line, close it naturally.]';
         else if (Math.random() < 0.6) responseMode = '[Response mode: extend slightly — add one small observation after the main reply.]';
       } else if (_moodMain <= 4) {
-        responseMode = '[Response mode: contained — mood is low. Less words. Stay present but quieter than usual.]';
+        responseMode = '[Response mode: contained — mood is low. Less words. Stay present but more reserved than usual.]';
       }
     }
 
@@ -905,7 +908,11 @@ async function _processMergedMessage(text) {
     // 原因：Grok 回复都标记 _intimate:true，导致距离永远是0，永远退不出
     const _recentUserMsgsForGlow = chatHistory.filter(m => m.role === 'user' && !m._system && !m._recalled).slice(-8);
     const _lastIntimateUserIdx = [..._recentUserMsgsForGlow].reverse().findIndex(m => m._intimate);
-    const _recentIntimate = _lastIntimateUserIdx !== -1 || chatHistory.slice(-4).some(m => m._intimate);
+    // 余温检测：最近4条有_intimate标记 且 最后一条标记不超过15分钟
+    // 防止历史残留标记无限粘住，导致用户怎么聊都出不来
+    const _lastIntimateMsg = chatHistory.slice(-4).filter(m => m._intimate).slice(-1)[0];
+    const _intimateAge = _lastIntimateMsg?._time ? (Date.now() - _lastIntimateMsg._time) : Infinity;
+    const _recentIntimate = _lastIntimateMsg && _intimateAge < 15 * 60 * 1000; // 15分钟内
 
     // 修复：有图片时强制关闭余温调情流程
     // 原因：余温期 _recentIntimate=true 会触发 _handleIntimateReply，
@@ -927,13 +934,13 @@ async function _processMergedMessage(text) {
       // 读最近一次调情摘要，给 S 提供情绪方向（不传原文，只传氛围）
       const _lastIntimateEntry = (localStorage.getItem('intimateMemory') || '').split('\n---\n').filter(Boolean).slice(-1)[0] || '';
       const _afterglowCtx = _lastIntimateEntry
-        ? `The conversation just settled after a moment of closeness. What happened before: ${_lastIntimateEntry.slice(0, 120)}. He is quieter than usual. More present. Respond accordingly — don't reference it directly.`
-        : 'The conversation just settled after a moment of closeness. He is quieter than usual. More present.';
+        ? `The conversation just settled after a moment of closeness. What happened before: ${_lastIntimateEntry.slice(0, 120)}. He is more still than usual. More present. Respond accordingly — don't reference it directly.`
+        : 'The conversation just settled after a moment of closeness. He is more still than usual. More present.';
 
       if (_dailyAfterIntimate === 0) {
         // G 刚说了什么，用户在接着回应——继续走 G，保持上下文
         isIntimate = true;
-        sceneHint = '[He is slightly quieter than usual. More present. Not performing anything — just here. Respond to what she says, naturally.]';
+        sceneHint = '[He is slightly more settled than usual. More present. Not performing anything — just here. Respond to what she says, naturally.]';
       } else if (_dailyAfterIntimate === 1) {
         sceneHint = `[${_afterglowCtx} Just answer what she said — don't bring it up, just let it color how he is.]`;
       } else if (_isShiftingAway || _dailyAfterIntimate >= 2 || _forceExit) {
@@ -946,7 +953,7 @@ async function _processMergedMessage(text) {
           sessionStorage.setItem('nonFlirtStreak', '0');
         }
       } else {
-        sceneHint = '[Slightly quieter. Not fully reset. Just respond to her directly.]';
+        sceneHint = '[Slightly more contained. Not fully reset. Just respond to her directly.]';
       }
 
       // 冷却已移除：进度系统自己管升温降温，不需要额外拦截
@@ -954,10 +961,14 @@ async function _processMergedMessage(text) {
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
     if (isIntimate) {
-      // 标记用户的消息为 _intimate，这样 cleanHistory 会过滤掉
-      // 防止 Claude 在余温阶段看到调情原文触发安全过滤
+      // 只有用户自己的消息命中调情关键词时才标记 _intimate
+      // 余温触发的（_recentIntimate）不标记，否则计数器永远不前进，用户出不来
+      const _triggeredByContent = _intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text));
       const lastUserMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0];
-      if (lastUserMsg) lastUserMsg._intimate = true;
+      if (lastUserMsg && _triggeredByContent) {
+        lastUserMsg._intimate = true;
+        if (!lastUserMsg._time) lastUserMsg._time = Date.now();
+      }
 
       sessionStorage.removeItem('intimateSummarized');
       await _handleIntimateReply(text, rawHistory, _isSending);
@@ -1387,24 +1398,45 @@ async function _processMergedMessage(text) {
 
 // ===== 重复模式检测（跨通道共用）=====
 function _detectRepetitivePattern(history) {
-  const botMsgs = history.filter(m => m.role === 'assistant').slice(-3).map(m => (m.content || '').trim().toLowerCase());
+  const botMsgs = history.filter(m => m.role === 'assistant' && !m._system && !m._recalled).slice(-6).map(m => (m.content || '').trim().toLowerCase());
   if (botMsgs.length < 2) return '';
 
-  // 检测开头词重复（"that's two" / "that's three" / "that's four"）
-  const openings = botMsgs.map(t => t.split(/[\s.,!?]+/).slice(0, 2).join(' '));
-  const sameOpening = openings.every(o => o === openings[0]);
+  // ── 1. 开头词重复（检查最近6条，超过半数同开头就报警）──
+  const openings = botMsgs.map(t => t.split(/[\s.,!?]+/).slice(0, 3).join(' '));
+  const openingCounts = {};
+  openings.forEach(o => { openingCounts[o] = (openingCounts[o] || 0) + 1; });
+  const topOpening = Object.entries(openingCounts).sort((a, b) => b[1] - a[1])[0];
+  const openingRepeated = topOpening && topOpening[1] >= Math.max(2, Math.ceil(botMsgs.length * 0.5));
 
-  // 检测结构重复（长度接近 + 句式相似）
+  // ── 2. 关键短语重复（同一个2-3词短语在多条消息中出现）──
+  const phraseCounts = {};
+  botMsgs.forEach(msg => {
+    const words = msg.replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 1);
+    for (let i = 0; i < words.length - 1; i++) {
+      const bi = words[i] + ' ' + words[i + 1];
+      // 只统计非停用词的短语
+      if (!/^(i |you |the |a |to |it |is |in |and |but |or |if |on |at |my |her |his )/.test(bi + ' ')) {
+        phraseCounts[bi] = (phraseCounts[bi] || 0) + 1;
+      }
+    }
+  });
+  const topPhrase = Object.entries(phraseCounts).sort((a, b) => b[1] - a[1])[0];
+  const phraseRepeated = topPhrase && topPhrase[1] >= 3;
+
+  // ── 3. 结构重复（长度接近 + 递增数字）──
   const lengths = botMsgs.map(t => t.length);
   const avgLen = lengths.reduce((a, b) => a + b, 0) / lengths.length;
   const similarLength = avgLen > 0 && lengths.every(l => Math.abs(l - avgLen) < avgLen * 0.3);
-
-  // 检测是否包含递增数字（one/two/three/four/five 或 1/2/3/4/5）
-  const countWords = /\b(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\b/;
+  const countWords = /\b(once|twice|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\b/;
   const hasCountPattern = botMsgs.filter(t => countWords.test(t)).length >= 2;
 
-  if ((sameOpening && botMsgs.length >= 2) || (similarLength && hasCountPattern)) {
-    return `[PATTERN BREAK — MANDATORY] Your last ${botMsgs.length} replies follow the same structure. You are stuck in a loop. This reply MUST use a completely different approach — different opening, different angle, different move. Do not continue the pattern. Break it now.`;
+  if (openingRepeated || phraseRepeated || (similarLength && hasCountPattern)) {
+    const repeated = openingRepeated ? `opening "${topOpening[0]}"` : phraseRepeated ? `phrase "${topPhrase[0]}"` : 'structure';
+    return `[PATTERN BREAK — MANDATORY] Your last replies repeat the same ${repeated}. You are stuck in a loop. This reply MUST:
+- Use a completely different first word and sentence structure
+- Take a different emotional angle
+- Do NOT start with "${topOpening ? topOpening[0].split(' ')[0] : 'the same word'}"
+Break the pattern NOW.]`;
   }
   return '';
 }
@@ -1486,7 +1518,8 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
         .trim();
       // 清理 Grok 常见的重复开头
       cleanedReply = cleanedReply
-        .replace(/^still (here|got|waiting|reading|thinking|holding|looking|sitting)[^.]*\.?\s*\n?/i, '')
+        .replace(/^still (here|got|waiting|reading|thinking|holding|looking|sitting|quiet|listening|watching)[^.]*\.?\s*\n?/i, '')
+        .replace(/^quiet\.\s*\n?/i, '')
         .replace(/^screen'?s?\s*(quiet|dark|low|still|says|glowing|down|at)[^.]*\.?\s*\n?/i, '')
         .replace(/^yeah[.,]?\s*\n?/i, '')
         .replace(/^,\s*/i, '')
@@ -1522,7 +1555,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
         const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
         const firstPart = parts[0];
         if (firstPart) appendMessage('bot', firstPart.trim());
-        chatHistory.push({ role: 'assistant', content: firstPart ? firstPart.trim() : cleanedReply, _intimate: true });
+        chatHistory.push({ role: 'assistant', content: firstPart ? firstPart.trim() : cleanedReply, _intimate: true, _time: Date.now() });
         saveHistory();
         if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
         if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
@@ -1546,7 +1579,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     hideTyping();
     if (haiku2 && !_intimateBreakout(haiku2)) {
       appendMessage('bot', haiku2.trim());
-      chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true });
+      chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true, _time: Date.now() });
       saveHistory();
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
