@@ -1410,13 +1410,24 @@ Break the pattern NOW.]`;
 async function _handleIntimateReply(text, rawHistory, isSendingRef) {
   try {
     // 图片消息替换为占位符传给Grok——Grok看不到图，用占位符保留上下文
-    // 这样余温期调情可以正常进行，不会因为Grok看不到图而破防说Kirk
-    const recentMsgs = rawHistory.slice(-8).map(m => {
+    // 关键：去除 Grok 自己的重复回复，防止它抄自己形成复读机循环
+    const _rawSlice = rawHistory.slice(-8);
+    const _seenOpenings = new Set();
+    const recentMsgs = _rawSlice.map(m => {
       const who = m.role === 'user' ? 'Her' : 'Ghost';
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
       if (hasPhoto) return `${who}: [sent a photo]`;
-      return `${who}: ${(m.content || '').slice(0, 150)}`;
-    }).join('\n');
+      const content = (m.content || '').slice(0, 150);
+      // Ghost 的回复：检查开头是否重复
+      if (m.role === 'assistant') {
+        const opening = content.toLowerCase().split(/[\s.,!?]+/).slice(0, 3).join(' ');
+        if (_seenOpenings.has(opening)) {
+          return null; // 跳过重复开头的回复，Grok 不看到就不会抄
+        }
+        _seenOpenings.add(opening);
+      }
+      return `${who}: ${content}`;
+    }).filter(Boolean).join('\n');
 
     const _loveStage = getLovePermission ? getLovePermission() : 1;
     const _marriageMode = localStorage.getItem('marriageType') || 'established';
