@@ -629,7 +629,7 @@ async function _processMergedMessage(text) {
       const _isRoutine = /早安|晚安|吃饭|睡觉|good morning|good night/.test(t);
       if (_isAffectionate) {
         const r = Math.random();
-        if (r < 0.5) responseMode = "[Response mode: his way — receive it, respond briefly. Dry but present.]";
+        if (r < 0.5) responseMode = "[Response mode: his way — receive it, let it land. Quiet but present.]";
         else if (r < 0.8) responseMode = "[Response mode: give it — respond directly. Keep it brief but real.]";
         else responseMode = "[Response mode: tease — push back lightly, but she should still feel it landed.]";
       } else if (_isHurting) {
