@@ -412,20 +412,31 @@ async function _processMergedMessage(text) {
   resetSilenceTimer();
 
   // ── pendingTransfer检测：用户回答了理由，继续处理转账 ──
-  const _pendingTransferRaw = sessionStorage.getItem('pendingTransfer');
+  const _pendingTransferRaw = sessionStorage.getItem('pendingTransfer') || localStorage.getItem('pendingTransfer');
   if (_pendingTransferRaw) {
     try {
       const _pt = JSON.parse(_pendingTransferRaw);
       if (_pt && _pt.amount && _pt.deducted) {
-        sessionStorage.removeItem('pendingTransfer');
-        // 用户这条消息作为理由，重新走判断收/退
-        if (typeof handlePendingTransfer === 'function') {
-          await handlePendingTransfer(_pt.amount, text);
-          return;
+        // 超过24小时的挂起转账自动退款
+        if (_pt.at && Date.now() - _pt.at > 24 * 3600 * 1000) {
+          sessionStorage.removeItem('pendingTransfer');
+          localStorage.removeItem('pendingTransfer');
+          if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（超时未确认）', amount: _pt.amount });
+          if (typeof renderWallet === 'function') renderWallet();
+          if (typeof showToast === 'function') showToast(`£${_pt.amount} 转账超时已退回`);
+        } else {
+          sessionStorage.removeItem('pendingTransfer');
+          localStorage.removeItem('pendingTransfer');
+          // 用户这条消息作为理由，重新走判断收/退
+          if (typeof handlePendingTransfer === 'function') {
+            await handlePendingTransfer(_pt.amount, text);
+            return;
+          }
         }
       }
     } catch(e) {
       sessionStorage.removeItem('pendingTransfer');
+      localStorage.removeItem('pendingTransfer');
     }
   }
 
@@ -820,7 +831,7 @@ async function _processMergedMessage(text) {
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
             'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
             'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
-            'flirt判断标准：凡是涉及对方身体、私人习惯、亲密感、身体能力、外貌、两人之间的张力，或者话里有暗示意味的，都算true。只有明确是普通日常闲聊才为false。不确定时宁可判true。\n特别注意1：涉及睡衣/浴巾/内衣/真空穿/穿对方衣物等服装场景，或者要求对方给穿搭打分/排行（哪怕用问卷形式），都算flirt=true。\n特别注意2：语境性的暗示也算——比如"你今天穿什么睡觉""好热不想穿衣服""你想我吗""你有没有想过我们在一起"，哪怕不直白，有亲密暗示就算true。',
+            'flirt判断标准：只有涉及对方身体、明确的性暗示、露骨的亲密动作才算true。普通日常闲聊、聊食物、聊天气、闲聊爱好、撒娇、表达想念、说babe/baby都是false。不确定时判false。\n特别注意1：涉及睡衣/浴巾/内衣/真空穿/穿对方衣物等服装场景算flirt=true。\n特别注意2：明确的身体接触暗示（亲/摸/咬/舔/抱紧不放）算true，但普通的"想你""抱抱"算false。',
             `用户说：${text}`,
             100
           ),
@@ -831,12 +842,8 @@ async function _processMergedMessage(text) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
             if (!_intimacyForceCleared) {
-              // 有调情上下文时宽松判断：继续走 G
-              const _hasRecentIntimateCtx = chatHistory.slice(-10).some(m => m._intimate);
-              // 明显日常话题：退出调情
-              const _dailyExit = /吃饭|睡觉|训练|任务|上班|下班|累了|饿了|天气|无聊|回来了|出门|到了|换个话题|不说了|算了|随便/i.test(text) ||
-                /ate|sleep|training|mission|work|tired|hungry|weather|boring|got home|heading out|change.*topic|never mind|forget it/i.test(text);
-              if (combinedResult.flirt === true || (_hasRecentIntimateCtx && !_dailyExit)) {
+              // 只信任 Haiku 的判断，不再用历史标记覆盖
+              if (combinedResult.flirt === true) {
                 isIntimate = true;
               }
             }

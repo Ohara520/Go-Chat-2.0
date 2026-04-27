@@ -637,6 +637,7 @@ async function confirmTransfer() {
   // 没有理由 → Ghost问一句，存pendingTransfer等用户回答
   if (!_hasContextReason) {
     sessionStorage.setItem('pendingTransfer', JSON.stringify({ amount, deducted: true }));
+    localStorage.setItem('pendingTransfer', JSON.stringify({ amount, deducted: true, at: Date.now() }));
 
     const _askLine = await (async () => {
       try {
