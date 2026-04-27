@@ -413,7 +413,12 @@ async function loadFromCloud() {
             return lk === key;
           })) merged.push(ct);
         });
-        merged.sort((a, b) => (b.time || b.date || '').localeCompare(a.time || a.date || ''));
+        merged.sort((a, b) => {
+          const ta = a.time || a.date || '';
+          const tb = b.time || b.date || '';
+          if (typeof ta === 'number' && typeof tb === 'number') return tb - ta;
+          return String(tb).localeCompare(String(ta));
+        });
         localStorage.setItem('transactions', JSON.stringify(merged.slice(0, 200)));
       }
 
@@ -450,7 +455,9 @@ async function loadFromCloud() {
         merged.sort((a, b) => {
           const ta = a.time || a.date || a.at || a.createdAt || '';
           const tb = b.time || b.date || b.at || b.createdAt || '';
-          return tb.localeCompare(ta);
+          // 兼容数字时间戳和字符串日期
+          if (typeof ta === 'number' && typeof tb === 'number') return tb - ta;
+          return String(tb).localeCompare(String(ta));
         });
         localStorage.setItem(key, JSON.stringify(merged.slice(0, maxLen)));
       };

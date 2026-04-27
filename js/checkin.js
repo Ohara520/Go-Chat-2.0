@@ -157,16 +157,51 @@ function applyCheckinBonusMessages(count) {
     }).then(r => r.json()).then(d => {
       if (d.ok && typeof _subCache !== 'undefined' && _subCache) {
         _subCache.remaining = d.remaining;
+        // 成功了，清掉待重试的 bonus
+        localStorage.removeItem('pendingCheckinBonus');
       } else {
         console.warn('[checkin] bonus API 返回异常:', d);
+        _savePendingBonus(email, count);
       }
     }).catch(e => {
       console.warn('[checkin] bonus API 调用失败:', e);
-      // API 失败但乐观更新已生效，用户当前 session 不受影响
+      _savePendingBonus(email, count);
     });
   } else {
     applyLocalBonusMessages(count);
   }
+}
+
+// 存储失败的 bonus，下次启动重试
+function _savePendingBonus(email, count) {
+  const existing = parseInt(localStorage.getItem('pendingCheckinBonus') || '0');
+  localStorage.setItem('pendingCheckinBonus', String(existing + count));
+  localStorage.setItem('pendingCheckinBonusEmail', email);
+}
+
+// 启动时重试未同步的 bonus
+function retryPendingCheckinBonus() {
+  const pending = parseInt(localStorage.getItem('pendingCheckinBonus') || '0');
+  const email = localStorage.getItem('pendingCheckinBonusEmail') || '';
+  if (!pending || !email) return;
+
+  fetch('/api/checkin-bonus', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, bonus: pending })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      localStorage.removeItem('pendingCheckinBonus');
+      localStorage.removeItem('pendingCheckinBonusEmail');
+      if (typeof _subCache !== 'undefined' && _subCache) _subCache.remaining = d.remaining;
+      console.log('[checkin] 补发 bonus 成功:', pending);
+    }
+  }).catch(() => {});
+}
+
+// 页面加载时自动重试
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(retryPendingCheckinBonus, 3000));
 }
 
 
