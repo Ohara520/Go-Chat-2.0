@@ -544,17 +544,19 @@ function renderMarket(categoryId) {
   const isFromHome = categoryId === 'fromhome';
   let products = MARKET_PRODUCTS[categoryId] || [];
   if (isFromHome) {
-    const seasonal = getSeasonalFromHome();
-    products = [...products, ...seasonal];
+    try { const seasonal = getSeasonalFromHome(); products = [...products, ...seasonal]; } catch(e) {}
   }
   const gridEl = document.getElementById('productsGrid');
   if (!gridEl) return;
+
+  try {
   const isWishlist = categoryId === 'wishlist';
   const isLuxury = categoryId === 'luxury';
   const isHome = categoryId === 'home';
   const purchased = _safeGet('purchasedItems', []);
   const purchaseCounts = _safeGet('purchaseCounts', {});
-  const weeklySale = isLuxury ? getWeeklySale() : null;
+  let weeklySale = null;
+  try { weeklySale = isLuxury ? getWeeklySale() : null; } catch(e) { console.warn('[shop] getWeeklySale失败:', e); }
 
   gridEl.innerHTML = products.map((p, i) => {
     try {
@@ -630,6 +632,16 @@ function renderMarket(categoryId) {
       </div>`;
     } catch(e) { console.warn('[shop] 商品渲染失败:', e, p?.name); return ''; }
   }).join('');
+
+  } catch(outerErr) {
+    console.error('[shop] 商城渲染崩溃:', outerErr);
+    gridEl.innerHTML = `<div style="padding:48px 24px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">🛠️</div>
+      <div style="font-size:14px;color:#a07020;margin-bottom:8px;">商城加载失败</div>
+      <div style="font-size:12px;color:#c0b090;">请刷新页面重试</div>
+      <button onclick="renderMarket('${categoryId}')" style="margin-top:12px;padding:8px 20px;border-radius:12px;border:1px solid #c0b090;background:transparent;color:#a07020;cursor:pointer;">重试</button>
+    </div>`;
+  }
 }
 
 function openBuyModal(idx) {
