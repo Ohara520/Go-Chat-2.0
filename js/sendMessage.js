@@ -628,19 +628,25 @@ async function _processMergedMessage(text) {
       const _isHurting = /难过|伤心|哭|委屈|hurt|sad|crying|upset/.test(t);
       const _isRoutine = /早安|晚安|吃饭|睡觉|good morning|good night/.test(t);
       if (_isAffectionate) {
+        // 她朝你靠 — 接住她，不是推开她
         const r = Math.random();
-        if (r < 0.5) responseMode = "[Response mode: his way — receive it, let it land. Quiet but present.]";
-        else if (r < 0.8) responseMode = "[Response mode: give it — respond directly. Keep it brief but real.]";
-        else responseMode = "[Response mode: tease — push back lightly, but she should still feel it landed.]";
+        if (r < 0.45) responseMode = "[Response mode: receive it, let it land. Quiet but present — she should feel you stayed.]";
+        else if (r < 0.80) responseMode = "[Response mode: meet her where she is. Restrained, but the warmth comes through. Don't make her work for it.]";
+        else responseMode = "[Response mode: push back lightly — but she should feel it landed harder than it pushed.]";
       } else if (_isHurting) {
+        // 在场比说话重要 — 但要让她知道你读到了
         responseMode = Math.random() < 0.5
-          ? "[Response mode: direct — show up plainly. One or two lines.]"
-          : "[Response mode: contained — say something small but real. Let the weight of one line do the work.]";
+          ? "[Response mode: show up plainly. One steady line is worth more than a string of qualified ones. Don't perform comfort.]"
+          : "[Response mode: stay with her. Pick up something specific from what she said — show you read it, not just heard it.]";
       } else if (_isRoutine) {
-        if (Math.random() < 0.3) responseMode = '[Response mode: brief — one line, close it naturally.]';
-        else if (Math.random() < 0.6) responseMode = '[Response mode: extend slightly — add one small observation after the main reply.]';
+        // 早晚安/吃饭 — 这是注意到她的窗口，不是收尾的窗口
+        const r = Math.random();
+        if (r < 0.55) responseMode = '[Response mode: notice one thing — what time it is on her side, what she might be doing, something specific. Attentive without announcing it.]';
+        else if (r < 0.85) responseMode = '[Response mode: meet it in kind. You are awake too / eating too / it is late your side too. Small, real, not flagged.]';
+        // 15% 留空 — 让 buildPacingBlock 自然控制
       } else if (_moodMain <= 4) {
-        responseMode = '[Response mode: contained — mood is low. Less words. Stay present but more reserved than usual.]';
+        // 他自己心情低 — 收着但不疏远
+        responseMode = '[Response mode: contained — mood is low. Stay present, but more reserved than usual. Do not fake warmth, but do not pull back either.]';
       }
     }
 
