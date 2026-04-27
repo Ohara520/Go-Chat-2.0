@@ -1061,9 +1061,17 @@ function getGhostCard() {
       saved.balance = Math.min((saved.balance || 0) + newLimit, newLimit * 3);
     }
 
-    // 月内锁定上限：只升不降，但冷战 / moneyEase=0 等硬关闭状态仍然生效
+    // 月内锁定上限：只升不降（防心情波动），但职业切换时重算
+    const _currentCareer = typeof getCareer === 'function' ? getCareer() : '';
+    const _savedCareer = saved._careerType || '';
+    if (_currentCareer !== _savedCareer) {
+      // 职业变了，重新算上限
+      saved.monthlyLimit = monthlyLimit;
+      saved._careerType = _currentCareer;
+    }
     const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit);
     saved.monthlyLimit = lockedLimit;
+    saved._careerType = _currentCareer;
 
     // 保证余额不低于本月剩余应得额度
     // 兼容旧版按天补发数据、云端同步覆盖等各种情况

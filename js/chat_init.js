@@ -36,7 +36,14 @@ async function onSilenceTimeout() {
     return;
   }
 
-  // 触发一次 Ghost 主动 check_in（触发后不自动重置，等用户下次发消息才重置）
+  // 触发一次 Ghost 主动 check_in
+  // 但如果最后2条都是 Ghost 的（自言自语），不要继续
+  const _recentRealMsgs = (typeof chatHistory !== 'undefined' ? chatHistory : [])
+    .filter(m => !m._system && !m._recalled).slice(-2);
+  if (_recentRealMsgs.length >= 2 && _recentRealMsgs.every(m => m.role === 'assistant')) {
+    _silenceTimer = setTimeout(onSilenceTimeout, 40 * 60 * 1000);
+    return;
+  }
   try {
     await emitGhostEvent('check_in');
   } catch(e) {}
@@ -82,6 +89,12 @@ async function maybeProactiveMessage() {
   // 最近5分钟有消息，不打扰
   const lastMsg = chatHistory.filter(m => m.role === 'assistant').slice(-1)[0];
   if (lastMsg && lastMsg._time && Date.now() - lastMsg._time < 5 * 60 * 1000) {
+    scheduleProactiveMessage(); return;
+  }
+
+  // Ghost 连续发了2条以上没有用户回复 → 不要继续自言自语
+  const _recentRealMsgs = chatHistory.filter(m => !m._system && !m._recalled).slice(-2);
+  if (_recentRealMsgs.length >= 2 && _recentRealMsgs.every(m => m.role === 'assistant')) {
     scheduleProactiveMessage(); return;
   }
 
@@ -455,6 +468,11 @@ function refreshChatScreen() {
   // 刷新状态UI
   if (typeof updateUKTime === 'function') updateUKTime();
   if (typeof refreshStatusEmoji === 'function') refreshStatusEmoji();
+
+  // 检查是否有未触发的外卖/快递反应（用户从外卖页切回聊天时触发）
+  setTimeout(() => {
+    if (typeof checkPendingTakeoutReactions === 'function') checkPendingTakeoutReactions();
+  }, 500);
 }
 
 // ===== iOS 键盘处理 =====

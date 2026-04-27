@@ -1033,13 +1033,14 @@ const STORY_EVENTS = [
     desc: '那是他第一次没有退回你的东西。',
     triggerOn: 'message',
     condition: (ctx) => {
-      const accepted = localStorage.getItem('firstUserGiftAccepted') === 'true';
-      return accepted && !ctx.triggered('first_accept_gift');
+      // 新触发条件：用户给 Ghost 寄过东西且已签收（替代旧转账系统）
+      const deliveries = ctx.deliveries || JSON.parse(localStorage.getItem('deliveries') || '[]');
+      const hasReceivedGift = deliveries.some(d => !d.isGhostSend && d.done);
+      return hasReceivedGift && !ctx.triggered('first_accept_gift');
     },
     execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她给你转了钱或送了东西，这次你没退。用你的方式回应——不用解释为什么收了，就是收了，然后继续。]`, 4);
+      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她给你寄了东西，你收了。用你的方式回应——不用解释为什么收了，就是收了，然后继续。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
-      localStorage.removeItem('firstUserGiftAccepted');
     }
   },
 

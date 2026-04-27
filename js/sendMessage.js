@@ -465,8 +465,9 @@ async function _processMergedMessage(text) {
 
       const _comebackPrompt = `[She has been away for ${_timeDesc}. She just came back and sent a message. Ghost noticed the absence. ${_styleGuide} Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay in Ghost's voice — dry, real, lowercase.]`;
 
-      // 存储 comeback 意图，等主回复结束后再触发（修复竞态）
-      sessionStorage.setItem('pendingComebackPrompt', _comebackPrompt);
+      // 融入主回复的 sceneHint，不单独发第二条消息
+      // 这样 Ghost 一条回复里既回应用户说的话，又自然带出"注意到她回来了"
+      sessionStorage.setItem('pendingComebackHint', _comebackPrompt);
     }
   }
 
@@ -578,6 +579,14 @@ async function _processMergedMessage(text) {
     // 场景提示
     const t = text.toLowerCase();
     let sceneHint = '';
+
+    // ── 用户回来检测：融入主回复，不单独发第二条 ──
+    const _comebackHint = sessionStorage.getItem('pendingComebackHint');
+    if (_comebackHint) {
+      sessionStorage.removeItem('pendingComebackHint');
+      sceneHint = _comebackHint;
+      // sceneHint 后面可能被覆盖，但 comeback 优先级高，加到前面
+    }
 
     // 外卖场景：用户问到外卖/吃饭 且 longTermMemory 有外卖记录 → 带英文菜名提醒 Ghost 确认
     const _ltmNow = localStorage.getItem('longTermMemory') || '';
@@ -1335,28 +1344,6 @@ async function _processMergedMessage(text) {
     _isSending = false;
     if (_currentAbortController) {
       _currentAbortController = null;
-    }
-    // BUG-2 FIX: comeback 回复在主回复完成后才触发，避免竞态
-    const _pendingComeback = sessionStorage.getItem('pendingComebackPrompt');
-    if (_pendingComeback) {
-      sessionStorage.removeItem('pendingComebackPrompt');
-      setTimeout(async () => {
-        if (_isSending) return;
-        showTyping();
-        try {
-          const r = await callHaiku(
-            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()),
-            [...chatHistory.filter(m => !m._system).slice(-6), { role: 'user', content: _pendingComeback }],
-            80
-          );
-          hideTyping();
-          if (r && !isBreakout(r) && r.length < 120) {
-            appendMessage('bot', r);
-            chatHistory.push({ role: 'assistant', content: r });
-            saveHistory();
-          }
-        } catch(e) { hideTyping(); }
-      }, 2000);
     }
   }
 }

@@ -375,14 +375,21 @@ function _switchMenuTab(tab) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function _renderTrackingTab(body) {
-  const orders = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').filter(o => !o.done);
-  if (!orders.length) {
-    body.innerHTML = `<div style="padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:14px;">🛵</div><div style="font-size:14px;color:#a07020;">暂无配送中的外卖</div></div>`;
+  const allOrders = JSON.parse(localStorage.getItem('takeoutOrders') || '[]');
+  const active = allOrders.filter(o => !o.done);
+  const completed = allOrders.filter(o => o.done).slice(0, 5); // 最近5条已完成
+
+  if (!active.length && !completed.length) {
+    body.innerHTML = `<div style="padding:48px 24px;text-align:center;"><div style="font-size:40px;margin-bottom:14px;">🛵</div><div style="font-size:14px;color:#a07020;">暂无配送记录</div></div>`;
     return;
   }
 
-  const now = Date.now();
-  body.innerHTML = orders.map(order => {
+  let html = '';
+
+  // 配送中
+  if (active.length) {
+    const now = Date.now();
+    html += active.map(order => {
     const remaining = Math.max(0, Math.ceil((order.deliverAt - now) / 60000));
     const pct       = Math.min(100, Math.round(((now - order.orderedAt) / (order.deliverAt - order.orderedAt)) * 100));
     const step      = pct < 15 ? 0 : pct < 40 ? 1 : pct < 85 ? 2 : 3;
@@ -454,6 +461,31 @@ function _renderTrackingTab(body) {
       </div>
     </div>`;
   }).join('');
+  }
+
+  // 已送达（最近5条）
+  if (completed.length) {
+    html += `<div style="padding:12px 16px 4px;"><div style="font-size:12px;font-weight:700;color:#a07020;letter-spacing:1px;">已送达</div></div>`;
+    html += completed.map(order => {
+      const doneTime = order.doneAt ? new Date(order.doneAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }) : '';
+      const doneDate = order.doneAt ? new Date(order.doneAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
+      return `<div style="padding:6px 16px;">
+        <div style="background:#f8f5ee;border:1px solid #e8dfc0;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
+          <div style="font-size:24px;">${order.emoji}</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:600;color:#3a2000;">${order.name}</div>
+            <div style="font-size:10px;color:#a07020;margin-top:2px;">£${(order.price + (order.fee || 0)).toFixed(2)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:#5a9a46;font-weight:600;">✅ 已送达</div>
+            <div style="font-size:10px;color:#b0a080;margin-top:2px;">${doneDate} ${doneTime}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  body.innerHTML = html;
 }
 
 
