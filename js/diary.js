@@ -34,48 +34,49 @@ function hasYesterdayDiary() {
 
 // ===== 日记生成 =====
 
+let _diaryGenerating = false; // 防并发锁
+
 async function generateDiaryEntry() {
   if (hasYesterdayDiary()) return;
+  if (_diaryGenerating) return;
+  _diaryGenerating = true;
 
-  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
-  const locationReason = localStorage.getItem('currentLocationReason') || '';
-  const weather = localStorage.getItem('lastWeatherDisplay') || '';
-  const userName = localStorage.getItem('userName') || 'her';
+  try {
+    const location = localStorage.getItem('currentLocation') || 'Hereford Base';
+    const locationReason = localStorage.getItem('currentLocationReason') || '';
+    const weather = localStorage.getItem('lastWeatherDisplay') || '';
+    const userName = localStorage.getItem('userName') || 'her';
 
-  // 只抓最近8条，省 tokens
-  const recentChat = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-    .filter(m => !m._system && !m._recalled)
-    .slice(-8)
-    .map(m => {
-      const who = m.role === 'user' ? userName : 'Ghost';
-      return `${who}: ${(m.content || '').slice(0, 40)}`;
-    })
-    .join('\n');
+    // 用 longTermMemory（已总结过的记忆），不用原始聊天记录
+    // 原始记录问题：1.今天的聊天被写进昨天日记 2.Ghost的话被当成用户说的
+    const memory = localStorage.getItem('longTermMemory') || '';
+    const memoryHint = memory
+      ? `What you remember about recent days with ${userName}:\n${memory.slice(-300)}`
+      : '';
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayWeekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][yesterday.getDay()];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayWeekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][yesterday.getDay()];
 
-  const prompt = `You are Simon "Ghost" Riley writing in a worn notebook before bed. No one reads this.
+    const prompt = `You are Simon "Ghost" Riley writing in a worn notebook before bed. No one reads this.
 
 Location: ${location}${locationReason ? ` (${locationReason})` : ''}
 Weather: ${weather || 'unknown'}
 Day: ${yesterdayWeekday}
 
-${recentChat ? `Recent conversation with ${userName}:\n${recentChat}\n` : `Didn't talk to ${userName} yesterday.\n`}
+${memoryHint ? memoryHint + '\n' : `Didn't talk to ${userName} yesterday.\n`}
 
-Write yesterday's entry. Rules:
+Write yesterday's diary entry. Rules:
 - 3-4 lines. Short sentences. Lowercase.
 - Write like a soldier's notebook. No poetry. No metaphors.
-- Include 1-2 things that happened in your day — training, food, teammates, something you saw.
-- Pick at most one thing from the conversation that actually stuck with you. Not every detail. Only what mattered.
-- Weather only if it affected your day. Don't mention it just to fill space.
-- End with one honest thought — something private, something you'd never text her. Keep it blunt, not sentimental.
-- This should feel like something worth reading in secret. Not a grocery list, not a love poem.
-- DO NOT romanticize mundane things she said.
-- English only. No timestamps. No "dear diary".`;
+- Include 1-2 things from YOUR day — training, food, teammates, something you saw.
+- If something about ${userName} is in your memory, pick ONE thing that stuck. Not everything.
+- DO NOT invent conversations. DO NOT quote things she said unless it is clearly in the memory above. If unsure, do not write it.
+- DO NOT put your own words or thoughts in her mouth.
+- Weather only if it affected your day.
+- End with one honest thought — something private, blunt, not sentimental.
+- English only. No timestamps. No "dear diary". No action descriptions.`;
 
-  try {
     let entry = '';
     if (typeof callSonnetLight === 'function') {
       entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
@@ -84,7 +85,6 @@ Write yesterday's entry. Rules:
     }
 
     if (!entry || entry.length < 20) {
-      // 兜底：静态日记
       entry = _getFallbackEntry(location, weather);
     }
 
@@ -96,6 +96,8 @@ Write yesterday's entry. Rules:
       .trim();
 
     if (entry) {
+      // 再次检查防止并发写入
+      if (hasYesterdayDiary()) return;
       const entries = getDiaryEntries();
       entries.push({
         date: getYesterdayKey(),
@@ -107,6 +109,8 @@ Write yesterday's entry. Rules:
     }
   } catch(e) {
     console.warn('[diary] 生成失败:', e);
+  } finally {
+    _diaryGenerating = false;
   }
 }
 
