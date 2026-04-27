@@ -557,6 +557,7 @@ function renderMarket(categoryId) {
   const weeklySale = isLuxury ? getWeeklySale() : null;
 
   gridEl.innerHTML = products.map((p, i) => {
+    try {
     const isUnlocked = canUnlockProduct(p);  // 关系是否满足解锁条件
     const maxBuy = p.maxPurchase || 1;
     const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
@@ -564,7 +565,7 @@ function renderMarket(categoryId) {
     const onSale = weeklySale && weeklySale.name === p.name;
     let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
     if (!isLuxury) displayPrice = Math.round(displayPrice * 1.8);
-    const triggerReason = isUnlocked ? getProductTrigger(p.name) : null;
+    const triggerReason = isUnlocked && typeof getProductTrigger === 'function' ? getProductTrigger(p.name) : null;
     const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
     const discountPct = onSale ? Math.round((1 - weeklySale.discount) * 100) : 0;
     const discountLabel = discountPct >= 30 ? `${discountPct}% OFF · 限时${discountPct}折`
@@ -627,6 +628,7 @@ function renderMarket(categoryId) {
           : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''} ${isFromHome?'fromhome-buy-btn':''} ${isHome?'home-buy-btn':''}">${isWishlist?'💝 加入宝贝':isFromHome?'📦 寄给他':isHome?'🏡 购置':'🛒 购买'}${showCount ? ` (${buyCount}/${maxBuy})` : ''}</button>`
         }
       </div>`;
+    } catch(e) { console.warn('[shop] 商品渲染失败:', e, p?.name); return ''; }
   }).join('');
 }
 
