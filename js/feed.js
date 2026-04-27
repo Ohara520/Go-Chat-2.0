@@ -181,7 +181,10 @@ function checkFeedBadge() {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
-    saveToCloud(); // 切后台时尽力保存
+    // 聊天记录优先存（轻量，只写 chat_history 一列，快）
+    // Vivo/OPPO 等安卓机后台杀 WebView 很快，saveToCloud 来不及完成
+    if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow();
+    saveToCloud(); // 完整存档（慢，可能存不完，但聊天记录已经先存了）
   }
 });
 
@@ -405,11 +408,18 @@ function renderCoupleFeed(posts) {
   const GHOST_AVATAR_HTML = `<img src="${_ghostAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   const emojiMap = { Ghost: GHOST_AVATAR_HTML, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
   const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
+  const _ghostNickname = localStorage.getItem('botNickname') || '';
 
   posts.forEach((item, idx) => {
-    // 头像处理：优先用存储的avatar字段，IMG占位符替换成实际base64
+    // Ghost 帖子：永远用当前头像（不用存的旧头像）
+    const _isGhostPost = item.author === 'Ghost'
+      || item.nameClass === 'ghost'
+      || item.nameClass === 'couple-ghost-name'
+      || (_ghostNickname && item.author === _ghostNickname);
+
     const savedAvatar = localStorage.getItem('userAvatarBase64');
     const getAvatarHTML = (a) => {
+      if (_isGhostPost) return GHOST_AVATAR_HTML; // Ghost 永远用最新头像
       if (!a || a === '👤') return emojiMap[item.author] || '👤';
       if (a === 'IMG') return savedAvatar
         ? `<img src="${savedAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
@@ -417,7 +427,7 @@ function renderCoupleFeed(posts) {
       if (a.startsWith('<img')) return a;
       return a; // emoji
     };
-    const postAvatarHTML = item.avatar ? getAvatarHTML(item.avatar) : (emojiMap[item.author] || '👤');
+    const postAvatarHTML = _isGhostPost ? GHOST_AVATAR_HTML : (item.avatar ? getAvatarHTML(item.avatar) : (emojiMap[item.author] || '👤'));
     const commentsHTML = (item.comments || []).map((c, ci) => {
       const commentId = `comment_${idx}_${ci}`;
       const zhText = c.zh || '';
