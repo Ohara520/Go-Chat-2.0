@@ -141,17 +141,12 @@ function checkSalaryDay() {
 
   const salaryKey = 'salaryPaid_' + today.getFullYear() + '_' + (today.getMonth() + 1);
 
-  // 自动修复：key存在但本月没有工资交易记录，说明之前存了key但钱没到，清掉重来
-  if (localStorage.getItem(salaryKey)) {
-    const monthKey = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
-    const txList = JSON.parse(localStorage.getItem('transactions') || '[]');
-    const hasSalaryTx = txList.some(tx => tx.name === 'Ghost 月度工资' && tx.time && tx.time.startsWith(monthKey));
-    if (!hasSalaryTx) {
-      localStorage.removeItem(salaryKey);
-    } else {
-      return;
-    }
-  }
+  // 防重发：salaryKey 存在 OR 本月交易记录里有工资 → 已发过
+  const _txList = JSON.parse(localStorage.getItem('transactions') || '[]');
+  const _monthStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+  const _alreadyPaid = localStorage.getItem(salaryKey)
+    || _txList.some(tx => tx.name === 'Ghost 月度工资' && tx.time && tx.time.startsWith(_monthStr));
+  if (_alreadyPaid) return;
 
   // 根据本月出差天数浮动工资
   const _monthKey  = 'locDays_' + today.getFullYear() + '_' + (today.getMonth() + 1);
@@ -175,12 +170,14 @@ function checkSalaryDay() {
   localStorage.setItem('lastSalaryAmount', salary);
   localStorage.setItem('lastSalaryMonth', today.getFullYear() + '-' + (today.getMonth() + 1));
 
+  // 立刻标记已发，防止 initChat 多次调用导致重复发薪
+  localStorage.setItem(salaryKey, salary.toString());
+
   setTimeout(() => {
     // 直接入账，不走转账卡片
     if (typeof addTransaction === 'function') {
       addTransaction({ icon: '💷', name: 'Ghost 月度工资', amount: salary });
     }
-    localStorage.setItem(salaryKey, salary.toString());
     if (typeof renderWallet === 'function') renderWallet();
     if (typeof changeAffection === 'function') changeAffection(1);
     if (typeof setRelationshipFlag === 'function') setRelationshipFlag('firstSalary', true);

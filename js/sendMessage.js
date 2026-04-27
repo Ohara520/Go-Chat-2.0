@@ -903,69 +903,34 @@ async function _processMergedMessage(text) {
       }
     }
 
-    // ── 余温状态判断 ─────────────────────────────────────────
-    // 修复：只看用户消息的距离，不看 Grok 的回复
-    // 原因：Grok 回复都标记 _intimate:true，导致距离永远是0，永远退不出
-    const _recentUserMsgsForGlow = chatHistory.filter(m => m.role === 'user' && !m._system && !m._recalled).slice(-8);
-    const _lastIntimateUserIdx = [..._recentUserMsgsForGlow].reverse().findIndex(m => m._intimate);
-    // 余温检测：最近4条有_intimate标记 且 最后一条标记不超过15分钟
-    // 防止历史残留标记无限粘住，导致用户怎么聊都出不来
-    const _lastIntimateMsg = chatHistory.slice(-4).filter(m => m._intimate).slice(-1)[0];
-    const _intimateAge = _lastIntimateMsg?._time ? (Date.now() - _lastIntimateMsg._time) : Infinity;
-    const _recentIntimate = _lastIntimateMsg && _intimateAge < 15 * 60 * 1000; // 15分钟内
+    // ── 余温处理（只影响 Sonnet 的语气，不再把人拽回 Grok）─────
+    // 简化原则：这条消息是露骨的→走 Grok，不是→走 Sonnet，一条一条判断，不粘
+    if (!isIntimate) {
+      // 看看最近有没有调情过，如果有就给 Sonnet 一个氛围提示（但不改路由）
+      const _lastIntimateMsg = chatHistory.slice(-6).filter(m => m._intimate).slice(-1)[0];
+      const _intimateAge = _lastIntimateMsg?._time ? (Date.now() - _lastIntimateMsg._time) : Infinity;
+      const _hasRecentIntimate = _lastIntimateMsg && _intimateAge < 10 * 60 * 1000; // 10分钟内
 
-    // 修复：有图片时强制关闭余温调情流程
-    // 原因：余温期 _recentIntimate=true 会触发 _handleIntimateReply，
-    // 但 Grok 看不到图片，会破防说 Kirk
-    const _recentPhotoExists = chatHistory
-      .filter(m => m.role === 'user' && m._photoBase64 && !m._system)
-      .slice(-1)[0];
-    const _hasRecentPhoto = _recentPhotoExists &&
-      chatHistory.indexOf(_recentPhotoExists) >= chatHistory.length - 6;
-
-    if (!isIntimate && _recentIntimate && !_hasRecentPhoto) {
-      const _dailyAfterIntimate = _lastIntimateUserIdx === -1 ? 99 : _lastIntimateUserIdx;
-      const _dailyKws = /吃饭|睡觉|今天|训练|任务|怎么样|好了|行了|不说了|换个话题|算了|随便|工作|上班|下班|累了|饿了|喝水|天气|无聊|在干嘛|在哪|几点|时间|回来了|出门|到了|好冷|好热|what.*day|how.*day|ate|sleep|training|mission|anyway|work|tired|hungry|weather|boring|where are you|what time|got home|heading out/i;
-      const _isShiftingAway = _dailyKws.test(text) && _dailyAfterIntimate >= 1;
-
-      // 用户发了两条以上非调情消息，强制退出余温
-      const _forceExit = _dailyAfterIntimate >= 3;
-
-      // 读最近一次调情摘要，给 S 提供情绪方向（不传原文，只传氛围）
-      const _lastIntimateEntry = (localStorage.getItem('intimateMemory') || '').split('\n---\n').filter(Boolean).slice(-1)[0] || '';
-      const _afterglowCtx = _lastIntimateEntry
-        ? `The conversation just settled after a moment of closeness. What happened before: ${_lastIntimateEntry.slice(0, 120)}. He is more still than usual. More present. Respond accordingly — don't reference it directly.`
-        : 'The conversation just settled after a moment of closeness. He is more still than usual. More present.';
-
-      if (_dailyAfterIntimate === 0) {
-        // G 刚说了什么，用户在接着回应——继续走 G，保持上下文
-        isIntimate = true;
-        sceneHint = '[He is slightly more settled than usual. More present. Not performing anything — just here. Respond to what she says, naturally.]';
-      } else if (_dailyAfterIntimate === 1) {
-        sceneHint = `[${_afterglowCtx} Just answer what she said — don't bring it up, just let it color how he is.]`;
-      } else if (_isShiftingAway || _dailyAfterIntimate >= 2 || _forceExit) {
-        sceneHint = '[Back to normal. Dry, present, brief. Just answer what she said — nothing to carry forward.]';
+      if (_hasRecentIntimate) {
+        const _lastIntimateEntry = (localStorage.getItem('intimateMemory') || '').split('\n---\n').filter(Boolean).slice(-1)[0] || '';
+        if (_lastIntimateEntry) {
+          sceneHint = `[The conversation settled after a moment of closeness a few minutes ago. He is more present than usual. Just answer what she said naturally — don't bring it up.]`;
+        }
+        // 如果还没存摘要，存一下
         if (!sessionStorage.getItem('intimateSummarized')) {
           sessionStorage.setItem('intimateSummarized', '1');
           _summarizeIntimateMemory();
-          // 余温结束，同步重置调情进度，防止 G 被一句话拉回来
           sessionStorage.setItem('flirtProgress', '0');
           sessionStorage.setItem('nonFlirtStreak', '0');
         }
-      } else {
-        sceneHint = '[Slightly more contained. Not fully reset. Just respond to her directly.]';
       }
-
-      // 冷却已移除：进度系统自己管升温降温，不需要额外拦截
     }
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
     if (isIntimate) {
-      // 只有用户自己的消息命中调情关键词时才标记 _intimate
-      // 余温触发的（_recentIntimate）不标记，否则计数器永远不前进，用户出不来
-      const _triggeredByContent = _intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text));
+      // 只标记真正命中调情关键词的用户消息
       const lastUserMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0];
-      if (lastUserMsg && _triggeredByContent) {
+      if (lastUserMsg) {
         lastUserMsg._intimate = true;
         if (!lastUserMsg._time) lastUserMsg._time = Date.now();
       }
