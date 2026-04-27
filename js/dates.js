@@ -244,15 +244,21 @@ function recordGiftToShelf(delivery, ghostReaction) {
       if (!localStorage.getItem(flagKey)) {
         localStorage.setItem(flagKey, '1');
         if (typeof showToast === 'function') {
-          showToast('💑 约会已解锁！可以让 Simon 飞过来见你了～');
+          showToast('💑 约会已解锁！点主页"约会"卡片选个城市～');
         }
       }
     }
+    // 顺手刷新主页两张卡
+    if (typeof refreshShelfCardBadge === 'function') refreshShelfCardBadge();
+    if (typeof refreshDateCardBadge === 'function') refreshDateCardBadge();
   }, 600);
 
   // 如果当前在物品架页面，刷新
   if (document.getElementById('shelfScreen')?.classList.contains('active')) {
     renderGiftShelf();
+  }
+  if (document.getElementById('dateHubScreen')?.classList.contains('active')) {
+    renderDateHub();
   }
 }
 
@@ -341,47 +347,6 @@ function renderGiftShelf() {
   if (!body) return;
 
   const records = getGiftRecords().slice().reverse(); // 新的在上
-  const memories = getDateMemories().slice().reverse();
-  const st = getDateUnlockState();
-
-  // ── 头部：进度条 + 约会按钮 ──
-  const pct = Math.round(st.progress * 100);
-  const remaining = Math.max(0, st.threshold - st.giftsSince);
-  let unlockHTML;
-  if (st.isUnlocked) {
-    unlockHTML = `
-      <button class="shelf-date-btn" onclick="openDatePicker()">
-        💑 约 Simon 来见你
-      </button>
-      <div class="shelf-progress-hint">已解锁这次约会 · 完成后下次需 ${st.threshold + DATE_THRESHOLD_STEP} 件礼物</div>
-    `;
-  } else {
-    unlockHTML = `
-      <div class="shelf-progress-bar">
-        <div class="shelf-progress-fill" style="width:${pct}%"></div>
-      </div>
-      <div class="shelf-progress-hint">
-        ${st.giftsSince} / ${st.threshold} · 还差 <b>${remaining}</b> 件礼物，他就飞来见你
-      </div>
-    `;
-  }
-
-  // ── 记忆相册（横向滚动）──
-  let memoriesHTML = '';
-  if (memories.length > 0) {
-    memoriesHTML = `
-      <div class="shelf-section-title">📷 记忆相册</div>
-      <div class="shelf-memories-row">
-        ${memories.map(m => `
-          <div class="shelf-memory-card" style="background:${m.bg || 'linear-gradient(135deg,#888,#aaa)'};" onclick="openDateMemory('${m.id}')">
-            <div class="shelf-memory-emoji">${m.cityEmoji || '💑'}</div>
-            <div class="shelf-memory-city">${m.cityName}</div>
-            <div class="shelf-memory-date">${_formatShortDate(m.timestamp)}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  }
 
   // ── 礼物列表 ──
   let giftsHTML;
@@ -395,7 +360,6 @@ function renderGiftShelf() {
     `;
   } else {
     giftsHTML = `
-      <div class="shelf-section-title">🎁 你送过他 ${records.length} 件东西</div>
       <div class="shelf-gifts-list">
         ${records.map(g => `
           <div class="shelf-gift-card${g.isLuxury ? ' is-luxury' : ''}${g.isIntimate ? ' is-intimate' : ''}">
@@ -417,14 +381,109 @@ function renderGiftShelf() {
   body.innerHTML = `
     <div class="shelf-header-card">
       <div class="shelf-header-title">🏠 Ghost 的小屋</div>
-      <div class="shelf-header-sub">他收到的每件东西，都在这儿留着</div>
-      ${unlockHTML}
+      <div class="shelf-header-sub">${records.length > 0 ? `你送过他 ${records.length} 件东西，都在这儿留着` : '他收到的每件东西，都在这儿留着'}</div>
     </div>
-    ${memoriesHTML}
     ${giftsHTML}
   `;
 }
 window.renderGiftShelf = renderGiftShelf;
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ④.5 约会主页（独立板块）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function renderDateHub() {
+  const screen = document.getElementById('dateHubScreen');
+  if (!screen) return;
+  const body = screen.querySelector('.date-hub-body');
+  if (!body) return;
+
+  const memories = getDateMemories().slice().reverse();
+  const st = getDateUnlockState();
+  const pct = Math.round(st.progress * 100);
+  const remaining = Math.max(0, st.threshold - st.giftsSince);
+
+  // ── 进度卡片 ──
+  let progressHTML;
+  if (st.isUnlocked) {
+    progressHTML = `
+      <div class="date-hub-status-card unlocked">
+        <div class="date-hub-status-emoji">💑</div>
+        <div class="date-hub-status-title">他可以飞过来了</div>
+        <div class="date-hub-status-sub">机酒他自己定，你只管选个能让他心动的地方</div>
+        <button class="date-hub-go-btn" onclick="openDatePicker()">
+          选个城市 →
+        </button>
+        <div class="date-hub-status-foot">完成这次后，下次需要 ${st.threshold + DATE_THRESHOLD_STEP} 件礼物</div>
+      </div>
+    `;
+  } else {
+    progressHTML = `
+      <div class="date-hub-status-card locked">
+        <div class="date-hub-status-emoji">✈️</div>
+        <div class="date-hub-status-title">${st.completedCount === 0 ? '让他飞来中国看你' : '约下一次'}</div>
+        <div class="date-hub-status-sub">凑够 ${st.threshold} 件礼物，他就准假飞过来了</div>
+        <div class="date-hub-progress-bar">
+          <div class="date-hub-progress-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="date-hub-progress-num">
+          <b>${st.giftsSince}</b> <span>/ ${st.threshold}</span>
+          <span class="date-hub-progress-remain">还差 ${remaining} 件</span>
+        </div>
+        <button class="date-hub-go-btn locked-btn" disabled>
+          🔒 还没解锁
+        </button>
+      </div>
+    `;
+  }
+
+  // ── 记忆相册 ──
+  let memoriesHTML = '';
+  if (memories.length > 0) {
+    memoriesHTML = `
+      <div class="date-hub-section-title">📷 记忆相册 · ${memories.length} 次相聚</div>
+      <div class="date-hub-memories-grid">
+        ${memories.map(m => `
+          <div class="date-hub-memory-card" style="background:${m.bg || 'linear-gradient(135deg,#888,#aaa)'};" onclick="openDateMemory('${m.id}')">
+            <div class="date-hub-memory-emoji">${m.cityEmoji || '💑'}${m.restaurantEmoji || ''}</div>
+            <div class="date-hub-memory-info">
+              <div class="date-hub-memory-city">${m.cityName} · ${m.restaurantName || ''}</div>
+              <div class="date-hub-memory-date">${_formatShortDate(m.timestamp)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else {
+    memoriesHTML = `
+      <div class="date-hub-section-title">📷 记忆相册</div>
+      <div class="date-hub-memories-empty">
+        还没和他真正见过面 · 第一次约会会留在这里
+      </div>
+    `;
+  }
+
+  // ── 关于约会 ──
+  const aboutHTML = `
+    <div class="date-hub-about">
+      <div class="date-hub-about-title">关于约会</div>
+      <div class="date-hub-about-text">
+        送够礼物，Simon 会请假飞来中国看你。<br/>
+        你选城市、选餐厅，他买单的是机票和酒店。<br/>
+        他在你身边时，话不会多，但会留下来。<br/>
+        每一次见面都会存进相册，回去翻得到。
+      </div>
+    </div>
+  `;
+
+  body.innerHTML = `
+    ${progressHTML}
+    ${memoriesHTML}
+    ${aboutHTML}
+  `;
+}
+window.renderDateHub = renderDateHub;
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -745,9 +804,9 @@ function finalizeDateMemory() {
 
   if (typeof showToast === 'function') showToast('📷 已存进相册～');
   _activeDate = null;
-  // 跳回物品架
-  if (typeof openScreen === 'function') openScreen('shelfScreen');
-  setTimeout(renderGiftShelf, 50);
+  // 跳回约会主页
+  if (typeof openScreen === 'function') openScreen('dateHubScreen');
+  setTimeout(() => { if (typeof renderDateHub === 'function') renderDateHub(); }, 50);
 }
 window.finalizeDateMemory = finalizeDateMemory;
 
@@ -795,28 +854,44 @@ window.closeDateMemory = closeDateMemory;
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⑧ 主页卡片小红点（解锁后提示一次）
+// ⑧ 主页两张卡片状态刷新（物品架卡 + 约会卡）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function refreshShelfCardBadge() {
   const card = document.getElementById('shelfCard');
   if (!card) return;
-  const st = getDateUnlockState();
   const desc = card.querySelector('.card-desc');
   if (!desc) return;
   const total = getGiftRecords().length;
-  if (st.isUnlocked) {
-    desc.innerHTML = `💑 约会已解锁`;
-    card.classList.add('shelf-unlocked');
-  } else if (total > 0) {
-    desc.textContent = `${total} 件礼物 · 还差 ${st.threshold - st.giftsSince}`;
-    card.classList.remove('shelf-unlocked');
+  if (total > 0) {
+    desc.textContent = `${total} 件礼物在架上`;
   } else {
     desc.textContent = '送过他的东西';
-    card.classList.remove('shelf-unlocked');
   }
 }
 window.refreshShelfCardBadge = refreshShelfCardBadge;
+
+function refreshDateCardBadge() {
+  const card = document.getElementById('dateCard');
+  if (!card) return;
+  const desc = card.querySelector('.card-desc');
+  if (!desc) return;
+  const st = getDateUnlockState();
+  const memCount = getDateMemories().length;
+  if (st.isUnlocked) {
+    desc.innerHTML = '💞 他可以来了';
+    card.classList.add('date-card-unlocked');
+    card.classList.remove('date-card-locked');
+  } else if (memCount > 0) {
+    desc.textContent = `${memCount} 次相聚 · 还差 ${st.threshold - st.giftsSince}`;
+    card.classList.remove('date-card-unlocked', 'date-card-locked');
+  } else {
+    desc.textContent = `还差 ${st.threshold - st.giftsSince} 件礼物`;
+    card.classList.add('date-card-locked');
+    card.classList.remove('date-card-unlocked');
+  }
+}
+window.refreshDateCardBadge = refreshDateCardBadge;
 
 // 在 openScreen 钩子里刷新（若 app.js 有 hook）
 (function hookMainScreenRefresh() {
@@ -829,8 +904,12 @@ window.refreshShelfCardBadge = refreshShelfCardBadge;
   window.openScreen = function(id) {
     const result = _origOpen.apply(this, arguments);
     try {
-      if (id === 'mainScreen') refreshShelfCardBadge();
+      if (id === 'mainScreen') {
+        refreshShelfCardBadge();
+        refreshDateCardBadge();
+      }
       if (id === 'shelfScreen') renderGiftShelf();
+      if (id === 'dateHubScreen') renderDateHub();
     } catch(e) {}
     return result;
   };
