@@ -623,6 +623,13 @@
         <div class="card-title">外卖</div>
         <div class="card-desc" id="takeoutCardDesc">给Ghost点外卖</div>
       </div>
+      <div class="card shelf-card" id="shelfCard"
+           onclick="openScreen('shelfScreen');setTimeout(()=>{if(typeof renderGiftShelf==='function')renderGiftShelf();},80);"
+           style="background:linear-gradient(135deg,rgba(220,180,255,0.42),rgba(255,200,220,0.32)) !important;border:1px solid rgba(180,120,200,0.32) !important;">
+        <div class="card-icon">🏠</div>
+        <div class="card-title">他的小屋</div>
+        <div class="card-desc">送过他的东西</div>
+      </div>
     </div>
 
     <!-- QQ群弹窗 -->
@@ -1179,6 +1186,39 @@
     </div>
   </div>
 
+  <!-- ═══ 物品架页面 ═══ -->
+  <div class="screen" id="shelfScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <div class="screen-title">他的小屋</div>
+    </div>
+    <div class="shelf-body">
+      <!-- renderGiftShelf() 动态填充 -->
+    </div>
+  </div>
+
+  <!-- ═══ 约会城市/餐厅选择页面 ═══ -->
+  <div class="screen" id="datePickerScreen">
+    <div class="screen-header">
+      <button class="back-button chat-back-btn" onclick="openScreen('shelfScreen')">‹</button>
+      <div class="screen-title">约会</div>
+    </div>
+    <div class="date-picker-body" id="datePickerBody">
+      <!-- renderDateCityList / renderDateRestaurantList 动态填充 -->
+    </div>
+  </div>
+
+  <!-- ═══ 约会场景页面 ═══ -->
+  <div class="screen date-scene-screen" id="dateSceneScreen">
+    <div class="screen-header date-scene-header-bar">
+      <button class="back-button chat-back-btn date-scene-back" onclick="if(confirm('确定要中途离开？这次约会不会保存。'))openScreen('shelfScreen')">‹</button>
+      <div class="screen-title" style="color:#fff;text-shadow:0 1px 8px rgba(0,0,0,0.5);">在一起</div>
+    </div>
+    <div class="date-scene-body">
+      <!-- renderDateScene() 动态填充 -->
+    </div>
+  </div>
+
   <!-- 故事书页 -->
   <div class="screen" id="achievementScreen">
     <div class="screen-header">
@@ -1607,6 +1647,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/diary.js"></script>
 <script src="js/chat_init.js"></script>
 <script src="js/app.js"></script>
+<script src="js/dates.js"></script>
 
 <!-- ═══ 选角弹窗 ═══ -->
 <div id="charSelectOverlay" style="
@@ -1694,6 +1735,569 @@ document.addEventListener('DOMContentLoaded', () => {
 @keyframes slideUpModal {
   from { transform:translateX(-50%) translateY(100%); opacity:0; }
   to   { transform:translateX(-50%) translateY(0); opacity:1; }
+}
+</style>
+
+<style>
+/* ================================================== */
+/* 物品架 / 约会系统样式                                */
+/* ================================================== */
+
+/* —— 物品架页面 —— */
+#shelfScreen .shelf-body {
+  padding: 12px 14px 80px;
+  overflow-y: auto;
+  height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
+}
+
+.shelf-header-card {
+  background: linear-gradient(135deg, rgba(220,180,255,0.45), rgba(255,210,220,0.45));
+  border: 1px solid rgba(180,120,200,0.35);
+  border-radius: 18px;
+  padding: 16px 16px 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 16px rgba(150,100,180,0.10);
+}
+.shelf-header-title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #4a2068;
+  margin-bottom: 4px;
+}
+.shelf-header-sub {
+  font-size: 12px;
+  color: #7a5a90;
+  margin-bottom: 12px;
+}
+.shelf-progress-bar {
+  height: 10px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  border: 1px solid rgba(180,120,200,0.25);
+}
+.shelf-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #b886d8, #e896c5);
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+.shelf-progress-hint {
+  font-size: 12px;
+  color: #6a3d8a;
+  text-align: center;
+  margin-top: 4px;
+}
+.shelf-progress-hint b {
+  color: #4a2068;
+  font-weight: 900;
+}
+
+.shelf-date-btn {
+  width: 100%;
+  padding: 13px 14px;
+  background: linear-gradient(135deg, #a268d6, #d65eb6);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(180,80,180,0.30);
+  transition: transform 0.2s;
+}
+.shelf-date-btn:active { transform: scale(0.97); }
+
+/* —— 记忆相册（横滚）—— */
+.shelf-section-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #4a2068;
+  margin: 12px 4px 8px;
+  letter-spacing: 0.3px;
+}
+.shelf-memories-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  scrollbar-width: none;
+}
+.shelf-memories-row::-webkit-scrollbar { display: none; }
+.shelf-memory-card {
+  flex: 0 0 auto;
+  width: 110px;
+  height: 130px;
+  border-radius: 14px;
+  padding: 12px 10px;
+  color: #fff;
+  cursor: pointer;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  transition: transform 0.2s;
+}
+.shelf-memory-card:active { transform: scale(0.96); }
+.shelf-memory-emoji { font-size: 28px; }
+.shelf-memory-city { font-size: 14px; font-weight: 800; }
+.shelf-memory-date { font-size: 10px; opacity: 0.85; font-weight: 600; }
+
+/* —— 礼物列表 —— */
+.shelf-empty {
+  text-align: center;
+  padding: 50px 20px 30px;
+  color: #8a6da0;
+}
+.shelf-empty-emoji { font-size: 48px; opacity: 0.5; margin-bottom: 10px; }
+.shelf-empty-title { font-size: 15px; font-weight: 800; margin-bottom: 4px; color: #6a4d80; }
+.shelf-empty-desc { font-size: 12px; line-height: 1.6; }
+
+.shelf-gifts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.shelf-gift-card {
+  display: flex;
+  gap: 10px;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(200,180,220,0.4);
+  border-radius: 14px;
+  padding: 11px 12px;
+  box-shadow: 0 2px 8px rgba(120,80,160,0.06);
+}
+.shelf-gift-card.is-luxury {
+  background: linear-gradient(135deg, rgba(255,245,200,0.7), rgba(255,225,180,0.65));
+  border-color: rgba(220,170,80,0.4);
+}
+.shelf-gift-card.is-intimate {
+  background: linear-gradient(135deg, rgba(255,200,210,0.6), rgba(255,180,210,0.55));
+  border-color: rgba(220,120,160,0.4);
+}
+.shelf-gift-emoji {
+  font-size: 30px;
+  flex: 0 0 38px;
+  text-align: center;
+  align-self: flex-start;
+  padding-top: 2px;
+}
+.shelf-gift-body { flex: 1; min-width: 0; }
+.shelf-gift-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #2a1f3a;
+  margin-bottom: 2px;
+  word-wrap: break-word;
+}
+.shelf-gift-meta {
+  font-size: 11px;
+  color: #8a7898;
+  margin-bottom: 6px;
+}
+.shelf-gift-quote {
+  font-size: 12px;
+  color: #4a3a60;
+  font-style: italic;
+  line-height: 1.5;
+  background: rgba(180,140,220,0.08);
+  border-left: 2px solid rgba(160,100,200,0.45);
+  padding: 6px 9px;
+  border-radius: 0 8px 8px 0;
+  word-wrap: break-word;
+}
+.shelf-gift-quote-empty {
+  opacity: 0.5;
+  font-style: normal;
+}
+.shelf-gift-attrib {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: normal;
+  color: #8a6da0;
+  margin-top: 4px;
+}
+
+/* —— 主页卡片解锁状态 —— */
+.shelf-card.shelf-unlocked .card-desc {
+  color: #8a3d8a !important;
+  font-weight: 800;
+  animation: shelf-pulse 2s ease-in-out infinite;
+}
+@keyframes shelf-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+/* —— 约会城市选择 —— */
+.date-picker-body {
+  padding: 14px 14px 60px;
+  overflow-y: auto;
+  height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
+}
+.date-picker-back {
+  display: inline-block;
+  font-size: 13px;
+  color: #7a5a90;
+  cursor: pointer;
+  padding: 4px 0;
+  font-weight: 700;
+}
+.date-picker-back:active { opacity: 0.6; }
+.date-picker-title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #2a1f3a;
+  margin-bottom: 4px;
+}
+.date-picker-sub {
+  font-size: 12px;
+  color: #7a6890;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+.date-cities-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.date-city-card {
+  border-radius: 16px;
+  padding: 14px 12px 12px;
+  color: #fff;
+  cursor: pointer;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+  box-shadow: 0 5px 16px rgba(0,0,0,0.18);
+  transition: transform 0.18s;
+}
+.date-city-card:active { transform: scale(0.97); }
+.date-city-emoji { font-size: 28px; }
+.date-city-name { font-size: 17px; font-weight: 900; margin-top: 6px; }
+.date-city-desc { font-size: 11px; opacity: 0.92; line-height: 1.4; margin-top: 2px; }
+.date-city-cost {
+  font-size: 14px;
+  font-weight: 800;
+  margin-top: 8px;
+  align-self: flex-end;
+  background: rgba(0,0,0,0.25);
+  padding: 3px 9px;
+  border-radius: 10px;
+}
+
+/* —— 餐厅选择 —— */
+.date-restaurants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.date-restaurant-card {
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(180,140,210,0.3);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 10px rgba(120,80,160,0.06);
+}
+.date-restaurant-card:active { transform: scale(0.98); }
+.date-restaurant-card.not-affordable {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.date-restaurant-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.date-restaurant-emoji { font-size: 22px; }
+.date-restaurant-tier {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.5px;
+}
+.date-restaurant-tier-street { background: #e8f5e0; color: #4a7a30; }
+.date-restaurant-tier-mid { background: #fde6c0; color: #a06a20; }
+.date-restaurant-tier-upscale { background: #f0d6f0; color: #80308a; }
+.date-restaurant-name { font-size: 15px; font-weight: 800; color: #2a1f3a; margin-bottom: 2px; }
+.date-restaurant-dish { font-size: 12px; color: #7a6890; margin-bottom: 8px; }
+.date-restaurant-price { font-size: 12px; color: #555; }
+.date-restaurant-total { font-weight: 800; color: #6a3d8a; font-size: 13px; }
+.date-picker-balance {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #7a6890;
+}
+
+/* —— 约会确认弹窗 —— */
+.date-confirm-modal {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.date-confirm-card {
+  background: white;
+  border-radius: 20px;
+  padding: 22px 20px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.date-confirm-emoji { font-size: 36px; margin-bottom: 6px; }
+.date-confirm-title { font-size: 17px; font-weight: 900; color: #2a1f3a; margin-bottom: 4px; }
+.date-confirm-desc { font-size: 12px; color: #7a6890; margin-bottom: 16px; }
+.date-confirm-cost {
+  background: rgba(180,140,210,0.1);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  color: #4a3a60;
+  margin-bottom: 14px;
+  text-align: left;
+  line-height: 1.8;
+}
+.date-confirm-total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(180,140,210,0.25);
+  font-size: 14px;
+  color: #2a1f3a;
+}
+.date-confirm-buttons { display: flex; gap: 10px; }
+.date-confirm-cancel,
+.date-confirm-go {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.date-confirm-cancel {
+  background: #eee;
+  color: #555;
+}
+.date-confirm-go {
+  background: linear-gradient(135deg, #a268d6, #d65eb6);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(180,80,180,0.30);
+}
+
+/* —— 约会场景（全屏）—— */
+.date-scene-screen {
+  background: linear-gradient(135deg, #2a1f3a, #5a3050);
+  transition: background 0.6s ease;
+}
+.date-scene-header-bar {
+  background: rgba(0,0,0,0.25) !important;
+  backdrop-filter: blur(10px);
+  border-bottom-color: rgba(255,255,255,0.12) !important;
+}
+.date-scene-back { color: #fff !important; }
+.date-scene-body {
+  padding: 12px 14px 14px;
+  height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
+  display: flex;
+  flex-direction: column;
+}
+.date-scene-header {
+  background: rgba(0,0,0,0.32);
+  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  color: #fff;
+}
+.date-scene-loc {
+  font-size: 14px;
+  font-weight: 800;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.date-scene-dish {
+  font-size: 11px;
+  opacity: 0.88;
+  margin-top: 2px;
+}
+.date-scene-bubbles {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.date-bubble {
+  max-width: 80%;
+  padding: 9px 13px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+}
+.date-bubble-ghost {
+  background: rgba(255,255,255,0.94);
+  color: #2a1f3a;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+.date-bubble-user {
+  background: var(--date-accent, #c98ce0);
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.date-bubble-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+.date-bubble-text { font-size: 14px; line-height: 1.5; }
+
+.date-scene-footer {
+  margin-top: 10px;
+  background: rgba(0,0,0,0.32);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 10px;
+}
+.date-scene-input {
+  width: 100%;
+  border: none;
+  background: rgba(255,255,255,0.92);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+.date-scene-input:disabled { opacity: 0.55; }
+.date-scene-buttons {
+  display: flex;
+  gap: 8px;
+}
+.date-scene-end-btn,
+.date-scene-send-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.date-scene-end-btn {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+.date-scene-send-btn {
+  background: var(--date-accent, #c98ce0);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.date-scene-send-btn:disabled { opacity: 0.5; }
+.date-scene-hint {
+  text-align: center;
+  font-size: 10px;
+  color: rgba(255,255,255,0.7);
+  margin-top: 6px;
+}
+.date-end-save-btn {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255,255,255,0.95);
+  color: #2a1f3a;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+}
+
+/* —— 记忆相册详情弹窗 —— */
+.memory-detail-overlay {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.memory-detail-card {
+  width: 100%;
+  max-width: 360px;
+  max-height: 85vh;
+  border-radius: 22px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 25px 70px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+}
+.memory-detail-close {
+  position: absolute;
+  top: 10px; right: 12px;
+  width: 30px; height: 30px;
+  border-radius: 15px;
+  background: rgba(0,0,0,0.4);
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 2;
+}
+.memory-detail-head {
+  padding: 22px 18px 14px;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+}
+.memory-detail-emoji { font-size: 32px; margin-bottom: 4px; }
+.memory-detail-title { font-size: 18px; font-weight: 900; margin-bottom: 2px; }
+.memory-detail-meta { font-size: 12px; opacity: 0.88; }
+.memory-detail-bubbles {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0,0,0,0.18);
+}
+
+@media (max-width: 380px) {
+  .date-cities-grid { grid-template-columns: 1fr; }
 }
 </style>
 
