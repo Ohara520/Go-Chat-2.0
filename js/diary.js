@@ -10,8 +10,15 @@ function getDiaryEntries() {
 }
 
 function saveDiaryEntries(entries) {
+  // 去重：同一天只保留第一篇
+  const seen = new Set();
+  const deduped = entries.filter(e => {
+    if (seen.has(e.date)) return false;
+    seen.add(e.date);
+    return true;
+  });
   // 最多保留30天
-  const trimmed = entries.slice(-30);
+  const trimmed = deduped.slice(-30);
   localStorage.setItem('ghostDiary', JSON.stringify(trimmed));
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
@@ -34,11 +41,16 @@ function hasYesterdayDiary() {
 
 // ===== 日记生成 =====
 
-let _diaryGenerating = false; // 防并发锁
+let _diaryGenerating = false; // 防并发锁（运行时）
 
 async function generateDiaryEntry() {
   if (hasYesterdayDiary()) return;
   if (_diaryGenerating) return;
+
+  // 持久锁：防止页面刷新后重复生成
+  const _lockKey = 'diaryLock_' + getYesterdayKey();
+  if (localStorage.getItem(_lockKey)) return;
+  localStorage.setItem(_lockKey, '1');
   _diaryGenerating = true;
 
   try {
@@ -84,6 +96,12 @@ Write yesterday's diary entry. Rules:
       entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
     }
 
+    // 破防检测：不存 AI 泄露内容
+    if (entry && typeof isBreakout === 'function' && isBreakout(entry)) {
+      console.warn('[diary] 破防内容，使用兜底');
+      entry = '';
+    }
+
     if (!entry || entry.length < 20) {
       entry = _getFallbackEntry(location, weather);
     }
@@ -109,6 +127,8 @@ Write yesterday's diary entry. Rules:
     }
   } catch(e) {
     console.warn('[diary] 生成失败:', e);
+    // 生成失败清除锁，下次可以重试
+    localStorage.removeItem(_lockKey);
   } finally {
     _diaryGenerating = false;
   }
@@ -117,7 +137,7 @@ Write yesterday's diary entry. Rules:
 // 兜底静态日记
 function _getFallbackEntry(location, weather) {
   const pool = [
-    `quiet day at ${location}. ${weather ? weather + '.' : ''} didn't do much. thought about calling her but didn't.`,
+    `slow day at ${location}. ${weather ? weather + '.' : ''} didn't do much. thought about calling her but didn't.`,
     `long one. training ran late. ${weather ? weather + ' outside.' : ''} sat in the mess for a bit after. didn't feel like talking.`,
     `${location}. same routine. ${weather ? weather + '.' : ''} she sent something earlier. read it twice before replying once.`,
     `nothing worth writing. ${weather ? weather + ' all day.' : ''} cleaned my kit. checked my phone more than i should've.`,
@@ -174,6 +194,19 @@ function renderDiary() {
 // ===== 每日检查（在 app.js 调用）=====
 
 async function dailyDiaryCheck() {
+  // 先清理已有的重复日记
+  const existing = getDiaryEntries();
+  const seen = new Set();
+  const cleaned = existing.filter(e => {
+    if (seen.has(e.date)) return false;
+    seen.add(e.date);
+    return true;
+  });
+  if (cleaned.length < existing.length) {
+    console.log('[diary] 清理重复日记:', existing.length - cleaned.length, '条');
+    localStorage.setItem('ghostDiary', JSON.stringify(cleaned));
+  }
+
   if (!hasYesterdayDiary()) {
     await generateDiaryEntry();
   }
