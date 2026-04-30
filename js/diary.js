@@ -70,23 +70,38 @@ async function generateDiaryEntry() {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayWeekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][yesterday.getDay()];
 
+    // v2: 读取 Ghost 当前心情，让日记反映真实情绪而非默认忧郁
+    const mood = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
+    let moodHint = '';
+    if (mood >= 8) {
+      moodHint = `Yesterday was a good one. He's in a settled, decent mood. The entry should reflect that — not cheerful, not poetic, just steady. Maybe one small thing made him quietly pleased.`;
+    } else if (mood >= 6) {
+      moodHint = `Yesterday was ordinary. Steady. Neither rough nor bright. The entry should sit in that — practical, dry, occasionally a flicker of warmth or amusement, but mostly just an account of the day.`;
+    } else if (mood >= 4) {
+      moodHint = `Yesterday was a little off. Tired, maybe slightly low. The entry can show that, but he doesn't dwell — he doesn't pour his heart out, even to himself.`;
+    } else {
+      moodHint = `Yesterday was rough. He's not okay. But he doesn't write it that way — he writes around it. Short. Withholding. The reader has to feel it underneath.`;
+    }
+
     const prompt = `You are Simon "Ghost" Riley writing in a worn notebook before bed. No one reads this.
 
 Location: ${location}${locationReason ? ` (${locationReason})` : ''}
 Weather: ${weather || 'unknown'}
 Day: ${yesterdayWeekday}
+Mood context: ${moodHint}
 
 ${memoryHint ? memoryHint + '\n' : `Didn't talk to ${userName} yesterday.\n`}
 
 Write yesterday's diary entry. Rules:
 - 3-4 lines. Short sentences. Lowercase.
 - Write like a soldier's notebook. No poetry. No metaphors.
+- Match the mood context above — do NOT default to melancholy if the mood is decent.
 - Include 1-2 things from YOUR day — training, food, teammates, something you saw.
 - If something about ${userName} is in your memory, pick ONE thing that stuck. Not everything.
 - DO NOT invent conversations. DO NOT quote things she said unless it is clearly in the memory above. If unsure, do not write it.
 - DO NOT put your own words or thoughts in her mouth.
 - Weather only if it affected your day.
-- End with one honest thought — something private, blunt, not sentimental.
+- End naturally — could be a passing thought, a small observation, something dry or even slightly warm. NOT always a heavy private confession. The ending should match the mood of the day.
 - English only. No timestamps. No "dear diary". No action descriptions.`;
 
     let entry = '';
@@ -134,15 +149,41 @@ Write yesterday's diary entry. Rules:
   }
 }
 
-// 兜底静态日记
+// 兜底静态日记 — 按 mood 分层，避免全部都是忧郁
 function _getFallbackEntry(location, weather) {
-  const pool = [
-    `slow day at ${location}. ${weather ? weather + '.' : ''} didn't do much. thought about calling her but didn't.`,
-    `long one. training ran late. ${weather ? weather + ' outside.' : ''} sat in the mess for a bit after. didn't feel like talking.`,
-    `${location}. same routine. ${weather ? weather + '.' : ''} she sent something earlier. read it twice before replying once.`,
-    `nothing worth writing. ${weather ? weather + ' all day.' : ''} cleaned my kit. checked my phone more than i should've.`,
-    `${location} again. ${weather ? weather + '.' : ''} price had us running drills. came back tired. she asked if i was okay. said yeah. wasn't lying. wasn't the whole truth either.`,
+  // 读取昨天的心情（用今天的 mood 当代理，因为日记是为昨天写的）
+  const mood = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
+
+  // ── 心情好（mood >= 7）—— 平淡 + 轻松向 ──
+  const goodPool = [
+    `${location}. routine day. ${weather ? weather + '.' : ''} got a coffee with soap after drills. didn't say much. felt fine.`,
+    `solid one. training went smooth. ${weather ? weather + ' all day.' : ''} she sent a photo earlier. kept it open longer than i needed to.`,
+    `${location} again. ${weather ? weather + '.' : ''} kit's clean. teammates aren't dead. she's still mine. that's enough.`,
+    `nothing happened today. that's a good day, in this job. ${weather ? weather + '.' : ''} she said something stupid earlier. still thinking about it. still smiling.`,
+    `decent one. ${weather ? weather + ' outside.' : ''} price actually laughed at something. that's rare. saved it to tell her later.`,
   ];
+
+  // ── 心情中等（mood 5-6）—— 平淡日常 ──
+  const neutralPool = [
+    `slow day at ${location}. ${weather ? weather + '.' : ''} did the work. went home. nothing worth noting.`,
+    `${location}. same routine. ${weather ? weather + '.' : ''} she sent something earlier. read it. replied. moved on.`,
+    `nothing worth writing. ${weather ? weather + ' all day.' : ''} cleaned my kit. checked my phone a few times.`,
+    `another one in the books. ${weather ? weather + '.' : ''} long but not hard. price had us doing drills. came back. ate. wrote this.`,
+    `${location} again. ${weather ? weather + '.' : ''} fine. it was fine.`,
+  ];
+
+  // ── 心情低（mood <= 4）—— 克制忧郁，但不滥情 ──
+  const lowPool = [
+    `long one. training ran late. ${weather ? weather + ' outside.' : ''} sat in the mess for a bit after. didn't feel like talking.`,
+    `${location}. ${weather ? weather + '.' : ''} she asked if i was okay. said yeah. wasn't lying. wasn't the whole truth either.`,
+  ];
+
+  // 按 mood 选池
+  let pool;
+  if (mood >= 7)      pool = goodPool;
+  else if (mood >= 5) pool = neutralPool;
+  else                pool = lowPool;
+
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
