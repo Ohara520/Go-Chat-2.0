@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "api/chat.js": {
+      "maxDuration": 60
+    },
+    "api/venice.js": {
+      "maxDuration": 60
+    },
+    "api/venice-keegan.js": {
+      "maxDuration": 60
+    },
+    "api/gemini.js": {
+      "maxDuration": 60
+    },
+    "api/deepseek.js": {
+      "maxDuration": 60
+    }
+  }
+}
