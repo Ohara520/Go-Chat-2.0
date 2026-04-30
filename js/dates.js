@@ -273,6 +273,85 @@ window.recordGiftToShelf = recordGiftToShelf;
 
 const _giftCaptureQueue = [];
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// v2 改动：智能匹配 Ghost 反应 + 定时自救清理
+//
+// 旧版问题：
+//   1. 90 秒队列清理只在 _safeDeliverySaveHistory 触发时跑
+//      → 用户寄完关页面，礼物永远卡队列里不入小屋
+//   2. 拿"最近一条 assistant 消息"当礼物反应
+//      → 可能是完全无关的话（咖啡配"喝水"）
+//
+// 新版方案：
+//   1. setInterval 每 30 秒自动检查过期队列，强制兜底入小屋
+//   2. assistant 消息必须满足两个条件之一才算"礼物反应"：
+//      a. 内容包含礼物名字（部分匹配也算）
+//      b. 内容包含通用感谢词（thanks/thank/got it/received/didn't expect 等）
+//      不满足 → 留空入小屋（按 Bug 2 修复方案 A，干净不假装）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const _GIFT_QUEUE_TIMEOUT_MS = 90000;     // 90 秒过期
+const _GIFT_AUTO_CHECK_MS    = 30000;     // 每 30 秒自动检查
+
+// 通用感谢/收到关键词（任一命中即认为是礼物反应）
+const _GIFT_REACTION_KEYWORDS = [
+  'thanks', 'thank', 'got it', 'received', "didn't expect",
+  'didn\'t expect', 'didnt expect', 'unexpected',
+  'showed up', 'arrived', 'package', 'parcel', 'delivery',
+  'cheers', 'appreciate', 'appreciate it',
+];
+
+/**
+ * 判断 assistant 消息是否真的是对这个礼物的反应
+ * @param {string} message  Ghost 的消息内容
+ * @param {object} delivery 礼物对象
+ * @returns {boolean}
+ */
+function _isGiftReaction(message, delivery) {
+  if (!message || !delivery) return false;
+  const lower = message.toLowerCase();
+
+  // 1. 礼物名字直接命中（部分匹配，比如礼物叫"格纹围巾"，消息含"围巾"也算）
+  const giftName = (delivery.name || '').toLowerCase();
+  if (giftName) {
+    // 拆分礼物名为关键词，任意词命中即可
+    const nameTokens = giftName.split(/[\s\-,，。、（）()]+/).filter(t => t.length >= 2);
+    for (const token of nameTokens) {
+      if (lower.includes(token)) return true;
+    }
+  }
+
+  // 2. 礼物 emoji 命中
+  if (delivery.emoji && message.includes(delivery.emoji)) return true;
+
+  // 3. 通用感谢/收到词命中
+  for (const kw of _GIFT_REACTION_KEYWORDS) {
+    if (lower.includes(kw)) return true;
+  }
+
+  // 4. 礼物类别词命中（衣服/吃的/用的）— 如果 productData 里有 category
+  const category = (delivery.productData && delivery.productData.category) || '';
+  if (category && lower.includes(category.toLowerCase())) return true;
+
+  return false;
+}
+
+/**
+ * 处理过期队列：超时还没匹配到反应的礼物，强制入小屋（反应留空）
+ * 这个函数会被两个地方调用：
+ *   1. _safeDeliverySaveHistory hook（聊天活动触发）
+ *   2. setInterval 定时器（用户没活动也能触发）
+ */
+function _processStaleGiftQueue() {
+  while (_giftCaptureQueue.length && Date.now() - _giftCaptureQueue[0].ts > _GIFT_QUEUE_TIMEOUT_MS) {
+    const stale = _giftCaptureQueue.shift();
+    if (!stale.captured) {
+      console.log('[dates] gift timeout, recording without reaction:', stale.delivery.name);
+      recordGiftToShelf(stale.delivery, ''); // 留空，符合方案 A
+    }
+  }
+}
+
 function _installGiftCaptureHooks() {
   // 包装 onGhostReceived：只追踪用户寄给 Ghost 的礼物
   const _origOnGhostReceived = window.onGhostReceived;
@@ -287,13 +366,15 @@ function _installGiftCaptureHooks() {
       if (delivery && !delivery.isGhostSend &&
           !(delivery.productData && delivery.productData.isUserItem)) {
         _giftCaptureQueue.push({ delivery, ts: Date.now(), captured: false });
+        console.log('[dates] gift queued for reaction matching:', delivery.name);
       }
     } catch(e) { console.warn('[dates] queue push fail:', e); }
     return await _origOnGhostReceived.apply(this, arguments);
   };
   window.onGhostReceived._giftPatched = true;
 
-  // 包装 _safeDeliverySaveHistory：每次 delivery 保存 chatHistory 时，把最新 assistant 消息归档给队首
+  // 包装 _safeDeliverySaveHistory：每次 delivery 保存 chatHistory 时，
+  // 智能匹配 Ghost 反应消息
   const _origSaveHist = window._safeDeliverySaveHistory;
   if (typeof _origSaveHist !== 'function') {
     console.warn('[dates] _safeDeliverySaveHistory 未找到 — 物品架捕获回退到无文字模式。');
@@ -303,21 +384,32 @@ function _installGiftCaptureHooks() {
   window._safeDeliverySaveHistory = function() {
     const result = _origSaveHist.apply(this, arguments);
     try {
-      // 清理超时（90s）
-      while (_giftCaptureQueue.length && Date.now() - _giftCaptureQueue[0].ts > 90000) {
-        const stale = _giftCaptureQueue.shift();
-        // 即使没拿到反应也记录一条，反应留空
-        if (!stale.captured) recordGiftToShelf(stale.delivery, '');
-      }
-      // 给队首归档最近一条 assistant 消息
+      // 1. 清理过期队列
+      _processStaleGiftQueue();
+
+      // 2. 智能匹配队首礼物的反应
       if (_giftCaptureQueue.length > 0 && typeof chatHistory !== 'undefined') {
-        const last = chatHistory[chatHistory.length - 1];
-        if (last && last.role === 'assistant' && last.content) {
-          const head = _giftCaptureQueue[0];
-          if (!head.captured) {
-            head.captured = true;
-            recordGiftToShelf(head.delivery, last.content);
-            _giftCaptureQueue.shift();
+        const head = _giftCaptureQueue[0];
+        if (!head.captured) {
+          // 只看礼物入队后产生的 assistant 消息（防止匹配到入队前的消息）
+          // 从最近往前找，找到第一条入队后的 assistant 消息
+          for (let i = chatHistory.length - 1; i >= 0; i--) {
+            const msg = chatHistory[i];
+            if (msg.role !== 'assistant' || !msg.content) continue;
+
+            // 假设 msg 没有 _time 字段时，默认它是新的（容错）
+            const msgTime = msg._time || Date.now();
+            if (msgTime < head.ts) break; // 已经早于礼物入队，停止往前找
+
+            // 用智能匹配判断是否真的是礼物反应
+            if (_isGiftReaction(msg.content, head.delivery)) {
+              head.captured = true;
+              console.log('[dates] gift reaction matched:', head.delivery.name);
+              recordGiftToShelf(head.delivery, msg.content);
+              _giftCaptureQueue.shift();
+              break;
+            }
+            // 不是礼物反应 → 不匹配，继续等下次保存
           }
         }
       }
@@ -325,7 +417,16 @@ function _installGiftCaptureHooks() {
     return result;
   };
   window._safeDeliverySaveHistory._giftPatched = true;
-  console.log('[dates] 物品架捕获 hook 已安装');
+
+  // 3. 启动定时自救：每 30 秒检查一次过期队列
+  // 即使用户没在聊天活动，过期礼物也会被兜底入小屋
+  if (!window._giftQueueAutoTimer) {
+    window._giftQueueAutoTimer = setInterval(() => {
+      try { _processStaleGiftQueue(); } catch(e) {}
+    }, _GIFT_AUTO_CHECK_MS);
+  }
+
+  console.log('[dates] 物品架捕获 hook 已安装（v2: smart match + auto timer）');
 }
 
 // DOM 就绪后安装（保证 delivery.js 已挂载全局函数）
