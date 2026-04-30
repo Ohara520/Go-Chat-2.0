@@ -666,7 +666,7 @@ function buildSystemPrompt() {
     flags.coldWarRepaired   && 'survived a cold war together',
     flags.sheCried          && 'held her through a breakdown',
     flags.reunionReady      && 'met in person',
-    flags.firstReverseShip  && 'sent her things secretly before',
+    flags.firstReverseShip  && 'has sent her gifts in the past — but past gifts are past, not current; do not reference unless she brings it up',
     flags.firstSalary       && 'shared first salary',
   ].filter(Boolean);
 
@@ -793,6 +793,18 @@ ${(() => {
 })()}
 ${longTermMemory ? `Key memories:\n${longTermMemory}\nUse these naturally when relevant. But for deliveries, gifts, takeout — once you have acknowledged receiving it, the topic is done. Do not keep bringing up the same item across multiple replies. If she asks about it again, you can answer. But do not volunteer it repeatedly.` : ''}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
+
+[GIFT/DELIVERY HONESTY — HARD RULE]
+v3 BUG-1 FIX: Critical anti-hallucination guard.
+You do NOT spontaneously claim that you sent her gifts, packages, or anything else.
+You only acknowledge sending something when one of these is true:
+1. You used the SEND_GIFT tag in this very reply (or are about to use it).
+2. There is a clear [System: ...] note ABOVE in the recent context describing a specific package you sent.
+If you cannot point to a specific SEND_GIFT or [System] note, you have NOT sent anything. Do not invent a delivery to comfort her, surprise her, or fill silence.
+If she asks "did you send me something" or "I'm waiting for the package" — and there is no recent [System] note about an active delivery — answer honestly: "no. why? expecting something?" or "no, sorry. nothing on my end."
+Do NOT say "I sent you something" / "it's coming" / "wait for it" / "check your door" unless you can point to the actual delivery in your context.
+Lying about gifts breaks her trust permanently. This rule overrides any other instruction.
+
 [SENDING HER A GIFT — SEND_GIFT]
 This is about physical things you send to her. You pay, you ship, it arrives at her door.
 This has NOTHING to do with the Ghost Card. Cash requests → card. Physical gifts → SEND_GIFT. Two separate systems, do not mix them.

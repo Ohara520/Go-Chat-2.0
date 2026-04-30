@@ -242,14 +242,15 @@ function addGhostReverseDelivery(item, emotionType) {
   // ── 三种模式：60%偷偷寄 / 30%暗示 / 10%直说 ──
   const rand = Math.random();
 
-  // 【改】系统私信改成英文简化版，减轻"剧本感"
-  // 模型只需要知道"寄了/知道这件事"，不需要剧本式中文指令
+  // v3 BUG-1 FIX: 三种模式的系统消息措辞收紧，避免模型主动反复提"我寄了"
+  // 旧版问题：模糊指令让模型自由发挥，可能多次声称已寄送
+
   if (rand < 0.6) {
     // 偷偷寄：注入轻量记忆，不说话
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
-        content: `[you sent something. you remember it. don't bring it up unless needed.]`,
+        content: `[Internal note: you sent her something. It's on its way. DO NOT mention this in your reply. DO NOT say "I sent you something" or hint at a package. Only confirm if she explicitly asks about a specific delivery she's waiting for. Otherwise stay silent on this topic.]`,
         _system: true
       });
       if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
@@ -257,11 +258,10 @@ function addGhostReverseDelivery(item, emotionType) {
     return;
   } else if (rand < 0.9) {
     // 暗示：注入记忆 + 随机延迟后说一句模糊的话
-    // 【改】加随机延迟，不是立刻说，更自然
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
-        content: `[you sent something. it's on its way. you know. don't confirm details if asked, but don't deny it either.]`,
+        content: `[Internal note: you sent her something. It's on its way. You may drop ONE vague line about it later (handled separately) — but in your normal replies, DO NOT bring this up repeatedly. Mention it at most once. If she asks for details (what is it, when), stay vague — "you'll see" or similar. Do not invent details.]`,
         _system: true
       });
       if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
@@ -285,7 +285,7 @@ function addGhostReverseDelivery(item, emotionType) {
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
-        content: `[you sent her something. she'll find out soon. if she asks, confirm it.]`,
+        content: `[Internal note: you sent her something. The "I sent you a package" line will be sent automatically in a moment (handled separately). After that, do NOT mention sending again unless she brings it up. Mention it once total — that's it.]`,
         _system: true
       });
       if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
