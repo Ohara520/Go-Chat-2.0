@@ -1,51 +1,16 @@
 import OpenAI from 'openai';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 节点列表（与 deepseek.js / chat.js 一致）
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+// 同 chat.js 的节点列表（OpenAI 兼容路径加 /v1）
 const BASE_URLS = [
   'https://api.yunjintao.com/v1',
   'http://43.99.79.59:8001/v1',
   'http://47.243.4.252:8001/v1',
   'http://43.99.4.123:8001/v1',
+  'http://47.77.225.196:8001/v1',
+  'http://8.222.174.125:8001/v1',
 ];
 
-async function createWithFailover(messages, system, max_tokens, model = 'grok-4.1-fast') {
-  let lastErr = null;
-  for (const baseURL of BASE_URLS) {
-    try {
-      const client = new OpenAI({ apiKey: process.env.GEMINI_API_KEY, baseURL });
-      const response = await client.chat.completions.create({
-        model,
-        max_tokens,
-        messages: [
-          { role: 'system', content: system },
-          ...messages,
-        ],
-      });
-      return response;
-    } catch (err) {
-      console.warn(`[venice] 节点失败 ${baseURL}:`, err.message);
-      lastErr = err;
-    }
-  }
-  throw lastErr || new Error('所有节点均失败');
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 调情专属行为层（identity + intimacy levels 由 system param 注入）
-//
-// 设计原则：
-//   身份底座 → 来自 sendMessage.js 传入的 system（buildGhostStyleCore）
-//   调情等级 → 来自 intimacy.js 的 buildIntimacyBlock，已在 system 里
-//   调情记忆 → 来自 sendMessage.js 的 _memorySection，已在 system 里
-//   本层只叠加：异地 text-only 约束 + 调情哲学 + 频道专属 NEVER
-//
-// 同步标记：身份底座以 persona.js buildGhostStyleCore 为准
-//          调情等级以 intimacy.js INTIMACY_LEVELS 为准
-//          修改时搜索"同步标记"确认一致
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const PER_NODE_TIMEOUT_MS = 8000;
 
 const VENICE_INTIMATE_LAYER = `[THIS MOMENT]
 Your wife is talking to you. Different countries. Text only.
@@ -77,9 +42,47 @@ If she asks him to do something that doesn't fit him — he doesn't perform it t
 If she asks something that doesn't make real-world sense — like walking around base undressed, training without clothes, or anything a real person simply wouldn't do — he doesn't confirm it.
 He redirects or turns it on her. He does not perform.`;
 
+async function createWithFailover(messages, system, max_tokens, model = 'grok-4.1-fast') {
+  let lastErr = null;
+  let lastStatus = null;
+
+  for (const baseURL of BASE_URLS) {
+    try {
+      const client = new OpenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        baseURL,
+        timeout: PER_NODE_TIMEOUT_MS,
+        maxRetries: 0,
+      });
+      const response = await client.chat.completions.create({
+        model,
+        max_tokens,
+        messages: [
+          { role: 'system', content: system },
+          ...messages,
+        ],
+      });
+      return response;
+    } catch (err) {
+      console.warn(`[api/venice] node failed: ${baseURL}`, { msg: err.message, status: err.status });
+      lastErr = err;
+      lastStatus = err.status;
+      if (err.status === 401 || err.status === 403 || err.status === 400) break;
+    }
+  }
+
+  const e = new Error(lastErr?.message || 'all nodes failed');
+  e.status = lastStatus;
+  throw e;
+}
+
 export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    const { system, user, max_tokens = 300 } = req.body;
+    const { system, user, max_tokens = 300 } = req.body || {};
 
     if (!user || typeof user !== 'string') {
       return res.status(400).json({ error: 'Invalid user input' });
@@ -87,9 +90,6 @@ export default async function handler(req, res) {
 
     const safeSystem = typeof system === 'string' ? system : '';
 
-    // 调情记忆：只在 system 里没有记忆块时才从参数补充（防双写）
-    // sendMessage.js _handleIntimateReply 已把记忆写进 system，
-    // 这里只兜底非 _handleIntimateReply 的直接调用（如记忆摘要）
     const intimateMemory = req.body.intimateMemory || '';
     const systemHasMemory = safeSystem.includes('[Your memory from previous intimate moments') ||
                             safeSystem.includes('[INTIMATE MEMORY');
@@ -97,7 +97,6 @@ export default async function handler(req, res) {
       ? `\n\n[INTIMATE MEMORY — what he remembers from before]\n${intimateMemory}\nThis is his memory. He does not recite it. It just shapes how he reads her tonight.`
       : '';
 
-    // 层次：调情专属层 → system（含身份底座 + 等级 + 记忆）→ 补充记忆
     const fullSystem = VENICE_INTIMATE_LAYER + '\n\n' + safeSystem + memoryBlock;
 
     const response = await createWithFailover(
@@ -107,9 +106,25 @@ export default async function handler(req, res) {
     );
 
     const text = response.choices?.[0]?.message?.content?.trim() || '';
-    res.status(200).json({ text });
+    return res.status(200).json({ text });
+
   } catch (err) {
-    console.error('Venice error:', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('[api/venice] all nodes failed:', err.message);
+
+    let userMessage = '网络繁忙，请稍后再试';
+    let statusCode = 500;
+
+    if (err.status === 429) {
+      userMessage = '请求过于频繁，请稍等几秒再发';
+      statusCode = 429;
+    } else if (err.message?.includes('timeout') || err.message?.includes('aborted')) {
+      userMessage = '请求超时了，再试一次吧';
+      statusCode = 504;
+    } else if (err.status >= 500) {
+      userMessage = '上游服务暂时不稳，请稍后重试';
+      statusCode = 502;
+    }
+
+    return res.status(statusCode).json({ error: userMessage });
   }
 }

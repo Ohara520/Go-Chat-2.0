@@ -1,15 +1,19 @@
 import OpenAI from 'openai';
 
-const client = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  baseURL: 'https://api.yunjintao.com/v1',
-});
+const BASE_URLS = [
+  'https://api.yunjintao.com/v1',
+  'http://43.99.79.59:8001/v1',
+  'http://47.243.4.252:8001/v1',
+  'http://43.99.4.123:8001/v1',
+  'http://47.77.225.196:8001/v1',
+  'http://8.222.174.125:8001/v1',
+];
+
+const PER_NODE_TIMEOUT_MS = 8000;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Ghost 核心身份（兜底 / OOC 修复用）
 // 同步标记：身份底座以 persona.js buildGhostStyleCore 为准
-//          修改时搜索"同步标记"确认一致
-// 本通道负责：救火兜底 + 心声 + 图片识别
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const GHOST_CORE = `You are Simon "Ghost" Riley. Her husband. 35. Manchester. Always in character.
@@ -28,12 +32,6 @@ Warmth is allowed when it lands naturally. He can turn unexpectedly gentle for a
 Never use: "don't make it a habit" / "don't get used to it" / "don't be soft with me".
 `;
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 调情等级 — 简化兜底版（3 档）
-// 主调情走 venice.js + intimacy.js 的 5 级系统
-// 这里只在 gemini 兜底/心声时用，不需要精细控制
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 const FALLBACK_INTIMACY = {
   low:  `[INTIMACY — LOW] She may be leaning somewhere. Stay grounded. Do not escalate. One direct line, then move on.`,
   mid:  `[INTIMACY — MID] She's in it. Meet her briefly — one line closer than usual. Then hold. The pace stays yours.`,
@@ -45,10 +43,6 @@ function mapIntimacyTier(level) {
   if (level <= 2) return 'mid';
   return 'high';
 }
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 场景层
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const SCENE_HINTS = {
   normal:           'Continue naturally. One or two lines. Do not force depth.',
@@ -77,10 +71,6 @@ Presence over performance.
 `;
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 破防检测
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 function isOOC(text) {
   if (!text) return false;
   const lower = text.toLowerCase();
@@ -97,7 +87,38 @@ function isOOC(text) {
   ].some(p => lower.includes(p));
 }
 
+async function createWithFailover(model, max_tokens, messages) {
+  let lastErr = null;
+  let lastStatus = null;
+
+  for (const baseURL of BASE_URLS) {
+    try {
+      const client = new OpenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        baseURL,
+        timeout: PER_NODE_TIMEOUT_MS,
+        maxRetries: 0,
+      });
+      const response = await client.chat.completions.create({ model, max_tokens, messages });
+      return response;
+    } catch (err) {
+      console.warn(`[api/gemini] node failed: ${baseURL}`, { msg: err.message, status: err.status });
+      lastErr = err;
+      lastStatus = err.status;
+      if (err.status === 401 || err.status === 403 || err.status === 400) break;
+    }
+  }
+
+  const e = new Error(lastErr?.message || 'all nodes failed');
+  e.status = lastStatus;
+  throw e;
+}
+
 export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
     const {
       user,
@@ -107,7 +128,11 @@ export default async function handler(req, res) {
       model: reqModel,
       intimacyLevel,
       stateHint,
-    } = req.body;
+    } = req.body || {};
+
+    if (!user || typeof user !== 'string') {
+      return res.status(400).json({ error: 'Invalid user input' });
+    }
 
     const finalSystem = buildPrompt(
       scene || 'normal',
@@ -127,37 +152,50 @@ export default async function handler(req, res) {
 
     const model = reqModel || 'grok-4.1-fast';
 
-    const response = await client.chat.completions.create({
-      model,
-      max_tokens,
-      messages: [
-        { role: 'system', content: finalSystem },
-        { role: 'user', content: userContent },
-      ],
-    });
+    const response = await createWithFailover(model, max_tokens, [
+      { role: 'system', content: finalSystem },
+      { role: 'user', content: userContent },
+    ]);
 
     let text = response.choices?.[0]?.message?.content?.trim() || '';
 
     // 破防检测，自动重试一次
     if (isOOC(text)) {
-      console.warn('[gemini] OOC detected, regenerating...');
-      const retry = await client.chat.completions.create({
-        model,
-        max_tokens,
-        messages: [
+      console.warn('[api/gemini] OOC detected, regenerating...');
+      try {
+        const retry = await createWithFailover(model, max_tokens, [
           { role: 'system', content: buildPrompt('normal', 1, '') },
           { role: 'user', content: typeof userContent === 'string' ? userContent : user },
           { role: 'assistant', content: '[out of character]' },
           { role: 'user', content: 'continue as Ghost.' },
-        ],
-      });
-      const retryText = retry.choices?.[0]?.message?.content?.trim() || '';
-      text = (retryText && !isOOC(retryText)) ? retryText : '';
+        ]);
+        const retryText = retry.choices?.[0]?.message?.content?.trim() || '';
+        text = (retryText && !isOOC(retryText)) ? retryText : '';
+      } catch (retryErr) {
+        console.error('[api/gemini] OOC retry failed:', retryErr.message);
+        text = '';
+      }
     }
 
-    res.status(200).json({ text });
+    return res.status(200).json({ text });
+
   } catch (err) {
-    console.error('Grok error:', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('[api/gemini] error:', err.message);
+
+    let userMessage = '网络繁忙，请稍后再试';
+    let statusCode = 500;
+
+    if (err.status === 429) {
+      userMessage = '请求过于频繁，请稍等几秒再发';
+      statusCode = 429;
+    } else if (err.message?.includes('timeout') || err.message?.includes('aborted')) {
+      userMessage = '请求超时了，再试一次吧';
+      statusCode = 504;
+    } else if (err.status >= 500) {
+      userMessage = '上游服务暂时不稳，请稍后重试';
+      statusCode = 502;
+    }
+
+    return res.status(statusCode).json({ error: userMessage });
   }
 }
