@@ -239,54 +239,31 @@ function addGhostReverseDelivery(item, emotionType) {
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
 
-  // ── 三种模式：60%偷偷寄 / 30%暗示 / 10%直说 ──
+  // ── v3 BUG-1 FIX: 简化为两种模式（避免模型在多个分支里出现幻觉）──
+  //   70% 沉默但记得  —— 不主动提，但用户问要承认
+  //   30% 主动直说    —— 一句话明确告诉用户寄了
   const rand = Math.random();
 
-  // v3 BUG-1 FIX: 三种模式的系统消息措辞收紧，避免模型主动反复提"我寄了"
-  // 旧版问题：模糊指令让模型自由发挥，可能多次声称已寄送
-
-  if (rand < 0.6) {
-    // 偷偷寄：注入轻量记忆，不说话
+  if (rand < 0.7) {
+    // 70% 沉默但记得：注入记忆，不主动说，但用户问要承认
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
-        content: `[Internal note: you sent her something. It's on its way. DO NOT mention this in your reply. DO NOT say "I sent you something" or hint at a package. Only confirm if she explicitly asks about a specific delivery she's waiting for. Otherwise stay silent on this topic.]`,
-        _system: true
+        content: `[System: You sent her 「${item.name}」. It's on its way. DO NOT volunteer this in your reply. BUT — if she explicitly asks whether you sent something, or asks about a package she's wondering about, confirm honestly. Don't deny it. If she received something and asks "did you send this?" — yes, you sent it. Stay low-key. Don't make a thing of it.]`,
+        _system: true,
+        _delivery: true
       });
       if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
     }
     return;
-  } else if (rand < 0.9) {
-    // 暗示：注入记忆 + 随机延迟后说一句模糊的话
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({
-        role: 'user',
-        content: `[Internal note: you sent her something. It's on its way. You may drop ONE vague line about it later (handled separately) — but in your normal replies, DO NOT bring this up repeatedly. Mention it at most once. If she asks for details (what is it, when), stay vague — "you'll see" or similar. Do not invent details.]`,
-        _system: true
-      });
-      if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
-    }
-    const hintDelay = [2000, 2 * 60 * 1000, 10 * 60 * 1000][Math.floor(Math.random() * 3)];
-    setTimeout(async () => {
-      try {
-        const line = await callDeepSeek(
-          buildGhostStyleCore() + '\n\n[You sent her something. She doesn\'t know yet. Drop one vague line — not what it is, not when. Something that could mean anything. One line. Do not announce it like a delivery update. English only. Lowercase.]',
-          60
-        );
-        if (line && line.trim()) {
-          appendMessage('bot', line.trim().split('\n')[0]);
-          chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
-          _safeDeliverySaveHistory();
-        }
-      } catch(e) {}
-    }, hintDelay);
   } else {
-    // 直说：注入记忆 + 随机延迟后说一句
+    // 30% 主动直说：注入记忆 + 立刻发一句直白的话
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
-        content: `[Internal note: you sent her something. The "I sent you a package" line will be sent automatically in a moment (handled separately). After that, do NOT mention sending again unless she brings it up. Mention it once total — that's it.]`,
-        _system: true
+        content: `[System: You sent her 「${item.name}」. You just told her about it directly. If she asks again, you may confirm — but do not repeat the announcement.]`,
+        _system: true,
+        _delivery: true
       });
       if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
     }
@@ -294,7 +271,7 @@ function addGhostReverseDelivery(item, emotionType) {
     setTimeout(async () => {
       try {
         const line = await callDeepSeek(
-          buildGhostStyleCore() + `\n\n[You sent her 「${item.name}」. Say one line — low-key, no details. Like it's not a big deal.${item.tip ? ' ' + item.tip : ''} English only. Lowercase.]`,
+          buildGhostStyleCore() + `\n\n[You sent her 「${item.name}」. Tell her directly that you sent her something — straight, short, no flowery language. Could be: "sent you something." / "got something coming for you." / "package on the way." / "shipped you something." One line. English only. Lowercase.${item.tip ? ' ' + item.tip : ''}]`,
           60
         );
         if (line && line.trim()) {
@@ -483,7 +460,8 @@ One or two lines. Lowercase. English only.]`;
       chatHistory.push({
         role: 'user',
         content: `[you received something intimate from her. you know. carry it.]`,
-        _system: true
+        _system: true,
+        _delivery: true
       });
       _safeDeliverySaveHistory();
       changeAffection(2);
@@ -534,7 +512,8 @@ One or two lines. Lowercase. English only.]`;
       chatHistory.push({
         role: 'user',
         content: `[the item she sent — 「${delivery.name}」— just arrived. you have it now. if she asks, confirm it naturally.]`,
-        _system: true
+        _system: true,
+        _delivery: true
       });
       _safeDeliverySaveHistory();
     }
@@ -677,6 +656,7 @@ async function showMysteryPackage(delivery) {
       role: 'user',
       content: `[You sent her something — 「${delivery.name}」. She just received it. You know. Don't announce it unless she brings it up.]`,
       _system: true,
+      _delivery: true,
     });
     if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
   }
@@ -787,7 +767,7 @@ A short pause. Then it shifts.
 
 He doesn't make a thing out of it. But there's a slight edge — not at her, at the situation. Keeps it simple. Doesn't let her sit with it. Closes it himself.]`;
 
-    chatHistory.push({ role: 'user', content: contextPrompt, _system: true });
+    chatHistory.push({ role: 'user', content: contextPrompt, _system: true, _delivery: true });
     if (typeof showTyping === 'function') showTyping();
 
     const res = await fetchWithTimeout('/api/chat', {

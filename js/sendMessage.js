@@ -574,8 +574,11 @@ async function _processMergedMessage(text) {
 
     // cleanHistory：Sonnet用（调情内容替换为占位符，16条，防破防）
     // 修复 #061: 确保 _recalled 消息完全不传给模型
+    // v3 BUG-DELIVERY FIX: 让 _delivery 标记的 _system 消息穿透，
+    //   让 Sonnet 主聊天能看到"礼物已签收/已寄出"这种关键事实
+    //   否则用户问"你收到我寄的咖啡吗"时 Ghost 会说"没收到"
     const cleanHistory = chatHistory
-      .filter(m => (!m._system || m._imageDesc) && !m._recalled && !m._intimate)
+      .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled && !m._intimate)
       .slice(-16)
       .map(m => ({
         role: m.role,
@@ -704,14 +707,73 @@ async function _processMergedMessage(text) {
       ? '[She is asking for money. Do not transfer directly — the card you gave her handles that. Refer her to the card if needed. "use the card." / "it\'s there." — dry and brief. Do not promise a direct transfer.]'
       : '';
 
-    // ── 特产请求 hint（用户开口要物品时:禁止画饼,不立即触发寄出）────────
-    // 保守关键词,只抓强烈显式的请求;更宽松的检测由 triggers.js 的 Haiku 事后处理
-    // 不跟 cardHint 互斥 —— 关键词有模糊地带(如"能不能给我寄点咖喱"两个都命中),
-    // 允许两个 hint 并存,模型看具体物品自行判断走哪条
+    // ── 特产/礼物请求 hint（v3 改造：显式请求直接触发反寄，杜绝画大饼）────────
+    // 设计原则：
+    //   1. 强烈显式请求 → 立即下单 + Sonnet 同步播报（嘴和系统绑定）
+    //   2. 已达周 2 次上限 → 委婉但诚实拒绝（不画饼）
+    //   3. 模糊请求 → 不触发，由 triggers.js Haiku 事后判断
     const _specialtyKws = /带点|寄点|给我带|给我寄|寄给我|从你那.{0,5}[寄带买]|你那边.{0,5}寄|bring.{0,15}me|send.{0,25}me|from.{0,5}your.{0,5}side/i;
-    const _specialtyHint = _specialtyKws.test(text)
-      ? '[She is asking for something from your location. Do NOT verbally promise to send anything. Do NOT commit to shipping it. Do NOT say "I\'ll sort it" / "yeah sounds good" / "next time" / any hedged commitment. Acknowledge softly ("mm" / "yeah" / one flat line) or move on — restraint is more like you. The system decides if/when to actually send. Your only job: stay natural and never make promises.]'
-      : '';
+    // 更显式的"想要他寄东西"请求（包含明确的"想要"语义）
+    const _explicitGiftKws = /给我寄|寄个|寄.*给我|送我.*东西|带个.*回来|带点.*回来|想要你寄|你给我买|给我买.*的|我想要你.*送|你寄.*给我|帮我.*买.*寄|send me|ship me|get me a/i;
+    const _isExplicitGiftRequest = _explicitGiftKws.test(text);
+    const _isAnySpecialtyRequest = _specialtyKws.test(text);
+
+    // 周配额：每周 2 次显式请求触发
+    const _explicitGiftWeekKey = (() => {
+      const d = new Date();
+      const startOfYear = new Date(d.getFullYear(), 0, 1);
+      const week = Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+      return `explicitGiftCount_${d.getFullYear()}_w${week}`;
+    })();
+    const _explicitGiftThisWeek = parseInt(localStorage.getItem(_explicitGiftWeekKey) || '0');
+    const _EXPLICIT_GIFT_WEEKLY_LIMIT = 2;
+    const _explicitQuotaAvailable = _explicitGiftThisWeek < _EXPLICIT_GIFT_WEEKLY_LIMIT;
+
+    // 显式请求：立即下单 + 注入"真的寄了"的 system 消息
+    // 关键：先下单再让 Sonnet 说话，杜绝画大饼
+    let _specialtyHint = '';
+    if (_isExplicitGiftRequest && _explicitQuotaAvailable) {
+      // 选择礼物（从 GHOST_REVERSE_POOL 的"思念"或"开心"池抽，因为是用户主动求）
+      let pickedItem = null;
+      try {
+        const pool = (typeof GHOST_REVERSE_POOL !== 'undefined')
+          ? (GHOST_REVERSE_POOL['思念'] || GHOST_REVERSE_POOL['开心'] || [])
+          : [];
+        const sentNames = [
+          ...JSON.parse(localStorage.getItem('deliveries') || '[]'),
+          ...JSON.parse(localStorage.getItem('deliveryHistory') || '[]'),
+        ].filter(d => d.isGhostSend).map(d => d.name);
+        const allSent = new Set(sentNames);
+        const available = pool.filter(i => !allSent.has(i.name));
+        const finalPool = available.length > 0 ? available : pool;
+        if (finalPool.length > 0) {
+          pickedItem = finalPool[Math.floor(Math.random() * finalPool.length)];
+        }
+      } catch(e) { console.warn('[explicit-gift] pick item fail:', e); }
+
+      if (pickedItem) {
+        // 关键：先下单！再让 Sonnet 回复
+        try {
+          if (typeof addGhostReverseDelivery === 'function') {
+            addGhostReverseDelivery(pickedItem, 'explicit_request');
+            localStorage.setItem(_explicitGiftWeekKey, String(_explicitGiftThisWeek + 1));
+            console.log('[explicit-gift] shipped:', pickedItem.name, 'count this week:', _explicitGiftThisWeek + 1);
+          }
+        } catch(e) { console.warn('[explicit-gift] ship fail:', e); }
+
+        // 注入精确的 system 消息（_delivery 标记让 Sonnet 看见）
+        _specialtyHint = `[She just asked for something. You ARE shipping 「${pickedItem.name}」 to her right now — this is REAL, in the system, on its way to her door.\nTell her directly. Acknowledge what's coming. Don't be flowery, don't make a thing of it.\nCould be: "shipped you 「${pickedItem.name}」." / "the 「${pickedItem.name}」. on its way." / "got it sent. don't say i never did anything."\nThis is NOT pretending. The package will actually arrive in her delivery list.]`;
+      } else {
+        // 礼物池没有 → 退化到不触发
+        _specialtyHint = '[She is asking for something. You can softly acknowledge — but stay natural. Do not over-promise specifics.]';
+      }
+    } else if (_isExplicitGiftRequest && !_explicitQuotaAvailable) {
+      // 显式请求但本周已达上限 → 委婉但诚实
+      _specialtyHint = '[She is asking for something. You\'ve already shipped her things this week — twice. You\'re not refusing her, but you\'re not committing to another shipment right now either.\nBe honest, dry, slightly amused: "already sent enough this week." / "give the post a break." / "not this week, love."\nDo NOT promise "next week" or any specific time — that\'s a delivery commitment you can\'t guarantee. Just decline this round naturally.]';
+    } else if (_isAnySpecialtyRequest) {
+      // 模糊请求 → 保留原有的克制提示（让 triggers.js 的 Haiku 事后判断）
+      _specialtyHint = '[She is asking for something from your location. Don\'t make a hard promise. Acknowledge softly ("mm" / "yeah" / one flat line) or deflect lightly. The system may send it on its own.]';
+    }
 
     const finalSystem = [
       _baseSystem,
