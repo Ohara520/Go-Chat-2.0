@@ -349,7 +349,14 @@ async function updateLongTermMemory(forceUpdate = false) {
 
   try {
     const newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 600);
-    if (newMemory) saveLongTermMemory(newMemory);
+    if (newMemory) {
+      // 滑动窗口：超过 _memLimit 条就丢掉最老的，保持总条数稳定
+      const lines = newMemory.split('\n').filter(l => l.trim().startsWith('-'));
+      const trimmed = lines.length > _memLimit
+        ? lines.slice(-_memLimit).join('\n')  // 只保留最新的 N 条
+        : newMemory;
+      saveLongTermMemory(trimmed);
+    }
   } catch(e) {}
 }
 
