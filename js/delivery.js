@@ -249,7 +249,7 @@ function addGhostReverseDelivery(item, emotionType) {
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
-        content: `[System: You sent her 「${item.name}」. It's on its way. DO NOT volunteer this in your reply. BUT — if she explicitly asks whether you sent something, or asks about a package she's wondering about, confirm honestly. Don't deny it. If she received something and asks "did you send this?" — yes, you sent it. Stay low-key. Don't make a thing of it.]`,
+        content: `[System: You sent her 「${item.name}」. It is still in transit — NOT delivered yet. Do NOT say or imply she has received it. Do NOT volunteer this. If she explicitly asks whether you sent something, confirm it is on the way. Do not say "got it" / "arrived" / "use it" — it has not arrived yet.]`,
         _system: true,
         _delivery: true
       });
@@ -261,7 +261,7 @@ function addGhostReverseDelivery(item, emotionType) {
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
-        content: `[System: You sent her 「${item.name}」. You just told her about it directly. If she asks again, you may confirm — but do not repeat the announcement.]`,
+        content: `[System: You sent her 「${item.name}」. It is on the way — NOT delivered yet. You just told her you sent something. Do NOT imply she has already received it.]`,
         _system: true,
         _delivery: true
       });
@@ -1155,4 +1155,62 @@ function _dismissNotice(id) {
       }
     }, 250);
   }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 离线补触发（对应外卖的 checkPendingTakeoutReactions）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function checkPendingDeliveryReactions() {
+  try {
+    const pending = JSON.parse(localStorage.getItem('pendingDeliveryReactions') || '[]');
+    if (!pending.length) return;
+    // 只处理 48 小时内的 pending，太旧的丢掉
+    const fresh = pending.filter(p => Date.now() - (p.savedAt || 0) < 48 * 3600 * 1000);
+    localStorage.removeItem('pendingDeliveryReactions');
+    fresh.forEach((item, idx) => {
+      setTimeout(() => {
+        if (item.delivery) onGhostReceived(item.delivery);
+      }, idx * 4000);
+    });
+  } catch(e) {}
+}
+
+// 用户切回聊天页时自动回放 pending
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      setTimeout(checkPendingDeliveryReactions, 1500);
+    }
+  });
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 离线补触发：用户回到聊天页时处理积压的签收反应
+// 对标 takeout.js 的 checkPendingTakeoutReactions
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function checkPendingDeliveryReactions() {
+  try {
+    const pending = JSON.parse(localStorage.getItem('pendingDeliveryReactions') || '[]');
+    if (!pending.length) return;
+    localStorage.removeItem('pendingDeliveryReactions');
+    pending.forEach((item, idx) => {
+      // 每条间隔4秒，防止同时触发多条挤在一起
+      setTimeout(() => {
+        if (item.delivery) onGhostReceived(item.delivery);
+      }, idx * 4000);
+    });
+  } catch(e) {}
+}
+
+// 用户切回聊天页时自动触发 pending
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      setTimeout(checkPendingDeliveryReactions, 1500);
+    }
+  });
 }

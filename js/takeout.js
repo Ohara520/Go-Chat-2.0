@@ -719,6 +719,16 @@ async function onGhostReceivedTakeout(order) {
   const told = (chatHistory || []).filter(m => m.role === 'user' && !m._system).slice(-20)
     .some(m => kw.some(k => k && (m.content || '').toLowerCase().includes(k)));
 
+  const container = document.getElementById('messagesContainer');
+  if (!container) {
+    // 不在聊天页面，存起来下次触发（不提前写 chatHistory，防止未卜先知）
+    const pending = JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]');
+    pending.push({ order, savedAt: Date.now() });
+    localStorage.setItem('pendingTakeoutReactions', JSON.stringify(pending));
+    return;
+  }
+
+  // 在聊天页面才注入 system 消息，防止用户不在场时 Ghost 已经"知道收到了"
   if (typeof chatHistory !== 'undefined') {
     chatHistory.push({
       role: 'user',
@@ -727,17 +737,8 @@ async function onGhostReceivedTakeout(order) {
         : `[A takeout delivery just showed up — 「${order.nameEn || order.name}」. You didn't know she was ordering. You have it now. If she asks, confirm you received it.]`,
       _system: true,
     });
-    // 只在有真实聊天记录时才保存，防止空 chatHistory 覆盖本地历史
     const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
     if (_realMsgs.length > 0 && typeof saveHistory === 'function') saveHistory();
-  }
-
-  const container = document.getElementById('messagesContainer');
-  if (!container) {
-    const pending = JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]');
-    pending.push({ order, savedAt: Date.now() });
-    localStorage.setItem('pendingTakeoutReactions', JSON.stringify(pending));
-    return;
   }
 
   // 正在发消息就等一会儿，不干扰用户输入
