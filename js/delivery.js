@@ -1220,3 +1220,8 @@ if (typeof document !== 'undefined') {
     }
   });
 }
+
+// ── 关键修复：把 onGhostReceived 挂到 window 上 ──
+// dates.js 的 hook 需要从 window 拦截，否则 delivery.js 内部直接调用
+// 本地函数会完全绕过 hook，导致礼物签收后进不了小屋
+window.onGhostReceived = onGhostReceived;

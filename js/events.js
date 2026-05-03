@@ -337,7 +337,8 @@ ${moodHint}${_followUpHint}${_contextBlock}${_ciNoRepeat}`,
 
     case 'reverse_package': {
       const motive = payload.motive || 'delayed_longing';
-      const item   = payload.item || decideReversePackageItem(motive);
+      // item 优先用 triggers.js 已经选好的，没有才重新生成
+      const item = payload.item || await generateReversePackageItem(motive, payload.contextSnapshot || (typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []));
       const motiveHint = {
         practical_care:   'He sent it because it needed doing. Not a gesture — just handling it. Slightly bossy about it.',
         compensation:     'Something happened between them. He is not apologizing out loud. This is what he does instead.',
@@ -387,7 +388,37 @@ English only.`,
 
       line = generatedLine;
       sideEffect = () => {
-        if (typeof addGhostReverseDelivery === 'function') addGhostReverseDelivery(item, motive);
+        if (typeof addGhostReverseDelivery === 'function') {
+          // triggers.js 的情绪反寄已经做过冷却检查，直接更新冷却时间跳过重复检查
+          if (payload.item) {
+            localStorage.setItem('lastAnyReverseAt', Date.now().toString());
+            // 直接调内部逻辑，跳过 addGhostReverseDelivery 的冷却拦截
+            const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+            const now = Date.now();
+            const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000;
+            const interval = totalMs / (typeof DELIVERY_STAGES_GHOST !== 'undefined' ? DELIVERY_STAGES_GHOST.length : 6);
+            deliveries.unshift({
+              id: now,
+              name: item.name,
+              emoji: item.emoji,
+              isGhostSend: true,
+              isEmotionReverse: true,
+              isSecretDelivery: false,
+              visibleAt: now + ((Math.floor(Math.random() * 24) + 24) * 3600 * 1000),
+              emotionType: payload.emotionType || motive,
+              stages: (typeof DELIVERY_STAGES_GHOST !== 'undefined' ? DELIVERY_STAGES_GHOST : []).map((s, i) => ({ ...s, triggerAt: now + interval * (i + 1), done: false })),
+              currentStage: 0,
+              done: false,
+              isLost: false,
+              lostAtStage: -1,
+              isLostConfirmed: false,
+              productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc || '', tip: item.tip || '' }
+            });
+            localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
+          } else {
+            addGhostReverseDelivery(item, motive);
+          }
+        }
         setLastReversePackageTurn(_globalTurnCount);
       };
       break;

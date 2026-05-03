@@ -126,7 +126,7 @@ function pickReadyPendingEvent() {
     if (topicShifted) return null;
   }
 
-  return { type: 'reverse_package', motive: ready.motive, contextSnapshot: ready.contextSnapshot || [] };
+  return { type: 'reverse_package', motive: ready.motive, item: ready.item, emotionType: ready.emotionType, contextSnapshot: ready.contextSnapshot || [] };
 }
 
 function decideMainIntent(text, pendingEvent) {
