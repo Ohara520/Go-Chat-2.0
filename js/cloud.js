@@ -462,7 +462,7 @@ async function loadFromCloud() {
         localStorage.setItem(key, JSON.stringify(merged.slice(0, maxLen)));
       };
       mergeArrays('storyBook', s.storyBook, 30);
-      mergeArrays('collections', s.collections, 50);
+      mergeArrays('collections', s.collections, 400);
       mergeArrays('coupleFeedHistory', s.coupleFeedHistory, 50);
       mergeArrays('deliveryHistory', s.deliveryHistory, 50);
       mergeArrays('takeoutHistory', s.takeoutHistory, 50);
@@ -736,7 +736,7 @@ async function saveToCloud() {
       // 故事书、相册、朋友圈
       // 故事书、相册、朋友圈——只存最近10条，减小体积
       storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 10),
-      collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 50),
+      collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 400),
       coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 25),
       coupleFeedDate: localStorage.getItem('coupleFeedDate') || '',
       organicFeedCount: localStorage.getItem('organicFeedCount_' + getTodayDateStr()) || '0',
