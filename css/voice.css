@@ -1,0 +1,233 @@
+/* ============================================================
+   voice.css — 语音功能样式 v2.0
+   配色适配 Go Chat 绿色主题（#5a9a46 / #1e4020）
+
+   § 1  日常聊天：语音条（.vc-bar-wrap）
+   § 2  约会场景：小喇叭按钮（.date-spk-btn）
+============================================================ */
+
+
+/* ══════════════════════════════════════════════════════════
+   § 1  日常聊天语音条
+   ══════════════════════════════════════════════════════════ */
+
+/* 消息行（与 .bot-message 布局并列） */
+.vc-message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 12px;
+  margin-bottom: 8px;
+  justify-content: flex-start;
+}
+
+/* 语音条外壳 */
+.vc-bar-wrap {
+  max-width: 220px;
+  min-width: 140px;
+  background: rgba(255, 255, 255, 0.80);
+  border: 1.5px solid rgba(140, 190, 100, 0.30);
+  border-radius: 18px 18px 18px 4px;   /* 左下直角 = Ghost 气泡方向 */
+  box-shadow: 0 2px 10px rgba(60, 120, 40, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* 播放中：整条微微变绿 */
+.vc-bar-wrap.vc-playing {
+  border-color: rgba(90, 154, 70, 0.50);
+  box-shadow: 0 2px 14px rgba(60, 120, 40, 0.14);
+}
+
+/* 主行（横排：播放键 + 波形 + 时长 + 文字按钮） */
+.vc-bar-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px 9px 9px;
+}
+
+/* ── 播放按钮 ── */
+.vc-play-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #5a9a46, #3d7a2a);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(60, 120, 40, 0.25);
+  transition: background 0.15s, transform 0.1s;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.vc-play-btn:active { transform: scale(0.90); }
+.vc-play-btn svg    { display: block; flex-shrink: 0; }
+
+/* 加载中省略号动画 */
+.vc-icon-spin {
+  font-size: 13px;
+  animation: vcPulse 0.8s linear infinite;
+  color: rgba(255,255,255,0.85);
+  line-height: 1;
+}
+@keyframes vcPulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* ── 波形区域 ── */
+.vc-waveform {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  flex: 1;
+  height: 22px;
+}
+.vc-bar {
+  display: inline-block;
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(60, 110, 40, 0.28);
+  transform-origin: center;
+  transition: background 0.2s;
+}
+
+/* 播放中：柱子变色 + 律动 */
+.vc-bar-wrap.vc-playing .vc-bar {
+  background: rgba(60, 130, 40, 0.65);
+  animation: vcWave 0.6s ease-in-out infinite alternate;
+}
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(1) { animation-delay: 0.00s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(2) { animation-delay: 0.07s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(3) { animation-delay: 0.14s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(4) { animation-delay: 0.21s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(5) { animation-delay: 0.28s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(6) { animation-delay: 0.21s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(7) { animation-delay: 0.14s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(8) { animation-delay: 0.07s; }
+.vc-bar-wrap.vc-playing .vc-bar:nth-child(9) { animation-delay: 0.00s; }
+@keyframes vcWave {
+  0%   { transform: scaleY(0.55); }
+  100% { transform: scaleY(1.80); }
+}
+
+/* ── 时长文字 ── */
+.vc-duration {
+  font-size: 11px;
+  color: rgba(30, 64, 32, 0.50);
+  white-space: nowrap;
+  min-width: 26px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}
+.vc-bar-wrap.vc-playing .vc-duration { color: rgba(30, 64, 32, 0.75); }
+
+/* ── 转文字按钮 ── */
+.vc-txt-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: rgba(50, 110, 30, 0.55);
+  background: rgba(90, 154, 70, 0.08);
+  border: 1px solid rgba(90, 154, 70, 0.20);
+  border-radius: 8px;
+  padding: 3px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.vc-txt-btn:active      { transform: scale(0.93); }
+.vc-txt-btn.vc-txt-active {
+  color: #2d6020;
+  background: rgba(90, 154, 70, 0.18);
+  border-color: rgba(90, 154, 70, 0.40);
+}
+
+/* ── 展开的文字区 ── */
+.vc-transcript {
+  font-size: 12.5px;
+  color: rgba(30, 64, 32, 0.80);
+  line-height: 1.55;
+  padding: 0 12px 11px 52px;   /* 左边留出头像+播放键的宽度 */
+  border-top: 1px solid rgba(90, 154, 70, 0.10);
+  word-break: break-word;
+  font-style: italic;
+  letter-spacing: 0.1px;
+  animation: vcFadeIn 0.2s ease;
+}
+@keyframes vcFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   § 2  约会场景：小喇叭按钮
+   ══════════════════════════════════════════════════════════ */
+
+/* 约会气泡本身需要留右下角空间 */
+.date-bubble-ghost {
+  position: relative;
+  padding-bottom: 22px !important;
+  padding-right: 36px  !important;  /* 给喇叭留位置 */
+}
+
+/* 小喇叭按钮 */
+.date-spk-btn {
+  position: absolute;
+  bottom: 5px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.50);
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  z-index: 3;
+  transition: background 0.15s, transform 0.12s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18);
+}
+.date-spk-btn:active { transform: scale(0.88); }
+
+/* 加载中：半透明闪烁 */
+.date-spk-btn.date-spk-loading {
+  animation: vcPulse 0.7s linear infinite;
+}
+
+/* 播放中：亮起来 */
+.date-spk-btn.date-spk-playing {
+  background: rgba(60, 130, 40, 0.75);
+  border-color: rgba(180, 230, 150, 0.65);
+  box-shadow: 0 0 8px rgba(60, 130, 40, 0.40);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   § 3  移动端适配
+   ══════════════════════════════════════════════════════════ */
+
+@media (max-width: 420px) {
+  .vc-bar-wrap { min-width: 120px; max-width: 190px; }
+  .vc-play-btn { width: 30px; height: 30px; }
+  .vc-txt-btn  { font-size: 10px; padding: 2px 6px; }
+  .date-spk-btn { width: 24px; height: 24px; font-size: 12px; }
+}
