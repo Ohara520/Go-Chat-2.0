@@ -234,9 +234,16 @@ function initLocation() {
   const now = Date.now();
   let chosen;
 
+  // 有保存的地点且没到换地点时间 → 直接用，不重新随机
   if (saved && now < nextChange) {
     chosen = LOCATIONS.find(l => l.name === saved) || LOCATIONS[0];
+  } else if (saved && !nextChange) {
+    // 有地点但没有 nextChange（老用户/清缓存用户）→ 保留当前地点，重新设定换点时间
+    chosen = LOCATIONS.find(l => l.name === saved) || LOCATIONS[0];
+    const days = 2 + Math.floor(Math.random() * 2); // 2~3天
+    localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
   } else {
+    // 真正到了换地点时间 → 随机新地点
     const roll = Math.random() * 100;
     let cumulative = 0;
     chosen = LOCATIONS[0];
@@ -248,14 +255,12 @@ function initLocation() {
     localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
     localStorage.setItem('currentLocationReason', chosen.reason || '');
     localStorage.setItem('currentLocationType', chosen.type || 'base');
-    const days = 1 + Math.floor(Math.random() * 3);
+    const days = 2 + Math.floor(Math.random() * 2); // 2~3天
     localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
-    // 修复：换地点时记录到达时间，供 checkLocationSpecialAutoTrigger 判断"待满2天"
     const _locKey = (chosen.name || '').replace(/\s+/g, '_');
     localStorage.setItem('locationArrivedAt_' + _locKey, now.toString());
     localStorage.setItem('locationArrivedAt_' + chosen.name, now.toString());
 
-    // 追踪本月各类地点天数（用于月底工资计算）
     const monthKey = 'locDays_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1);
     const locDays  = JSON.parse(localStorage.getItem(monthKey) || '{"deployed":0,"base":0,"leave":0}');
     const type     = chosen.type || 'base';

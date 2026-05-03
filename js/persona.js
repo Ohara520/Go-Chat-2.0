@@ -229,11 +229,15 @@ function getRelationshipBlock() {
   if (mode === 'slowBurn') {
     // 已经解锁过就永久用established，不再回头
     if (localStorage.getItem('relationshipUnlocked') === 'true') {
+      // 顺手把 marriageType 也改掉，让黑卡/状态系统同步升级
+      localStorage.setItem('marriageType', 'established');
       return relationshipBlock.established;
     }
     const affection = parseInt(localStorage.getItem('affection') || '30');
     if (affection >= 60) {
       localStorage.setItem('relationshipUnlocked', 'true');
+      // 关键：marriageType 同步升级，黑卡上限、moneyEase 等全部跟着升
+      localStorage.setItem('marriageType', 'established');
       return relationshipBlock.established;
     }
     return relationshipBlock.slowBurn;

@@ -906,7 +906,22 @@ window.endDateScene = endDateScene;
 // 把约会存进相册
 function finalizeDateMemory() {
   if (!_activeDate) return;
+
+  // 防重复：同城市同餐厅 60 秒内不允许重复保存
   const memories = getDateMemories();
+  const now = Date.now();
+  const isDuplicate = memories.some(m =>
+    m.cityId === _activeDate.city.id &&
+    m.restaurantName === _activeDate.restaurant.name &&
+    now - m.timestamp < 60 * 1000
+  );
+  if (isDuplicate) {
+    if (typeof showToast === 'function') showToast('📷 已经存过了～');
+    _activeDate = null;
+    if (typeof openScreen === 'function') openScreen('dateHubScreen');
+    setTimeout(() => { if (typeof renderDateHub === 'function') renderDateHub(); }, 50);
+    return;
+  }
   const id = 'date_' + Date.now();
   const memory = {
     id,

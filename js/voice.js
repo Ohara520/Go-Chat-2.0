@@ -232,6 +232,13 @@ function maybeTriggerVoice(botReply) {
   const intimacy = (typeof getTrustHeat === 'function') ? getTrustHeat() : 50;
   if (intimacy < VOICE_CONFIG.minIntimacyForVoice) return;
   if (Math.random() > VOICE_CONFIG.voiceChance) return;
+
+  // 每天最多触发8条语音
+  const _dayKey = 'voiceCount_' + new Date().toDateString();
+  const _todayCount = parseInt(localStorage.getItem(_dayKey) || '0');
+  if (_todayCount >= 5) return;
+  localStorage.setItem(_dayKey, _todayCount + 1);
+
   setTimeout(() => appendVoiceMessage(botReply), 900);
 }
 window.maybeTriggerVoice = maybeTriggerVoice;
@@ -308,6 +315,15 @@ function installDateVoiceButtons() {
   });
 }
 window.installDateVoiceButtons = installDateVoiceButtons;
+
+// 每秒检查一次约会页面，有气泡就注入喇叭
+// 解决：patch 安装前 renderDateScene 已经跑了，气泡没有喇叭的问题
+setInterval(() => {
+  const screen = document.getElementById('dateSceneScreen');
+  if (screen && screen.classList.contains('active')) {
+    installDateVoiceButtons();
+  }
+}, 1000);
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
