@@ -826,6 +826,10 @@ function _finishPurchase(p, isWishlist, isLuxury) {
   if (p.isHomeItem && !p.comingSoon) setTimeout(() => triggerHomeItemMoment(p), 2000);
 
   renderMarket(currentCategory);
+  // 修复：购买完成后刷新物流追踪器，确保新快递立即显示
+  if (typeof renderDeliveryTracker === 'function') {
+    setTimeout(() => renderDeliveryTracker(), 300);
+  }
   if (typeof saveToCloud === 'function') saveToCloud().catch(()=>{});
 }
 

@@ -854,12 +854,12 @@ function renderDeliveryTracker() {
   tracker.innerHTML = visible.map((d) => {
     const isGhost = d.isGhostSend;
     if (d.isLostConfirmed) {
-      return `<span class="delivery-tag" onclick="openDeliveryModal(${active.indexOf(d)})" style="background:rgba(255,235,235,0.9);border-color:rgba(240,100,100,0.5);color:#b91c1c;">
+      return `<span class="delivery-tag" onclick="openDeliveryModalById(${d.id})" style="background:rgba(255,235,235,0.9);border-color:rgba(240,100,100,0.5);color:#b91c1c;">
         <span style="font-size:10px">❌</span>
         ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
       </span>`;
     }
-    return `<span class="delivery-tag" onclick="openDeliveryModal(${active.indexOf(d)})" style="${isGhost ? 'background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.5);' : ''}">
+    return `<span class="delivery-tag" onclick="openDeliveryModalById(${d.id})" style="${isGhost ? 'background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.5);' : ''}">
       <div class="delivery-tag-dot" style="${isGhost ? 'background:#a855f7;' : ''}"></div>
       ${isGhost ? '💌 ' : ''}${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
     </span>`;
@@ -885,10 +885,28 @@ function openDeliveryModal(idx) {
     if (d.isSecretDelivery) return d.currentStage >= d.stages.length - 2;
     return true;
   });
-
   const d = active[idx];
   if (!d) return;
+  _renderDeliveryModal(d);
+}
 
+// Bug fix：通过 id 打开详情，避免 index 在两次计算间不同步导致打开错误快递
+function openDeliveryModalById(id) {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const now        = Date.now();
+  const active     = deliveries.filter(d => {
+    if (d.done || d.lostTicketExpired) return false;
+    if (d.visibleAt && now < d.visibleAt) return false;
+    if (d.isLostConfirmed && (!d.lostConfirmedAt || now - d.lostConfirmedAt > 48 * 3600 * 1000)) return false;
+    if (d.isSecretDelivery) return d.currentStage >= d.stages.length - 2;
+    return true;
+  });
+  const d = active.find(d => d.id === id);
+  if (!d) return;
+  _renderDeliveryModal(d);
+}
+
+function _renderDeliveryModal(d) {
   const titleEl = document.getElementById('deliveryModalTitle');
   if (titleEl) titleEl.textContent = d.emoji + ' ' + d.name;
 

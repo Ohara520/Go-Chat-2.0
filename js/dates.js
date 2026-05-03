@@ -291,7 +291,7 @@ const _giftCaptureQueue = [];
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const _GIFT_QUEUE_TIMEOUT_MS = 90000;     // 90 秒过期
-const _GIFT_AUTO_CHECK_MS    = 30000;     // 每 30 秒自动检查
+const _GIFT_POLL_MS          = 5000;      // 每 5 秒轮询一次（v3）
 
 // 通用感谢/收到关键词（任一命中即认为是礼物反应）
 const _GIFT_REACTION_KEYWORDS = [
@@ -337,96 +337,119 @@ function _isGiftReaction(message, delivery) {
 }
 
 /**
- * 处理过期队列：超时还没匹配到反应的礼物，强制入小屋（反应留空）
- * 这个函数会被两个地方调用：
- *   1. _safeDeliverySaveHistory hook（聊天活动触发）
- *   2. setInterval 定时器（用户没活动也能触发）
+ * 处理过期队列（保留供外部兼容调用，实际逻辑已整合进 _pollGiftQueue）
  */
 function _processStaleGiftQueue() {
-  while (_giftCaptureQueue.length && Date.now() - _giftCaptureQueue[0].ts > _GIFT_QUEUE_TIMEOUT_MS) {
-    const stale = _giftCaptureQueue.shift();
-    if (!stale.captured) {
-      console.log('[dates] gift timeout, recording without reaction:', stale.delivery.name);
-      recordGiftToShelf(stale.delivery, ''); // 留空，符合方案 A
+  _pollGiftQueue();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Bug fix 说明（v3）：
+//
+// 原版两个根本问题：
+//
+// Bug 1：window._safeDeliverySaveHistory hook 包的是空的
+//   _safeDeliverySaveHistory 在 delivery.js 里是普通函数声明，
+//   不挂在 window 上，所以 window._safeDeliverySaveHistory === undefined，
+//   hook 一碰到这个就 return 了，匹配逻辑和定时器都没启动。
+//   礼物永久卡队列，关页面就丢了。
+//
+// Bug 2：时间戳判断用 msg._time || Date.now()
+//   绝大多数 chatHistory 消息没有 _time 字段，fallback 成 Date.now()，
+//   永远 > head.ts，break 条件失效——循环会扫完整个历史，
+//   但也意味着旧消息会被误匹配上。
+//
+// 修法（v3）：
+//   1. 放弃包装 _safeDeliverySaveHistory，改用轮询：
+//      每 5 秒扫一次队列，直接读 chatHistory（全局变量）做匹配。
+//      不依赖任何 window 挂载，100% 可靠。
+//   2. 队列入队时记录当前 chatHistory.length（histLenAtQueue），
+//      匹配时只看入队后新增的消息，杜绝误匹配历史消息。
+//   3. onGhostReceived hook 保留，但加防御性重试（DOM ready 后 200ms 重试一次）。
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// _GIFT_POLL_MS 已在上方第294行定义，此处不重复声明
+
+/**
+ * 核心轮询：扫队列，匹配反应 + 清理超时
+ * 每 5 秒自动调用，不依赖任何外部 hook
+ */
+function _pollGiftQueue() {
+  try {
+    const now = Date.now();
+    const history = (typeof chatHistory !== 'undefined') ? chatHistory : [];
+
+    let i = 0;
+    while (i < _giftCaptureQueue.length) {
+      const item = _giftCaptureQueue[i];
+      if (item.captured) { _giftCaptureQueue.splice(i, 1); continue; }
+
+      // 超时兜底：90 秒还没匹配到 → 留空入小屋
+      if (now - item.ts > _GIFT_QUEUE_TIMEOUT_MS) {
+        console.log('[dates] gift timeout, recording without reaction:', item.delivery.name);
+        recordGiftToShelf(item.delivery, '');
+        _giftCaptureQueue.splice(i, 1);
+        continue;
+      }
+
+      // 只看入队后新增的 assistant 消息（用 histLenAtQueue 作为起点）
+      const startIdx = item.histLenAtQueue || 0;
+      for (let j = startIdx; j < history.length; j++) {
+        const msg = history[j];
+        if (msg.role !== 'assistant' || !msg.content || msg._system) continue;
+        if (_isGiftReaction(msg.content, item.delivery)) {
+          console.log('[dates] gift reaction matched:', item.delivery.name);
+          item.captured = true;
+          recordGiftToShelf(item.delivery, msg.content);
+          _giftCaptureQueue.splice(i, 1);
+          break;
+        }
+      }
+
+      if (!item.captured) i++;
     }
-  }
+  } catch(e) { console.warn('[dates] _pollGiftQueue error:', e); }
 }
 
 function _installGiftCaptureHooks() {
-  // 包装 onGhostReceived：只追踪用户寄给 Ghost 的礼物
-  const _origOnGhostReceived = window.onGhostReceived;
-  if (typeof _origOnGhostReceived !== 'function') {
-    console.warn('[dates] onGhostReceived 未找到 — 物品架捕获未安装。请确认 dates.js 在 delivery.js 之后加载。');
+  // ── onGhostReceived hook：把礼物推入队列 ──
+  // delivery.js 里是普通函数，同时也挂到了 window（delivery.js 末尾或被 checkDeliveryUpdates 调用）
+  // 双重保险：先试 window.onGhostReceived，再试全局函数名
+  const _origFn = window.onGhostReceived || (typeof onGhostReceived === 'function' ? onGhostReceived : null);
+  if (typeof _origFn !== 'function') {
+    // delivery.js 还没加载完，200ms 后重试
+    setTimeout(_installGiftCaptureHooks, 200);
     return;
   }
-  if (window.onGhostReceived._giftPatched) return; // 防止重复包装
-  window.onGhostReceived = async function(delivery) {
-    try {
-      // 只捕获用户寄给 Ghost 的（非 Ghost 反寄、非 isUserItem）
-      if (delivery && !delivery.isGhostSend &&
-          !(delivery.productData && delivery.productData.isUserItem)) {
-        _giftCaptureQueue.push({ delivery, ts: Date.now(), captured: false });
-        console.log('[dates] gift queued for reaction matching:', delivery.name);
-      }
-    } catch(e) { console.warn('[dates] queue push fail:', e); }
-    return await _origOnGhostReceived.apply(this, arguments);
-  };
-  window.onGhostReceived._giftPatched = true;
-
-  // 包装 _safeDeliverySaveHistory：每次 delivery 保存 chatHistory 时，
-  // 智能匹配 Ghost 反应消息
-  const _origSaveHist = window._safeDeliverySaveHistory;
-  if (typeof _origSaveHist !== 'function') {
-    console.warn('[dates] _safeDeliverySaveHistory 未找到 — 物品架捕获回退到无文字模式。');
-    return;
-  }
-  if (window._safeDeliverySaveHistory._giftPatched) return;
-  window._safeDeliverySaveHistory = function() {
-    const result = _origSaveHist.apply(this, arguments);
-    try {
-      // 1. 清理过期队列
-      _processStaleGiftQueue();
-
-      // 2. 智能匹配队首礼物的反应
-      if (_giftCaptureQueue.length > 0 && typeof chatHistory !== 'undefined') {
-        const head = _giftCaptureQueue[0];
-        if (!head.captured) {
-          // 只看礼物入队后产生的 assistant 消息（防止匹配到入队前的消息）
-          // 从最近往前找，找到第一条入队后的 assistant 消息
-          for (let i = chatHistory.length - 1; i >= 0; i--) {
-            const msg = chatHistory[i];
-            if (msg.role !== 'assistant' || !msg.content) continue;
-
-            // 假设 msg 没有 _time 字段时，默认它是新的（容错）
-            const msgTime = msg._time || Date.now();
-            if (msgTime < head.ts) break; // 已经早于礼物入队，停止往前找
-
-            // 用智能匹配判断是否真的是礼物反应
-            if (_isGiftReaction(msg.content, head.delivery)) {
-              head.captured = true;
-              console.log('[dates] gift reaction matched:', head.delivery.name);
-              recordGiftToShelf(head.delivery, msg.content);
-              _giftCaptureQueue.shift();
-              break;
-            }
-            // 不是礼物反应 → 不匹配，继续等下次保存
-          }
+  if (!window.onGhostReceived?._giftPatched) {
+    window.onGhostReceived = async function(delivery) {
+      try {
+        if (delivery && !delivery.isGhostSend &&
+            !(delivery.productData && delivery.productData.isUserItem)) {
+          const histLen = (typeof chatHistory !== 'undefined') ? chatHistory.length : 0;
+          _giftCaptureQueue.push({
+            delivery,
+            ts: Date.now(),
+            captured: false,
+            histLenAtQueue: histLen  // Bug 2 fix：记录入队时的 history 长度
+          });
+          console.log('[dates] gift queued:', delivery.name, '(histLen:', histLen, ')');
         }
-      }
-    } catch(e) { console.warn('[dates] capture fail:', e); }
-    return result;
-  };
-  window._safeDeliverySaveHistory._giftPatched = true;
+      } catch(e) { console.warn('[dates] queue push fail:', e); }
+      return await _origFn.apply(this, arguments);
+    };
+    window.onGhostReceived._giftPatched = true;
+  }
 
-  // 3. 启动定时自救：每 30 秒检查一次过期队列
-  // 即使用户没在聊天活动，过期礼物也会被兜底入小屋
+  // ── Bug 1 fix：用轮询替代 _safeDeliverySaveHistory hook ──
+  // 不再依赖 window._safeDeliverySaveHistory（它根本不在 window 上）
+  // 直接 setInterval 每 5 秒扫一次，可靠且简单
   if (!window._giftQueueAutoTimer) {
     window._giftQueueAutoTimer = setInterval(() => {
-      try { _processStaleGiftQueue(); } catch(e) {}
-    }, _GIFT_AUTO_CHECK_MS);
+      try { _pollGiftQueue(); } catch(e) {}
+    }, _GIFT_POLL_MS);
+    console.log('[dates] 物品架捕获 hook 已安装（v3: poll-based, no window hook dependency）');
   }
-
-  console.log('[dates] 物品架捕获 hook 已安装（v2: smart match + auto timer）');
 }
 
 // DOM 就绪后安装（保证 delivery.js 已挂载全局函数）

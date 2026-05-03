@@ -167,7 +167,7 @@ function renderGhostCardWallet() {
   const card           = (typeof getGhostCard === 'function') ? getGhostCard() : null;
   const coldWar        = localStorage.getItem('coldWarMode') === 'true';
   const suspended      = coldWar || !card || card.monthlyLimit === 0;
-  const available      = card ? Math.max(0, Math.min(card.balance, card.monthlyLimit - card.spentThisMonth)) : 0;
+  const available      = card ? Math.max(0, card.balance) : 0;
   const monthlyLimit   = card ? card.monthlyLimit : 0;
   const spentThisMonth = card ? (card.spentThisMonth || 0) : 0;
   const usedPct        = monthlyLimit > 0 ? Math.min(100, Math.round(spentThisMonth / monthlyLimit * 100)) : 0;

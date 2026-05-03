@@ -181,7 +181,10 @@ async function callGrokWithCtx(systemPrompt, writePrompt, n = 4) {
   const userContent = recentCtx
     ? `Recent chat:\n${recentCtx}\n\n${writePrompt}`
     : writePrompt;
-  return await callGrok(systemPrompt, userContent, 100);
+  // Bug fix: 原来写的 callGrok(systemPrompt, userContent, 100) 参数顺序错了
+  // callGrok 签名是 (user, maxTokens, ...) — systemPrompt 被当作 user，userContent 被当作 maxTokens（数字位传了字符串）
+  // 改用 callGrokWithSystem(system, user, maxTokens) 正确传参
+  return await callGrokWithSystem(systemPrompt, userContent, 100);
 }
 
 // ── 事件冷却管理 ──────────────────────────────────
@@ -764,6 +767,11 @@ async function checkLocationSpecialTrigger(userText) {
       consumeSpecialtyPendingMatching(item.name);
     }
 
+    // Bug fix：预占统一反寄冷却位，防止 30-60min 延迟期间被其他反寄触发
+    // 若不预占，addGhostReverseDelivery 的冷却检查会在延迟到期后才看到，
+    // 但此时 lastAnyReverseAt 可能已被别的反寄写入，导致本次反寄被拦截丢失
+    localStorage.setItem('lastAnyReverseAt', Date.now().toString());
+
     // ── 30-60分钟后出现包裹 ──────────────────────
     const delay = (30 + Math.floor(Math.random() * 30)) * 60 * 1000;
     setTimeout(() => {
@@ -843,6 +851,9 @@ function checkLocationSpecialAutoTrigger() {
     if (typeof consumeSpecialtyPendingMatching === 'function') {
       consumeSpecialtyPendingMatching(item.name);
     }
+
+    // Bug fix：预占统一反寄冷却位（同 checkLocationSpecialTrigger）
+    localStorage.setItem('lastAnyReverseAt', Date.now().toString());
 
     const delay = (30 + Math.floor(Math.random() * 30)) * 60 * 1000;
     setTimeout(() => {

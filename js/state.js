@@ -940,6 +940,8 @@ function startColdWar() {
 function endColdWar(userApologized = false) {
   localStorage.setItem('coldWarMode', 'false');
   localStorage.removeItem('coldWarStage');
+  // Bug fix: 写入冷战结束时间，供 buildIntimateStateBriefing 检测"刚和好的余温"
+  localStorage.setItem('coldWarEndedAt', Date.now().toString());
   _touch();
   refreshStatusEmoji();
   if (coldWarTimer) { clearTimeout(coldWarTimer); coldWarTimer = null; }

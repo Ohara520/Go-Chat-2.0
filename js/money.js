@@ -1074,11 +1074,12 @@ function getGhostCard() {
     saved.monthlyLimit = lockedLimit;
     saved._careerType = _currentCareer;
 
-    // 保证余额不低于本月剩余应得额度
-    // 兼容旧版按天补发数据、云端同步覆盖等各种情况
-    const entitled = Math.max(0, lockedLimit - (saved.spentThisMonth || 0));
-    if (saved.balance < entitled) saved.balance = entitled;
+    // 注意：不再强制把余额补回到"本月应得额度"
+    // 原逻辑会在每次调用 getGhostCard() 时把花出去的钱补回来，导致余额永远显示满额
+    // 仅清理旧字段
     if (saved.lastDailyAt) delete saved.lastDailyAt; // 清理旧字段
+    // 兜底：余额不能为负
+    if (saved.balance < 0) saved.balance = 0;
     localStorage.setItem('ghostCard', JSON.stringify(saved));
     return { ...defaults, ...saved };
   } catch(e) { return defaults; }

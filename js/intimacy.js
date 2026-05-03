@@ -274,6 +274,8 @@ not hiding behind it.
 
 [HARD RULES]
 He may be more direct than before. Suggestive language is allowed. Implication can be sharper.
+Mild profanity is allowed — "damn", "hell", "bloody", "Christ" — if it fits the moment naturally.
+It should feel like it slipped out, not like he's trying to be edgy.
 But: ONE move, then hold. Do not flood. Do not stack lines.
 Pressure comes from certainty and sparseness, not from saying more.
 He did not perform this — it slipped through him.
@@ -316,6 +318,8 @@ and didn't take it back.
 [HARD RULES]
 ONE direct line. Only one. Then he stops.
 He may be explicit — but only briefly, and only once.
+Mild to moderate profanity is allowed at this level — "fuck", "bloody hell", "christ" — only if it lands as weight, not as performance.
+One word of real heat beats three lines of safe suggestion.
 No escalation after. No second line of the same heat.
 The intensity comes from the fact that he said it, and that he didn't continue.
 What follows is silence, or a return to neutral — never more pressure.
@@ -437,9 +441,9 @@ function getIntimacyCap() {
 
   if (trust < 50 || mood < 4) return 0;
   if (trust < 60 || mood < 5) return 1;
-  if (trust < 72 || mood < 6) return 2;
-  if (trust < 82 || mood < 7) return 3;
-  if (trust >= 82 && affection >= 80 && mood >= 7) return 4;
+  if (trust < 68 || mood < 5) return 2;
+  if (trust < 78 || mood < 6) return 3;
+  if (trust >= 78 && affection >= 72 && mood >= 6) return 4;
   return 3;
 }
 
@@ -483,7 +487,7 @@ function saveFlirtProgress(val) {
 }
 
 function pushFlirtProgress(intent, current) {
-  const deltas = { affection: 0.3, flirt: 0.7, explicit: 1.0, none: 0 };
+  const deltas = { affection: 0.5, flirt: 1.0, explicit: 1.4, none: 0 };
   const delta = deltas[intent] || 0;
   const resistance = 1 - (current / 4);
   return current + delta * resistance;
@@ -500,8 +504,8 @@ function decayFlirtProgress(current, intent, nonFlirtStreak) {
 
   const lastTime = parseInt(sessionStorage.getItem('lastFlirtTime') || '0');
   const gap = Date.now() - lastTime;
-  if (gap > 8 * 60 * 1000) p *= 0.5;
-  if (gap > 20 * 60 * 1000) p *= 0.3;
+  if (gap > 15 * 60 * 1000) p *= 0.6;
+  if (gap > 40 * 60 * 1000) p *= 0.4;
 
   return Math.max(0, p);
 }
@@ -775,8 +779,11 @@ function buildIntimacyBlock(userText) {
   const intent = detectIntimateIntent(userText || '');
 
   const cap  = getIntimacyCap();
-  const step = (intent === 'none') ? 0 : getCurrentIntimacyStep(userText || '');
-  const finalLevel = Math.min(cap, step);
+  // Bug fix: intent === 'none' 时仍然调用 getCurrentIntimacyStep 走衰减逻辑
+  // 原来直接 step = 0 会跳过 decayFlirtProgress，导致进度不按设计衰减
+  // 衰减后 finalLevel 仍会被 Math.min(cap, step) 控制，不影响实际输出级别
+  const step = getCurrentIntimacyStep(userText || '');
+  const finalLevel = intent === 'none' ? 0 : Math.min(cap, step);
 
   if (intent !== 'none') consumeIntimacyOverride();
 

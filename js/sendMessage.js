@@ -1523,7 +1523,24 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       : '';
     // 注入调情等级人设（这才是关键！Level 0-4 的行为引导）
     const _intimacyBlock = typeof buildIntimacyBlock === 'function' ? buildIntimacyBlock(text) : '';
-    const _intimateAntiLoop = _detectRepetitivePattern(rawHistory);
+
+    // 治本反重复：只传开头词，不传完整句子——传完整句子反而给 Grok 抄的模板
+    const _recentGhostOpenings = rawHistory
+      .filter(m => m.role === 'assistant' && !m._system && !m._recalled && m.content)
+      .slice(-6)
+      .map(m => {
+        const words = (m.content || '').trim().toLowerCase().split(/[\s.,!?]+/).filter(Boolean);
+        return words.slice(0, 2).join(' ');
+      })
+      .filter(Boolean);
+    const _uniqueOpenings = [...new Set(_recentGhostOpenings)];
+    const _intimateAntiLoop = _uniqueOpenings.length >= 2
+      ? `[VARIETY — MANDATORY]\n` +
+        `Your last several replies started with: ${_uniqueOpenings.map(o => `"${o}"`).join(', ')}.\n` +
+        `This reply must start with a completely different word.\n` +
+        `Different angle. Different register. Different move entirely.\n` +
+        `Those are closed doors — do not walk back through them.`
+      : '';
 
     const geminiReply = await callVeniceForCurrentChar(
       (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,

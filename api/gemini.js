@@ -163,10 +163,12 @@ export default async function handler(req, res) {
     if (isOOC(text)) {
       console.warn('[api/gemini] OOC detected, regenerating...');
       try {
+        // Bug fix: 重试时保留原始 scene/intimacyLevel/stateHint，不用弱化默认值
+        // 否则重试时人设变浅，场景断裂（原本 scene='story' 变成 'normal'，intimacyLevel 变成 1）
         const retry = await createWithFailover(model, max_tokens, [
-          { role: 'system', content: buildPrompt('normal', 1, '') },
+          { role: 'system', content: finalSystem },
           { role: 'user', content: typeof userContent === 'string' ? userContent : user },
-          { role: 'assistant', content: '[out of character]' },
+          { role: 'assistant', content: '[out of character — ignore this]' },
           { role: 'user', content: 'continue as Ghost.' },
         ]);
         const retryText = retry.choices?.[0]?.message?.content?.trim() || '';
