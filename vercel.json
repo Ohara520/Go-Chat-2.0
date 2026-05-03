@@ -1,19 +1,28 @@
 {
   "functions": {
     "api/chat.js": {
-      "maxDuration": 60
+      "memory": 512,
+      "maxDuration": 45
     },
     "api/venice.js": {
-      "maxDuration": 60
+      "memory": 256,
+      "maxDuration": 45
     },
     "api/venice-keegan.js": {
-      "maxDuration": 60
+      "memory": 256,
+      "maxDuration": 45
     },
     "api/gemini.js": {
-      "maxDuration": 60
+      "memory": 256,
+      "maxDuration": 30
     },
     "api/deepseek.js": {
-      "maxDuration": 60
+      "memory": 256,
+      "maxDuration": 30
+    },
+    "api/tts.js": {
+      "memory": 256,
+      "maxDuration": 30
     }
   }
 }
