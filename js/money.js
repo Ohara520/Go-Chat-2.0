@@ -1071,6 +1071,15 @@ function getGhostCard() {
       saved._careerType = _currentCareer;
     }
     const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit);
+
+    // 上限升级补差额：如果新上限比旧上限高，把差额补进余额
+    // 场景：磨合升级到老夫老妻，上限从2000升到3000，差额1000补进余额
+    const oldLimit = saved.monthlyLimit || 0;
+    if (lockedLimit > oldLimit && oldLimit > 0) {
+      const diff = lockedLimit - oldLimit;
+      saved.balance = Math.min((saved.balance || 0) + diff, lockedLimit);
+    }
+
     saved.monthlyLimit = lockedLimit;
     saved._careerType = _currentCareer;
 

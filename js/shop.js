@@ -19,6 +19,12 @@ function getMarriageDays() {
 
 function canUnlockProduct(product) {
   if (!product.unlock) return true;
+
+  // 持久化解锁记录：一旦解锁过就永久记录，不再重新计算
+  // 解决：签到乱了导致 affection/trust 下降，商品重新锁上的问题
+  const _unlockKey = 'shopUnlocked_' + (product.name || '').replace(/\s+/g, '_');
+  if (localStorage.getItem(_unlockKey) === '1') return true;
+
   const affection = parseInt(localStorage.getItem('affection') || '60');
   const trust = typeof getTrustHeat === 'function' ? getTrustHeat() : 60;
   const days = getMarriageDays();
@@ -26,6 +32,9 @@ function canUnlockProduct(product) {
   if (u.affection && affection < u.affection) return false;
   if (u.trust    && trust    < u.trust)    return false;
   if (u.days     && days     < u.days)     return false;
+
+  // 首次满足条件：记录下来，永久解锁
+  localStorage.setItem(_unlockKey, '1');
   return true;
 }
 
