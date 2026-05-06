@@ -159,13 +159,18 @@ function checkFeedBadge() {
 
   // 有 flag，但检查是否真的有新内容（最近帖子时间 > 上次查看时间）
   const lastViewed = parseInt(localStorage.getItem('feedLastViewedAt') || '0');
+  const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+
   if (lastViewed === 0) {
-    // 从没看过 → 只要有帖子就算新
+    // 从没看过 → 检查是否真的有帖子，没有就不显示红点
+    if (history.length === 0) {
+      localStorage.removeItem('feedHasNew');
+      badge.style.display = 'none';
+      return;
+    }
     badge.style.display = 'block';
     return;
   }
-
-  const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
   const hasNewerPost = history.some(h => (h.post?.time || 0) > lastViewed);
   if (hasNewerPost) {
     badge.style.display = 'block';

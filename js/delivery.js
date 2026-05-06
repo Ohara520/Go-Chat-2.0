@@ -732,7 +732,12 @@ async function handleLostPackageClaim(userText) {
   if (lostItems.length === 0) return false;
 
   const keywords = ['快递','丢了','遗失','没到','包裹','寄的'];
-  if (!keywords.some(k => userText.includes(k))) return false;
+  // 修复：必须同时提到具体快递名或明确说"丢了/遗失"，防止普通聊天误触发
+  const hasKeyword = keywords.some(k => userText.includes(k));
+  const hasStrongKeyword = ['丢了','遗失','没到'].some(k => userText.includes(k));
+  const hasItemName = lostItems.some(d => userText.includes(d.name));
+  if (!hasKeyword) return false;
+  if (!hasStrongKeyword && !hasItemName) return false;
 
   const d     = lostItems[0];
   const price = d.productData?.price || 0;

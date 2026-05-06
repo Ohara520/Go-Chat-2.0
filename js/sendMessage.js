@@ -896,8 +896,9 @@ async function _processMergedMessage(text) {
     let _emotionLabel = '平淡';
     if (!isIntimate && !isRecentPhoto && !_isClearlyNormal) {
       try {
-        // 超时兜底：一律走 Claude，只有 Haiku 明确回复 flirt=true 才走 Grok
-        const _timeoutDefault = '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
+        // 超时兜底：一律走 Grok，宁可误判也不让 Claude 接到色色内容破防
+        // 5秒超时（原3秒太短，Haiku偶尔慢就触发）
+        const _timeoutDefault = '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
 
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
@@ -911,7 +912,7 @@ async function _processMergedMessage(text) {
             100
           ),
           // 超时兜底：有调情上下文时才默认走 Grok，否则走 Claude
-          new Promise(resolve => setTimeout(() => resolve(_timeoutDefault), 3000))
+          new Promise(resolve => setTimeout(() => resolve(_timeoutDefault), 5000))
         ]);
         if (combinedRaw) {
           const combinedResult = safeParseJSON(combinedRaw);
@@ -1564,11 +1565,19 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
         "as an ai","i'm an ai","i'm kiro","i am kiro","i'm kirk","i am kirk","kiro","kirk",
         "ai assistant","development work","coding questions","not the right tool",
         "i need to step back","i'm an ai assistant","how can i help you today",
-        // 补充常见漏网破防词
         "i want to be transparent","i should clarify","let me be honest",
         "as a language model","i need to be clear","i must clarify",
         "i'm not able to","i cannot engage","i won't be able to",
-        "this isn't something i","that's not something i"].some(p => l.includes(p));
+        "this isn't something i","that's not something i",
+        // 补充漏网破防词
+        "i want to be upfront","i need to be upfront","i should be upfront",
+        "i want to maintain","i need to maintain","i should mention",
+        "i'm here to help","happy to help","i'd be happy",
+        "as your ai","as an assistant","my purpose is",
+        "i don't actually","i don't have a","i'm not a real",
+        "let me be direct","to be honest with you","i have to be honest",
+        "this content","this type of content","that kind of content",
+      ].some(p => l.includes(p));
     };
 
     if (geminiReply && !_intimateBreakout(geminiReply)) {
@@ -1634,7 +1643,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       return { role: m.role, content: m.content };
     });
     const haiku2 = await callHaiku(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character.',
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character. Do not mention being an AI. Do not break character.',
       [..._haiku2History, { role: 'user', content: text }],
       100
     );
@@ -1646,6 +1655,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       incrementTodayCount();
       if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
     }
+    // 如果 Haiku 也破防了，静默失败，不显示任何内容给用户
   } catch(e) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
