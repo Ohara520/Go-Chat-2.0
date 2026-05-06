@@ -273,6 +273,20 @@ window.recordGiftToShelf = recordGiftToShelf;
 
 const _giftCaptureQueue = [];
 
+// 队列持久化：刷新页面不丢礼物
+function _loadGiftQueue() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('_giftCaptureQueue') || '[]');
+    saved.forEach(item => _giftCaptureQueue.push(item));
+  } catch(e) {}
+}
+function _saveGiftQueue() {
+  try {
+    localStorage.setItem('_giftCaptureQueue', JSON.stringify(_giftCaptureQueue));
+  } catch(e) {}
+}
+_loadGiftQueue();
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // v2 改动：智能匹配 Ghost 反应 + 定时自救清理
 //
@@ -378,36 +392,50 @@ function _pollGiftQueue() {
   try {
     const now = Date.now();
     const history = (typeof chatHistory !== 'undefined') ? chatHistory : [];
+    let changed = false;
 
     let i = 0;
     while (i < _giftCaptureQueue.length) {
       const item = _giftCaptureQueue[i];
-      if (item.captured) { _giftCaptureQueue.splice(i, 1); continue; }
+      if (item.captured) { _giftCaptureQueue.splice(i, 1); changed = true; continue; }
 
-      // 超时兜底：90 秒还没匹配到 → 留空入小屋
+      // 超时兜底：90 秒还没匹配到台词 → 直接从队列移除（礼物已经入小屋了）
       if (now - item.ts > _GIFT_QUEUE_TIMEOUT_MS) {
-        console.log('[dates] gift timeout, recording without reaction:', item.delivery.name);
-        recordGiftToShelf(item.delivery, '');
+        console.log('[dates] gift reaction timeout, keeping empty reaction:', item.delivery.name);
         _giftCaptureQueue.splice(i, 1);
+        changed = true;
         continue;
       }
 
-      // 只看入队后新增的 assistant 消息（用 histLenAtQueue 作为起点）
+      // 只看入队后新增的 assistant 消息
       const startIdx = item.histLenAtQueue || 0;
       for (let j = startIdx; j < history.length; j++) {
         const msg = history[j];
         if (msg.role !== 'assistant' || !msg.content || msg._system) continue;
         if (_isGiftReaction(msg.content, item.delivery)) {
-          console.log('[dates] gift reaction matched:', item.delivery.name);
+          console.log('[dates] gift reaction matched, updating shelf:', item.delivery.name);
+          // 更新已有记录的台词，而不是重新记录
+          try {
+            const list = getGiftRecords();
+            const existing = list.find(g => g.deliveryId === item.delivery.id);
+            if (existing && !existing.ghostReaction) {
+              existing.ghostReaction = msg.content.trim().slice(0, 280);
+              localStorage.setItem('giftRecords', JSON.stringify(list));
+              if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+              if (document.getElementById('shelfScreen')?.classList.contains('active')) renderGiftShelf();
+            }
+          } catch(e) {}
           item.captured = true;
-          recordGiftToShelf(item.delivery, msg.content);
           _giftCaptureQueue.splice(i, 1);
+          changed = true;
           break;
         }
       }
 
       if (!item.captured) i++;
     }
+
+    if (changed) _saveGiftQueue();
   } catch(e) { console.warn('[dates] _pollGiftQueue error:', e); }
 }
 
@@ -427,13 +455,20 @@ function _installGiftCaptureHooks() {
         if (delivery && !delivery.isGhostSend &&
             !(delivery.productData && delivery.productData.isUserItem)) {
           const histLen = (typeof chatHistory !== 'undefined') ? chatHistory.length : 0;
+
+          // 关键修复：先直接入小屋（空台词），再等台词匹配后更新
+          // 这样刷新页面也不会丢失礼物
+          recordGiftToShelf(delivery, '');
+
+          // 再把它加入队列，等台词匹配后更新 ghostReaction
           _giftCaptureQueue.push({
             delivery,
             ts: Date.now(),
             captured: false,
-            histLenAtQueue: histLen  // Bug 2 fix：记录入队时的 history 长度
+            histLenAtQueue: histLen
           });
-          console.log('[dates] gift queued:', delivery.name, '(histLen:', histLen, ')');
+          _saveGiftQueue();
+          console.log('[dates] gift recorded + queued for reaction:', delivery.name);
         }
       } catch(e) { console.warn('[dates] queue push fail:', e); }
       return await _origFn.apply(this, arguments);
@@ -493,7 +528,7 @@ function renderGiftShelf() {
               <div class="shelf-gift-meta">${_formatShortDate(g.timestamp)}${g.price ? ' · £' + g.price : ''}</div>
               ${g.ghostReaction
                 ? `<div class="shelf-gift-quote">"${_esc(g.ghostReaction)}"<span class="shelf-gift-attrib">— Ghost</span></div>`
-                : `<div class="shelf-gift-quote shelf-gift-quote-empty">他还没说什么…</div>`
+                : `<div class="shelf-gift-received">📍 已放进小屋 · ${_formatShortDate(g.timestamp)}</div>`
               }
             </div>
           </div>

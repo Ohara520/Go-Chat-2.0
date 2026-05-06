@@ -222,8 +222,15 @@
 
 
 /* ══════════════════════════════════════════════════════════
-   § 3  移动端适配
+   § 5  Ghost 小屋 · 已放进小屋标签
    ══════════════════════════════════════════════════════════ */
+
+.shelf-gift-received {
+  font-size: 11.5px;
+  color: rgba(60, 110, 40, 0.55);
+  margin-top: 5px;
+  letter-spacing: 0.2px;
+}
 
 @media (max-width: 420px) {
   .vc-bar-wrap { min-width: 120px; max-width: 190px; }
