@@ -48,22 +48,32 @@ async function generateDiaryEntry() {
   if (_diaryGenerating) return;
 
   // 持久锁：防止页面刷新后重复生成
+  // 修复：锁加上过期时间（2小时），避免生成失败后永久卡死
   const _lockKey = 'diaryLock_' + getYesterdayKey();
-  if (localStorage.getItem(_lockKey)) return;
-  localStorage.setItem(_lockKey, '1');
+  const _lockVal = localStorage.getItem(_lockKey);
+  if (_lockVal) {
+    const _lockTime = parseInt(_lockVal);
+    // 如果锁是一个时间戳且还在2小时内，跳过
+    if (!isNaN(_lockTime) && Date.now() - _lockTime < 2 * 60 * 60 * 1000) return;
+    // 锁过期了或者是旧版'1'格式，清掉重新生成
+    localStorage.removeItem(_lockKey);
+  }
+  localStorage.setItem(_lockKey, Date.now().toString());
   _diaryGenerating = true;
 
   try {
     const location = localStorage.getItem('currentLocation') || 'Hereford Base';
     const locationReason = localStorage.getItem('currentLocationReason') || '';
-    const weather = localStorage.getItem('lastWeatherDisplay') || '';
+    const weather = (localStorage.getItem('lastWeatherDisplay') || '').replace(/^undefined$/i, '').trim();
     const userName = localStorage.getItem('userName') || 'her';
 
     // 用 longTermMemory（已总结过的记忆），不用原始聊天记录
     // 原始记录问题：1.今天的聊天被写进昨天日记 2.Ghost的话被当成用户说的
-    const memory = localStorage.getItem('longTermMemory') || '';
-    const memoryHint = memory
-      ? `What you remember about recent days with ${userName}:\n${memory.slice(-300)}`
+    // 取最近记忆，按行截取避免截断句子
+    const _memLines = memory.split('\n').filter(l => l.trim());
+    const _memRecent = _memLines.slice(-8).join('\n'); // 最近8条记忆
+    const memoryHint = _memRecent
+      ? `What you remember about recent days with ${userName}:\n${_memRecent}`
       : '';
 
     const yesterday = new Date();

@@ -505,32 +505,47 @@ function renderGiftShelf() {
   const body = screen.querySelector('.shelf-body');
   if (!body) return;
 
-  const records = getGiftRecords().slice().reverse(); // 新的在上
+  const records = getGiftRecords().slice().reverse();
+  const st = getDateUnlockState();
+  const pct = Math.round(st.progress * 100);
+  const remaining = Math.max(0, st.threshold - st.giftsSince);
 
-  // ── 礼物列表 ──
+  // ── 约会进度条 ──
+  const progressHTML = `
+    <div class="gwall-progress-card">
+      <div class="gwall-progress-title">
+        ${st.isUnlocked
+          ? `💑 他可以飞过来了！`
+          : `✈️ 再送 <b>${remaining}</b> 件，他就飞过来`}
+      </div>
+      <div class="gwall-progress-bar-wrap">
+        <div class="gwall-progress-bar-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="gwall-progress-num">${st.giftsSince} / ${st.threshold} 件</div>
+      ${st.isUnlocked
+        ? `<button class="gwall-date-btn" onclick="openScreen('dateHubScreen')">去选城市 →</button>`
+        : ''}
+    </div>
+  `;
+
+  // ── 礼物墙 ──
   let giftsHTML;
   if (records.length === 0) {
     giftsHTML = `
-      <div class="shelf-empty">
-        <div class="shelf-empty-emoji">📦</div>
-        <div class="shelf-empty-title">架子是空的</div>
-        <div class="shelf-empty-desc">从商城寄点东西过去，<br/>他签收时说的话会在这儿留着。</div>
+      <div class="gwall-empty">
+        <div class="gwall-empty-emoji">🎁</div>
+        <div class="gwall-empty-title">还没送过东西</div>
+        <div class="gwall-empty-desc">从商城寄点什么给他，<br/>每件礼物都会留在这里。</div>
       </div>
     `;
   } else {
     giftsHTML = `
-      <div class="shelf-gifts-list">
+      <div class="gwall-grid">
         ${records.map(g => `
-          <div class="shelf-gift-card${g.isLuxury ? ' is-luxury' : ''}${g.isIntimate ? ' is-intimate' : ''}">
-            <div class="shelf-gift-emoji">${g.emoji}</div>
-            <div class="shelf-gift-body">
-              <div class="shelf-gift-name">${_esc(g.name)}</div>
-              <div class="shelf-gift-meta">${_formatShortDate(g.timestamp)}${g.price ? ' · £' + g.price : ''}</div>
-              ${g.ghostReaction
-                ? `<div class="shelf-gift-quote">"${_esc(g.ghostReaction)}"<span class="shelf-gift-attrib">— Ghost</span></div>`
-                : `<div class="shelf-gift-received">📍 已放进小屋 · ${_formatShortDate(g.timestamp)}</div>`
-              }
-            </div>
+          <div class="gwall-item${g.isLuxury ? ' gwall-luxury' : ''}${g.isIntimate ? ' gwall-intimate' : ''}">
+            <div class="gwall-item-emoji">${g.emoji}</div>
+            <div class="gwall-item-name">${_esc(g.name)}</div>
+            <div class="gwall-item-date">${_formatShortDate(g.timestamp)}</div>
           </div>
         `).join('')}
       </div>
@@ -538,10 +553,11 @@ function renderGiftShelf() {
   }
 
   body.innerHTML = `
-    <div class="shelf-header-card">
-      <div class="shelf-header-title">🏠 Ghost 的小屋</div>
-      <div class="shelf-header-sub">${records.length > 0 ? `你送过他 ${records.length} 件东西，都在这儿留着` : '他收到的每件东西，都在这儿留着'}</div>
+    <div class="gwall-header">
+      <div class="gwall-header-title">🏠 Ghost 的小屋</div>
+      <div class="gwall-header-sub">${records.length > 0 ? `你送过他 ${records.length} 件东西` : '你送的每件东西，都在这儿留着'}</div>
     </div>
+    ${progressHTML}
     ${giftsHTML}
   `;
 }

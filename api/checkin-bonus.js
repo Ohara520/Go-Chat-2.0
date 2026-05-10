@@ -21,12 +21,23 @@ export default async function handler(req, res) {
       .single();
 
     if (error || !data) {
-      return res.status(200).json({ ok: false, reason: 'no_subscription' });
+      // 没有订阅记录 → 往 topup_logs 插一条免费签到奖励
+      try {
+        await supabase.from('topup_logs').insert({
+          email: email.toLowerCase().trim(),
+          plan_name: '签到奖励',
+          quota_added: bonus,
+          note: 'checkin_bonus',
+          created_at: new Date().toISOString(),
+        });
+        return res.status(200).json({ ok: true, remaining: bonus });
+      } catch(e) {
+        return res.status(200).json({ ok: false, reason: 'insert_failed' });
+      }
     }
 
-    if (new Date(data.period_end) < new Date() || data.status !== 'active') {
-      return res.status(200).json({ ok: false, reason: 'expired' });
-    }
+    // 注意：不再拦截过期用户，签到奖励对所有有订阅记录的用户都生效
+    // 原因：套餐过期时加条数，用户才有动力续费继续聊
 
     // 减少 used_count（相当于退还条数），最小为0
     const newUsed = Math.max(0, data.used_count - bonus);

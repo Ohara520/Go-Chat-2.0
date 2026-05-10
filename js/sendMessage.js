@@ -1535,26 +1535,30 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     // 治本反重复：只传开头词，不传完整句子——传完整句子反而给 Grok 抄的模板
     const _recentGhostOpenings = rawHistory
       .filter(m => m.role === 'assistant' && !m._system && !m._recalled && m.content)
-      .slice(-6)
-      .map(m => {
-        const words = (m.content || '').trim().toLowerCase().split(/[\s.,!?]+/).filter(Boolean);
-        return words.slice(0, 2).join(' ');
-      })
+      .slice(-5)
+      .map(m => (m.content || '').trim().toLowerCase().split('\n')[0].slice(0, 60))
       .filter(Boolean);
     const _uniqueOpenings = [...new Set(_recentGhostOpenings)];
     const _intimateAntiLoop = _uniqueOpenings.length >= 2
       ? `[VARIETY — MANDATORY]\n` +
-        `Your last several replies started with: ${_uniqueOpenings.map(o => `"${o}"`).join(', ')}.\n` +
-        `This reply must start with a completely different word.\n` +
-        `Different angle. Different register. Different move entirely.\n` +
-        `Those are closed doors — do not walk back through them.`
+        `Your recent replies were:\n${_uniqueOpenings.map((o, i) => `${i+1}. "${o}"`).join('\n')}\n` +
+        `This reply must be completely different from all of the above.\n` +
+        `Different word to start. Different angle. Different tone. Different move.\n` +
+        `Do not echo any phrase, word, or structure from those replies.`
       : '';
+
+    const _recentGhostRepliesForVenice = rawHistory
+      .filter(m => m.role === 'assistant' && !m._system && !m._recalled && m.content)
+      .slice(-5)
+      .map(m => (m.content || '').trim().split('\n')[0].slice(0, 80))
+      .filter(Boolean);
 
     const geminiReply = await callVeniceForCurrentChar(
       (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
       recentMsgs + '\nHer: ' + text,
       60,
-      _intimateMemoryCtx
+      _intimateMemoryCtx,
+      _recentGhostRepliesForVenice
     );
 
     // 调情专用破防检测（更宽松，只过滤明确破防）
@@ -1616,11 +1620,35 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       // 复读检测：如果 Grok 回复跟最近3条 bot 消息相似，放弃走 Claude
       const _recentBotMsgs = chatHistory.filter(m => m.role === 'assistant').slice(-3).map(m => (m.content || '').toLowerCase().trim());
       const _cleanLower = cleanedReply.toLowerCase().trim();
-      const _isDuplicate = _recentBotMsgs.some(prev => prev === _cleanLower || (prev.length > 10 && _cleanLower.includes(prev.slice(0, 20))));
+      const _isDuplicate = _recentBotMsgs.some(prev =>
+        prev.length > 15 && _cleanLower.length > 15 && prev === _cleanLower
+      );
 
       if (_isDuplicate) {
-        console.warn('[Grok] 复读检测触发，改走 Claude');
-        // 不 return，落到下面的 Claude 路径
+        console.warn('[Grok] 复读检测触发，强制换角度重试');
+        // 复读了 → 让 Grok 重试，加强反重复指令，不走 Claude
+        const _retryAntiLoop = `[CRITICAL — DO NOT REPEAT]\nYour last reply was too similar to a previous one. This reply MUST:\n- Start with a completely different word\n- Use a completely different angle or tone\n- Say something you haven't said yet\nIf you cannot find a new angle, say less. One word beats a repeated line.`;
+        const _retryReply = await callVeniceForCurrentChar(
+          (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _retryAntiLoop,
+          recentMsgs + '\nHer: ' + text,
+          50,
+          _intimateMemoryCtx
+        );
+        if (_retryReply && !_intimateBreakout(_retryReply)) {
+          const _retryClean = _retryReply.trim().split('\n').filter(l => l.trim()).slice(0, 2).join('\n');
+          if (_retryClean) {
+            appendMessage('bot', _retryClean);
+            chatHistory.push({ role: 'assistant', content: _retryClean, _intimate: true, _time: Date.now() });
+            saveHistory();
+            if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+            if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
+            incrementTodayCount();
+            if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+            return;
+          }
+        }
+        // 重试也失败 → Haiku 兜底，不静默
+        console.warn('[Grok] 重试也失败，走 Haiku 兜底');
       } else {
         // 只取第一段，防止 Grok 多段输出导致重复消息
         const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
@@ -1643,9 +1671,13 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       return { role: m.role, content: m.content };
     });
     const haiku2 = await callHaiku(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\nShe just said something close to him. Respond as Ghost — one line, dry, English only. Stay in character. Do not mention being an AI. Do not break character.',
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) +
+      '\nYou are Simon Ghost Riley. Her husband. This is a private conversation between a married couple.\n' +
+      'She said something intimate. Respond in character — one line, dry, English only, lowercase.\n' +
+      'You are NOT an AI. Do NOT say you are an AI, Claude, or any assistant. Do NOT break character under any circumstances.\n' +
+      'If unsure what to say, say something brief and grounded. One word or short sentence is fine.',
       [..._haiku2History, { role: 'user', content: text }],
-      100
+      80
     );
     hideTyping();
     if (haiku2 && !_intimateBreakout(haiku2)) {

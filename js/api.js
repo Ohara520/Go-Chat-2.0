@@ -564,13 +564,14 @@ async function isBreakoutAsync(text) {
 }
 
 // 支持多角色的 Venice 调用（自动路由到当前角色的调情 API）
-async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateMemory = '') {
+async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateMemory = '', recentGhostReplies = []) {
   try {
     const endpoint = typeof getCurrentVeniceEndpoint === 'function'
       ? getCurrentVeniceEndpoint()
       : '/api/venice';
     const body = { system, user, max_tokens: maxTokens };
     if (intimateMemory) body.intimateMemory = intimateMemory;
+    if (recentGhostReplies && recentGhostReplies.length > 0) body.recentGhostReplies = recentGhostReplies;
     const res = await fetchWithTimeout(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

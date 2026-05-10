@@ -1052,12 +1052,15 @@ function getGhostCard() {
       return defaults;
     }
 
-    // 月初重置：花费清零，新月额度叠加到余额（可跨月积攒）
-    if (saved.lastResetMonth !== now.getMonth()) {
+    // 月初重置：用年+月判断，避免跨年或跨多月不重置的问题
+    const nowMonthKey = now.getFullYear() * 100 + now.getMonth();
+    const savedMonthKey = (saved.lastResetYear || 0) * 100 + (saved.lastResetMonth ?? 99);
+    if (savedMonthKey !== nowMonthKey) {
       const newLimit = getGhostCardMonthlyLimit();
       saved.monthlyLimit   = newLimit;
       saved.spentThisMonth = 0;
       saved.lastResetMonth = now.getMonth();
+      saved.lastResetYear  = now.getFullYear();
       // 旧余额保留，叠加新月额度，上限 3 个月额度防止无限堆积
       saved.balance = Math.min((saved.balance || 0) + newLimit, newLimit * 3);
     }
@@ -1130,7 +1133,7 @@ function _classifySpend(amount, category, card) {
 
   if (last10min.length >= 3) return { reactionType: 'intervene', lineTone: 'sharp', needExplanation: true };
 
-  const limit = card.monthlyLimit || 2000;
+  const limit = card.monthlyLimit || getGhostCardMonthlyLimit() || 2000;
   const ratio = amount / limit;
   const baseSensitivity = { daily: 0, self: 0.5, for_him: 0, gift: 1.5, unknown: 1 }[category] || 1;
   let sensitivityMod = 0;
