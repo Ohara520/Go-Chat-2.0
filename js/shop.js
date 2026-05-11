@@ -1043,19 +1043,19 @@ function _showComplaintResult(d) {
 
   let resultEmoji, resultTitle, resultDesc, refundAmount;
   if (rand < 0.10) {
-    // 10%：全额赔偿
+    // 10%：全额赔付
     refundAmount = price;
     resultEmoji = '🎉';
     resultTitle = '投诉成功！全额赔付';
     resultDesc  = `快递公司确认责任在我方，全额赔付 <b>£${price}</b> 已到账`;
   } else if (rand < 0.50) {
-    // 40%：赔一半
+    // 40%：赔50%
     refundAmount = Math.round(price * 0.5);
     resultEmoji = '✅';
     resultTitle = '投诉部分成功';
     resultDesc  = `快递公司赔付 50%，<b>£${refundAmount}</b> 已到账`;
   } else {
-    // 50%：没有赔偿
+    // 50%：不赔
     refundAmount = 0;
     resultEmoji = '😔';
     resultTitle = '投诉未获赔付';
@@ -1083,6 +1083,23 @@ function _showComplaintResult(d) {
     }
     if (typeof renderWallet === 'function') renderWallet();
   }
+
+  // 商场补货：买满了才恢复一次购买机会
+  try {
+    const _purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+    const _buyCount = _purchased.filter(n => n === d.name).length;
+    const _allProducts = Object.values(typeof MARKET_PRODUCTS !== 'undefined' ? MARKET_PRODUCTS : {}).flat();
+    const _product = _allProducts.find(p => p.name === d.name);
+    const _maxBuy = _product?.maxPurchase || 1;
+    if (_buyCount >= _maxBuy) {
+      const _idx = _purchased.indexOf(d.name);
+      if (_idx !== -1) {
+        _purchased.splice(_idx, 1);
+        localStorage.setItem('purchasedItems', JSON.stringify(_purchased));
+        if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+      }
+    }
+  } catch(e) {}
 
   if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
 

@@ -309,36 +309,6 @@ function checkDeliveryUpdates() {
           showToast(`❌ ${d.name} 快递遗失了`);
           _addDeliveryNotice({ id: 'lost_' + d.id, type: 'lost', itemName: d.name, itemEmoji: d.emoji || '📦' });
           renderDeliveryTracker();
-
-          // 丢失补货：记录同一商品丢失次数，连续丢2次后自动补货且不再丢
-          try {
-            const _lostKey = 'lostCount_' + (d.name || '').replace(/\s+/g, '_');
-            const _lostCount = parseInt(localStorage.getItem(_lostKey) || '0') + 1;
-            localStorage.setItem(_lostKey, _lostCount);
-            if (_lostCount >= 2) {
-              // 连续丢失2次，3~7天后自动补货，且标记 noLost
-              localStorage.removeItem(_lostKey);
-              setTimeout(() => {
-                const _reshipProduct = {
-                  ...d.productData,
-                  name: d.name,
-                  emoji: d.emoji || '📦',
-                  noLost: true, // 补货不再丢失
-                };
-                if (typeof addDelivery === 'function') {
-                  addDelivery(_reshipProduct, d.isGhostSend || false, d.isLuxury || false);
-                  showToast(`📦 ${d.name} 正在补发中…`);
-                  chatHistory?.push({
-                    role: 'user',
-                    content: `[System: The replacement for "${d.name}" is on its way. Ghost arranged it after it was lost twice. It will arrive soon and will not be lost again.]`,
-                    _system: true
-                  });
-                  if (typeof saveHistory === 'function') saveHistory();
-                }
-              }, (3 + Math.floor(Math.random() * 4)) * 24 * 3600 * 1000);
-            }
-          } catch(e) {}
-
           return;
         }
 
@@ -401,16 +371,6 @@ function checkDeliveryUpdates() {
   if (updated) {
     localStorage.setItem('deliveries', JSON.stringify(deliveries));
     renderDeliveryTracker();
-    // 修复：后台检测到更新后，主动触发通知弹窗
-    // 不依赖用户进入商城才能看到通知
-    setTimeout(() => {
-      if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
-      // 只在非商城页面弹，商城页面 initMarket 会自己处理
-      const marketScreen = document.getElementById('marketScreen');
-      if (!marketScreen?.classList.contains('active')) {
-        if (typeof checkAndShowDeliveryNotices === 'function') checkAndShowDeliveryNotices();
-      }
-    }, 800);
   }
 }
 
