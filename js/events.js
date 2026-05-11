@@ -337,8 +337,16 @@ ${moodHint}${_followUpHint}${_contextBlock}${_ciNoRepeat}`,
 
     case 'reverse_package': {
       const motive = payload.motive || 'delayed_longing';
-      // item 优先用 triggers.js 已经选好的，没有才重新生成
-      const item = payload.item || await generateReversePackageItem(motive, payload.contextSnapshot || (typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []));
+      // item 优先用 triggers.js 已经选好的，没有才从礼物池随机选
+      let item = payload.item;
+      if (!item) {
+        const _pool = (typeof GHOST_REVERSE_POOL !== 'undefined')
+          ? (GHOST_REVERSE_POOL[payload.emotionType] || GHOST_REVERSE_POOL['思念'] || [])
+          : [];
+        item = _pool.length > 0
+          ? _pool[Math.floor(Math.random() * _pool.length)]
+          : { name: 'something', emoji: '📦', desc: 'a small thing', tip: '' };
+      }
       const motiveHint = {
         practical_care:   'He sent it because it needed doing. Not a gesture — just handling it. Slightly bossy about it.',
         compensation:     'Something happened between them. He is not apologizing out loud. This is what he does instead.',
@@ -660,8 +668,13 @@ async function handlePostReplyEvents(userText, reply, intent) {
     }
 
     case 'reverse_package': {
-      const item = await generateReversePackageItem(intent.motive, intent.contextSnapshot || (typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []));
-      await emitGhostEvent('reverse_package', { motive: intent.motive, item });
+      const _pool2 = (typeof GHOST_REVERSE_POOL !== 'undefined')
+        ? (GHOST_REVERSE_POOL[intent.emotionType] || GHOST_REVERSE_POOL['思念'] || [])
+        : [];
+      const item = intent.item || (_pool2.length > 0
+        ? _pool2[Math.floor(Math.random() * _pool2.length)]
+        : { name: 'something', emoji: '📦', desc: 'a small thing', tip: '' });
+      await emitGhostEvent('reverse_package', { motive: intent.motive, item, emotionType: intent.emotionType });
       break;
     }
 

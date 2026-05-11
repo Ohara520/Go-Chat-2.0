@@ -958,6 +958,10 @@ window.endDateScene = endDateScene;
 function finalizeDateMemory() {
   if (!_activeDate) return;
 
+  // 防重复：全局锁，防止快速双击
+  if (window._finalizingDate) return;
+  window._finalizingDate = true;
+
   // 防重复：同城市同餐厅 60 秒内不允许重复保存
   const memories = getDateMemories();
   const now = Date.now();
@@ -969,10 +973,16 @@ function finalizeDateMemory() {
   if (isDuplicate) {
     if (typeof showToast === 'function') showToast('📷 已经存过了～');
     _activeDate = null;
+    window._finalizingDate = false;
     if (typeof openScreen === 'function') openScreen('dateHubScreen');
     setTimeout(() => { if (typeof renderDateHub === 'function') renderDateHub(); }, 50);
     return;
   }
+
+  // 禁用按钮防止重复点击
+  const saveBtn = document.querySelector('.date-end-save-btn');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '📷 保存中…'; }
+
   const id = 'date_' + Date.now();
   const memory = {
     id,
@@ -994,6 +1004,7 @@ function finalizeDateMemory() {
 
   if (typeof showToast === 'function') showToast('📷 已存进相册～');
   _activeDate = null;
+  window._finalizingDate = false;
   // 跳回约会主页
   if (typeof openScreen === 'function') openScreen('dateHubScreen');
   setTimeout(() => { if (typeof renderDateHub === 'function') renderDateHub(); }, 50);

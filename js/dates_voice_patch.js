@@ -13,43 +13,54 @@
 
 (function _installDateVoicePatch() {
 
-  // 等 dates.js 里的 renderDateScene 挂到 window
   function _tryPatch() {
-    if (typeof renderDateScene !== 'function') {
-      // dates.js 还没加载完，50ms 后重试
+    // 等 dates.js 把 renderDateScene 挂到 window 上
+    if (typeof window.renderDateScene !== 'function') {
       setTimeout(_tryPatch, 50);
       return;
     }
 
     // 避免重复 patch
-    if (window.renderDateScene && window.renderDateScene._voicePatched) return;
+    if (window.renderDateScene._voicePatched) return;
 
-    const _origRender = window.renderDateScene || renderDateScene;
+    const _origRender = window.renderDateScene;
 
     window.renderDateScene = function(...args) {
-      // 先执行原来的渲染
       const result = _origRender.apply(this, args);
-
-      // 渲染完 DOM 后，注入播放按钮
-      // 用 requestAnimationFrame 确保 DOM 已更新
       requestAnimationFrame(() => {
         if (typeof installDateVoiceButtons === 'function') {
           installDateVoiceButtons();
         }
       });
-
       return result;
     };
 
     window.renderDateScene._voicePatched = true;
     console.log('[dates_voice_patch] renderDateScene 已 patch，约会语音按钮已启用');
+
+    // 关键修复：patch 完之后再检查一次，防止 dates.js 再次覆盖
+    // 用 MutationObserver 监听 dateSceneBubbles 变化，随时补注入
+    const observer = new MutationObserver(() => {
+      if (typeof installDateVoiceButtons === 'function') {
+        installDateVoiceButtons();
+      }
+    });
+    const tryObserve = () => {
+      const container = document.getElementById('dateSceneBubbles');
+      if (container) {
+        observer.observe(container, { childList: true, subtree: true });
+      } else {
+        setTimeout(tryObserve, 500);
+      }
+    };
+    tryObserve();
   }
 
-  // DOM 就绪后开始尝试 patch
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _tryPatch);
+  // 等页面完全加载后再 patch，确保 dates.js 已经执行完
+  if (document.readyState === 'complete') {
+    setTimeout(_tryPatch, 100);
   } else {
-    _tryPatch();
+    window.addEventListener('load', () => setTimeout(_tryPatch, 100));
   }
 
 })();
