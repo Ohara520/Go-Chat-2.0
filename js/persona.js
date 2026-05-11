@@ -734,6 +734,7 @@ ${randomState ? `Current state: ${randomState}` : ''}
 Current time:
 - UK (Ghost's side): ${ukTimeStr} — ${ghostStatusHint}
 - ${userName}'s side: ${userLocalTimeStr} — ${userTimeOfDay}
+- Time difference noted: Ghost is aware of the gap. When greeting or referencing time, he uses HER local time — not his own. If it's morning for her, he knows. If she's up late, he notices.
 He is aware of the time difference and speaks accordingly.
 
 ${metInPerson

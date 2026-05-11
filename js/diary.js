@@ -68,7 +68,7 @@ async function generateDiaryEntry() {
     const userName = localStorage.getItem('userName') || 'her';
 
     // 用 longTermMemory（已总结过的记忆），不用原始聊天记录
-    // 原始记录问题：1.今天的聊天被写进昨天日记 2.Ghost的话被当成用户说的
+    const memory = localStorage.getItem('longTermMemory') || '';
     // 取最近记忆，按行截取避免截断句子
     const _memLines = memory.split('\n').filter(l => l.trim());
     const _memRecent = _memLines.slice(-8).join('\n'); // 最近8条记忆

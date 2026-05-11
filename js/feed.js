@@ -171,7 +171,7 @@ function checkFeedBadge() {
     badge.style.display = 'block';
     return;
   }
-  const hasNewerPost = history.some(h => (h.post?.time || 0) > lastViewed);
+  const hasNewerPost = history.some(h => (h.post?.time || 0) >= lastViewed);
   if (hasNewerPost) {
     badge.style.display = 'block';
   } else {
@@ -769,14 +769,14 @@ Return JSON only: {"en":"...","zh":"..."}`;
       );
     }
 
-    const entry = {
+      const entry = {
       date: new Date().toISOString().slice(0, 10),
       post: {
         en: post.en, zh: post.zh,
         avatar: GHOST_AV,
         author: localStorage.getItem('botNickname') || 'Simon Riley',
         name: localStorage.getItem('botNickname') || 'Simon Riley',
-        comments, time: Date.now(),
+        comments, time: Date.now() + 1000, // +1秒确保比 lastViewedAt 新
         likes: Math.floor(Math.random() * 30 + 3),
         sourceEvent: 'user_requested'
       }
@@ -1375,6 +1375,16 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
 // ----- 插入帖子到历史 -----
 function insertFeedPost(entry) {
   let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+
+  // 确保 post.time 存在且比 lastViewedAt 新（修复红点虚报）
+  if (entry.post && !entry.post.time) {
+    entry.post.time = Date.now() + 1000;
+  } else if (entry.post) {
+    const lastViewed = parseInt(localStorage.getItem('feedLastViewedAt') || '0');
+    if (entry.post.time <= lastViewed) {
+      entry.post.time = lastViewed + 1000;
+    }
+  }
 
   // 去重：同一天 + 同作者 + 内容前30字符相同 → 跳过
   const newEn = (entry.post?.en || '').slice(0, 30);
