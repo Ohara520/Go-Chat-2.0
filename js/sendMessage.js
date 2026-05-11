@@ -1559,7 +1559,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     const geminiReply = await callVeniceForCurrentChar(
       (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
       recentMsgs + '\nHer: ' + text,
-      120,
+      200,
       _intimateMemoryCtx,
       _recentGhostRepliesForVenice
     );
