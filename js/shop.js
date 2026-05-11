@@ -1038,7 +1038,11 @@ function _runComplaintSearch(id, allDeliveries) {
 }
 
 function _showComplaintResult(d) {
-  const price = d.productData?.price || 0;
+  const basePrice = d.productData?.price || 0;
+  const isLuxury = d.productData?.isLuxury || false;
+  const isBigTicket = d.productData?.isReunion || d.productData?.isHomeItem || false;
+  // 用户实际付的是显示价格（非奢侈品、非大件乘以1.8）
+  const price = (!isLuxury && !isBigTicket) ? Math.round(basePrice * 1.8) : basePrice;
   const rand = Math.random();
 
   let resultEmoji, resultTitle, resultDesc, refundAmount;
