@@ -45,7 +45,7 @@ export default async function handler(req, res) {
 
         const response = await client.messages.create(
           { model, max_tokens, system, messages },
-          { headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' } }
+          {}
         );
 
         return res.status(200).json(response);
