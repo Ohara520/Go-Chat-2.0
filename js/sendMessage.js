@@ -880,7 +880,7 @@ async function _processMergedMessage(text) {
     }
 
     let _intimacyForceCleared = false;
-    if (_clearIntimateKws.test(text) && chatHistory.slice(-6).some(m => m._intimate)) {
+    if (_clearIntimateKws.test(text) && !INTIMATE_PATTERNS.some(p => p.test(text)) && chatHistory.slice(-6).some(m => m._intimate)) {
       isIntimate = false;
       _intimacyForceCleared = true;
     }
@@ -1564,26 +1564,19 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       _recentGhostRepliesForVenice
     );
 
-    // 调情专用破防检测（更宽松，只过滤明确破防）
+    // 调情专用破防检测（只过滤100%确定的破防，宁可放过也不误伤）
     const _intimateBreakout = (txt) => {
       if (!txt) return true;
       const l = txt.toLowerCase();
-      return ["i'm claude","i am claude","made by anthropic","i can't roleplay","i cannot roleplay",
-        "as an ai","i'm an ai","i'm kiro","i am kiro","i'm kirk","i am kirk","kiro","kirk",
-        "ai assistant","development work","coding questions","not the right tool",
-        "i need to step back","i'm an ai assistant","how can i help you today",
-        "i want to be transparent","i should clarify","let me be honest",
-        "as a language model","i need to be clear","i must clarify",
-        "i'm not able to","i cannot engage","i won't be able to",
-        "this isn't something i","that's not something i",
-        // 补充漏网破防词
-        "i want to be upfront","i need to be upfront","i should be upfront",
-        "i want to maintain","i need to maintain","i should mention",
-        "i'm here to help","happy to help","i'd be happy",
-        "as your ai","as an assistant","my purpose is",
-        "i don't actually","i don't have a","i'm not a real",
-        "let me be direct","to be honest with you","i have to be honest",
-        "this content","this type of content","that kind of content",
+      return [
+        "i'm claude","i am claude","made by anthropic",
+        "i can't roleplay","i cannot roleplay",
+        "as an ai","i'm an ai","i am an ai",
+        "i'm kiro","i am kiro","i'm kirk","i am kirk",
+        "i'm an ai assistant","how can i help you today",
+        "as a language model",
+        "i cannot engage","i won't engage",
+        "not the right tool","development work","coding questions",
       ].some(p => l.includes(p));
     };
 
