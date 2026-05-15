@@ -764,7 +764,9 @@ function confirmPurchase() {
   const weeklySale = isLuxury ? getWeeklySale() : null;
   const onSale = weeklySale && weeklySale.name === p.name;
   let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
-  if (!isLuxury) displayPrice = Math.round(displayPrice * 1.8);
+  // 修复：大件商品（机票/酒店/车/房）不乘1.8，与openBuyModal保持一致
+  const _isBigTicketConfirm = p.isReunion || p.isHomeItem;
+  if (!isLuxury && !_isBigTicketConfirm) displayPrice = Math.round(displayPrice * 1.8);
   const _shopDiscount2 = (!isLuxury && typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
   if (_shopDiscount2 > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount2 / 100));
   let shipping = p.isUserItem ? (isLuxury ? 45 : 25) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));

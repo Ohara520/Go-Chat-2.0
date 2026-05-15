@@ -152,9 +152,11 @@ Write yesterday's diary entry. Rules:
     }
   } catch(e) {
     console.warn('[diary] 生成失败:', e);
-    // 生成失败清除锁，下次可以重试
-    localStorage.removeItem(_lockKey);
   } finally {
+    // 修复：无论成功还是失败都清除锁
+    // 成功：日记已写入，hasYesterdayDiary()会拦截重复生成，锁不再需要
+    // 失败：清锁让下次进入时可以重试，不永久卡死
+    localStorage.removeItem(_lockKey);
     _diaryGenerating = false;
   }
 }
@@ -203,6 +205,19 @@ function renderDiary() {
   const container = document.getElementById('diaryContainer');
   if (!container) return;
 
+  // 修复：每次打开日记页面时主动检查并生成
+  // 不依赖 app.js 的初始化时机，切换页面也能触发
+  if (!hasYesterdayDiary()) {
+    dailyDiaryCheck().then(() => {
+      // 生成完成后重新渲染一次
+      _renderDiaryContent(container);
+    }).catch(() => {});
+  }
+
+  _renderDiaryContent(container);
+}
+
+function _renderDiaryContent(container) {
   const entries = getDiaryEntries().slice().reverse();
 
   if (entries.length === 0) {
@@ -258,6 +273,8 @@ async function dailyDiaryCheck() {
     localStorage.setItem('ghostDiary', JSON.stringify(cleaned));
   }
 
+  // 修复：检查昨天的日记，没有才生成
+  // hasYesterdayDiary() 是唯一的写入门槛，锁只是防并发，不阻止重试
   if (!hasYesterdayDiary()) {
     await generateDiaryEntry();
   }

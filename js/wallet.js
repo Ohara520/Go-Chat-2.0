@@ -1,7 +1,11 @@
 // ===== 钱包系统 (wallet.js) =====
 // ===== 钱包系统 =====
-function getBalance() {
-  // 迁移v3：清空旧数据，发新婚礼金（云端标记，换浏览器不重复领）
+
+// 修复：把初始化和补偿逻辑从 getBalance() 里独立出来
+// getBalance() 会被高频调用（每次显示余额都会触发），放里面容易重复执行
+// initWallet() 只在页面初始化时调用一次（在 index.js 或页面入口里调用）
+function initWallet() {
+  // 迁移v3：清空旧数据，发新婚礼金
   if (!localStorage.getItem('walletMigrated_v3')) {
     localStorage.setItem('walletMigrated_v3', '1');
     localStorage.removeItem('walletMigrated_v2');
@@ -14,14 +18,15 @@ function getBalance() {
       addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
     }
   }
-
-  // 开服补偿（2026年4月）：云端标记控制，换浏览器不重复领
+  // 开服补偿（2026年4月）：只执行一次
   if (!localStorage.getItem('maintenanceComp_20260409')) {
     localStorage.setItem('maintenanceComp_20260409', '1');
     addTransaction({ icon: '🎁', name: '开服补偿', amount: 200 });
   }
+}
 
-  // 从transactions算余额
+function getBalance() {
+  // 从transactions算余额（纯计算，不做任何初始化副作用）
   const txs = getTransactions();
   return Math.max(0, txs.reduce((sum, t) => t.ghostCard ? sum : sum + (t.amount || 0), 0));
 }

@@ -1192,9 +1192,8 @@ async function _ghostCardReaction(amount, itemName, category, card) {
     if (!prompt) return;
     localStorage.setItem(`ghostCardReacted_${category}_${new Date().toDateString()}`, '1');
     await new Promise(r => setTimeout(r, 3000));
-    if (decision.reactionType === 'intervene') {
-      const c = getGhostCard(); c.balance = Math.max(0, c.balance - amount * 0.3); saveGhostCard(c);
-    }
+    // 修复：移除 intervene 时偷扣 Ghost Card 余额的逻辑
+    // 该函数由 spendGhostCard 调用，intervene 额外扣余额会导致双倍扣钱
     const _sys = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
     const _res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
