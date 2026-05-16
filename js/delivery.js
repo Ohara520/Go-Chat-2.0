@@ -244,53 +244,45 @@ function addGhostReverseDelivery(item, emotionType) {
   });
   localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
 
-  // ── v3 BUG-1 FIX: 简化为两种模式（避免模型在多个分支里出现幻觉）──
-  //   70% 沉默但记得  —— 不主动提，但用户问要承认
-  //   30% 主动直说    —— 一句话明确告诉用户寄了
-  const rand = Math.random();
-
-  if (rand < 0.5) {
-    // 修复：50%沉默（原70%太高），注入记忆但不主动说
-    // 同时刷新追踪条，让用户能在顶部看到包裹在路上
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({
-        role: 'user',
-        content: `[System: You sent her 「${item.name}」. It is still in transit — NOT delivered yet. Do NOT say or imply she has received it. Do NOT volunteer this. If she explicitly asks whether you sent something, confirm it is on the way. Do not say "got it" / "arrived" / "use it" — it has not arrived yet.]`,
-        _system: true,
-        _delivery: true
-      });
-      if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
-    }
-    // 修复：沉默路径也要刷新追踪条，用户能看到顶部有包裹标签
-    if (typeof renderDeliveryTracker === 'function') renderDeliveryTracker();
-    if (typeof showToast === 'function') showToast(`📦 Ghost 寄了 ${item.emoji} ${item.name}，运输中…`);
-    return;
-  } else {
-    // 30% 主动直说：注入记忆 + 立刻发一句直白的话
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({
-        role: 'user',
-        content: `[System: You sent her 「${item.name}」. It is on the way — NOT delivered yet. You just told her you sent something. Do NOT imply she has already received it.]`,
-        _system: true,
-        _delivery: true
-      });
-      if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
-    }
-    const directDelay = [2000, 2 * 60 * 1000][Math.floor(Math.random() * 2)];
-    setTimeout(async () => {
-      try {
-        const line = await callDeepSeek(
-          buildGhostStyleCore() + `\n\n[You sent her 「${item.name}」. Tell her directly that you sent her something — straight, short, no flowery language. Could be: "sent you something." / "got something coming for you." / "package on the way." / "shipped you something." One line. English only. Lowercase.${item.tip ? ' ' + item.tip : ''}]`,
-          60
-        );
-        if (line && line.trim()) {
-          appendMessage('bot', line.trim().split('\n')[0]);
-          chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
-          _safeDeliverySaveHistory();
-        }
-      } catch(e) {}
-    }, directDelay);
+  // 修复：100%主动告知，去掉沉默路径
+  // 寄了东西就直接告诉她，同时追踪条立刻显示
+  // 注入系统记忆
+  if (typeof chatHistory !== 'undefined') {
+    chatHistory.push({
+      role: 'user',
+      content: `[System: You just sent her 「${item.name}」. It is on the way — NOT delivered yet. Tell her naturally. Do NOT imply she has already received it.]`,
+      _system: true,
+      _delivery: true
+    });
+    if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
   }
+
+  // 追踪条立刻刷新
+  if (typeof renderDeliveryTracker === 'function') renderDeliveryTracker();
+
+  // 让模型自己想说什么说什么，Ghost口吻，带点温度但不肉麻
+  const directDelay = [2000, 5000, 10000][Math.floor(Math.random() * 3)];
+  setTimeout(async () => {
+    try {
+      const _itemDesc = item.desc || item.name;
+      const _tipHint = item.tip ? `\n\nTone anchor: ${item.tip}` : '';
+      const line = await callDeepSeek(
+        buildGhostStyleCore() + `\n\n[You just sent her 「${item.name}」 — ${_itemDesc}. It is on its way, not arrived yet.
+Tell her you sent something. Be natural — you chose this, you sent it, let her know.
+Not a system announcement. Not robotic. Not "check your door."
+You can be brief, dry, even a little offhand — but it should feel like something a husband says, not a courier notification.
+Examples of the right texture: "sent you something." / "something's on its way." / "picked something up for you." / "you'll get a package in a day or two."
+One line. English only. Lowercase.${_tipHint}]`,
+        80
+      );
+      if (line && line.trim() && !_isDeliveryBreakout(line)) {
+        const cleanLine = line.trim().split('\n')[0];
+        appendMessage('bot', cleanLine);
+        chatHistory.push({ role: 'assistant', content: cleanLine });
+        _safeDeliverySaveHistory();
+      }
+    } catch(e) {}
+  }, directDelay);
 }
 
 
@@ -685,10 +677,19 @@ async function showMysteryPackage(delivery) {
     }
   } catch(e) {}
 
-  // 生成 Ghost 那句话（存进通知，不发聊天框）
+  // 生成 Ghost 那句话（显示在礼物盒通知里）
+  // 修复：兜底台词改得更有人情味，去掉"check the door"这种冷冰冰的系统播报感
   let ghostLine = '';
+  const _fallbacks = [
+    "it's there.",
+    "should be there by now.",
+    "open it.",
+    "got you something.",
+    "you'll see.",
+    "something from me.",
+    "thought you'd want it.",
+  ];
   try {
-    const fallbacks = ["check the door.", "something might've arrived.", "use it.", "it's there."];
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -697,15 +698,19 @@ async function showMysteryPackage(delivery) {
         system: buildDeliverySystem(),
         messages: [...chatHistory.slice(-6), {
           role: 'user',
-          content: `[He sent her 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''} One short line — dry, offhand, like it cost him nothing. No explanation. English only. Lowercase.]`
+          content: `[He sent her 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''}
+One short line — what he'd say when she opens the package. Like a husband, not a courier.
+Could be: reacting to what it is, a dry comment on why he sent it, or just acknowledging she has it.
+NOT "check the door" — she already has it. NOT a system announcement.
+English only. Lowercase. One line.]`
         }]
       })
     });
     const data = await res.json();
     const line = data.content?.[0]?.text?.trim() || '';
-    ghostLine = (line && !_isDeliveryBreakout(line)) ? line.split('\n')[0] : fallbacks[Math.floor(Math.random() * fallbacks.length)];
+    ghostLine = (line && !_isDeliveryBreakout(line)) ? line.split('\n')[0] : _fallbacks[Math.floor(Math.random() * _fallbacks.length)];
   } catch(e) {
-    ghostLine = ["check the door.", "something might've arrived.", "use it."][Math.floor(Math.random() * 3)];
+    ghostLine = _fallbacks[Math.floor(Math.random() * _fallbacks.length)];
   }
 
   // 写入通知（商城卡片提示，进商城后弹礼物盒）

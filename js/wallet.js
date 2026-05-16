@@ -29,6 +29,24 @@ function initWallet() {
     localStorage.setItem('bugComp_20260516', '1');
     addTransaction({ icon: '💰', name: '双倍扣款补偿', amount: 888 });
   }
+
+  // Ghost Card 余额校正（2026年5月）：修复金融师升职导致的余额虚高
+  // 正确余额 = monthlyLimit - spentThisMonth
+  // bug期间升职逻辑重复叠加了balance，导致余额虚高
+  if (!localStorage.getItem('ghostCardBalanceFix_20260516')) {
+    localStorage.setItem('ghostCardBalanceFix_20260516', '1');
+    try {
+      const _gc = JSON.parse(localStorage.getItem('ghostCard') || 'null');
+      if (_gc && typeof _gc.monthlyLimit === 'number' && typeof _gc.spentThisMonth === 'number') {
+        const _correctBalance = Math.max(0, _gc.monthlyLimit - _gc.spentThisMonth);
+        if (_gc.balance !== _correctBalance) {
+          console.log('[ghostCard] 余额校正:', _gc.balance, '->', _correctBalance);
+          _gc.balance = _correctBalance;
+          localStorage.setItem('ghostCard', JSON.stringify(_gc));
+        }
+      }
+    } catch(e) {}
+  }
 }
 
 function getBalance() {
