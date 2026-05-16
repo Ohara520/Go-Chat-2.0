@@ -597,7 +597,11 @@ function addTakeoutOrder(city, item) {
       () => {
         const bal = getBalance();
         if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); _isOrdering = false; return false; }
+        // 修复：加上 setBalance 立刻刷新余额显示
+        // 旧版只有 addTransaction 没有 setBalance，用户看到余额没变，以为没扣成功，重复点单导致双倍扣款
+        if (typeof setBalance === 'function') setBalance(bal - total);
         addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
+        if (typeof showToast === 'function') showToast(`🛵 已下单！· 已扣款 £${total.toFixed(0)}`);
         if (typeof renderWallet === 'function') renderWallet();
         _finishTakeoutOrder(city, item, calc);
       },
@@ -609,7 +613,10 @@ function addTakeoutOrder(city, item) {
   } else {
     const bal = getBalance();
     if (bal < total) { if (typeof showToast === 'function') showToast('余额不足'); _isOrdering = false; return false; }
+    // 修复：同步补上 setBalance，与选卡路径保持一致
+    if (typeof setBalance === 'function') setBalance(bal - total);
     addTransaction({ icon: item.emoji, name: `外卖 · ${item.name}`, amount: -total });
+    if (typeof showToast === 'function') showToast(`🛵 已下单！· 已扣款 £${total.toFixed(0)}`);
     if (typeof renderWallet === 'function') renderWallet();
     _finishTakeoutOrder(city, item, calc);
   }
