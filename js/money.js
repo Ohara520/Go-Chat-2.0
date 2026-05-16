@@ -1307,11 +1307,23 @@ function showCardSelector(amount, itemName, onUserCard, onGhostCard) {
     </div>
   `;
 
-  window._cardSelect = (choice) => {
-    modal.remove(); delete window._cardSelect;
+  // 修复：用唯一ID替代 window._cardSelect
+  // 旧写法 window._cardSelect 是全局唯一的，连续快速购买两件商品时
+  // 第二个弹窗会覆盖第一个的回调，导致第一个弹窗的按钮触发第二个弹窗的支付逻辑
+  // 造成串台、双倍扣款或用户卡/黑卡混用的问题
+  const _cbKey = '_cardSel_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  window[_cbKey] = (choice) => {
+    modal.remove();
+    delete window[_cbKey];
     if (choice === 'user' && canUseUser) onUserCard();
     else if (choice === 'ghost' && canUseGhost) onGhostCard();
   };
+
+  // 把 innerHTML 里的 onclick 替换成唯一key
+  modal.querySelectorAll('[onclick]').forEach(el => {
+    const oc = el.getAttribute('onclick') || '';
+    el.setAttribute('onclick', oc.replace(/window\._cardSelect/g, "window['" + _cbKey + "']"));
+  });
 
   document.body.appendChild(modal);
 }

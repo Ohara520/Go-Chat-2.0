@@ -1039,7 +1039,10 @@ async function _processMergedMessage(text) {
     // ── 图片注入 ─────────────────────────────────────────────
     let messagesForRequest = cleanHistory;
     if (isRecentPhoto && lastPhotoMsg._photoBase64?.length > 0) {
-      sceneHint = '[She just sent you an image. React to it directly — a dry comment, calling her out, or your honest first reaction. Do NOT describe what you see in detail. Sharp, real, one or two lines.]';
+      // 修复：删除"一两行"的死限制，让 Ghost 正常作为丈夫看图回应
+      // 原指令强制简短 + "calling her out"（阴阳语气），导致老婆发照片只收到 okay./noted.
+      // Ghost 话少是性格，不是规定——他看到老婆的照片，该有什么反应就有什么反应
+      sceneHint = '[She just sent you a photo. Look at it and respond naturally as her husband — warm but not over the top, honest but never critical or sarcastic. React to what you actually see: what she is wearing, how she looks, what the moment feels like. Do NOT pick apart her appearance. Do NOT be dismissive. She shared this with you — show up for it.]';
       const currentMsg = messagesForRequest[messagesForRequest.length - 1];
       if (currentMsg && currentMsg.role === 'user' && typeof currentMsg.content === 'string') {
         messagesForRequest = [

@@ -199,6 +199,27 @@ function checkCareerLevelUp() {
 
   if (newLevel > currentLevel) {
     localStorage.setItem('careerLevel', newLevel.toString());
+
+    // 修复：金融师升级后立即同步更新 Ghost Card 的 monthlyLimit
+    // 旧逻辑只存了 careerLevel，但 ghostCard.monthlyLimit 是独立存在 localStorage 里的
+    // 不主动更新的话，用户升级后黑卡上限仍是旧值，花钱超出旧上限就显示余额不足
+    if (type === 'finance' && typeof getGhostCard === 'function' && typeof saveGhostCard === 'function') {
+      const _card = getGhostCard();
+      const _baseLimit = typeof getGhostCardMonthlyLimit === 'function' ? getGhostCardMonthlyLimit() : 2000;
+      const _bonus = 100 + newLevel * 100; // 与 getCareerGhostCardBonus() 保持一致
+      const _newLimit = _baseLimit + _bonus;
+      // 只往上调，不往下扣（防止极端情况下上限缩水）
+      if (_newLimit > _card.monthlyLimit) {
+        // 同步增加可用余额（上限提高了，相应的可用额度也要跟上）
+        const _diff = _newLimit - _card.monthlyLimit;
+        _card.monthlyLimit = _newLimit;
+        _card.balance = Math.min(_card.balance + _diff, _newLimit);
+        saveGhostCard(_card);
+        if (typeof renderGhostCardWallet === 'function') renderGhostCardWallet();
+        if (typeof renderWallet === 'function') renderWallet();
+      }
+    }
+
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
     return { oldLevel: currentLevel, newLevel, career: CAREER_DATA[type] };
   }

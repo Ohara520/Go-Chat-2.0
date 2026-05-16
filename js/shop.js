@@ -783,7 +783,7 @@ function confirmPurchase() {
     setBalance(bal - total);
     addTransaction({ icon: p.emoji, name: itemLabel, amount: -total });
     renderWallet();
-    _finishPurchase(p, isWishlist, isLuxury);
+    _finishPurchase(p, isWishlist, isLuxury, total);
     return;
   }
 
@@ -797,11 +797,11 @@ function confirmPurchase() {
         setBalance(bal - total);
         addTransaction({ icon: p.emoji, name: itemLabel, amount: -total });
         renderWallet();
-        _finishPurchase(p, isWishlist, isLuxury);
+        _finishPurchase(p, isWishlist, isLuxury, total);
       },
       () => {
         if (!spendGhostCard(total, p.name, category)) { showToast('💔 Ghost Card 额度不足！'); return; }
-        _finishPurchase(p, isWishlist, isLuxury);
+        _finishPurchase(p, isWishlist, isLuxury, total);
       }
     );
   } else {
@@ -810,11 +810,11 @@ function confirmPurchase() {
     setBalance(bal - total);
     addTransaction({ icon: p.emoji, name: itemLabel, amount: -total });
     renderWallet();
-    _finishPurchase(p, isWishlist, isLuxury);
+    _finishPurchase(p, isWishlist, isLuxury, total);
   }
 }
 
-function _finishPurchase(p, isWishlist, isLuxury) {
+function _finishPurchase(p, isWishlist, isLuxury, total) {
   const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
   if (!purchased.includes(p.name)) { purchased.push(p.name); localStorage.setItem('purchasedItems', JSON.stringify(purchased)); }
   const purchaseCounts = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
@@ -833,11 +833,13 @@ function _finishPurchase(p, isWishlist, isLuxury) {
     delete _iT[p.name]; localStorage.setItem('intimateTriggered', JSON.stringify(_iT));
   }
 
+  // 修复：加上扣款金额，防止用户看不到扣款反馈以为没成功而重复购买
+  const _amtStr = total ? ` · 已扣款 £${total}` : '';
   if (isWishlist) showToast('💝 已加入心愿单！');
   else if (p.isUserItem) {
-    showToast('🛍️ 购买成功！');
+    showToast('🛍️ 购买成功' + _amtStr);
   }
-  else showToast('📦 已寄出！Ghost 会收到的～');
+  else showToast('📦 已寄出！Ghost 会收到的～' + _amtStr);
 
   if (!isWishlist && !p.isUserItem) {
     addDelivery(p, false, isLuxury);

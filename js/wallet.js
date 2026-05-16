@@ -23,6 +23,12 @@ function initWallet() {
     localStorage.setItem('maintenanceComp_20260409', '1');
     addTransaction({ icon: '🎁', name: '开服补偿', amount: 200 });
   }
+
+  // 双倍扣款补偿（2026年5月）：每人只能领一次
+  if (!localStorage.getItem('bugComp_20260516')) {
+    localStorage.setItem('bugComp_20260516', '1');
+    addTransaction({ icon: '💰', name: '双倍扣款补偿', amount: 888 });
+  }
 }
 
 function getBalance() {
