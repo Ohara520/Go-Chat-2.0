@@ -218,7 +218,12 @@ function addGhostReverseDelivery(item, emotionType) {
   const now         = Date.now();
   const interval    = totalMs / DELIVERY_STAGES_GHOST.length;
   const isSecret    = !!item._secretDelivery;
-  const visibleAt   = now + ((Math.floor(Math.random() * 24) + 24) * 3600 * 1000);
+  // 修复：visibleAt 改成立刻显示，不再延迟24-48小时
+  // 旧版延迟导致用户完全看不到追踪条，误以为包裹不存在
+  // 秘密快递（_secretDelivery）保留延迟显示的设计
+  const visibleAt   = isSecret
+    ? now + ((Math.floor(Math.random() * 24) + 24) * 3600 * 1000)
+    : now;
 
   deliveries.unshift({
     id: now,
@@ -244,8 +249,9 @@ function addGhostReverseDelivery(item, emotionType) {
   //   30% 主动直说    —— 一句话明确告诉用户寄了
   const rand = Math.random();
 
-  if (rand < 0.7) {
-    // 70% 沉默但记得：注入记忆，不主动说，但用户问要承认
+  if (rand < 0.5) {
+    // 修复：50%沉默（原70%太高），注入记忆但不主动说
+    // 同时刷新追踪条，让用户能在顶部看到包裹在路上
     if (typeof chatHistory !== 'undefined') {
       chatHistory.push({
         role: 'user',
@@ -255,6 +261,9 @@ function addGhostReverseDelivery(item, emotionType) {
       });
       if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
     }
+    // 修复：沉默路径也要刷新追踪条，用户能看到顶部有包裹标签
+    if (typeof renderDeliveryTracker === 'function') renderDeliveryTracker();
+    if (typeof showToast === 'function') showToast(`📦 Ghost 寄了 ${item.emoji} ${item.name}，运输中…`);
     return;
   } else {
     // 30% 主动直说：注入记忆 + 立刻发一句直白的话
@@ -1198,35 +1207,33 @@ if (typeof document !== 'undefined') {
 }
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 离线补触发：用户回到聊天页时处理积压的签收反应
-// 对标 takeout.js 的 checkPendingTakeoutReactions
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function checkPendingDeliveryReactions() {
-  try {
-    const pending = JSON.parse(localStorage.getItem('pendingDeliveryReactions') || '[]');
-    if (!pending.length) return;
-    localStorage.removeItem('pendingDeliveryReactions');
-    pending.forEach((item, idx) => {
-      // 每条间隔4秒，防止同时触发多条挤在一起
-      setTimeout(() => {
-        if (item.delivery) onGhostReceived(item.delivery);
-      }, idx * 4000);
-    });
-  } catch(e) {}
-}
-
-// 用户切回聊天页时自动触发 pending
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      setTimeout(checkPendingDeliveryReactions, 1500);
-    }
-  });
-}
+// 注：checkPendingDeliveryReactions 已在上方定义（带48小时过滤），此处不重复
 
 // ── 关键修复：把 onGhostReceived 挂到 window 上 ──
 // dates.js 的 hook 需要从 window 拦截，否则 delivery.js 内部直接调用
 // 本地函数会完全绕过 hook，导致礼物签收后进不了小屋
 window.onGhostReceived = onGhostReceived;
+
+// ── 修复：给快递加定时器，每60秒自动检查一次 ──
+// 旧版只在 initChat 和购买时检查，用户长时间聊天不重开页面就永远收不到快递
+// 对标 takeout.js 的 setInterval，确保快递能准时送达
+if (typeof document !== 'undefined') {
+  // 页面切回来时立刻检查
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      setTimeout(() => {
+        try { if (typeof checkDeliveryUpdates === 'function') checkDeliveryUpdates(); } catch(e) {}
+      }, 1000);
+    }
+  });
+
+  // 每60秒自动检查（跟外卖系统一致）
+  if (!window._deliveryCheckInterval) {
+    window._deliveryCheckInterval = setInterval(() => {
+      try {
+        const hasActive = JSON.parse(localStorage.getItem('deliveries') || '[]').some(d => !d.done && !d.isLostConfirmed);
+        if (hasActive && typeof checkDeliveryUpdates === 'function') checkDeliveryUpdates();
+      } catch(e) {}
+    }, 60000);
+  }
+}

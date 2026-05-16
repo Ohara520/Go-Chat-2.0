@@ -256,6 +256,9 @@ async function initChat() {
   //   );
   //   if (chatHistory.length < before && typeof saveHistory === 'function') saveHistory();
   // }
+  // 钱包初始化（补偿/礼金/迁移，只执行一次）
+  if (typeof initWallet === 'function') initWallet();
+
   // 好感度首次初始化
   if (!localStorage.getItem('affection')) setAffection(70);
 

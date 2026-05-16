@@ -414,9 +414,22 @@ function initProfile() {
   const remEl = document.getElementById('profileRemark');
   if (remEl) remEl.value = remark;
 
-  const ghostAvatarUrl = localStorage.getItem('ghostAvatarUrl');
-  if (ghostAvatarUrl) {
-    document.querySelectorAll('.ghost-avatar-img').forEach(img => { img.src = ghostAvatarUrl; });
+  // 修复：统一用 refreshGhostAvatar() 刷新头像
+  // 旧逻辑只读 ghostAvatarUrl，上传失败时 base64 备份不会被用到
+  // refreshGhostAvatar() 同时处理 URL 和 base64 备份，两边一致
+  if (typeof refreshGhostAvatar === 'function') {
+    refreshGhostAvatar();
+  } else {
+    // 兜底：refreshGhostAvatar 还没加载时手动处理
+    const ghostAvatarUrl = localStorage.getItem('ghostAvatarUrl');
+    const ghostAvatarB64 = localStorage.getItem('ghostAvatarBase64');
+    if (ghostAvatarUrl) {
+      document.querySelectorAll('.ghost-avatar-img').forEach(img => { img.src = ghostAvatarUrl; });
+    } else if (ghostAvatarB64) {
+      document.querySelectorAll('.ghost-avatar-img').forEach(img => {
+        img.src = 'data:image/jpeg;base64,' + ghostAvatarB64;
+      });
+    }
   }
 
   renderGhostProfile();
