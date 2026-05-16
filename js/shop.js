@@ -674,7 +674,8 @@ function renderMarket(categoryId) {
 
     return `
       <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
-           onclick="${owned||isLocked?'':'openBuyModal_byName('+JSON.stringify(p.name)+','+JSON.stringify(categoryId)+')'  }">
+           data-pname="${p.name.replace(/"/g,'__DQUOTE__')}" data-pcat="${categoryId}"
+           onclick="${owned||isLocked?'':'(function(el){openBuyModal_byName(el.dataset.pname.replace(/__DQUOTE__/g,String.fromCharCode(34)),el.dataset.pcat)})(this)'}">
         ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
         ${p.festival&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(255,200,100,0.15);border-color:rgba(255,180,50,0.4);color:#b45309;">🎋 ${p.festival}限定</div>` : ''}
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">💡 ${triggerReason}</div>` : ''}
