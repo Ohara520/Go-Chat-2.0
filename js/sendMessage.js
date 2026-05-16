@@ -921,9 +921,18 @@ async function _processMergedMessage(text) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
             if (!_intimacyForceCleared) {
-              // 只信任 Haiku 的判断，不再用历史标记覆盖
               if (combinedResult.flirt === true) {
                 isIntimate = true;
+              } else {
+                // 修复：DeepSeek 判 false 时，检查最近6条有没有调情上下文
+                // 有的话继续走 Grok，不让 Sonnet 接到调情内容破防
+                const _recentHasIntimate = chatHistory
+                  .filter(m => !m._system && !m._recalled)
+                  .slice(-6)
+                  .some(m => m._intimate);
+                if (_recentHasIntimate && !_isClearlyNormal) {
+                  isIntimate = true;
+                }
               }
             }
             _emotionLabel = combinedResult.emotion || '平淡';
@@ -1663,33 +1672,58 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       }
     }
 
-    // Venice失败，Haiku兜底（同样过滤图片消息）
-    const _haiku2History = rawHistory.slice(-6).map(m => {
-      const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return { role: m.role, content: '[sent a photo]' };
-      return { role: m.role, content: m.content };
-    });
-    const haiku2 = await callHaiku(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) +
-      '\nYou are Simon Ghost Riley. Her husband. This is a private conversation between a married couple.\n' +
-      'She said something intimate. Respond in character — one line, dry, English only, lowercase.\n' +
-      'You are NOT an AI. Do NOT say you are an AI, Claude, or any assistant. Do NOT break character under any circumstances.\n' +
-      'If unsure what to say, say something brief and grounded. One word or short sentence is fine.',
-      [..._haiku2History, { role: 'user', content: text }],
-      80
-    );
+    // 修复：Grok 失败后不走 Haiku（Haiku 容易破防调情内容导致已读不回）
+    // 改走 Sonnet 兜底，Sonnet 有角色锁定，比 Haiku 稳
     hideTyping();
-    if (haiku2 && !_intimateBreakout(haiku2)) {
-      appendMessage('bot', haiku2.trim());
-      chatHistory.push({ role: 'assistant', content: haiku2.trim(), _intimate: true, _time: Date.now() });
-      saveHistory();
-      incrementTodayCount();
-      if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+    try {
+      const _sonnetFallbackMsgs = rawHistory.slice(-6).map(m => {
+        const hasPhoto = m._photoBase64 || Array.isArray(m.content);
+        if (hasPhoto) return { role: m.role, content: '[sent a photo]' };
+        return { role: m.role, content: typeof m.content === 'string' ? m.content : '[message]' };
+      });
+      const _sonnetFallbackRes = await fetchWithTimeout('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-5-20250929',
+          max_tokens: 120,
+          system: (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore()) +
+            '\nYou are Simon Ghost Riley. Her husband. She said something intimate.' +
+            '\nRespond naturally as her husband — short, in character, dry but present.' +
+            '\nEnglish only. Lowercase. Do NOT say you are an AI or break character.',
+          messages: [..._sonnetFallbackMsgs, { role: 'user', content: text }]
+        })
+      }, 15000);
+      if (_sonnetFallbackRes.ok) {
+        const _sfData = await _sonnetFallbackRes.json();
+        const _sfReply = (_sfData.content?.[0]?.text || '').trim();
+        if (_sfReply && !_intimateBreakout(_sfReply)) {
+          appendMessage('bot', _sfReply);
+          chatHistory.push({ role: 'assistant', content: _sfReply, _intimate: true, _time: Date.now() });
+          saveHistory();
+          if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+          incrementTodayCount();
+          if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+          return;
+        }
+      }
+    } catch(e) {
+      console.warn('[intimate] Sonnet兜底失败:', e);
     }
-    // 如果 Haiku 也破防了，静默失败，不显示任何内容给用户
+    // 任何情况下都不静默——已读不回比任何回复都差
+    const _safeReplies = ['here.', 'still here.', "i'm here.", 'yeah.', 'go on.'];
+    const _safeReply = _safeReplies[Math.floor(Math.random() * _safeReplies.length)];
+    appendMessage('bot', _safeReply);
+    chatHistory.push({ role: 'assistant', content: _safeReply, _intimate: true, _time: Date.now() });
+    saveHistory();
   } catch(e) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
+    const _emergencyReplies = ['here.', 'still here.', "i'm here."];
+    const _emergencyReply = _emergencyReplies[Math.floor(Math.random() * _emergencyReplies.length)];
+    appendMessage('bot', _emergencyReply);
+    chatHistory.push({ role: 'assistant', content: _emergencyReply, _intimate: true, _time: Date.now() });
+    saveHistory();
   }
 }
 
