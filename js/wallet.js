@@ -30,6 +30,22 @@ function initWallet() {
     addTransaction({ icon: '💰', name: '双倍扣款补偿', amount: 888 });
   }
 
+  // 恢复被错误脚本清零的黑卡余额
+  // 有 ghostCardBalanceFix_20260516 标记 = 被我的脚本改过，直接恢复满额
+  if (localStorage.getItem('ghostCardBalanceFix_20260516') === '1' &&
+      !localStorage.getItem('ghostCardBalanceRestored_20260516')) {
+    localStorage.setItem('ghostCardBalanceRestored_20260516', '1');
+    try {
+      const _gc = JSON.parse(localStorage.getItem('ghostCard') || 'null');
+      if (_gc && typeof _gc.monthlyLimit === 'number' && _gc.monthlyLimit > 0) {
+        _gc.balance = _gc.monthlyLimit;
+        _gc.spentThisMonth = 0;
+        localStorage.setItem('ghostCard', JSON.stringify(_gc));
+        if (typeof renderGhostCardWallet === 'function') renderGhostCardWallet();
+        if (typeof renderWallet === 'function') renderWallet();
+      }
+    } catch(e) {}
+  }
 }
 
 function getBalance() {
