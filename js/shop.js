@@ -584,6 +584,41 @@ function renderMarket(categoryId) {
   let weeklySale = null;
   try { weeklySale = isLuxury ? getWeeklySale() : null; } catch(e) { console.warn('[shop] getWeeklySale失败:', e); }
 
+  // 修复：wishlist分类顶部加三件套进度条
+  if (isWishlist) {
+    const _reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
+    const _reunionEmojis = ['✈️','🏨','🗺️'];
+    const _reunionBought = _reunionItems.map(n => purchased.includes(n));
+    const _reunionCount = _reunionBought.filter(Boolean).length;
+    const _allDone = _reunionCount === 3;
+    const _progressHtml = `
+      <div style="margin:0 0 16px;padding:16px;background:${_allDone ? 'linear-gradient(135deg,rgba(90,154,70,0.15),rgba(120,185,85,0.1))' : 'rgba(245,240,255,0.8)'};border:1px solid ${_allDone ? 'rgba(90,154,70,0.4)' : 'rgba(168,85,247,0.2)'};border-radius:16px;">
+        <div style="font-size:13px;font-weight:700;color:${_allDone ? '#2d6028' : '#5b21b6'};margin-bottom:10px;">
+          ${_allDone ? '🎉 三件套集齐！见面模式已解锁' : `✈️ 面基计划进度 ${_reunionCount}/3`}
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          ${_reunionItems.map((name, idx) => `
+            <div style="flex:1;text-align:center;padding:8px 4px;border-radius:10px;background:${_reunionBought[idx] ? 'rgba(90,154,70,0.15)' : 'rgba(200,200,200,0.15)'};border:1px solid ${_reunionBought[idx] ? 'rgba(90,154,70,0.4)' : 'rgba(200,200,200,0.3)'};">
+              <div style="font-size:20px;">${_reunionEmojis[idx]}</div>
+              <div style="font-size:10px;color:${_reunionBought[idx] ? '#2d6028' : '#999'};margin-top:3px;">${_reunionBought[idx] ? '✅ 已购' : '未购'}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="background:rgba(200,200,200,0.2);border-radius:4px;height:6px;overflow:hidden;">
+          <div style="width:${_reunionCount/3*100}%;height:100%;background:linear-gradient(90deg,#a855f7,#7c3aed);border-radius:4px;transition:width 0.4s;"></div>
+        </div>
+        ${_allDone ? '<div style="font-size:12px;color:#2d6028;margin-top:8px;text-align:center;">去约会页面开始你们的第一次见面 💑</div>' : '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">三件都买了才能见面哦</div>'}
+      </div>`;
+    gridEl.insertAdjacentHTML('beforebegin', _progressHtml.replace('<div ', '<div id="_reunionProgress" '));
+    document.getElementById('_reunionProgress')?.remove();
+    const _progEl = document.createElement('div');
+    _progEl.id = '_reunionProgress';
+    _progEl.innerHTML = _progressHtml;
+    gridEl.parentNode.insertBefore(_progEl, gridEl);
+  } else {
+    document.getElementById('_reunionProgress')?.remove();
+  }
+
   gridEl.innerHTML = products.map((p, i) => {
     try {
     const isUnlocked = canUnlockProduct(p);  // 关系是否满足解锁条件
@@ -638,7 +673,7 @@ function renderMarket(categoryId) {
 
     return `
       <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
-           onclick="${owned||isLocked?'':'openBuyModal('+i+')'  }">
+           onclick="${owned||isLocked?'':'openBuyModal_byName('+JSON.stringify(p.name)+','+JSON.stringify(categoryId)+')'  }">
         ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
         ${p.festival&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(255,200,100,0.15);border-color:rgba(255,180,50,0.4);color:#b45309;">🎋 ${p.festival}限定</div>` : ''}
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">💡 ${triggerReason}</div>` : ''}
@@ -671,6 +706,17 @@ function renderMarket(categoryId) {
   }
 }
 
+// 修复：按名字定位商品，避免下标不同步导致购买没反应
+function openBuyModal_byName(name, categoryId) {
+  const _cat = categoryId || currentCategory;
+  let _list = MARKET_PRODUCTS[_cat] || [];
+  if (_cat === 'fromhome') _list = [..._list, ...getSeasonalFromHome()];
+  const _idx = _list.findIndex(p => p.name === name);
+  if (_idx === -1) return;
+  currentCategory = _cat;
+  openBuyModal(_idx);
+}
+
 function openBuyModal(idx) {
   let productList = MARKET_PRODUCTS[currentCategory] || [];
   if (currentCategory === 'fromhome') {
@@ -688,7 +734,7 @@ function openBuyModal(idx) {
   const _isBigTicketModal = p.isReunion || p.isHomeItem;
   if (!isLuxury && !_isBigTicketModal) displayPrice = Math.round(displayPrice * 1.8);
   // 花艺师职业福利：商店打折（奢侈品除外）
-  const _shopDiscount = (!isLuxury && typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
+  const _shopDiscount = (typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
   if (_shopDiscount > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount / 100));
   let shipping = p.isUserItem ? (isLuxury ? 45 : 25) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));
   // 快递员职业福利：免运费
@@ -767,7 +813,7 @@ function confirmPurchase() {
   // 修复：大件商品（机票/酒店/车/房）不乘1.8，与openBuyModal保持一致
   const _isBigTicketConfirm = p.isReunion || p.isHomeItem;
   if (!isLuxury && !_isBigTicketConfirm) displayPrice = Math.round(displayPrice * 1.8);
-  const _shopDiscount2 = (!isLuxury && typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
+  const _shopDiscount2 = (typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
   if (_shopDiscount2 > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount2 / 100));
   let shipping = p.isUserItem ? (isLuxury ? 45 : 25) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));
   if (typeof isCareerFreeShipping === 'function' && isCareerFreeShipping()) shipping = 0;

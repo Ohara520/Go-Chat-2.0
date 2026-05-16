@@ -19,8 +19,13 @@
 const DATE_BASE_THRESHOLD = 10;
 const DATE_THRESHOLD_STEP = 5;
 
-// 一次约会最大 AI 轮数（前后各 1 轮脚本，中间 AI）
-const DATE_MAX_AI_TURNS = 4;
+// 一次约会最大 AI 轮数
+// 三件套见面约会：20-30轮；普通约会：8轮
+const DATE_MAX_AI_TURNS = 8;
+function getDateMaxTurns(isReunionDate) {
+  if (isReunionDate) return 20 + Math.floor(Math.random() * 11); // 20-30轮随机
+  return DATE_MAX_AI_TURNS;
+}
 
 // 城市 + 餐厅数据
 const DATE_CITIES = [
@@ -197,17 +202,25 @@ function getDateMemories() {
 }
 
 // 礼物达标进度
+// 修复：三件套（机票+酒店+旅行计划）购齐也算解锁约会
 function getDateUnlockState() {
   const memories = getDateMemories();
   const completedCount = memories.length;
   const threshold = DATE_BASE_THRESHOLD + completedCount * DATE_THRESHOLD_STEP;
   const lastDateTs = completedCount > 0 ? memories[memories.length - 1].timestamp : 0;
   const giftsSince = getGiftRecords().filter(g => g.timestamp > lastDateTs).length;
+
+  // 检查三件套
+  const _purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  const _reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
+  const _reunionComplete = _reunionItems.every(n => _purchased.includes(n));
+
   return {
     completedCount,
     threshold,
     giftsSince,
-    isUnlocked: giftsSince >= threshold,
+    reunionComplete: _reunionComplete,
+    isUnlocked: giftsSince >= threshold || _reunionComplete,
     progress: Math.min(1, giftsSince / threshold)
   };
 }
@@ -799,7 +812,11 @@ function confirmAndStartDate() {
   }
   if (typeof renderWallet === 'function') renderWallet();
   closeDateConfirm();
-  startDateScene(_selectedDateCity, _selectedDateRestaurant);
+  // 判断是三件套见面约会还是礼物积累约会
+  const _purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+  const _reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
+  const _isReunionDate = _reunionItems.every(n => _purchased.includes(n));
+  startDateScene(_selectedDateCity, _selectedDateRestaurant, _isReunionDate);
 }
 window.confirmAndStartDate = confirmAndStartDate;
 
@@ -811,12 +828,15 @@ window.confirmAndStartDate = confirmAndStartDate;
 let _activeDate = null;
 // _activeDate = { city, restaurant, dialogue: [{role,text}], aiTurnsUsed, ended }
 
-function startDateScene(city, restaurant) {
+function startDateScene(city, restaurant, isReunionDate) {
   // 选脚本开场（每城 2-3 条随机）
   const opener = city.openings[Math.floor(Math.random() * city.openings.length)];
+  const _maxTurns = getDateMaxTurns(isReunionDate);
   _activeDate = {
     city,
     restaurant,
+    isReunionDate: !!isReunionDate,
+    maxTurns: _maxTurns,
     dialogue: [{ role: 'ghost', text: opener, scripted: true }],
     aiTurnsUsed: 0,
     ended: false,
@@ -844,7 +864,7 @@ function renderDateScene() {
     return `<div class="date-bubble ${cls}">${tag}<div class="date-bubble-text">${_esc(line.text)}</div></div>`;
   }).join('');
 
-  const remainingAI = DATE_MAX_AI_TURNS - aiTurnsUsed;
+  const remainingAI = (_activeDate.maxTurns || DATE_MAX_AI_TURNS) - aiTurnsUsed;
   const inputDisabled = ended || _activeDate._waitingReply;
 
   let footerHTML;
@@ -888,7 +908,8 @@ window.renderDateScene = renderDateScene;
 
 async function sendDateTurn() {
   if (!_activeDate || _activeDate.ended || _activeDate._waitingReply) return;
-  if (_activeDate.aiTurnsUsed >= DATE_MAX_AI_TURNS) {
+  const _curMaxTurns = _activeDate.maxTurns || DATE_MAX_AI_TURNS;
+  if (_activeDate.aiTurnsUsed >= _curMaxTurns) {
     if (typeof showToast === 'function') showToast('够了，让他喘口气吧～');
     return;
   }
