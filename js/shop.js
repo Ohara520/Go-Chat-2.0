@@ -558,7 +558,7 @@ function renderMarket(categoryId) {
         <div class="product-emoji">${p.emoji}</div>
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${!isUnlocked ? '继续和他相处，慢慢解锁' : p.desc}</div>
-        <div class="product-price">${!isUnlocked ? '🔒 ' : ''}£${Math.round(p.price * 1.8).toLocaleString()}</div>
+        <div class="product-price">${!isUnlocked ? '🔒 ' : ''}£${(p.isReunion || p.isHomeItem ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</div>
         ${actionHtml}
       </div>`;
     });
@@ -584,37 +584,38 @@ function renderMarket(categoryId) {
   let weeklySale = null;
   try { weeklySale = isLuxury ? getWeeklySale() : null; } catch(e) { console.warn('[shop] getWeeklySale失败:', e); }
 
-  // 修复：wishlist分类顶部加三件套进度条
+  // 修复：wishlist分类顶部加三件套进度条（避免嵌套模板字符串，防止浏览器解析崩溃）
   if (isWishlist) {
     const _reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
     const _reunionEmojis = ['✈️','🏨','🗺️'];
-    const _reunionBought = _reunionItems.map(n => purchased.includes(n));
+    const _reunionBought = _reunionItems.map(function(n) { return purchased.includes(n); });
     const _reunionCount = _reunionBought.filter(Boolean).length;
     const _allDone = _reunionCount === 3;
-    const _progressHtml = `
-      <div style="margin:0 0 16px;padding:16px;background:${_allDone ? 'linear-gradient(135deg,rgba(90,154,70,0.15),rgba(120,185,85,0.1))' : 'rgba(245,240,255,0.8)'};border:1px solid ${_allDone ? 'rgba(90,154,70,0.4)' : 'rgba(168,85,247,0.2)'};border-radius:16px;">
-        <div style="font-size:13px;font-weight:700;color:${_allDone ? '#2d6028' : '#5b21b6'};margin-bottom:10px;">
-          ${_allDone ? '🎉 三件套集齐！见面模式已解锁' : `✈️ 面基计划进度 ${_reunionCount}/3`}
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          ${_reunionItems.map((name, idx) => `
-            <div style="flex:1;text-align:center;padding:8px 4px;border-radius:10px;background:${_reunionBought[idx] ? 'rgba(90,154,70,0.15)' : 'rgba(200,200,200,0.15)'};border:1px solid ${_reunionBought[idx] ? 'rgba(90,154,70,0.4)' : 'rgba(200,200,200,0.3)'};">
-              <div style="font-size:20px;">${_reunionEmojis[idx]}</div>
-              <div style="font-size:10px;color:${_reunionBought[idx] ? '#2d6028' : '#999'};margin-top:3px;">${_reunionBought[idx] ? '✅ 已购' : '未购'}</div>
-            </div>
-          `).join('')}
-        </div>
-        <div style="background:rgba(200,200,200,0.2);border-radius:4px;height:6px;overflow:hidden;">
-          <div style="width:${_reunionCount/3*100}%;height:100%;background:linear-gradient(90deg,#a855f7,#7c3aed);border-radius:4px;transition:width 0.4s;"></div>
-        </div>
-        ${_allDone ? '<div style="font-size:12px;color:#2d6028;margin-top:8px;text-align:center;">去约会页面开始你们的第一次见面 💑</div>' : '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">三件都买了才能见面哦</div>'}
-      </div>`;
-    gridEl.insertAdjacentHTML('beforebegin', _progressHtml.replace('<div ', '<div id="_reunionProgress" '));
+
     document.getElementById('_reunionProgress')?.remove();
     const _progEl = document.createElement('div');
     _progEl.id = '_reunionProgress';
-    _progEl.innerHTML = _progressHtml;
-    gridEl.parentNode.insertBefore(_progEl, gridEl);
+    _progEl.style.cssText = 'margin:0 0 16px;padding:16px;background:' + (_allDone ? 'linear-gradient(135deg,rgba(90,154,70,0.15),rgba(120,185,85,0.1))' : 'rgba(245,240,255,0.8)') + ';border:1px solid ' + (_allDone ? 'rgba(90,154,70,0.4)' : 'rgba(168,85,247,0.2)') + ';border-radius:16px;';
+
+    const _titleText = _allDone ? '🎉 三件套集齐！见面模式已解锁' : ('✈️ 面基计划进度 ' + _reunionCount + '/3');
+    const _itemsHtml = _reunionItems.map(function(name, idx) {
+      const bought = _reunionBought[idx];
+      return '<div style="flex:1;text-align:center;padding:8px 4px;border-radius:10px;background:' + (bought ? 'rgba(90,154,70,0.15)' : 'rgba(200,200,200,0.15)') + ';border:1px solid ' + (bought ? 'rgba(90,154,70,0.4)' : 'rgba(200,200,200,0.3)') + ';">'
+        + '<div style="font-size:20px;">' + _reunionEmojis[idx] + '</div>'
+        + '<div style="font-size:10px;color:' + (bought ? '#2d6028' : '#999') + ';margin-top:3px;">' + (bought ? '✅ 已购' : '未购') + '</div>'
+        + '</div>';
+    }).join('');
+    const _bottomText = _allDone
+      ? '<div style="font-size:12px;color:#2d6028;margin-top:8px;text-align:center;">去约会页面开始你们的第一次见面 💑</div>'
+      : '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">三件都买了才能见面哦</div>';
+
+    _progEl.innerHTML = '<div style="font-size:13px;font-weight:700;color:' + (_allDone ? '#2d6028' : '#5b21b6') + ';margin-bottom:10px;">' + _titleText + '</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:10px;">' + _itemsHtml + '</div>'
+      + '<div style="background:rgba(200,200,200,0.2);border-radius:4px;height:6px;overflow:hidden;">'
+      + '<div style="width:' + (_reunionCount/3*100) + '%;height:100%;background:linear-gradient(90deg,#a855f7,#7c3aed);border-radius:4px;transition:width 0.4s;"></div>'
+      + '</div>' + _bottomText;
+
+    if (gridEl.parentNode) gridEl.parentNode.insertBefore(_progEl, gridEl);
   } else {
     document.getElementById('_reunionProgress')?.remove();
   }
@@ -666,7 +667,7 @@ function renderMarket(categoryId) {
           <div class="product-emoji">${p.emoji}</div>
           <div class="product-name">${p.name}</div>
           <div class="product-desc">继续和他相处，慢慢解锁</div>
-          <div class="product-price">£${Math.round(p.price * 1.8).toLocaleString()}</div>
+          <div class="product-price">£${(p.isReunion || p.isHomeItem ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</div>
           <button class="product-buy-btn" disabled style="${btnStyle}display:flex;align-items:center;justify-content:center;">🔒 未解锁</button>
         </div>`;
     }
@@ -684,7 +685,7 @@ function renderMarket(categoryId) {
         ${isWishlist&&p.badge ? `<div class="product-badge-preview">🏅 ${p.badge}</div>` : ''}
         ${p.desc ? `<div class="product-desc">${p.desc}</div>` : ''}
         <div class="product-price ${isWishlist?'wishlist-price':''}">
-          ${onSale ? `<span class="sale-original-price">£${(isLuxury ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</span>` : ''}
+          ${onSale ? `<span class="sale-original-price">£${((isLuxury || p.isReunion || p.isHomeItem) ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</span>` : ''}
           £${displayPrice.toLocaleString()}
         </div>
         ${owned
@@ -747,7 +748,8 @@ function openBuyModal(idx) {
   document.getElementById('buyModalEmoji').textContent = p.emoji;
   document.getElementById('buyModalName').textContent = p.name;
   document.getElementById('buyModalDesc').textContent = p.desc || '';
-  const _basePrice = isLuxury ? p.price : Math.round(p.price * 1.8);
+  const _isBigTicketBase = p.isReunion || p.isHomeItem;
+  const _basePrice = (isLuxury || _isBigTicketBase) ? p.price : Math.round(p.price * 1.8);
   const _hasDiscount = _shopDiscount > 0 && displayPrice < _basePrice;
   const _shippingFree = shipping === 0 && (p.shipping > 0 || !p.isUserItem);
   document.getElementById('buyModalPrice').innerHTML = _hasDiscount
