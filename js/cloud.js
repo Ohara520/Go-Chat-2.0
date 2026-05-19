@@ -66,8 +66,14 @@ async function loadFromCloud() {
         const toAdd = data.chat_history.filter(m => !localContents.has(m.role + '|' + (m.content || '').slice(0, 80)));
         if (toAdd.length > 0) {
           // 云端的放前面（更早），本地的放后面（更新）
-          const merged = [...toAdd, ...localHistory].slice(-300);
-          localStorage.setItem('chatHistory', JSON.stringify(merged));
+          const merged = [...toAdd, ...localHistory];
+          // 修复：合并后先保留本地最新的消息，再截取300条上限
+          // 旧版直接 slice(-300) 可能把本地新消息切掉
+          // 新版：本地消息全部保留，从云端补旧消息，总量超300才截最早的
+          const trimmed = merged.length > 300
+            ? merged.slice(merged.length - 300)
+            : merged;
+          localStorage.setItem('chatHistory', JSON.stringify(trimmed));
           localStorage.setItem('chatUpdatedAt', cloudTs);
         }
       }
@@ -441,6 +447,12 @@ async function loadFromCloud() {
       const mergeArrays = (key, cloudArr, maxLen) => {
         if (!Array.isArray(cloudArr) || cloudArr.length === 0) return;
         const local = JSON.parse(localStorage.getItem(key) || '[]');
+        // 修复：云端是空的但本地有数据时，跳过合并防止数据丢失
+        // 站点不稳定时保存失败，刷新后旧的云端空数据会覆盖本地新数据
+        if (cloudArr.length === 0 && local.length > 0) {
+          console.warn('[cloud] ' + key + ' 云端为空但本地有数据，跳过覆盖');
+          return;
+        }
         if (local.length === 0) { localStorage.setItem(key, JSON.stringify(cloudArr.slice(0, maxLen))); return; }
         // 用内容前40字符+时间戳做key去重
         const getKey = item => {
