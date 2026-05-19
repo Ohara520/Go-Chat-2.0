@@ -476,6 +476,22 @@ async function loadFromCloud() {
       mergeArrays('storyBook', s.storyBook, 30);
       mergeArrays('collections', s.collections, 400);
       mergeArrays('dateMemories', s.dateMemories, 50);
+
+      // 修复：礼物记录加入云端同步，防止缓存清除后丢失
+      if (Array.isArray(s.giftRecords) && s.giftRecords.length > 0) {
+        const localGifts = JSON.parse(localStorage.getItem('giftRecords') || '[]');
+        if (localGifts.length === 0) {
+          localStorage.setItem('giftRecords', JSON.stringify(s.giftRecords.slice(0, 100)));
+        } else {
+          // 合并去重，按时间戳排序
+          const merged = [...localGifts];
+          s.giftRecords.forEach(cg => {
+            if (!merged.find(lg => lg.id === cg.id)) merged.push(cg);
+          });
+          merged.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          localStorage.setItem('giftRecords', JSON.stringify(merged.slice(0, 100)));
+        }
+      }
       mergeArrays('coupleFeedHistory', s.coupleFeedHistory, 50);
       mergeArrays('deliveryHistory', s.deliveryHistory, 50);
       mergeArrays('takeoutHistory', s.takeoutHistory, 50);
@@ -751,6 +767,7 @@ async function saveToCloud() {
       storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 10),
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 400),
       dateMemories: JSON.parse(localStorage.getItem('dateMemories') || '[]').slice(0, 50),
+      giftRecords: JSON.parse(localStorage.getItem('giftRecords') || '[]').slice(0, 100),
       coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 25),
       coupleFeedDate: localStorage.getItem('coupleFeedDate') || '',
       organicFeedCount: localStorage.getItem('organicFeedCount_' + getTodayDateStr()) || '0',
