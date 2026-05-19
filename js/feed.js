@@ -171,7 +171,8 @@ function checkFeedBadge() {
     badge.style.display = 'block';
     return;
   }
-  const hasNewerPost = history.some(h => (h.post?.time || 0) >= lastViewed);
+  // 修复：加1秒容错，防止用户刚看完时间戳跟帖子时间完全相同导致假红点
+  const hasNewerPost = history.some(h => (h.post?.time || 0) > lastViewed + 1000);
   if (hasNewerPost) {
     badge.style.display = 'block';
   } else {
@@ -1547,9 +1548,10 @@ async function publishUserDraft() {
     post: { en: text, zh, avatar: userAvatar, author: userName, name: userName, comments, time: Date.now(), likes: 1, isUserPost: true }
   };
   insertFeedPost(entry);
-  localStorage.setItem('feedHasNew', '1');
-  const badge = document.getElementById('feedNewBadge');
-  if (badge) badge.style.display = 'block';
+  // 修复：用户自己发帖不触发红点，同时更新lastViewedAt避免假红点
+  // 用户刚发完帖子还在朋友圈页面，不需要提示"有新动态"
+  localStorage.setItem('feedLastViewedAt', String(Date.now()));
+  localStorage.removeItem('feedHasNew');
 
   showToast('✨ 已发布到动态');
 

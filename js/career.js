@@ -233,9 +233,13 @@ function checkCareerSalary() {
   if (!type) return;
 
   const today = new Date();
-  if (today.getDate() !== 10) return;
-
   const monthKey = today.getFullYear() + '_' + (today.getMonth() + 1);
+
+  // 修复：工资发放不卡时间点
+  // 原逻辑：只在10号打开才发，用户10号没开app就错过，11号打开也发不了
+  // 新逻辑：10号或之后打开都能领，但每月只发一次（monthKey去重）
+  // 这样不管用户几号几点打开，当月工资都能拿到
+  if (today.getDate() < 10) return;
   if (localStorage.getItem('careerLastSalaryMonth') === monthKey) return;
 
   const info = getCareerInfo();

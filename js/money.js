@@ -1052,43 +1052,45 @@ function getGhostCard() {
       return defaults;
     }
 
-    // 月初重置：用年+月判断，避免跨年或跨多月不重置的问题
+    // 修复：月初重置和上限差额补偿只执行一次，用 _lastCalcKey 标记
+    // 原逻辑每次调用 getGhostCard() 都重算，导致余额漂移（登录扣20、每日少5等）
     const nowMonthKey = now.getFullYear() * 100 + now.getMonth();
     const savedMonthKey = (saved.lastResetYear || 0) * 100 + (saved.lastResetMonth ?? 99);
-    if (savedMonthKey !== nowMonthKey) {
-      const newLimit = getGhostCardMonthlyLimit();
-      saved.monthlyLimit   = newLimit;
-      saved.spentThisMonth = 0;
-      saved.lastResetMonth = now.getMonth();
-      saved.lastResetYear  = now.getFullYear();
-      // 旧余额保留，叠加新月额度，上限 3 个月额度防止无限堆积
-      saved.balance = Math.min((saved.balance || 0) + newLimit, newLimit * 3);
-    }
-
-    // 月内锁定上限：只升不降（防心情波动），但职业切换时重算
     const _currentCareer = typeof getCareer === 'function' ? getCareer() : '';
     const _savedCareer = saved._careerType || '';
-    if (_currentCareer !== _savedCareer) {
-      // 职业变了，重新算上限
-      saved.monthlyLimit = monthlyLimit;
+    const _calcKey = nowMonthKey + '_' + _currentCareer;
+
+    if (saved._lastCalcKey !== _calcKey) {
+      // 月初重置
+      if (savedMonthKey !== nowMonthKey) {
+        const newLimit = getGhostCardMonthlyLimit();
+        saved.monthlyLimit   = newLimit;
+        saved.spentThisMonth = 0;
+        saved.lastResetMonth = now.getMonth();
+        saved.lastResetYear  = now.getFullYear();
+        // 旧余额保留，叠加新月额度，上限3个月防无限堆积
+        saved.balance = Math.min((saved.balance || 0) + newLimit, newLimit * 3);
+      }
+
+      // 职业切换重算上限
+      if (_currentCareer !== _savedCareer) {
+        saved.monthlyLimit = monthlyLimit;
+        saved._careerType = _currentCareer;
+      }
+      const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit);
+
+      // 上限升级补差额（只在本次计算周期内执行一次）
+      const oldLimit = saved.monthlyLimit || 0;
+      if (lockedLimit > oldLimit && oldLimit > 0) {
+        const diff = lockedLimit - oldLimit;
+        saved.balance = Math.min((saved.balance || 0) + diff, lockedLimit);
+      }
+
+      saved.monthlyLimit = lockedLimit;
       saved._careerType = _currentCareer;
-    }
-    const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit);
-
-    // 上限升级补差额：如果新上限比旧上限高，把差额补进余额
-    // 场景：磨合升级到老夫老妻，上限从2000升到3000，差额1000补进余额
-    const oldLimit = saved.monthlyLimit || 0;
-    if (lockedLimit > oldLimit && oldLimit > 0) {
-      const diff = lockedLimit - oldLimit;
-      saved.balance = Math.min((saved.balance || 0) + diff, lockedLimit);
+      saved._lastCalcKey = _calcKey; // 标记本周期已计算，防止重复执行
     }
 
-    saved.monthlyLimit = lockedLimit;
-    saved._careerType = _currentCareer;
-
-    // 注意：不再强制把余额补回到"本月应得额度"
-    // 原逻辑会在每次调用 getGhostCard() 时把花出去的钱补回来，导致余额永远显示满额
-    // 仅清理旧字段
     if (saved.lastDailyAt) delete saved.lastDailyAt; // 清理旧字段
     // 兜底：余额不能为负
     if (saved.balance < 0) saved.balance = 0;
