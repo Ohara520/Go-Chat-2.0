@@ -249,7 +249,6 @@ function checkCareerSalary() {
 
   // 发工资
   if (typeof setBalance === 'function' && typeof getBalance === 'function') {
-    setBalance(getBalance() + salary);
   }
   if (typeof addTransaction === 'function') {
     addTransaction({
@@ -261,6 +260,7 @@ function checkCareerSalary() {
 
   localStorage.setItem('careerLastSalaryMonth', monthKey);
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof renderWallet === 'function') renderWallet();
 
   // 显示通知
   _showCareerNotification(`💰 发薪日！${info.title}月薪 £${salary} 已到账`);
@@ -322,7 +322,6 @@ function checkStreamerTip() {
     else { giftName = '棒棒糖'; giftIcon = '🍭'; }
 
     if (typeof setBalance === 'function' && typeof getBalance === 'function') {
-      setBalance(getBalance() + totalTip);
     }
     if (typeof addTransaction === 'function') {
       addTransaction({
@@ -340,6 +339,7 @@ function checkStreamerTip() {
 
   localStorage.setItem('streamerTipDate', today);
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof renderWallet === 'function') renderWallet();
   return totalTip;
 }
 
@@ -356,7 +356,6 @@ function checkProgrammerIncome() {
   const income = 5 + level * 5; // L1: £10, L10: £55
 
   if (typeof setBalance === 'function' && typeof getBalance === 'function') {
-    setBalance(getBalance() + income);
   }
   if (typeof addTransaction === 'function') {
     addTransaction({ icon: '💻', name: '接单收入', amount: income });
@@ -364,6 +363,7 @@ function checkProgrammerIncome() {
 
   localStorage.setItem('programmerIncomeDate', today);
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof renderWallet === 'function') renderWallet();
   _showCareerNotification(`💻 今日接单收入 £${income}`);
   return income;
 }
@@ -383,7 +383,6 @@ function checkChefIncome() {
     '餐厅值班', '餐厅值班', '主厨接单', '主厨接单', '米其林接单'][level - 1] || '摆摊';
 
   if (typeof setBalance === 'function' && typeof getBalance === 'function') {
-    setBalance(getBalance() + income);
   }
   if (typeof addTransaction === 'function') {
     addTransaction({ icon: '👩‍🍳', name: jobName, amount: income });
@@ -391,6 +390,7 @@ function checkChefIncome() {
 
   localStorage.setItem('chefIncomeDate', today);
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof renderWallet === 'function') renderWallet();
   _showCareerNotification(`👩‍🍳 ${jobName}收入 £${income}`);
   return income;
 }
@@ -439,7 +439,6 @@ function checkEntertainerEndorsement() {
   if (income <= 0) return 0;
 
   if (typeof setBalance === 'function' && typeof getBalance === 'function') {
-    setBalance(getBalance() + income);
   }
   if (typeof addTransaction === 'function') {
     addTransaction({ icon: '🎤', name: '代言费', amount: income });
@@ -447,6 +446,7 @@ function checkEntertainerEndorsement() {
 
   localStorage.setItem('entertainerEndorsementDate', today);
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof renderWallet === 'function') renderWallet();
   _showCareerNotification(`🎤 今日代言费 £${income}`);
   return income;
 }
@@ -481,7 +481,6 @@ function checkEntertainerShow() {
   }
 
   if (typeof setBalance === 'function' && typeof getBalance === 'function') {
-    setBalance(getBalance() + income);
   }
   if (typeof addTransaction === 'function') {
     addTransaction({

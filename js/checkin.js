@@ -242,7 +242,6 @@ function doCheckin() {
   if (rand < luckyChance) {
     let baseCoins = Math.random() < 0.5 ? 100 : 150;
     let coins = _isBarista ? Math.round(baseCoins * _baristaMulti) : baseCoins;
-    if (typeof setBalance    === 'function') setBalance(getBalance() + coins);
     if (typeof addTransaction === 'function') addTransaction({ icon: '🎰', name: '欧气签到！', amount: coins });
     if (typeof renderWallet  === 'function') renderWallet();
     rewardMsg = _isBarista
@@ -251,7 +250,6 @@ function doCheckin() {
   } else if (rand < luckyChance + 0.475) {
     let baseCoins = [5, 8, 10, 15, 20][Math.floor(Math.random() * 5)];
     let coins = _isBarista ? Math.round(baseCoins * _baristaMulti) : baseCoins;
-    if (typeof setBalance    === 'function') setBalance(getBalance() + coins);
     if (typeof addTransaction === 'function') addTransaction({ icon: '🎁', name: '签到奖励', amount: coins });
     if (typeof renderWallet  === 'function') renderWallet();
     rewardMsg = _isBarista

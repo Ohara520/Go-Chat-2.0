@@ -795,14 +795,19 @@ window.closeDateConfirm = closeDateConfirm;
 
 function confirmAndStartDate() {
   if (!_selectedDateCity || !_selectedDateRestaurant) return;
+  // 修复：防重复点击，避免快速双击扣两次钱
+  if (window._dateConfirming) return;
+  window._dateConfirming = true;
+  setTimeout(() => { window._dateConfirming = false; }, 3000);
+
   const total = _selectedDateCity.visitCost + _selectedDateRestaurant.price;
   const bal = (typeof getBalance === 'function') ? getBalance() : 0;
   if (bal < total) {
     if (typeof showToast === 'function') showToast('💔 余额不足');
+    window._dateConfirming = false;
     return;
   }
-  // 扣钱
-  if (typeof setBalance === 'function') setBalance(bal - total);
+  // 修复：删掉多余的setBalance，只用addTransaction记账，余额由transactions统一计算
   if (typeof addTransaction === 'function') {
     addTransaction({
       icon: _selectedDateCity.emoji,
@@ -1026,6 +1031,9 @@ function finalizeDateMemory() {
   if (typeof showToast === 'function') showToast('📷 已存进相册～');
   _activeDate = null;
   window._finalizingDate = false;
+  // 修复：清空城市和餐厅选择，防止用户返回后还是选中状态，再点确认重复扣钱
+  _selectedDateCity = null;
+  _selectedDateRestaurant = null;
   // 跳回约会主页
   if (typeof openScreen === 'function') openScreen('dateHubScreen');
   setTimeout(() => { if (typeof renderDateHub === 'function') renderDateHub(); }, 50);

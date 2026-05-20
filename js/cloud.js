@@ -454,20 +454,21 @@ async function loadFromCloud() {
           return;
         }
         if (local.length === 0) { localStorage.setItem(key, JSON.stringify(cloudArr.slice(0, maxLen))); return; }
-        // 用内容前40字符+时间戳做key去重
+        // 修复：优先用 id 去重，解决约会回忆（dateMemories）等有id字段的数据无法正确合并的问题
+        // 旧版只用 content+time 去重，但约会回忆没有这两个字段，导致合并出错、回忆丢失
         const getKey = item => {
+          if (item.id) return 'id_' + item.id;
           const content = (item.content || item.text || item.title || JSON.stringify(item)).slice(0, 40);
-          const time = item.time || item.date || item.at || item.createdAt || '';
+          const time = item.time || item.date || item.at || item.createdAt || item.timestamp || '';
           return content + '_' + time;
         };
         const merged = [...local];
         const localKeys = new Set(local.map(getKey));
         cloudArr.forEach(ci => { if (!localKeys.has(getKey(ci))) merged.push(ci); });
-        // 按时间排序，新的在前
+        // 按时间排序，新的在前，兼容 timestamp 字段（约会回忆用的是这个）
         merged.sort((a, b) => {
-          const ta = a.time || a.date || a.at || a.createdAt || '';
-          const tb = b.time || b.date || b.at || b.createdAt || '';
-          // 兼容数字时间戳和字符串日期
+          const ta = a.time || a.date || a.at || a.createdAt || a.timestamp || '';
+          const tb = b.time || b.date || b.at || b.createdAt || b.timestamp || '';
           if (typeof ta === 'number' && typeof tb === 'number') return tb - ta;
           return String(tb).localeCompare(String(ta));
         });

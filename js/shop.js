@@ -911,7 +911,8 @@ function _finishPurchase(p, isWishlist, isLuxury, total) {
   if (typeof renderDeliveryTracker === 'function') {
     setTimeout(() => renderDeliveryTracker(), 300);
   }
-  if (typeof saveToCloud === 'function') saveToCloud().catch(()=>{});
+  // 修复：改用scheduleCloudSave，网络抖动时会自动重试，防止快递记录丢失
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 // ===== 每周折扣 =====
