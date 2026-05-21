@@ -587,6 +587,27 @@ function renderDateHub() {
   const body = screen.querySelector('.date-hub-body');
   if (!body) return;
 
+  // ── 检查有没有未完成的约会 ──────────────────────────────
+  // 有的话优先显示"续上"提示，不允许重新付款开新约会
+  const _pendingSession = _loadActiveDateSession();
+  if (_pendingSession && !_pendingSession.ended) {
+    const _pc = _pendingSession.city;
+    const _pr = _pendingSession.restaurant;
+    body.innerHTML = `
+      <div style="padding: 2rem 1.5rem; text-align: center;">
+        <div style="font-size: 2rem; margin-bottom: 0.75rem;">${_pc.emoji}</div>
+        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">上次约会还没结束</div>
+        <div style="font-size: 0.9rem; opacity: 0.75; margin-bottom: 1.5rem;">${_pc.name} · ${_pr.name}</div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button onclick="resumeDateScene()" style="padding: 10px 24px; border-radius: 20px; border: none; background: ${_pc.accentColor}; color: white; font-size: 0.95rem; cursor: pointer;">继续约会</button>
+          <button onclick="abandonDateScene()" style="padding: 10px 24px; border-radius: 20px; border: 1px solid #ccc; background: transparent; font-size: 0.95rem; cursor: pointer;">放弃这次</button>
+        </div>
+        <div style="font-size: 0.78rem; opacity: 0.5; margin-top: 1rem;">放弃不退款，但下次约会门槛不增加</div>
+      </div>
+    `;
+    return;
+  }
+
   const memories = getDateMemories().slice().reverse();
   const st = getDateUnlockState();
   const pct = Math.round(st.progress * 100);
@@ -825,6 +846,30 @@ function confirmAndStartDate() {
 }
 window.confirmAndStartDate = confirmAndStartDate;
 
+// 续上未完成的约会
+function resumeDateScene() {
+  const session = _loadActiveDateSession();
+  if (!session) return;
+  _activeDate = session;
+  if (typeof openScreen === 'function') openScreen('dateSceneScreen');
+  renderDateScene();
+}
+window.resumeDateScene = resumeDateScene;
+
+// 放弃未完成的约会（不退款，但下次门槛不增加）
+function abandonDateScene() {
+  if (!confirm('确定放弃这次约会吗？钱不退，但下次约会门槛不会增加。')) return;
+  // 不往 dateMemories 里写，所以 completedCount 不增加，门槛不涨
+  _activeDate = null;
+  localStorage.removeItem('activeDateSession');
+  _selectedDateCity = null;
+  _selectedDateRestaurant = null;
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof showToast === 'function') showToast('这次约会已放弃');
+  if (typeof renderDateHub === 'function') renderDateHub();
+}
+window.abandonDateScene = abandonDateScene;
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ⑥ 约会场景（混合：脚本开场 → AI 中段 → 脚本收尾）
@@ -832,6 +877,33 @@ window.confirmAndStartDate = confirmAndStartDate;
 
 let _activeDate = null;
 // _activeDate = { city, restaurant, dialogue: [{role,text}], aiTurnsUsed, ended }
+
+function _saveActiveDateSession() {
+  try {
+    if (_activeDate) {
+      localStorage.setItem('activeDateSession', JSON.stringify(_activeDate));
+    } else {
+      localStorage.removeItem('activeDateSession');
+    }
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  } catch(e) {}
+}
+
+function _loadActiveDateSession() {
+  try {
+    const raw = localStorage.getItem('activeDateSession');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    // 恢复城市和餐厅对象（localStorage只存了数据，要从常量里匹配回来）
+    const city = DATE_CITIES.find(c => c.id === session.city?.id);
+    if (!city) return null;
+    const restaurant = city.restaurants.find(r => r.id === session.restaurant?.id);
+    if (!restaurant) return null;
+    session.city = city;
+    session.restaurant = restaurant;
+    return session;
+  } catch(e) { return null; }
+}
 
 function startDateScene(city, restaurant, isReunionDate) {
   // 选脚本开场（每城 2-3 条随机）
@@ -847,6 +919,7 @@ function startDateScene(city, restaurant, isReunionDate) {
     ended: false,
     startedAt: Date.now()
   };
+  _saveActiveDateSession();
   if (typeof openScreen === 'function') openScreen('dateSceneScreen');
   else document.getElementById('dateSceneScreen').classList.add('active');
   renderDateScene();
@@ -960,6 +1033,7 @@ async function sendDateTurn() {
   _activeDate.dialogue.push({ role: 'ghost', text: reply });
   _activeDate.aiTurnsUsed += 1;
   _activeDate._waitingReply = false;
+  _saveActiveDateSession();
   renderDateScene();
 }
 window.sendDateTurn = sendDateTurn;
@@ -970,6 +1044,7 @@ function endDateScene() {
   const closing = DATE_CLOSING_LINES[Math.floor(Math.random() * DATE_CLOSING_LINES.length)];
   _activeDate.dialogue.push({ role: 'ghost', text: closing, scripted: 'closing' });
   _activeDate.ended = true;
+  _saveActiveDateSession();
   renderDateScene();
 
   // 顺便扯一下好感度（如果系统有这函数）
@@ -1031,6 +1106,8 @@ function finalizeDateMemory() {
   if (typeof showToast === 'function') showToast('📷 已存进相册～');
   _activeDate = null;
   window._finalizingDate = false;
+  localStorage.removeItem('activeDateSession');
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   // 修复：清空城市和餐厅选择，防止用户返回后还是选中状态，再点确认重复扣钱
   _selectedDateCity = null;
   _selectedDateRestaurant = null;

@@ -814,7 +814,31 @@ ${(() => {
   if (f.ghost_knows === 'heard')   return `[${userName} may be celebrating ${f.label} today. Can ask or wish her.]`;
   return '';
 })()}
-${longTermMemory ? `Key memories:\n${longTermMemory}\nUse these naturally when relevant. But for deliveries, gifts, takeout — once you have acknowledged receiving it, the topic is done. Do not keep bringing up the same item across multiple replies. If she asks about it again, you can answer. But do not volunteer it repeatedly.` : ''}
+${(() => {
+  // ── 三层记忆注入 ──────────────────────────────────────────
+  // Layer 1: 核心事实（永远注入，绝不淘汰）
+  const _core = localStorage.getItem('coreMemory') || '';
+  // Layer 2: 检索记忆（按当前消息相关性，只取4条）
+  const _lastUserMsg = (() => {
+    try {
+      const _h = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+      const _last = [..._h].reverse().find(m => m.role === 'user' && !m._system);
+      return _last ? _last.content : '';
+    } catch(e) { return ''; }
+  })();
+  const _retrieved = (typeof retrieveRelevantMemory === 'function')
+    ? retrieveRelevantMemory(_lastUserMsg)
+    : longTermMemory;
+  // Layer 3: 如果检索结果为空，用全量兜底（保证不失忆）
+  const _fallback = (!_retrieved && longTermMemory) ? longTermMemory.split('\n').slice(0, 5).join('\n') : '';
+  const _memToShow = _retrieved || _fallback;
+
+  const parts = [];
+  if (_core) parts.push(`[CORE — always true]\n${_core}`);
+  if (_memToShow) parts.push(`[MEMORY — relevant to this moment]\n${_memToShow}`);
+  if (parts.length === 0) return '';
+  return parts.join('\n\n') + '\nUse these naturally when relevant. But for deliveries, gifts, takeout — once acknowledged, the topic is done. Do not keep bringing up the same item. If she asks again, you can answer. Do not volunteer it repeatedly.';
+})()}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
 
 [GIFT/DELIVERY HONESTY — HARD RULE]

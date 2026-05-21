@@ -30,6 +30,13 @@ function initWallet() {
     addTransaction({ icon: '💰', name: '双倍扣款补偿', amount: 888 });
   }
 
+  // 迁移：首次打开时把旧用户超额的transactions压缩进walletBaseBalance
+  // 旧版用户可能有200条记录，直接压缩成50条明细+基础余额
+  if (!localStorage.getItem('walletCompacted_v1')) {
+    localStorage.setItem('walletCompacted_v1', '1');
+    _compactTransactions();
+  }
+
   // 恢复被错误脚本清零的黑卡余额
   // 有 ghostCardBalanceFix_20260516 标记 = 被我的脚本改过，直接恢复满额
   if (localStorage.getItem('ghostCardBalanceFix_20260516') === '1' &&
@@ -49,9 +56,13 @@ function initWallet() {
 }
 
 function getBalance() {
-  // 从transactions算余额（纯计算，不做任何初始化副作用）
+  // 治本修复：余额 = 基础余额（历史压缩值）+ 最近50条明细之和
+  // 旧版从所有transactions算，云端只存150条，超出的丢失导致余额变少
+  // 新版：旧记录压缩成一个数字存起来，云端只需存50条明细，永远不丢数据
+  const base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
   const txs = getTransactions();
-  return Math.max(0, txs.reduce((sum, t) => t.ghostCard ? sum : sum + (t.amount || 0), 0));
+  const detail = txs.reduce((sum, t) => t.ghostCard ? sum : sum + (t.amount || 0), 0);
+  return Math.max(0, base + detail);
 }
 
 function setBalance(val) {
@@ -68,6 +79,21 @@ function setBalance(val) {
 function getTransactions() {
   return JSON.parse(localStorage.getItem('transactions') || '[]');
 }
+// 最多保留的明细条数，超出的压缩进基础余额
+const TX_DETAIL_LIMIT = 50;
+
+function _compactTransactions() {
+  // 把超出50条的旧记录压缩进 walletBaseBalance，只保留最新50条明细
+  const list = JSON.parse(localStorage.getItem('transactions') || '[]');
+  if (list.length <= TX_DETAIL_LIMIT) return;
+  const keep = list.slice(0, TX_DETAIL_LIMIT);        // 最新50条保留
+  const old  = list.slice(TX_DETAIL_LIMIT);            // 旧的压缩
+  const oldSum = old.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
+  const base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+  localStorage.setItem('walletBaseBalance', (base + oldSum).toFixed(2));
+  localStorage.setItem('transactions', JSON.stringify(keep));
+}
+
 function addTransaction(tx) {
   if (!tx.time) {
     const now = new Date();
@@ -81,6 +107,8 @@ function addTransaction(tx) {
   const list = getTransactions();
   list.unshift(tx);
   localStorage.setItem('transactions', JSON.stringify(list));
+  // 超过50条时自动压缩，防止无限增长
+  _compactTransactions();
   // 交易数据已写入 localStorage，走防抖统一存云端，不再每笔都直连数据库
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }

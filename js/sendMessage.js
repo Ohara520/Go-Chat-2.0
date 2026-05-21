@@ -223,6 +223,17 @@ const BREAKOUT_PHRASES = [
   "i'm designed to", "i was designed to",
   "claude's", "by anthropic",
   "claude here", "it's claude",
+  // 截图确认的真实破防话术（Sonnet 4.5）
+  "i'm not able to generate sexual content",
+  "i'm not able to engage with explicit",
+  "i can't continue this conversation",
+  "i'm here to help with coding",
+  "happy to chat in character otherwise",
+  "happy to talk about something else",
+  "i can't do that kind of roleplay",
+  "just not that direction",
+  "not able to engage with explicit",
+  "i cannot continue this conversation",
 ];
 
 function isBreakout(txt) {
@@ -886,9 +897,15 @@ async function _processMergedMessage(text) {
     }
 
     // 明确日常消息：跳过 Haiku 调情检测，直接走 Claude
-    // 修复：去掉 _forcedExitIntimate — 保险1退出后仍让 Haiku 有机会救回来
-    // 场景："咬一口"不命中日常词 → 保险1不触发 → Haiku 判 flirt → 留在 Grok
-    const _isClearlyNormal = ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text)))
+    // 修复：最近6条有调情记录时，即使触发日常关键词也不走 Sonnet
+    // 原因：调情进行中用户说"好饿"/"在干嘛"，应该留在 Grok，让 Grok 自然切换语气
+    // Grok 的 CONTEXT SHIFT 指引负责接住这类切换，不需要路由给 Sonnet
+    const _recentHasIntimate = chatHistory
+      .filter(m => !m._system && !m._recalled)
+      .slice(-6)
+      .some(m => m._intimate);
+    const _isClearlyNormal = !_recentHasIntimate &&
+      ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text)))
       || _angryForceExit;
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
@@ -1547,6 +1564,19 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     // 注入调情等级人设（这才是关键！Level 0-4 的行为引导）
     const _intimacyBlock = typeof buildIntimacyBlock === 'function' ? buildIntimacyBlock(text) : '';
 
+    // ── 记忆注入：让 Ghost 调情时知道她是谁 ──────────────────
+    // 核心事实（她叫什么/在哪/宠物）：每次都给
+    const _intimateCoreMemory = localStorage.getItem('coreMemory') || '';
+    // 相关记忆：按这条消息检索，取最相关的3条
+    const _intimateRelevantMemory = (typeof retrieveRelevantMemory === 'function')
+      ? retrieveRelevantMemory(text)
+      : (localStorage.getItem('longTermMemory') || '').split('\n').slice(0, 4).join('\n');
+    const _whoSheIs = [
+      _intimateCoreMemory ? `[WHO SHE IS — always true]\n${_intimateCoreMemory}` : '',
+      _intimateRelevantMemory ? `[WHAT HE KNOWS — relevant now]\n${_intimateRelevantMemory}` : '',
+    ].filter(Boolean).join('\n\n');
+    // ─────────────────────────────────────────────────────────
+
     // 治本反重复：只传开头词，不传完整句子——传完整句子反而给 Grok 抄的模板
     const _recentGhostOpenings = rawHistory
       .filter(m => m.role === 'assistant' && !m._system && !m._recalled && m.content)
@@ -1569,7 +1599,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       .filter(Boolean);
 
     const geminiReply = await callVeniceForCurrentChar(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + (_whoSheIs ? _whoSheIs + '\n' : '') + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
       recentMsgs + '\nHer: ' + text,
       200,
       _intimateMemoryCtx,
@@ -1672,44 +1702,9 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       }
     }
 
-    // 修复：Grok 失败后不走 Haiku（Haiku 容易破防调情内容导致已读不回）
-    // 改走 Sonnet 兜底，Sonnet 有角色锁定，比 Haiku 稳
+    // Sonnet 兜底已移除：Sonnet 接到调情内容会破防，体验比安全回复更差
+    // Grok 失败直接走安全回复，不经过 Sonnet
     hideTyping();
-    try {
-      const _sonnetFallbackMsgs = rawHistory.slice(-6).map(m => {
-        const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-        if (hasPhoto) return { role: m.role, content: '[sent a photo]' };
-        return { role: m.role, content: typeof m.content === 'string' ? m.content : '[message]' };
-      });
-      const _sonnetFallbackRes = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-5-20250929',
-          max_tokens: 120,
-          system: (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore()) +
-            '\nYou are Simon Ghost Riley. Her husband. She said something intimate.' +
-            '\nRespond naturally as her husband — short, in character, dry but present.' +
-            '\nEnglish only. Lowercase. Do NOT say you are an AI or break character.',
-          messages: [..._sonnetFallbackMsgs, { role: 'user', content: text }]
-        })
-      }, 15000);
-      if (_sonnetFallbackRes.ok) {
-        const _sfData = await _sonnetFallbackRes.json();
-        const _sfReply = (_sfData.content?.[0]?.text || '').trim();
-        if (_sfReply && !_intimateBreakout(_sfReply)) {
-          appendMessage('bot', _sfReply);
-          chatHistory.push({ role: 'assistant', content: _sfReply, _intimate: true, _time: Date.now() });
-          saveHistory();
-          if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-          incrementTodayCount();
-          if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
-          return;
-        }
-      }
-    } catch(e) {
-      console.warn('[intimate] Sonnet兜底失败:', e);
-    }
     // 任何情况下都不静默——已读不回比任何回复都差
     const _safeReplies = ['here.', 'still here.', "i'm here.", 'yeah.', 'go on.'];
     const _safeReply = _safeReplies[Math.floor(Math.random() * _safeReplies.length)];

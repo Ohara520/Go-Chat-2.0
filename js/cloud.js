@@ -300,13 +300,22 @@ async function loadFromCloud() {
     }
 
     // 4b. 优先从 state_snapshot.transactions 恢复交易记录
-    // 必须在 getBalance() 被调用前完成，防止余额算成0
-    // （state_snapshot 在下方第5步才完整处理，这里提前恢复 transactions）
+    // 治本修复：同时恢复 walletBaseBalance（历史余额压缩值）
+    // 余额 = walletBaseBalance + 最近50条明细，缺一不可
+    if (data.state_snapshot?.walletBaseBalance != null) {
+      const localBase = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+      const cloudBase = parseFloat(data.state_snapshot.walletBaseBalance || '0');
+      // 取较大值，防止本地压缩了更多历史但云端还是旧值
+      if (cloudBase > localBase) {
+        localStorage.setItem('walletBaseBalance', cloudBase.toFixed(2));
+        console.log('[cloud] walletBaseBalance从云端恢复:', cloudBase);
+      }
+    }
     if (data.state_snapshot?.transactions?.length > 0) {
       const localTxs = JSON.parse(localStorage.getItem('transactions') || '[]');
       if (localTxs.length === 0) {
         // 本地完全没有 → 直接从云端恢复
-        localStorage.setItem('transactions', JSON.stringify(data.state_snapshot.transactions.slice(0, 200)));
+        localStorage.setItem('transactions', JSON.stringify(data.state_snapshot.transactions.slice(0, 50)));
         console.log('[cloud] 交易记录从云端恢复:', data.state_snapshot.transactions.length, '条');
       }
       // 有本地记录的情况在第5步的合并逻辑里处理
@@ -408,7 +417,15 @@ async function loadFromCloud() {
         localStorage.setItem('intimateTriggered', JSON.stringify(merged));
       }
 
-      // 交易记录：按id合并
+      // 交易记录：按id合并，治本版
+      // 同时合并 walletBaseBalance，取本地和云端的较大值
+      if (s.walletBaseBalance != null) {
+        const localBase = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+        const cloudBase = parseFloat(s.walletBaseBalance || '0');
+        if (cloudBase > localBase) {
+          localStorage.setItem('walletBaseBalance', cloudBase.toFixed(2));
+        }
+      }
       if (Array.isArray(s.transactions)) {
         const local = JSON.parse(localStorage.getItem('transactions') || '[]');
         const merged = [...local];
@@ -425,7 +442,25 @@ async function loadFromCloud() {
           if (typeof ta === 'number' && typeof tb === 'number') return tb - ta;
           return String(tb).localeCompare(String(ta));
         });
-        localStorage.setItem('transactions', JSON.stringify(merged.slice(0, 200)));
+        // 治本：只保留50条明细，超出的压缩进walletBaseBalance
+        if (merged.length > 50) {
+          const keep = merged.slice(0, 50);
+          const old  = merged.slice(50);
+          const oldSum = old.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
+          const base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+          localStorage.setItem('walletBaseBalance', (base + oldSum).toFixed(2));
+          localStorage.setItem('transactions', JSON.stringify(keep));
+        } else {
+          localStorage.setItem('transactions', JSON.stringify(merged));
+        }
+      }
+
+      // 进行中的约会 session：云端有且本地没有才恢复（防止覆盖本地更新的进度）
+      if (s.activeDateSession && !localStorage.getItem('activeDateSession')) {
+        try {
+          localStorage.setItem('activeDateSession', JSON.stringify(s.activeDateSession));
+          console.log('[cloud] activeDateSession 已恢复');
+        } catch(e) {}
       }
 
       // 快递：按id合并，取进度更新的
@@ -440,7 +475,7 @@ async function loadFromCloud() {
             merged[idx] = cd;
           }
         });
-        localStorage.setItem('deliveries', JSON.stringify(merged.slice(0, 30)));
+        localStorage.setItem('deliveries', JSON.stringify(merged.slice(0, 100)));
       }
 
       // 故事书/相册/朋友圈历史/快递历史：双向合并去重，不丢任何一边的数据
@@ -759,8 +794,12 @@ async function saveToCloud() {
       lastReversePackageTurn: getLastReversePackageTurn(),
       relationshipFlags: getRelationshipFlags(),
       // 钱包和快递数据
-      deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]').slice(0, 30),
-      transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 150), // 提升到150条，防止钱包记录丢失
+      activeDateSession: (() => {
+        try { return JSON.parse(localStorage.getItem('activeDateSession') || 'null'); } catch(e) { return null; }
+      })(),
+      deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]').slice(0, 100),
+      transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 50), // 治本：只存50条明细，旧记录已压缩进walletBaseBalance
+      walletBaseBalance: parseFloat(localStorage.getItem('walletBaseBalance') || '0'), // 历史余额压缩值
       purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
       weeklyGiven: getWeeklyGiven(),
       // 故事书、相册、朋友圈
