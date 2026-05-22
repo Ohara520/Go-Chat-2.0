@@ -959,10 +959,11 @@ async function _processMergedMessage(text) {
         // 5秒超时（原3秒太短，Haiku偶尔慢就触发）
         // 修复：Haiku超时时根据最近历史决定路由
         // 原来一律 flirt:true → Grok节点不稳时所有消息变成 here./still here.
+        // 只有30分钟内的才算，防止旧污染标记超时时误走Grok
         const _hasRecentIntimateForTimeout = chatHistory
           .filter(m => !m._system && !m._recalled)
           .slice(-6)
-          .some(m => m._intimate);
+          .some(m => m._intimate && (m._time || 0) > Date.now() - 30 * 60 * 1000);
         const _timeoutDefault = _hasRecentIntimateForTimeout
           ? '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'
           : '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
@@ -991,12 +992,11 @@ async function _processMergedMessage(text) {
               if (combinedResult.flirt === true) {
                 isIntimate = true;
               } else {
-                // 修复：DeepSeek 判 false 时，检查最近6条有没有调情上下文
-                // 有的话继续走 Grok，不让 Sonnet 接到调情内容破防
+                // 修复：只有30分钟内的_intimate才算，防止旧污染标记一直触发Grok
                 const _recentHasIntimate = chatHistory
                   .filter(m => !m._system && !m._recalled)
                   .slice(-6)
-                  .some(m => m._intimate);
+                  .some(m => m._intimate && (m._time || 0) > Date.now() - 30 * 60 * 1000);
                 if (_recentHasIntimate && !_isClearlyNormal) {
                   isIntimate = true;
                 }
@@ -1748,7 +1748,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     const _safeReplies = ['here.', 'still here.', "i'm here.", 'yeah.', 'go on.'];
     const _safeReply = _safeReplies[Math.floor(Math.random() * _safeReplies.length)];
     appendMessage('bot', _safeReply);
-    chatHistory.push({ role: 'assistant', content: _safeReply, _intimate: true, _time: Date.now() });
+    chatHistory.push({ role: 'assistant', content: _safeReply, _time: Date.now() });
     saveHistory();
   } catch(e) {
     hideTyping();
@@ -1756,7 +1756,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     const _emergencyReplies = ['here.', 'still here.', "i'm here."];
     const _emergencyReply = _emergencyReplies[Math.floor(Math.random() * _emergencyReplies.length)];
     appendMessage('bot', _emergencyReply);
-    chatHistory.push({ role: 'assistant', content: _emergencyReply, _intimate: true, _time: Date.now() });
+    chatHistory.push({ role: 'assistant', content: _emergencyReply, _time: Date.now() });
     saveHistory();
   }
 }
