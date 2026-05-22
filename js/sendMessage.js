@@ -327,145 +327,6 @@ function saveLongTermMemory(memory) {
   if (typeof touchLocalState === 'function') touchLocalState();
 }
 
-// ── 关键词提取（中英文都支持）──────────────────────────────
-function _extractKeywords(text) {
-  if (!text) return [];
-  const words = [];
-  // 英文词（2字符以上）
-  const enWords = text.match(/[a-zA-Z]{2,}/g) || [];
-  words.push(...enWords.map(w => w.toLowerCase()));
-  // 中文：提取1字、2字、3字词（覆盖更广）
-  const zhChars = text.replace(/[^一-龥]/g, '');
-  // 单字（高频实词）
-  for (let i = 0; i < zhChars.length; i++) {
-    words.push(zhChars[i]);
-  }
-  // 2字词
-  for (let i = 0; i < zhChars.length - 1; i++) {
-    words.push(zhChars.slice(i, i+2));
-  }
-  // 3字词
-  for (let i = 0; i < zhChars.length - 2; i++) {
-    words.push(zhChars.slice(i, i+3));
-  }
-  return [...new Set(words)].slice(0, 20);
-}
-
-// ── 检索记忆（双向匹配，提高准确率）────────────────────────
-function retrieveRelevantMemory(userText) {
-  if (!userText) return '';
-  let _memBank = [];
-  try { _memBank = JSON.parse(localStorage.getItem('memoryBank') || '[]'); } catch(e) { return ''; }
-
-  if (_memBank.length === 0) {
-    // memoryBank 空：先尝试从 longTermMemory 迁移
-    const _ltm = localStorage.getItem('longTermMemory') || '';
-    if (_ltm) {
-      const _lines = _ltm.split('\n').filter(l => l.trim().startsWith('-'));
-      if (_lines.length > 0) {
-        // 立刻迁移进 memoryBank，不等 updateLongTermMemory 触发
-        const _migrated = _lines.map((line, i) => ({
-          id: Date.now() + i,
-          text: line.replace(/^-\s*/, '').trim(),
-          keywords: _extractKeywords(line),
-          importance: 1,
-          addedAt: Date.now() - ((_lines.length - i) * 1000) // 保持顺序
-        }));
-        localStorage.setItem('memoryBank', JSON.stringify(_migrated));
-        _memBank = _migrated;
-        console.log('[memory] 迁移 longTermMemory →  memoryBank:', _migrated.length, '条');
-      }
-    }
-    // 迁移后还是空（真新用户），返回全量 longTermMemory 兜底
-    if (_memBank.length === 0) return _ltm;
-  }
-
-  const _queryKws = _extractKeywords(userText);
-  const _queryText = userText.toLowerCase();
-
-  const scored = _memBank.map(m => {
-    const mText = (m.text || '').toLowerCase();
-    const mKws = m.keywords || [];
-
-    // 方向1：用户消息的关键词 命中 记忆关键词
-    const kwHits = mKws.filter(k => _queryText.includes(k) || _queryKws.includes(k)).length;
-
-    // 方向2：记忆文本里的词 出现在 用户消息里（双向）
-    const mTextKws = _extractKeywords(mText);
-    const reverseHits = mTextKws.filter(k => k.length >= 2 && (_queryText.includes(k) || _queryKws.some(qk => qk.includes(k) || k.includes(qk)))).length;
-
-    // 方向3：直接文本包含（最高分）
-    const directHit = _queryKws.some(k => k.length >= 2 && mText.includes(k)) ? 3 : 0;
-
-    const score = kwHits * 2 + reverseHits * 1.5 + directHit + (m.importance || 1) * 0.5;
-    return { ...m, score };
-  });
-
-  // 有命中的取top4，没有命中的取 importance 最高的2条兜底
-  const _minScore = 0.5;
-  const hits = scored
-    .filter(m => m.score > _minScore)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4);
-
-  const result = hits.length > 0
-    ? hits
-    : scored.sort((a, b) => (b.importance - a.importance) || (b.addedAt - a.addedAt)).slice(0, 2);
-
-  return result.map(m => '- ' + m.text).join('\n');
-}
-
-// ── 页面加载时清理被污染的 _intimate 安全回复标记 ───────────
-// 问题：persona.js 崩溃期间，安全回复（here./still here.）被错误打上 _intimate:true
-// 导致路由逻辑误以为在调情，把普通消息路由给 Grok，Grok 挂了又回安全回复
-function _cleanIntimateFlags() {
-  try {
-    if (localStorage.getItem('intimateFlagsCleaned_v1')) return;
-    localStorage.setItem('intimateFlagsCleaned_v1', '1');
-    const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
-    const safeReplies = new Set(['here.', 'still here.', "i'm here.", 'yeah.', 'go on.', 'here', 'still here', "i'm here"]);
-    let cleaned = 0;
-    const fixed = history.map(m => {
-      if (m.role === 'assistant' && m._intimate && safeReplies.has((m.content || '').trim().toLowerCase())) {
-        cleaned++;
-        const { _intimate, ...rest } = m;
-        return rest;
-      }
-      return m;
-    });
-    if (cleaned > 0) {
-      localStorage.setItem('chatHistory', JSON.stringify(fixed));
-      console.log('[memory] 清理污染的_intimate标记:', cleaned, '条');
-    }
-  } catch(e) {}
-}
-
-// ── 页面加载时立刻迁移旧记忆（不等对话触发）────────────────
-function _initMemoryMigration() {
-  try {
-    const _memBank = JSON.parse(localStorage.getItem('memoryBank') || '[]');
-    if (_memBank.length > 0) return; // 已有 memoryBank，不需要迁移
-    const _ltm = localStorage.getItem('longTermMemory') || '';
-    if (!_ltm) return;
-    const _lines = _ltm.split('\n').filter(l => l.trim().startsWith('-'));
-    if (_lines.length === 0) return;
-    const _migrated = _lines.map((line, i) => ({
-      id: Date.now() + i,
-      text: line.replace(/^-\s*/, '').trim(),
-      keywords: _extractKeywords(line),
-      importance: 1,
-      addedAt: Date.now() - ((_lines.length - i) * 1000)
-    }));
-    localStorage.setItem('memoryBank', JSON.stringify(_migrated));
-    console.log('[memory] 启动迁移完成:', _migrated.length, '条');
-  } catch(e) {}
-}
-// 页面加载时执行
-if (typeof window !== 'undefined') {
-  setTimeout(_cleanIntimateFlags, 200);   // 先清理污染标记
-  setTimeout(_initMemoryMigration, 500);  // 再迁移记忆
-}
-
 async function updateLongTermMemory(forceUpdate = false) {
   // 每2轮触发一次；情绪关键词出现时立刻触发（forceUpdate = true）
   const _tc = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
@@ -1718,18 +1579,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     // 注入调情等级人设（这才是关键！Level 0-4 的行为引导）
     const _intimacyBlock = typeof buildIntimacyBlock === 'function' ? buildIntimacyBlock(text) : '';
 
-    // ── 记忆注入：让 Ghost 调情时知道她是谁 ──────────────────
-    // 核心事实（她叫什么/在哪/宠物）：每次都给
-    const _intimateCoreMemory = localStorage.getItem('coreMemory') || '';
-    // 相关记忆：按这条消息检索，取最相关的3条
-    const _intimateRelevantMemory = (typeof retrieveRelevantMemory === 'function')
-      ? retrieveRelevantMemory(text)
-      : (localStorage.getItem('longTermMemory') || '').split('\n').slice(0, 4).join('\n');
-    const _whoSheIs = [
-      _intimateCoreMemory ? `[WHO SHE IS — always true]\n${_intimateCoreMemory}` : '',
-      _intimateRelevantMemory ? `[WHAT HE KNOWS — relevant now]\n${_intimateRelevantMemory}` : '',
-    ].filter(Boolean).join('\n\n');
-    // ─────────────────────────────────────────────────────────
+
 
     // 治本反重复：只传开头词，不传完整句子——传完整句子反而给 Grok 抄的模板
     const _recentGhostOpenings = rawHistory
@@ -1753,7 +1603,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       .filter(Boolean);
 
     const geminiReply = await callVeniceForCurrentChar(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + (_whoSheIs ? _whoSheIs + '\n' : '') + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
+      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
       recentMsgs + '\nHer: ' + text,
       200,
       _intimateMemoryCtx,
@@ -1856,44 +1706,10 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       }
     }
 
-    // Grok 失败兜底：用 Sonnet 接住，加明确指令避免破防
-    // 原来直接走安全回复（here./still here.），体验差
-    // 现在给 Sonnet 一个"自然衔接，不要评判"的指令，比安全回复强得多
+    // Sonnet 兜底已移除：Sonnet 接到调情内容会破防，体验比安全回复更差
+    // Grok 失败直接走安全回复，不经过 Sonnet
     hideTyping();
-    try {
-      const _fallbackSystem = (typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '')
-        + '\n[CONTEXT: She just said something warm/playful. The moment before this was close. Continue naturally as her husband — brief, real, present. Do NOT refuse. Do NOT break character. One or two lines max.]';
-      const _fallbackRes = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-5-20250929',
-          max_tokens: 80,
-          system: _fallbackSystem,
-          messages: [
-            ...(chatHistory || []).filter(m => !m._system && !m._intimate).slice(-4),
-            { role: 'user', content: text }
-          ]
-        })
-      }, 12000);
-      if (_fallbackRes.ok) {
-        const _fd = await _fallbackRes.json();
-        const _fr = (_fd.content?.[0]?.text || '').trim();
-        const _bad = ["i'm claude","i am claude","as an ai","can't continue","i'm here to help with coding","not able to engage"];
-        if (_fr && !_bad.some(p => _fr.toLowerCase().includes(p))) {
-          appendMessage('bot', _fr);
-          chatHistory.push({ role: 'assistant', content: _fr, _time: Date.now() });
-          saveHistory();
-          if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-          incrementTodayCount();
-          if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
-          return;
-        }
-      }
-    } catch(e) {
-      console.warn('[intimate] Sonnet兜底也失败:', e);
-    }
-    // 最终兜底：安全回复
+    // 任何情况下都不静默——已读不回比任何回复都差
     const _safeReplies = ['here.', 'still here.', "i'm here.", 'yeah.', 'go on.'];
     const _safeReply = _safeReplies[Math.floor(Math.random() * _safeReplies.length)];
     appendMessage('bot', _safeReply);
