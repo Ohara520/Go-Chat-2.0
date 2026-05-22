@@ -826,11 +826,13 @@ ${(() => {
       return _last ? _last.content : '';
     } catch(e) { return ''; }
   })();
+  // 修复：IIFE 访问不到外层 longTermMemory，改成直接读 localStorage
+  const _ltmFallback = localStorage.getItem('longTermMemory') || '';
   const _retrieved = (typeof retrieveRelevantMemory === 'function')
     ? retrieveRelevantMemory(_lastUserMsg)
-    : longTermMemory;
+    : _ltmFallback;
   // Layer 3: 如果检索结果为空，用全量兜底（保证不失忆）
-  const _fallback = (!_retrieved && longTermMemory) ? longTermMemory.split('\n').slice(0, 5).join('\n') : '';
+  const _fallback = (!_retrieved && _ltmFallback) ? _ltmFallback.split('\n').slice(0, 5).join('\n') : '';
   const _memToShow = _retrieved || _fallback;
 
   const parts = [];

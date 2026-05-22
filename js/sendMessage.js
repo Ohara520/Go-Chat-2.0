@@ -944,8 +944,16 @@ async function _processMergedMessage(text) {
       _angryForceExit = true;
     }
 
+    // 先定义 _recentHasIntimate，后面 _intimacyForceCleared 和 _isClearlyNormal 都要用
+    const _recentHasIntimate = chatHistory
+      .filter(m => !m._system && !m._recalled)
+      .slice(-6)
+      .some(m => m._intimate);
+
     let _intimacyForceCleared = false;
-    if (_clearIntimateKws.test(text) && !INTIMATE_PATTERNS.some(p => p.test(text)) && chatHistory.slice(-6).some(m => m._intimate)) {
+    // 修复：_recentHasIntimate 时不强制退出——让 Grok 的 CONTEXT SHIFT 自然接住日常话
+    // 否则调情中说"吃饭了吗"→ 强制退出 → 走 Sonnet → 破防 → 安全回复
+    if (!_recentHasIntimate && _clearIntimateKws.test(text) && !INTIMATE_PATTERNS.some(p => p.test(text)) && chatHistory.slice(-6).some(m => m._intimate)) {
       isIntimate = false;
       _intimacyForceCleared = true;
     }
@@ -954,10 +962,6 @@ async function _processMergedMessage(text) {
     // 修复：最近6条有调情记录时，即使触发日常关键词也不走 Sonnet
     // 原因：调情进行中用户说"好饿"/"在干嘛"，应该留在 Grok，让 Grok 自然切换语气
     // Grok 的 CONTEXT SHIFT 指引负责接住这类切换，不需要路由给 Sonnet
-    const _recentHasIntimate = chatHistory
-      .filter(m => !m._system && !m._recalled)
-      .slice(-6)
-      .some(m => m._intimate);
     const _isClearlyNormal = !_recentHasIntimate &&
       ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text)))
       || _angryForceExit;
