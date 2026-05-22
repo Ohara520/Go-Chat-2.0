@@ -697,6 +697,26 @@ function feedEvent_sheIsBack(absentHours) {
   });
 }
 
+// 里程碑纪念日：52天、100天、200天等
+// 由 profile.js 的 renderProfileMain() 调用，检测到当天是里程碑时触发
+function feedEvent_milestone(days, isAnniversary = false) {
+  const key = 'feedMilestonePushed_' + days;
+  if (localStorage.getItem(key)) return; // 每个里程碑只推一次
+  localStorage.setItem(key, '1');
+  pushFeedEvent({
+    type: 'anniversary',
+    actor: 'user', // 用户草稿路径
+    mood: 'soft',
+    intensity: days >= 365 ? 5 : days >= 100 ? 4 : 3,
+    shareability: 0.8,
+    privacy: 'semi',
+    dueAt: Date.now(),
+    expiresAt: Date.now() + 24 * 3600 * 1000,
+    meta: { days, isAnniversary }
+  });
+}
+window.feedEvent_milestone = feedEvent_milestone;
+
 // ── 用户在聊天里要求 Ghost 发朋友圈 ──────────────────
 // 每天最多1次，超过了 Ghost 会拒绝
 // 返回: { ok: true } 或 { ok: false, reply: '拒绝文案' }
@@ -1387,26 +1407,31 @@ function insertFeedPost(entry) {
     }
   }
 
-  // 去重：同一天 + 同作者 + 内容前30字符相同 → 跳过
-  const newEn = (entry.post?.en || '').slice(0, 30);
-  const newAuthor = entry.post?.author || '';
-  const isDupe = history.some(h =>
-    h.date === entry.date &&
-    (h.post?.author || '') === newAuthor &&
-    (h.post?.en || '').slice(0, 30) === newEn
-  );
-  if (isDupe) {
-    console.log('[feed] 跳过重复帖子:', newAuthor, newEn.slice(0, 20));
-    return;
+  // 去重：用户自己发的帖子跳过去重（防止被误判成重复帖子丢失）
+  // 其他帖子：同一天 + 同作者 + 内容前30字符相同 → 跳过
+  const _isUserPost = !!(entry.post?.isUserPost);
+  if (!_isUserPost) {
+    const newEn = (entry.post?.en || '').slice(0, 30);
+    const newAuthor = entry.post?.author || '';
+    const isDupe = history.some(h =>
+      h.date === entry.date &&
+      (h.post?.author || '') === newAuthor &&
+      (h.post?.en || '').slice(0, 30) === newEn
+    );
+    if (isDupe) {
+      console.log('[feed] 跳过重复帖子:', newAuthor, newEn.slice(0, 20));
+      return;
+    }
   }
 
   history.unshift(entry);
-  // 清理：只保留最近7天（用时间戳比较，兼容各种日期格式）
+  // 清理：只保留最近7天，但用户自己发的帖子永远不淘汰
   const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
   history = history.filter(h => {
+    if (h.post?.isUserPost) return true; // 用户帖子永不淘汰
     const t = Date.parse(h.date) || (h.post?.time || 0);
-    return t > sevenDaysAgo || isNaN(t); // 解析失败的保留不误删
-  }).slice(0, 25);
+    return t > sevenDaysAgo || isNaN(t);
+  }).slice(0, 50); // 扩大到50条，给用户帖子留空间
   localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
   const summary = history.slice(0, 3).map(h => `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`).join('\n');
   localStorage.setItem('coupleFeedSummary', summary);
@@ -1562,7 +1587,12 @@ async function publishUserDraft() {
 // ----- 只渲染历史（不重新生成） -----
 function renderCoupleFeedFromHistory() {
   const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-  renderCoupleFeed(all.map(h => h.post));
+  // 用户自己的帖子永远排在最前面，其他按时间倒序
+  const sorted = [
+    ...all.filter(h => h.post?.isUserPost),
+    ...all.filter(h => !h.post?.isUserPost)
+  ];
+  renderCoupleFeed(sorted.map(h => h.post));
 }
 
 // ===== 阴阳帖系统 =====

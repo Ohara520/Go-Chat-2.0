@@ -327,6 +327,49 @@ function saveLongTermMemory(memory) {
   if (typeof touchLocalState === 'function') touchLocalState();
 }
 
+// ── 关键词提取（简单版，不依赖外部库）──────────────────────
+function _extractKeywords(text) {
+  if (!text) return [];
+  const words = [];
+  const enWords = text.match(/[a-zA-Z]{2,}/g) || [];
+  words.push(...enWords.map(w => w.toLowerCase()));
+  const zhChars = text.replace(/[^一-龥]/g, '');
+  for (let i = 0; i < zhChars.length - 1; i++) {
+    words.push(zhChars.slice(i, i+2));
+  }
+  return [...new Set(words)].slice(0, 8);
+}
+
+// ── 检索记忆（按用户消息关键词匹配）────────────────────────
+function retrieveRelevantMemory(userText) {
+  if (!userText) return '';
+  let _memBank = [];
+  try { _memBank = JSON.parse(localStorage.getItem('memoryBank') || '[]'); } catch(e) { return ''; }
+  if (_memBank.length === 0) {
+    // 兼容旧版：memoryBank 还没建立时，退化到全量 longTermMemory
+    return localStorage.getItem('longTermMemory') || '';
+  }
+
+  const _queryText = userText.toLowerCase();
+
+  const scored = _memBank.map(m => {
+    const kwHits = (m.keywords || []).filter(k => _queryText.includes(k)).length;
+    const textHit = (m.keywords || []).some(k => _queryText.includes(k)) ? 0.5 : 0;
+    return { ...m, score: kwHits * 2 + textHit + (m.importance || 1) * 0.3 };
+  });
+
+  const hits = scored
+    .filter(m => m.score > (m.importance || 1) * 0.3 + 0.5)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
+  const result = hits.length > 0
+    ? hits
+    : scored.sort((a, b) => (b.importance - a.importance) || (b.addedAt - a.addedAt)).slice(0, 2);
+
+  return result.map(m => '- ' + m.text).join('\n');
+}
+
 async function updateLongTermMemory(forceUpdate = false) {
   // 每2轮触发一次；情绪关键词出现时立刻触发（forceUpdate = true）
   const _tc = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
@@ -620,12 +663,23 @@ async function _processMergedMessage(text) {
       // sceneHint 后面可能被覆盖，但 comeback 优先级高，加到前面
     }
 
-    // 外卖场景：用户问到外卖/吃饭 且 longTermMemory 有外卖记录 → 带英文菜名提醒 Ghost 确认
+    // 外卖场景：先查 sessionStorage（实时），再查 longTermMemory（持久）
+    // 修复：外卖到达后不等记忆更新，本轮就能检测到
     const _ltmNow = localStorage.getItem('longTermMemory') || '';
-    const _hasTakeoutMemory = /takeout showed up|she ordered takeout|you have it/i.test(_ltmNow);
+    const _currentTakeout = (() => {
+      try { return JSON.parse(sessionStorage.getItem('currentTakeout') || 'null'); } catch(e) { return null; }
+    })();
+    // sessionStorage 里有且是6小时内的，认为外卖还"新鲜"
+    const _hasFreshTakeout = _currentTakeout && (Date.now() - (_currentTakeout.arrivedAt || 0) < 6 * 3600 * 1000);
+    const _hasTakeoutMemory = _hasFreshTakeout || /takeout showed up|she ordered takeout|you have it/i.test(_ltmNow);
     if (_hasTakeoutMemory && /外卖|收到了吗|到了吗|吃了吗|好吃吗|怎么样|did.*arrive|did.*get|receiv|takeout|food.*arrive/i.test(t)) {
-      const _tkMatches = [..._ltmNow.matchAll(/「(.+?)」/g)];
-      const _tkName = _tkMatches.length > 0 ? _tkMatches[_tkMatches.length - 1][1] : '';
+      // 优先用 sessionStorage 里的菜名（最准确），再从 longTermMemory 里找
+      const _tkName = _hasFreshTakeout
+        ? (_currentTakeout.name || '')
+        : (() => {
+            const _tkMatches = [..._ltmNow.matchAll(/「(.+?)」/g)];
+            return _tkMatches.length > 0 ? _tkMatches[_tkMatches.length - 1][1] : '';
+          })();
       sceneHint = `[She is asking about the takeout she ordered for you${_tkName ? ` — 「${_tkName}」` : ''}. You received it. Confirm naturally and react to the specific food — do not deny.]`;
     } else if (/时差|几点|时间|time zone|what time|your time/.test(t)) {
       sceneHint = `[Time zone awareness: She mentioned time or time difference. Acknowledge it naturally if it fits.]`;

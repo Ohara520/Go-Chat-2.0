@@ -898,6 +898,12 @@ function initCalendar() {
   if (countdownLabelEl) countdownLabelEl.textContent = nextMilestone.label;
   if (nextMilestoneDaysEl) nextMilestoneDaysEl.textContent = nextMilestone.days + '天';
 
+  // 里程碑当天触发朋友圈草稿（52/100/200/300/365天）
+  const _milestones = [52, 100, 200, 300, 365, 400, 500];
+  if (_milestones.includes(marriageDays) && typeof feedEvent_milestone === 'function') {
+    feedEvent_milestone(marriageDays, marriageDays === 365);
+  }
+
   renderMilestones(marriageDays, marriageDate, userBirthday, today);
 
   const firstDay = new Date(year, month, 1).getDay();

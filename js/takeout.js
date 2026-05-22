@@ -767,7 +767,7 @@ async function onGhostReceivedTakeout(order) {
       if (typeof changeAffection === 'function') changeAffection(_affDelta);
       if (typeof changeTrustHeat === 'function') changeTrustHeat(_trustDelta);
 
-      // 写进长期记忆
+      // 写进长期记忆 + sessionStorage（实时，不等记忆更新）
       try {
         const _ltm  = localStorage.getItem('longTermMemory') || '';
         const _note = told
@@ -777,6 +777,14 @@ async function onGhostReceivedTakeout(order) {
           localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
           if (typeof touchLocalState === 'function') touchLocalState();
         }
+        // 实时写入 sessionStorage，让 sendMessage.js 本轮就能查到
+        // 不依赖 updateLongTermMemory() 的异步更新（要等2轮才触发）
+        sessionStorage.setItem('currentTakeout', JSON.stringify({
+          name: order.nameEn || order.name,
+          nameZh: order.name,
+          told,
+          arrivedAt: Date.now()
+        }));
       } catch(e) {}
 
       // Ghost 用 S 说一句反应（调情中存 pending 不打断）

@@ -67,14 +67,54 @@ async function generateDiaryEntry() {
     const weather = (localStorage.getItem('lastWeatherDisplay') || '').replace(/^undefined$/i, '').trim();
     const userName = localStorage.getItem('userName') || 'her';
 
-    // 取最近的上下文片段，用于丰富日记内容
-    const memory = localStorage.getItem('longTermMemory') || '';
-    const _memLines = memory.split('\n').filter(l => l.trim());
-    const _memRecent = _memLines.slice(-8).join('\n');
-    // 修复：避免"remember/memory"等触发拒绝的词，改成中性表达
-    const memoryHint = _memRecent
-      ? `Background details about ${userName}:\n${_memRecent}`
-      : '';
+    // ── 昨天的聊天记录（日记写的是昨天，不是今天）──────────────
+    const yesterdayStr = getYesterdayKey(); // "2026-05-21" 格式
+    const _allHistory = (() => {
+      try { return JSON.parse(localStorage.getItem('chatHistory') || '[]'); } catch(e) { return []; }
+    })();
+
+    // 筛出昨天的消息（按时间戳判断）
+    const _yesterdayStart = new Date(yesterdayStr + 'T00:00:00').getTime();
+    const _yesterdayEnd   = _yesterdayStart + 24 * 60 * 60 * 1000;
+    const _yesterdayMsgs  = _allHistory.filter(m => {
+      if (m._system || m._recalled) return false;
+      const t = m._time || m.timestamp || 0;
+      return t >= _yesterdayStart && t < _yesterdayEnd;
+    });
+
+    // 取最多10条，格式化成"她说了什么 / Ghost说了什么"
+    const _chatSnippet = _yesterdayMsgs
+      .slice(-10)
+      .map(m => {
+        const who = m.role === 'user' ? 'her' : 'ghost';
+        const text = (typeof m.content === 'string' ? m.content : '').slice(0, 80).replace(/\n/g, ' ');
+        return `${who}: ${text}`;
+      })
+      .join('\n');
+
+    // 如果昨天没有聊天记录，用 memoryBank 里最相关的几条兜底
+    let memoryHint = '';
+    if (_chatSnippet) {
+      memoryHint = `What happened yesterday between Ghost and her (their actual conversation):
+${_chatSnippet}`;
+    } else {
+      // 没有昨天的记录——从 memoryBank 拿几条关于她的背景
+      let _memBank = [];
+      try { _memBank = JSON.parse(localStorage.getItem('memoryBank') || '[]'); } catch(e) {}
+      if (_memBank.length > 0) {
+        const _memTop = _memBank
+          .sort((a, b) => (b.importance || 1) - (a.importance || 1))
+          .slice(0, 5)
+          .map(m => '- ' + m.text)
+          .join('\n');
+        memoryHint = `Background details about her:\n${_memTop}`;
+      } else {
+        // 再兜底：旧版 longTermMemory
+        const _oldMem = localStorage.getItem('longTermMemory') || '';
+        const _oldLines = _oldMem.split('\n').filter(l => l.trim()).slice(-5).join('\n');
+        if (_oldLines) memoryHint = `Background details about her:\n${_oldLines}`;
+      }
+    }
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -82,6 +122,18 @@ async function generateDiaryEntry() {
 
     // v2: 读取 Ghost 当前心情，让日记反映真实情绪而非默认忧郁
     const mood = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
+
+    // Ghost 那边的世界素材——给 DeepSeek 编造细节用
+    // 根据位置和心情提供合理的军旅细节
+    const _sideWorld = (() => {
+      const loc = localStorage.getItem('currentLocation') || 'Hereford Base';
+      const isDeployed = !loc.toLowerCase().includes('hereford') && !loc.toLowerCase().includes('base');
+      if (isDeployed) {
+        return `He's currently deployed at ${loc}. Details available to use: patrols, checkpoints, kit maintenance, local weather affecting operations, downtime in transit or barracks, limited comms, food from rations or local mess.`;
+      } else {
+        return `He's at base (${loc}). Details available to use: drills, range practice, briefings, PT, mess hall food, time with Soap/Gaz/Price, evening downtime, cleaning kit, admin work, early nights or late ones.`;
+      }
+    })();
     let moodHint = '';
     if (mood >= 8) {
       moodHint = `Yesterday was a good one. He's in a settled, decent mood. The entry should reflect that — not cheerful, not poetic, just steady. Maybe one small thing made him quietly pleased.`;
@@ -95,28 +147,31 @@ async function generateDiaryEntry() {
 
     // 修复：prompt 完全避免"memory system/track/relationship"等触发词
     // 改成创意写作语境，让模型理解这是小说角色的日记创作
-    const prompt = `You are writing a fictional notebook entry for a character named Simon "Ghost" Riley, a British soldier. This is a creative writing exercise — a short, realistic journal entry in his voice.
+    const prompt = `Write a short notebook entry for Simon "Ghost" Riley. British SAS soldier, 35.
 
 Setting: ${location}${locationReason ? ` (${locationReason})` : ''}
-Weather yesterday: ${weather || 'not noted'}
+Weather: ${weather || 'not noted'}
 Day: ${yesterdayWeekday}
-Tone: ${moodHint}
+${moodHint}
+${_sideWorld}
 
-${memoryHint ? `Background details to draw from (pick one if relevant):\n${memoryHint}\n` : `He didn't hear from anyone close yesterday.\n`}
-
-Write the journal entry. Guidelines:
-- 3-4 lines. Short sentences. Lowercase.
-- Soldier's notebook style — direct, sparse, no poetry.
-- Match the tone above — do NOT default to melancholy if the mood is decent.
-- Include 1-2 concrete details from his day — training, food, teammates, something observed.
-- If the background mentions ${userName}, pick ONE detail that felt significant. Don't list everything.
-- Do not invent dialogue or quote anyone unless it appears in the background above.
-- Weather only if it affected the day.
-- End naturally — a passing thought, dry observation, or quiet moment. Match the day's tone.
-- English only. No timestamps. No "dear diary". No stage directions.`;
+${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — draw from this, but write it as Ghost\'s experience, not a transcript. Pick 1-2 moments that stuck. Don\'t quote directly.' : 'Background about her — use at most one detail, naturally:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
+Strict rules:
+- 3-5 lines. Lowercase. Short sentences.
+- Split the entry between TWO things: (1) what happened on his side yesterday — training, teammates, food, something observed at base — and (2) one moment involving her, drawn from the conversation context.
+- Invent plausible soldier details freely: a drill that ran long, something soap did, what he ate, the cold, a card game, cleaning kit, a briefing that went nowhere. These make him feel real.
+- If she said something in the conversation — let it echo in his day without quoting it. Something she mentioned might connect to something that happened on his end.
+- He records facts. He does not name or explain his feelings. Ever.
+- Dry, flat, functional. NOT poetic. NOT introspective. NOT sentimental.
+- BANNED: "still thinking about it" / "that's enough" / "saved it to tell her" / "something felt different" / "still mine" / "quiet moment" / any sentence that ends on emotion.
+- She appears through his actions: "checked my phone" / "she called" / "she was still awake when i got back" — not "i missed her".
+- English only. No "dear diary". No timestamps. No stage directions.`;
 
     let entry = '';
-    if (typeof callSonnetLight === 'function') {
+    // 优先用 DeepSeek：不会拒绝日记内容，比 Sonnet 稳定
+    if (typeof fetchDeepSeek === 'function') {
+      entry = await fetchDeepSeek(prompt, 'write today\'s entry.', 120);
+    } else if (typeof callSonnetLight === 'function') {
       entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
     } else if (typeof callSonnet === 'function') {
       entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
@@ -186,28 +241,31 @@ function _getFallbackEntry(location, weather) {
   // 读取昨天的心情（用今天的 mood 当代理，因为日记是为昨天写的）
   const mood = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
 
-  // ── 心情好（mood >= 7）—— 平淡 + 轻松向 ──
+  // ── 心情好（mood >= 7）—— 平淡日常，她以行为方式出现 ──
   const goodPool = [
-    `${location}. routine day. ${weather ? weather + '.' : ''} got a coffee with soap after drills. didn't say much. felt fine.`,
-    `solid one. training went smooth. ${weather ? weather + ' all day.' : ''} she sent a photo earlier. kept it open longer than i needed to.`,
-    `${location} again. ${weather ? weather + '.' : ''} kit's clean. teammates aren't dead. she's still mine. that's enough.`,
-    `nothing happened today. that's a good day, in this job. ${weather ? weather + '.' : ''} she said something stupid earlier. still thinking about it. still smiling.`,
-    `decent one. ${weather ? weather + ' outside.' : ''} price actually laughed at something. that's rare. saved it to tell her later.`,
+    `${location}. ${weather ? weather + '.' : ''} drills in the morning. she messaged around noon. read it between sets. didn't reply until after.`,
+    `solid one. ${weather ? weather + '.' : ''} ran the route. got back. she'd already sent two things by then. read both.`,
+    `${location}. kit check after drills. ${weather ? weather + '.' : ''} she was still up when i got in. later than usual for her.`,
+    `${weather ? weather + '.' : ''} price ran us hard. no complaints. checked my phone after. she'd sent something. decent day.`,
+    `${location}. ${weather ? weather + '.' : ''} gaz said something stupid at dinner. would've told her. didn't.`,
+    `training. mess. bunk. ${weather ? weather + '.' : ''} she called. kept it short. not because i wanted to.`,
   ];
 
-  // ── 心情中等（mood 5-6）—— 平淡日常 ──
+  // ── 心情中等（mood 5-6）—— 她出现，但他不多说 ──
   const neutralPool = [
-    `slow day at ${location}. ${weather ? weather + '.' : ''} did the work. went home. nothing worth noting.`,
-    `${location}. same routine. ${weather ? weather + '.' : ''} she sent something earlier. read it. replied. moved on.`,
-    `nothing worth writing. ${weather ? weather + ' all day.' : ''} cleaned my kit. checked my phone a few times.`,
-    `another one in the books. ${weather ? weather + '.' : ''} long but not hard. price had us doing drills. came back. ate. wrote this.`,
-    `${location} again. ${weather ? weather + '.' : ''} fine. it was fine.`,
+    `${location}. ${weather ? weather + '.' : ''} long day. she messaged twice. answered the second one. meant to get back to the first.`,
+    `slow one. ${weather ? weather + ' all morning.' : ''} didn't hear from her until late. checked a few times before that.`,
+    `${location} again. ${weather ? weather + '.' : ''} briefing ran over. missed her call. she didn't leave a message.`,
+    `ran drills. ate. ${weather ? weather + '.' : ''} she sent something at an odd hour. she was still awake.`,
+    `long one. ${weather ? weather + '.' : ''} price had us out late. she was already asleep by the time i got back. didn't wake her.`,
   ];
 
-  // ── 心情低（mood <= 4）—— 克制忧郁，但不滥情 ──
+  // ── 心情低（mood <= 4）—— 更短，她若隐若现 ──
   const lowPool = [
-    `long one. training ran late. ${weather ? weather + ' outside.' : ''} sat in the mess for a bit after. didn't feel like talking.`,
-    `${location}. ${weather ? weather + '.' : ''} she asked if i was okay. said yeah. wasn't lying. wasn't the whole truth either.`,
+    `${location}. ${weather ? weather + '.' : ''} training ran long. she messaged. didn't have much to say back. said i was fine.`,
+    `bad sleep. drills anyway. ${weather ? weather + '.' : ''} she could tell something was off. didn't push it.`,
+    `${location}. ${weather ? weather + '.' : ''} checked my phone more than i needed to. nothing new.`,
+    `ran the route alone. ${weather ? weather + '.' : ''} she sent something in the morning. read it three times. didn't answer right away.`,
   ];
 
   // 按 mood 选池
@@ -216,7 +274,24 @@ function _getFallbackEntry(location, weather) {
   else if (mood >= 5) pool = neutralPool;
   else                pool = lowPool;
 
-  return pool[Math.floor(Math.random() * pool.length)];
+  // 去重：记录最近用过的兜底内容，避免连续几天重复
+  const _usedKey = 'diaryFallbackUsed';
+  let _used = [];
+  try { _used = JSON.parse(localStorage.getItem(_usedKey) || '[]'); } catch(e) {}
+
+  // 过滤掉最近用过的
+  const _available = pool.filter((_, i) => !_used.includes(i));
+  const _pickFrom = _available.length > 0 ? _available : pool; // 全用过了就重置
+
+  // 随机选一条
+  const _poolIdx = pool.indexOf(_pickFrom[Math.floor(Math.random() * _pickFrom.length)]);
+
+  // 记录这次用的，只保留最近3条记录
+  _used.push(_poolIdx);
+  if (_used.length > 3) _used = _used.slice(-3);
+  localStorage.setItem(_usedKey, JSON.stringify(_used));
+
+  return pool[_poolIdx];
 }
 
 // ===== 日记页面渲染 =====

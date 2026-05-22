@@ -422,27 +422,88 @@ async function loadFromCloud() {
       if (s.walletBaseBalance != null) {
         const localBase = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
         const cloudBase = parseFloat(s.walletBaseBalance || '0');
+        // 修复：只在本地完全没有数据时才用云端覆盖
+        // 如果本地已有 base，取较大值（防止云端旧值覆盖本地更新的值）
+        // 但不允许无限叠加——云端 base 只用一次
         if (cloudBase > localBase) {
           localStorage.setItem('walletBaseBalance', cloudBase.toFixed(2));
         }
       }
+
+      // ── 一次性余额修正 ────────────────────────────────────────
+      // 针对已经被重复叠加涨乱余额的老用户
+      // 修正逻辑：walletBaseBalance 不应该超过云端存的值太多
+      // 如果本地 base 比云端 base 大很多（超过£1000），说明被重复叠加了，重置
+      if (!localStorage.getItem('balanceDriftFixed_20260522') && s.walletBaseBalance != null) {
+        localStorage.setItem('balanceDriftFixed_20260522', '1');
+        const _localBase = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+        const _cloudBase = parseFloat(s.walletBaseBalance || '0');
+        const _localTxSum = JSON.parse(localStorage.getItem('transactions') || '[]')
+          .filter(t => !t.ghostCard)
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        const _cloudTxSum = (s.transactions || [])
+          .filter(t => !t.ghostCard)
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        // 正确余额 = 云端 base + 云端 transactions 之和
+        const _correctBalance = _cloudBase + _cloudTxSum;
+        const _currentBalance = _localBase + _localTxSum;
+        // 如果当前余额比正确余额多超过£500，说明有重复叠加，修正
+        if (_currentBalance - _correctBalance > 500) {
+          console.warn('[cloud] 检测到余额异常，修正中:', _currentBalance, '→', _correctBalance);
+          // 重置 base 到云端值，transactions 保留本地的（已去重）
+          localStorage.setItem('walletBaseBalance', _cloudBase.toFixed(2));
+        }
+      }
       if (Array.isArray(s.transactions)) {
         const local = JSON.parse(localStorage.getItem('transactions') || '[]');
+
+        // ── 防重复叠加修复 ────────────────────────────────────────
+        // 问题：本地已压缩（walletCompacted_v1）后，云端旧 transactions 仍被
+        // 当成"新记录"合并进来，导致每次打开钱包余额就涨一次。
+        // 修法：只合并云端有、本地没有、且时间比本地最旧记录更新的记录。
+        // 如果本地已压缩，跳过所有没有 id 的云端旧记录（它们已被压缩进 base）。
+        const _alreadyCompacted = !!localStorage.getItem('walletCompacted_v1');
+
+        // 找本地最旧一条记录的时间，作为"截止线"
+        const _localOldest = local.length > 0
+          ? local.reduce((oldest, t) => {
+              const ts = t.time || t.date || '';
+              return (!oldest || String(ts) < String(oldest)) ? ts : oldest;
+            }, null)
+          : null;
+
         const merged = [...local];
         s.transactions.forEach(ct => {
-          const key = ct.id || (ct.name + '_' + ct.amount + '_' + (ct.time || ct.date || ''));
+          // 有 id 的走精确去重
+          const key = ct.id || null;
+          if (key) {
+            if (!merged.find(lt => lt.id === key)) {
+              merged.push(ct);
+            }
+            return;
+          }
+
+          // 没有 id 的旧记录：本地已压缩则跳过，防止重复叠加
+          if (_alreadyCompacted) return;
+
+          // 没压缩过：用 name+amount+time 去重
+          const fallbackKey = ct.name + '_' + ct.amount + '_' + (ct.time || ct.date || '');
           if (!merged.find(lt => {
-            const lk = lt.id || (lt.name + '_' + lt.amount + '_' + (lt.time || lt.date || ''));
-            return lk === key;
-          })) merged.push(ct);
+            const lk = lt.name + '_' + lt.amount + '_' + (lt.time || lt.date || '');
+            return lk === fallbackKey;
+          })) {
+            merged.push(ct);
+          }
         });
+
         merged.sort((a, b) => {
           const ta = a.time || a.date || '';
           const tb = b.time || b.date || '';
           if (typeof ta === 'number' && typeof tb === 'number') return tb - ta;
           return String(tb).localeCompare(String(ta));
         });
-        // 治本：只保留50条明细，超出的压缩进walletBaseBalance
+
+        // 只保留50条明细，超出的压缩进walletBaseBalance
         if (merged.length > 50) {
           const keep = merged.slice(0, 50);
           const old  = merged.slice(50);
