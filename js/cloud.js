@@ -434,26 +434,7 @@ async function loadFromCloud() {
       // 针对已经被重复叠加涨乱余额的老用户
       // 修正逻辑：walletBaseBalance 不应该超过云端存的值太多
       // 如果本地 base 比云端 base 大很多（超过£1000），说明被重复叠加了，重置
-      if (!localStorage.getItem('balanceDriftFixed_20260522') && s.walletBaseBalance != null) {
-        localStorage.setItem('balanceDriftFixed_20260522', '1');
-        const _localBase = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
-        const _cloudBase = parseFloat(s.walletBaseBalance || '0');
-        const _localTxSum = JSON.parse(localStorage.getItem('transactions') || '[]')
-          .filter(t => !t.ghostCard)
-          .reduce((sum, t) => sum + (t.amount || 0), 0);
-        const _cloudTxSum = (s.transactions || [])
-          .filter(t => !t.ghostCard)
-          .reduce((sum, t) => sum + (t.amount || 0), 0);
-        // 正确余额 = 云端 base + 云端 transactions 之和
-        const _correctBalance = _cloudBase + _cloudTxSum;
-        const _currentBalance = _localBase + _localTxSum;
-        // 如果当前余额比正确余额多超过£500，说明有重复叠加，修正
-        if (_currentBalance - _correctBalance > 500) {
-          console.warn('[cloud] 检测到余额异常，修正中:', _currentBalance, '→', _correctBalance);
-          // 重置 base 到云端值，transactions 保留本地的（已去重）
-          localStorage.setItem('walletBaseBalance', _cloudBase.toFixed(2));
-        }
-      }
+      // 余额漂移修正移到 transactions 合并之后执行（见下方）
       if (Array.isArray(s.transactions)) {
         const local = JSON.parse(localStorage.getItem('transactions') || '[]');
 
@@ -513,6 +494,34 @@ async function loadFromCloud() {
           localStorage.setItem('transactions', JSON.stringify(keep));
         } else {
           localStorage.setItem('transactions', JSON.stringify(merged));
+        }
+      }
+
+      // ── 余额漂移修正（在 transactions 合并之后执行）──────────
+      // 更新标记日期，让之前打过旧标记的用户也能重新跑一次
+      if (!localStorage.getItem('balanceDriftFixed_20260523')) {
+        localStorage.setItem('balanceDriftFixed_20260523', '1');
+        const _cloudBase = parseFloat(s.walletBaseBalance || '0');
+        const _cloudTxSum = (s.transactions || [])
+          .filter(t => !t.ghostCard)
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        const _correctBalance = _cloudBase + _cloudTxSum;
+        // 合并后重新读取本地余额
+        const _localBase2 = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+        const _localTxSum2 = JSON.parse(localStorage.getItem('transactions') || '[]')
+          .filter(t => !t.ghostCard)
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        const _currentBalance2 = _localBase2 + _localTxSum2;
+        if (_currentBalance2 - _correctBalance > 500) {
+          console.warn('[cloud] 余额异常修正:', _currentBalance2, '→', _correctBalance);
+          localStorage.setItem('walletBaseBalance', _cloudBase.toFixed(2));
+          // 同时把超出的 transactions 也清理掉，只保留云端有的
+          if (Array.isArray(s.transactions) && s.transactions.length > 0) {
+            const _cloudIds = new Set(s.transactions.filter(t => t.id).map(t => t.id));
+            const _localTx = JSON.parse(localStorage.getItem('transactions') || '[]');
+            const _cleanedTx = _localTx.filter(t => !t.id || _cloudIds.has(t.id));
+            localStorage.setItem('transactions', JSON.stringify(_cleanedTx));
+          }
         }
       }
 
