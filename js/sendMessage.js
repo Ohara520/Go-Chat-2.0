@@ -322,6 +322,33 @@ function saveHistory() {
 function getLongTermMemory() {
   return localStorage.getItem('longTermMemory') || '';
 }
+
+// ── 一次性清理被污染的 _intimate 安全回复标记 ────────────────
+// 记忆库 bug 期间，here./still here. 被错误打上 _intimate:true
+// 导致路由逻辑误以为在调情，普通消息被路由到 Grok 走安全回复
+// 这个函数在页面加载时跑一次，清掉历史污染
+function _cleanIntimateFlags() {
+  try {
+    if (localStorage.getItem('intimateFlagsCleaned_v1')) return;
+    localStorage.setItem('intimateFlagsCleaned_v1', '1');
+    const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    const safeSet = new Set(['here.', 'still here.', "i'm here.", 'yeah.', 'go on.', 'here', 'still here', "i'm here"]);
+    let cleaned = 0;
+    const fixed = history.map(m => {
+      if (m.role === 'assistant' && m._intimate && safeSet.has((m.content || '').trim().toLowerCase())) {
+        cleaned++;
+        const { _intimate, ...rest } = m;
+        return rest;
+      }
+      return m;
+    });
+    if (cleaned > 0) {
+      localStorage.setItem('chatHistory', JSON.stringify(fixed));
+      console.log('[cleanup] 清理污染_intimate标记:', cleaned, '条');
+    }
+  } catch(e) {}
+}
+if (typeof window !== 'undefined') setTimeout(_cleanIntimateFlags, 300);
 function saveLongTermMemory(memory) {
   localStorage.setItem('longTermMemory', memory);
   if (typeof touchLocalState === 'function') touchLocalState();
