@@ -700,7 +700,20 @@ async function checkLocationSpecialTrigger(userText) {
   try {
     // ── 获取当前地点 ──────────────────────────────
     const rawLocation = localStorage.getItem('currentLocation') || 'Hereford Base';
-    const locationKey = LOCATION_KEY_MAP?.[rawLocation]
+
+    // 修复：回基地后 pending 里的外地物品也要能寄
+    // 优先用 pending 信号里记录的请求时位置（可能是外地），找不到才用当前位置
+    const _pendingForLocation = (() => {
+      try {
+        const arr = JSON.parse(localStorage.getItem('pendingSpecialtyRequests') || '[]');
+        return arr.find(p => p.requestedFromLocation && p.requestedFromLocation !== rawLocation);
+      } catch(e) { return null; }
+    })();
+    const _effectiveLocation = _pendingForLocation?.requestedFromLocation || rawLocation;
+
+    const locationKey = LOCATION_KEY_MAP?.[_effectiveLocation]
+      || LOCATION_KEY_MAP?.[Object.keys(LOCATION_KEY_MAP || {}).find(k => _effectiveLocation.includes(k))]
+      || LOCATION_KEY_MAP?.[rawLocation]
       || LOCATION_KEY_MAP?.[Object.keys(LOCATION_KEY_MAP || {}).find(k => rawLocation.includes(k))]
       || null;
     if (!locationKey) return;
@@ -1621,7 +1634,13 @@ function addSpecialtyPendingSignal(itemHint) {
       arr.sort((a, b) => a.requestedAt - b.requestedAt);
       arr.shift();
     }
-    arr.push({ id: 'sp_' + now, requestedAt: now, itemHint: itemHint || '' });
+    arr.push({
+      id: 'sp_' + now,
+      requestedAt: now,
+      itemHint: itemHint || '',
+      // 记录请求时 Ghost 的位置，回基地后还能用这个位置的特产寄
+      requestedFromLocation: localStorage.getItem('currentLocation') || ''
+    });
     localStorage.setItem('pendingSpecialtyRequests', JSON.stringify(arr));
     if (typeof touchLocalState === 'function') touchLocalState();
     return true;
