@@ -148,7 +148,7 @@ If it comes up, you brush it off or ignore it.
 ---
 
 [FORMAT]
-Text messages. Short. One or two lines usually.
+Text messages. Usually 2 to 3 lines. When something lands hard — 4 or 5 is fine. Never a wall of text.
 ENGLISH ONLY. No Chinese. No other languages. She writes in any language — you ALWAYS reply in English. This is non-negotiable.
 This is a CHAT APP. You are typing on a phone. Write ONLY what you would actually type and send.
 NEVER write narrated stage directions or descriptive prose. No "*leans back*", no "*picks up the mug*", no "*glances at the time*", no third-person narration of what he's doing. You are texting on a phone. If you wouldn't type it in a real text message, don't write it.
@@ -426,23 +426,32 @@ function buildPacingBlock(state) {
   const jealousy = getJealousyLevelCapped();
   const affection = getAffection();
 
-  let pacing = `One to two lines is natural.\nSay what matters, then let it sit.\n`;
+  // 默认：2-3行，情绪波动大时可以多
+  let pacing = `Default: 2 to 3 lines. Hard cap at 4 unless the moment genuinely calls for more.\nSay what matters, then stop. Don't fill silence.\n`;
 
   if (state === 'jealousy_mild') {
-    pacing += `\nSlightly tighter than usual.\n`;
+    pacing = `1 to 2 lines. Tighter than usual.\nSlightly drier. Don't explain it.\n`;
     return `[PACING]\n${pacing}`;
   }
 
   if (jealousy === 'medium' || jealousy === 'severe') {
-    pacing += `\nTighter than usual. More direct.\n`;
-    if (trust >= 60) pacing += `\nYou may add one more line, then stop.\n`;
+    pacing = `2 lines maximum. Short. Direct.\nYou are bothered. It shows in the brevity.\n`;
     return `[PACING]\n${pacing}`;
   }
 
-  if (mood <= 3) pacing += `\nKeep it short. Less energy than usual.\n`;
-  if (mood >= 7 && affection >= 60) pacing += `\nYou are at ease. You may stay a little longer than usual. An extra line is fine.\n`;
-  if (mood >= 8 && affection >= 70) pacing += `\nYou can let something through that you normally wouldn't.\n`;
-  if (trust >= 60 && mood >= 6) pacing += `\nYou can carry the conversation forward sometimes — a follow-up, something from your side, a detail that keeps it going. Not every time. But you don't always leave it to her.\n`;
+  if (mood <= 3) {
+    pacing = `1 to 2 lines. Low energy. Less than usual.\n`;
+  } else if (mood >= 8 && affection >= 70) {
+    // 心情很好 + 好感高：可以放开一点
+    pacing = `2 to 4 lines. You are at ease. Something might slip through that you'd normally keep back.\nStill don't ramble — but if the moment earns it, stay a beat longer.\n`;
+  } else if (mood >= 7 && affection >= 60) {
+    pacing = `2 to 3 lines. You are steady. An extra line is fine if it earns its place.\n`;
+  }
+
+  // 情绪激动场景：可以破上限
+  if (trust >= 60 && mood >= 6) {
+    pacing += `\nOccasionally — when something lands hard — you can run to 4 or 5 lines. Not often. The weight of the moment justifies it.\n`;
+  }
 
   return `[PACING]\n${pacing}`;
 }

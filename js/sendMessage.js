@@ -973,7 +973,16 @@ async function _processMergedMessage(text) {
       try {
         // 超时兜底：一律走 Grok，宁可误判也不让 Claude 接到色色内容破防
         // 5秒超时（原3秒太短，Haiku偶尔慢就触发）
-        const _timeoutDefault = '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
+        // 修复：超时时根据最近历史决定路由
+        // 有调情记录 → flirt:true（留在 Grok，比 Sonnet 破防强）
+        // 没有调情记录 → flirt:false（走 Sonnet 主路径，更稳定）
+        const _hasRecentIntimateForTimeout = chatHistory
+          .filter(m => !m._system && !m._recalled)
+          .slice(-6)
+          .some(m => m._intimate);
+        const _timeoutDefault = _hasRecentIntimateForTimeout
+          ? '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'
+          : '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
 
         const combinedRaw = await Promise.race([
           fetchDeepSeek(

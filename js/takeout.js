@@ -767,7 +767,7 @@ async function onGhostReceivedTakeout(order) {
       if (typeof changeAffection === 'function') changeAffection(_affDelta);
       if (typeof changeTrustHeat === 'function') changeTrustHeat(_trustDelta);
 
-      // 写进长期记忆 + sessionStorage（实时，不等记忆更新）
+      // 写进长期记忆
       try {
         const _ltm  = localStorage.getItem('longTermMemory') || '';
         const _note = told
@@ -777,14 +777,6 @@ async function onGhostReceivedTakeout(order) {
           localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
           if (typeof touchLocalState === 'function') touchLocalState();
         }
-        // 实时写入 sessionStorage，让 sendMessage.js 本轮就能查到
-        // 不依赖 updateLongTermMemory() 的异步更新（要等2轮才触发）
-        sessionStorage.setItem('currentTakeout', JSON.stringify({
-          name: order.nameEn || order.name,
-          nameZh: order.name,
-          told,
-          arrivedAt: Date.now()
-        }));
       } catch(e) {}
 
       // Ghost 用 S 说一句反应（调情中存 pending 不打断）
@@ -815,16 +807,20 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
           // 优先 Sonnet（质量好），超时降级 Haiku（快），都失败走兜底
           let _reply = '';
           try {
+            // 修复：_prompt 是系统指令不是用户消息，放进 system 里
+            // 用完整人设而不是轻量版，防止模型出戏（"appreciate it, simon"这类）
+            const _takeoutSystem = (typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '')
+              + '\n' + _prompt;
             const _res = await fetchWithTimeout('/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
                 max_tokens: 100,
-                system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
+                system: _takeoutSystem,
                 messages: [
                   ...(chatHistory || []).filter(m => !m._system).slice(-6),
-                  { role: 'user', content: _prompt }
+                  { role: 'user', content: '[food just arrived. react.]' }
                 ]
               })
             }, 25000);
@@ -844,10 +840,10 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
                 body: JSON.stringify({
                   model: 'claude-haiku-4-5-20251001',
                   max_tokens: 80,
-                  system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
+                  system: _takeoutSystem,
                   messages: [
                     ...(chatHistory || []).filter(m => !m._system).slice(-4),
-                    { role: 'user', content: _prompt }
+                    { role: 'user', content: '[food just arrived. react.]' }
                   ]
                 })
               }, 10000);
