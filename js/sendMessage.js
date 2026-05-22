@@ -329,13 +329,16 @@ function getLongTermMemory() {
 // 这个函数在页面加载时跑一次，清掉历史污染
 function _cleanIntimateFlags() {
   try {
-    if (localStorage.getItem('intimateFlagsCleaned_v1')) return;
-    localStorage.setItem('intimateFlagsCleaned_v1', '1');
+    // v3：清理所有1小时前的_intimate标记
+    // v1只清了安全回复，但正常Grok回复也被bug打上了标记
+    if (localStorage.getItem('intimateFlagsCleaned_v3')) return;
+    localStorage.setItem('intimateFlagsCleaned_v3', '1');
+    localStorage.removeItem('intimateFlagsCleaned_v1');
     const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
-    const safeSet = new Set(['here.', 'still here.', "i'm here.", 'yeah.', 'go on.', 'here', 'still here', "i'm here"]);
+    const _1hAgo = Date.now() - 60 * 60 * 1000;
     let cleaned = 0;
     const fixed = history.map(m => {
-      if (m.role === 'assistant' && m._intimate && safeSet.has((m.content || '').trim().toLowerCase())) {
+      if (m.role === 'assistant' && m._intimate && (m._time || 0) < _1hAgo) {
         cleaned++;
         const { _intimate, ...rest } = m;
         return rest;
@@ -344,7 +347,7 @@ function _cleanIntimateFlags() {
     });
     if (cleaned > 0) {
       localStorage.setItem('chatHistory', JSON.stringify(fixed));
-      console.log('[cleanup] 清理污染_intimate标记:', cleaned, '条');
+      console.log('[cleanup] 清理旧_intimate标记:', cleaned, '条');
     }
   } catch(e) {}
 }
