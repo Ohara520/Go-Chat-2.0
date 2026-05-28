@@ -355,6 +355,17 @@ function _renderDiaryContent(container) {
 // ===== 每日检查（在 app.js 调用）=====
 
 async function dailyDiaryCheck() {
+  // 清理过期的日记锁（超过2小时的锁视为失效，防止老用户永久卡死）
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('diaryLock_'))
+    .forEach(k => {
+      const val = localStorage.getItem(k);
+      const t = parseInt(val);
+      if (isNaN(t) || Date.now() - t > 2 * 60 * 60 * 1000) {
+        localStorage.removeItem(k);
+      }
+    });
+
   // 先清理已有的重复日记
   const existing = getDiaryEntries();
   const seen = new Set();

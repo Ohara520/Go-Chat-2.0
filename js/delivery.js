@@ -813,6 +813,21 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
       _safeDeliverySaveHistory();
     }
 
+    // 丢失商品重新上架（无论价格，让用户可以再买）
+    try {
+      const _itemName = d.productData?.name || d.name;
+      const _purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+      const _newPurchased = _purchased.filter(n => n !== _itemName);
+      localStorage.setItem('purchasedItems', JSON.stringify(_newPurchased));
+      const _counts = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
+      if (_counts[_itemName]) {
+        _counts[_itemName] = Math.max(0, (_counts[_itemName] || 1) - 1);
+        if (_counts[_itemName] === 0) delete _counts[_itemName];
+        localStorage.setItem('purchaseCounts', JSON.stringify(_counts));
+      }
+      if (typeof initMarket === 'function') initMarket();
+    } catch(e) {}
+
     // 赔偿
     if (price >= 500) {
       const compensation = Math.round(price * 0.5);
@@ -838,6 +853,7 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
             if (typeof showToast === 'function') showToast('📬 Ghost说他会补寄一个');
           }, (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000);
         }
+
         localStorage.setItem('deliveries', JSON.stringify(deliveries));
       }, 3000);
     }

@@ -53,6 +53,19 @@ function initWallet() {
       }
     } catch(e) {}
   }
+
+  // 迁移：老用户 marriageType 升级
+  // affection >= 60 的用户应已是 established，但旧版可能仍停在 slowBurn
+  // slowBurn 会让 moneyEase -1，导致黑卡上限卡在 £2000 而非 £2600
+  if (!localStorage.getItem('marriageTypeUpgrade_v1')) {
+    localStorage.setItem('marriageTypeUpgrade_v1', '1');
+    const _curType = localStorage.getItem('marriageType');
+    const _aff = parseInt(localStorage.getItem('affection') || '0');
+    if (_curType === 'slowBurn' && _aff >= 60) {
+      localStorage.setItem('marriageType', 'established');
+      localStorage.setItem('relationshipUnlocked', 'true');
+    }
+  }
 }
 
 function getBalance() {

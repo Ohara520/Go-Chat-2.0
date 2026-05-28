@@ -1065,20 +1065,28 @@ function getGhostCard() {
       // 月初重置
       if (savedMonthKey !== nowMonthKey) {
         const newLimit = getGhostCardMonthlyLimit();
-        saved.monthlyLimit   = newLimit;
+        // 月初重置：上限取历史最高和新算值的较大值（只升不降，冷战除外）
+        const _peakLimit = saved._peakLimit || 0;
+        const _resetLimit = monthlyLimit === 0 ? 0 : Math.max(newLimit, _peakLimit);
+        saved.monthlyLimit   = _resetLimit;
         saved.spentThisMonth = 0;
         saved.lastResetMonth = now.getMonth();
         saved.lastResetYear  = now.getFullYear();
         // 旧余额保留，叠加新月额度，上限3个月防无限堆积
-        saved.balance = Math.min((saved.balance || 0) + newLimit, newLimit * 3);
+        saved.balance = Math.min((saved.balance || 0) + _resetLimit, _resetLimit * 3);
       }
 
-      // 职业切换重算上限
+      // 职业切换重算上限：同样只升不降
       if (_currentCareer !== _savedCareer) {
-        saved.monthlyLimit = monthlyLimit;
+        const _peakLimit = saved._peakLimit || 0;
+        const _newCareerLimit = monthlyLimit === 0 ? 0 : Math.max(monthlyLimit, _peakLimit);
+        saved.monthlyLimit = _newCareerLimit;
         saved._careerType = _currentCareer;
       }
-      const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit);
+
+      // lockedLimit：取当前算出值、已存值、历史峰值三者最大（冷战归零除外）
+      const _peak = saved._peakLimit || 0;
+      const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit, _peak);
 
       // 上限升级补差额（只在本次计算周期内执行一次）
       const oldLimit = saved.monthlyLimit || 0;
@@ -1088,6 +1096,8 @@ function getGhostCard() {
       }
 
       saved.monthlyLimit = lockedLimit;
+      // 记录历史峰值（冷战时不更新峰值，恢复后能回到原来的上限）
+      if (lockedLimit > 0) saved._peakLimit = Math.max(saved._peakLimit || 0, lockedLimit);
       saved._careerType = _currentCareer;
       saved._lastCalcKey = _calcKey; // 标记本周期已计算，防止重复执行
     }
