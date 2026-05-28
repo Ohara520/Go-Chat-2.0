@@ -286,17 +286,19 @@ async function loadFromCloud() {
         localStorage.setItem(data.profile.todayWorkKey, data.profile.todayWorkData);
       }
     }
-    if (!data.profile?.walletMigrated_v3) {
-      if (data.chat_history?.length > 0 || data.state_snapshot?.transactions?.length > 0) {
-      // 云端有聊天记录或交易记录 → 一定是老用户，直接标记已迁移防止清空
-      localStorage.setItem('walletMigrated_v3', '1');
+    if (data.profile?.walletMigrated_v3) {
+      localStorage.setItem('walletMigrated_v3', data.profile.walletMigrated_v3);
     } else if (!localStorage.getItem('walletMigrated_v3')) {
-      // 全新用户：标记并给初始礼金
-      localStorage.setItem('walletMigrated_v3', '1');
-      if (typeof addTransaction === 'function') {
-        addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
+      if (data.chat_history?.length > 0 || data.state_snapshot?.transactions?.length > 0) {
+        // 云端有聊天记录或交易记录 → 一定是老用户，直接标记已迁移防止清空
+        localStorage.setItem('walletMigrated_v3', '1');
+      } else {
+        // 全新用户：标记并给初始礼金
+        localStorage.setItem('walletMigrated_v3', '1');
+        if (typeof addTransaction === 'function') {
+          addTransaction({ icon: '💍', name: '新婚礼金', amount: 200 });
+        }
       }
-    }
     }
 
     // 4b. 优先从 state_snapshot.transactions 恢复交易记录
@@ -512,14 +514,17 @@ async function loadFromCloud() {
           .filter(t => !t.ghostCard)
           .reduce((sum, t) => sum + (t.amount || 0), 0);
         const _currentBalance2 = _localBase2 + _localTxSum2;
-        if (_currentBalance2 - _correctBalance > 500) {
+        // 只修正明显虚高（超出云端正确值500以上），且不能把余额降到低于云端正确值
+        // 不再强制重置为云端旧值，防止把本地新收入（工资/签到）也一起抹掉
+        if (_currentBalance2 - _correctBalance > 500 && _correctBalance > 0) {
           console.warn('[cloud] 余额异常修正:', _currentBalance2, '→', _correctBalance);
-          localStorage.setItem('walletBaseBalance', _cloudBase.toFixed(2));
-          // 同时把超出的 transactions 也清理掉，只保留云端有的
+          // 只清理云端没有的重复transactions，不动walletBaseBalance
           if (Array.isArray(s.transactions) && s.transactions.length > 0) {
             const _cloudIds = new Set(s.transactions.filter(t => t.id).map(t => t.id));
             const _localTx = JSON.parse(localStorage.getItem('transactions') || '[]');
-            const _cleanedTx = _localTx.filter(t => !t.id || _cloudIds.has(t.id));
+            // 保留：云端有的 + 本地有id但云端没有的（可能是新产生的合法交易）
+            // 只删除：没有id的重复条目（这些是被bug重复插入的）
+            const _cleanedTx = _localTx.filter(t => t.id);
             localStorage.setItem('transactions', JSON.stringify(_cleanedTx));
           }
         }
@@ -722,7 +727,9 @@ async function saveToCloud() {
   }
 
   // 安全锁：如果本次启动时云端加载失败/超时，不允许保存，防止本地旧数据覆盖云端新数据
-  if (sessionStorage.getItem('cloudLoadFailed') === '1') {
+  // 例外：用户主动重置聊天时必须允许保存，否则重置永远不生效
+  if (sessionStorage.getItem('cloudLoadFailed') === '1' &&
+      localStorage.getItem('chatResetPending') !== '1') {
     console.warn('[cloud] 跳过保存：本次启动云端加载未成功，防止数据覆盖');
     return;
   }
@@ -942,7 +949,9 @@ async function saveToCloud() {
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
     // 钱包余额从transactions实时计算，确保与本地显示一致
     const _txs = JSON.parse(localStorage.getItem('transactions') || '[]');
-    const _walletCalc = Math.max(0, _txs.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0));
+    const _txSum = _txs.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
+    const _base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+    const _walletCalc = Math.max(0, _base + _txSum);
     const walletVal = _walletCalc || parseFloat(localStorage.getItem('wallet') || '0');
     if (walletVal > 0) upsertData.balance = walletVal;
 

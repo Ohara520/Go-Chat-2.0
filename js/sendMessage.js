@@ -237,7 +237,7 @@ const BREAKOUT_PHRASES = [
 ];
 
 function isBreakout(txt) {
-  if (!txt) return true;
+  if (!txt) return false;
   const lower = txt.toLowerCase();
   return BREAKOUT_PHRASES.some(p => lower.includes(p));
 }
@@ -1442,6 +1442,9 @@ async function _processMergedMessage(text) {
         localStorage.setItem('lastSendGiftAt', Date.now());
         const giftDesc = sendGift.description || sendGift;
         const giftMode = sendGift.mode || 'secret';
+        // 立即持久化待处理礼物，防止页面关闭导致丢失
+        const _pendingGift = { desc: giftDesc, mode: giftMode, ts: Date.now() };
+        localStorage.setItem('pendingSendGift', JSON.stringify(_pendingGift));
         setTimeout(async () => {
           try {
             const raw = await fetchDeepSeek(
@@ -1449,7 +1452,7 @@ async function _processMergedMessage(text) {
               `Ghost想寄：${giftDesc}`, 150
             );
             const item = safeParseJSON(raw);
-            if (!item?.name) return;
+            if (!item?.name) { localStorage.removeItem('pendingSendGift'); return; }
             const delay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
             const noteMap = {
               secret: `[System: You quietly sent her "${item.name}". She doesn't know yet — arriving in 2-4 days. Don't bring it up. If she asks, deflect. Don't flat-out deny it.]`,
@@ -1457,10 +1460,14 @@ async function _processMergedMessage(text) {
               normal: `[System: You sent her "${item.name}". Expected to arrive in 2-4 days.]`,
             };
             chatHistory.push({ role: 'user', content: noteMap[giftMode] || noteMap.normal, _system: true });
-            setTimeout(() => addGhostReverseDelivery({ ...item, isLocationSpecial: false }, 'care'), delay);
+            // 持久化快递记录，不依赖setTimeout存活
+            if (typeof addGhostReverseDelivery === 'function') {
+              addGhostReverseDelivery({ ...item, isLocationSpecial: false, _scheduledAt: Date.now() + delay }, 'care');
+            }
+            localStorage.removeItem('pendingSendGift');
             saveHistory();
-          } catch(e) {}
-        }, 1000);
+          } catch(e) { localStorage.removeItem('pendingSendGift'); }
+        }, 500);
       }
     }
 
@@ -1748,18 +1755,34 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     // Grok 失败直接走安全回复，不经过 Sonnet
     hideTyping();
     // 任何情况下都不静默——已读不回比任何回复都差
+    // 连续安全回复计数：超过2次强制退出调情通道，防止死循环
+    const _safeCount = parseInt(sessionStorage.getItem('intimateSafeReplyCount') || '0') + 1;
+    sessionStorage.setItem('intimateSafeReplyCount', _safeCount);
+    if (_safeCount >= 2) {
+      sessionStorage.removeItem('intimateSafeReplyCount');
+      // 强制退出调情通道：清掉最近几条的_intimate标记
+      chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
+      saveHistory();
+    }
     const _safeReplies = ['here.', 'still here.', "i'm here.", 'yeah.', 'go on.'];
     const _safeReply = _safeReplies[Math.floor(Math.random() * _safeReplies.length)];
     appendMessage('bot', _safeReply);
-    chatHistory.push({ role: 'assistant', content: _safeReply, _time: Date.now() });
+    chatHistory.push({ role: 'assistant', content: _safeReply, _intimate: true, _time: Date.now() });
     saveHistory();
   } catch(e) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
+    const _safeCount2 = parseInt(sessionStorage.getItem('intimateSafeReplyCount') || '0') + 1;
+    sessionStorage.setItem('intimateSafeReplyCount', _safeCount2);
+    if (_safeCount2 >= 2) {
+      sessionStorage.removeItem('intimateSafeReplyCount');
+      chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
+      saveHistory();
+    }
     const _emergencyReplies = ['here.', 'still here.', "i'm here."];
     const _emergencyReply = _emergencyReplies[Math.floor(Math.random() * _emergencyReplies.length)];
     appendMessage('bot', _emergencyReply);
-    chatHistory.push({ role: 'assistant', content: _emergencyReply, _time: Date.now() });
+    chatHistory.push({ role: 'assistant', content: _emergencyReply, _intimate: true, _time: Date.now() });
     saveHistory();
   }
 }

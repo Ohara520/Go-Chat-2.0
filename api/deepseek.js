@@ -18,7 +18,7 @@ async function createWithFailover(messages, max_tokens, model = 'deepseek-v3.2')
   for (const baseURL of BASE_URLS) {
     try {
       const client = new OpenAI({
-        apiKey: process.env.GEMINI_API_KEY,
+        apiKey: process.env.ANTHROPIC_API_KEY,
         baseURL,
         timeout: PER_NODE_TIMEOUT_MS,
         maxRetries: 0,

@@ -170,7 +170,7 @@ async function handleRegister() {
 
   btn.disabled = true; btn.textContent = '验证中...';
 
-  // 先验证邀请码
+  // 先验证邀请码（不消耗，防止注册失败时码被白白用掉）
   try {
     const inviteRes = await fetch('/api/check-invite', {
       method: 'POST',
@@ -197,6 +197,14 @@ async function handleRegister() {
     errEl.textContent = error.message.includes('already') ? '该邮箱已注册' : error.message;
     btn.disabled = false; btn.textContent = '注册';
   } else {
+    // 注册成功后才消耗邀请码
+    try {
+      await fetch('/api/check-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: invite, email, confirm: true }),
+      });
+    } catch(e) { /* 消耗失败不影响注册结果 */ }
     sucEl.textContent = '注册成功！请查收验证邮件，验证后即可登录';
     btn.disabled = false; btn.textContent = '注册';
   }

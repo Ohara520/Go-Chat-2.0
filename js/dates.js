@@ -866,7 +866,8 @@ function abandonDateScene() {
   _selectedDateRestaurant = null;
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   if (typeof showToast === 'function') showToast('这次约会已放弃');
-  if (typeof renderDateHub === 'function') renderDateHub();
+  if (typeof openScreen === 'function') openScreen('dateHubScreen');
+  else if (typeof renderDateHub === 'function') renderDateHub();
 }
 window.abandonDateScene = abandonDateScene;
 

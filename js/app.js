@@ -65,8 +65,8 @@ function openScreen(id) {
       if (badge) badge.style.display = 'none';
     }
     if (id === 'walletScreen'   && typeof renderWallet      === 'function') renderWallet();
-    if (id === 'workScreen'     && typeof updateWorkUI      === 'function') updateWorkUI();
-    if (id === 'vocabScreen'       && typeof renderVocabScreen    === 'function') renderVocabScreen();
+    if (id === 'careerScreen'     && typeof updateWorkUI      === 'function') updateWorkUI();
+    if (id === 'diaryScreen'       && typeof renderVocabScreen    === 'function') renderVocabScreen();
     if (id === 'collectionScreen'  && typeof renderCollectionScreen === 'function') renderCollectionScreen();
     if (id === 'calendarScreen'     && typeof initCalendar           === 'function') initCalendar();
     if (id === 'secretScreen'       && typeof loadSecretScreen        === 'function') loadSecretScreen();
@@ -219,8 +219,27 @@ window.onload = async function() {
     // 已有用户兜底：Ghost 档案数据（与 startChat 共享逻辑）
     _ensureGhostProfileDefaults();
 
-    openScreen('mainScreen');
-    if (typeof showTabBar === 'function') showTabBar();
+    // 恢复约会 session：如果有进行中的约会，直接恢复约会界面而不是主页
+    const _activeDate = localStorage.getItem('activeDateSession');
+    if (_activeDate) {
+      try {
+        const _ds = JSON.parse(_activeDate);
+        if (_ds && !_ds.ended && typeof resumeDateScene === 'function') {
+          openScreen('mainScreen');
+          if (typeof showTabBar === 'function') showTabBar();
+          resumeDateScene();
+        } else {
+          openScreen('mainScreen');
+          if (typeof showTabBar === 'function') showTabBar();
+        }
+      } catch(e) {
+        openScreen('mainScreen');
+        if (typeof showTabBar === 'function') showTabBar();
+      }
+    } else {
+      openScreen('mainScreen');
+      if (typeof showTabBar === 'function') showTabBar();
+    }
 
     // ── 包裹通知徽章更新 ─────────────────────────────────────
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();

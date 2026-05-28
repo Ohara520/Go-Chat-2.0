@@ -157,14 +157,23 @@ function applyCheckinBonusMessages(count) {
     }).then(r => r.json()).then(d => {
       if (d.ok && typeof _subCache !== 'undefined' && _subCache) {
         _subCache.remaining = d.remaining;
-        // 成功了，清掉待重试的 bonus
+        // 成功了，清掉待重试的 bonus（不再重试，防止双倍发放）
         localStorage.removeItem('pendingCheckinBonus');
+        localStorage.removeItem('pendingCheckinBonusEmail');
       } else {
         console.warn('[checkin] bonus API 返回异常:', d);
+        // 回滚乐观更新，再存待重试
+        if (typeof _subCache !== 'undefined' && _subCache && _subCache.remaining !== undefined) {
+          _subCache.remaining -= count;
+        }
         _savePendingBonus(email, count);
       }
     }).catch(e => {
       console.warn('[checkin] bonus API 调用失败:', e);
+      // 回滚乐观更新，再存待重试
+      if (typeof _subCache !== 'undefined' && _subCache && _subCache.remaining !== undefined) {
+        _subCache.remaining -= count;
+      }
       _savePendingBonus(email, count);
     });
   } else {

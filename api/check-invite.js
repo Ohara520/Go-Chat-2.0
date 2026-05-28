@@ -15,7 +15,7 @@ function genCode() {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { code, email } = req.body;
+  const { code, email, confirm } = req.body;
   if (!code) return res.status(400).json({ ok: false, reason: 'no_code' });
 
   const normalizedCode = code.trim().toUpperCase();
@@ -35,7 +35,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, reason: 'used' });
     }
 
-    // 标记为已使用
+    // 仅验证模式（confirm 未传或为 false）：只检查有效性，不消耗邀请码
+    if (!confirm) {
+      return res.status(200).json({ ok: true, validated: true });
+    }
+
+    // 确认消耗模式（注册成功后调用）：标记为已使用并生成新邀请码
     await supabase
       .from('invite_codes')
       .update({
@@ -45,11 +50,11 @@ export default async function handler(req, res) {
       })
       .eq('code', normalizedCode);
 
-    // 新用户注册成功后自动生成1个邀请码
-    if (email) {
+    // 新用户注册成功后自动生成1个邀请码给邀请人
+    if (data.created_by) {
       await supabase.from('invite_codes').insert({
         code: genCode(),
-        created_by: email.toLowerCase().trim(),
+        created_by: data.created_by,
         is_used: false,
         created_at: new Date().toISOString(),
       });
