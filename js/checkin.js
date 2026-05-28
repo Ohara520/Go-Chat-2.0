@@ -145,6 +145,9 @@ function renderCheckin() {
 function applyCheckinBonusMessages(count) {
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
   if (email) {
+    // 立即清掉 pending，防止 retryPendingCheckinBonus 并发重复发放
+    localStorage.removeItem('pendingCheckinBonus');
+    localStorage.removeItem('pendingCheckinBonusEmail');
     // 立即生效：先乐观更新本地缓存，不等 API 返回
     if (typeof _subCache !== 'undefined' && _subCache && _subCache.remaining !== undefined) {
       _subCache.remaining += count;
@@ -157,9 +160,6 @@ function applyCheckinBonusMessages(count) {
     }).then(r => r.json()).then(d => {
       if (d.ok && typeof _subCache !== 'undefined' && _subCache) {
         _subCache.remaining = d.remaining;
-        // 成功了，清掉待重试的 bonus（不再重试，防止双倍发放）
-        localStorage.removeItem('pendingCheckinBonus');
-        localStorage.removeItem('pendingCheckinBonusEmail');
       } else {
         console.warn('[checkin] bonus API 返回异常:', d);
         // 回滚乐观更新，再存待重试

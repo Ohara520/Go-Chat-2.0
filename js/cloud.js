@@ -45,10 +45,13 @@ async function loadFromCloud() {
     const cloudIsNewer = localTs === 0 || (cloudStateTs > 0 && cloudStateTs > localTs + 500);
 
     // ── 1. 聊天记录：合并云端和本地，保留更多 ────────────────
-    // 重置标记：用户刚重置了对话，跳过云端恢复，用本地（已清理）版本覆盖云端
-    if (localStorage.getItem('chatResetPending') === '1') {
+    // 重置标记：用户刚重置了对话，云端已在重置时同步，跳过 merge 防止旧数据被恢复
+    if (localStorage.getItem('chatResetConfirmed') === '1') {
+      localStorage.removeItem('chatResetConfirmed');
+      // 本地已是清理后的版本，不做任何 merge，直接跳过
+    } else if (localStorage.getItem('chatResetPending') === '1') {
       localStorage.removeItem('chatResetPending');
-      // 用本地已清理的记录覆盖云端
+      // 兼容旧流程：用本地已清理的记录覆盖云端
       try {
         const cleanedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
         await sb.from('user_data').update({ chat_history: cleanedHistory }).eq('user_id', userId);
@@ -107,11 +110,15 @@ async function loadFromCloud() {
       }
       setIfMissing('meetType', p.meetType);
       setIfMissing('botNickname', p.botNickname);
-      // 职业系统
-      setIfMissing('careerType', p.careerType);
-      setIfMissing('careerLevel', p.careerLevel);
-      setIfMissing('careerStartDate', p.careerStartDate);
-      setIfMissing('careerLastSalaryMonth', p.careerLastSalaryMonth);
+      // 职业系统：本地最近转职过（careerChangedAt 比云端 stateSavedAt 新）则不覆盖
+      const _careerChangedAt = parseInt(localStorage.getItem('careerChangedAt') || '0');
+      const _careerCloudOk = !_careerChangedAt || (cloudStateTs > 0 && cloudStateTs > _careerChangedAt);
+      if (_careerCloudOk) {
+        setIfMissing('careerType', p.careerType);
+        setIfMissing('careerLevel', p.careerLevel);
+        setIfMissing('careerStartDate', p.careerStartDate);
+        setIfMissing('careerLastSalaryMonth', p.careerLastSalaryMonth);
+      }
       // Ghost日记
       setIfMissing('ghostDiary', p.ghostDiary);
       // 用户设置：云端更新才覆盖；本地没有时也恢复（换设备场景）
@@ -239,7 +246,7 @@ async function loadFromCloud() {
         }
       });
     }
-    if (data.profile?.monthlyCheckinKey && data.profile?.monthlyCheckinCount) {
+    if (data.profile?.monthlyCheckinKey && data.profile?.monthlyCheckinCount != null) {
       const localCount = parseInt(localStorage.getItem(data.profile.monthlyCheckinKey) || '0');
       const cloudCount = parseInt(data.profile.monthlyCheckinCount || '0');
       // 取较大值，防止倒退
@@ -486,14 +493,11 @@ async function loadFromCloud() {
           return String(tb).localeCompare(String(ta));
         });
 
-        // 只保留50条明细，超出的压缩进walletBaseBalance
+        // 只保留50条明细，超出的直接丢弃（不加进 walletBaseBalance）
+        // 原因：超出的旧记录来自云端，其金额已包含在云端 walletBaseBalance 里
+        // 如果再加一次就会双重计算，导致余额虚高
         if (merged.length > 50) {
-          const keep = merged.slice(0, 50);
-          const old  = merged.slice(50);
-          const oldSum = old.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
-          const base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
-          localStorage.setItem('walletBaseBalance', (base + oldSum).toFixed(2));
-          localStorage.setItem('transactions', JSON.stringify(keep));
+          localStorage.setItem('transactions', JSON.stringify(merged.slice(0, 50)));
         } else {
           localStorage.setItem('transactions', JSON.stringify(merged));
         }

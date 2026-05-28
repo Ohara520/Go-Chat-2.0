@@ -509,7 +509,8 @@ English only. No translation. No AVATAR_SET tag.]`;
 
     // 7. 换头像由用户明确命令触发，发图时不自动执行
     // 把最新的图片存到 _lastReceivedPhotos 供后续命令使用
-    window._lastReceivedPhotos = { base64List, isTwoPhotos };
+    // 加时间戳：超过5分钟后自动失效，防止聊了一会儿后误触发换头像
+    window._lastReceivedPhotos = { base64List, isTwoPhotos, sentAt: Date.now() };
 
     // 8. 异步上传所有图片到Storage，完成后更新历史记录和气泡
     const photoUrls = new Array(base64List.length).fill(null);
@@ -600,6 +601,11 @@ async function checkAvatarCommand(userText) {
   // 有没有最近发过的图片（三层都需要，提前判断）
   const lastPhotos = window._lastReceivedPhotos;
   if (!lastPhotos || !lastPhotos.base64List || lastPhotos.base64List.length === 0) return false;
+  // 5分钟内才有效，防止聊了一会儿后误触发换头像
+  if (lastPhotos.sentAt && Date.now() - lastPhotos.sentAt > 5 * 60 * 1000) {
+    window._lastReceivedPhotos = null;
+    return false;
+  }
 
   // ── 第一层：强正则，明确意图直接换 ──
   const isStrongCommand = /用这个当头像|设为头像|换成这个|这个当(你的?)?头像|帮我换头像|给你换头像|换(一下|个)?头像|头像(就)?用这|做(你的?)?头像|当(你的?)?头像吧?|就这张|用上吧?|头像换了|头像换一下|就它了|用它吧|头像就这个|拿来当头像|当作头像|这张当头像|头像用这张|这个做头像|set.*avatar|use.*avatar|change.*avatar|make.*avatar|update.*avatar|this.*as.*avatar|avatar.*this/i.test(text);

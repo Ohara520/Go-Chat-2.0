@@ -503,106 +503,7 @@
 </style>
 </head>
 <body>
-<!-- ═══════════════════════════════════════
-     维护模式 — 开发者密码: 1314112
-     ═══════════════════════════════════════ -->
-<style>
-#maintenanceOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  background: linear-gradient(160deg, #d8edd8 0%, #e2eeda 50%, #eaf2e0 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
-  box-sizing: border-box;
-}
-#maintenanceOverlay .m-icon { font-size: 56px; margin-bottom: 16px; }
-#maintenanceOverlay .m-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #3a6b3a;
-  margin-bottom: 10px;
-  text-align: center;
-}
-#maintenanceOverlay .m-desc {
-  font-size: 14px;
-  color: #6a9a6a;
-  text-align: center;
-  line-height: 1.7;
-  max-width: 280px;
-  margin-bottom: 36px;
-}
-#maintenanceOverlay .m-input-wrap {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  max-width: 280px;
-}
-#maintenanceOverlay input {
-  flex: 1;
-  padding: 12px 16px;
-  border: 1.5px solid #b0d4b0;
-  border-radius: 12px;
-  font-size: 15px;
-  background: white;
-  color: #333;
-  outline: none;
-}
-#maintenanceOverlay input:focus { border-color: #5a9a5a; }
-#maintenanceOverlay button {
-  padding: 12px 18px;
-  border: none;
-  border-radius: 12px;
-  background: #5a9a5a;
-  color: white;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-#maintenanceOverlay .m-error {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #e05a5a;
-  display: none;
-}
-</style>
-
-<div id="maintenanceOverlay">
-  <div class="m-icon">🔧</div>
-  <div class="m-title">系统维护中</div>
-  <div class="m-desc">
-    Ghost 正在整理行装，稍后回来。<br>
-    预计维护时间较长，请耐心等待～
-  </div>
-  <div class="m-input-wrap">
-    <input type="password" id="devPassword" placeholder="开发者入口" onkeydown="if(event.key==='Enter')checkDevPassword()" />
-    <button onclick="checkDevPassword()">进入</button>
-  </div>
-  <div class="m-error" id="devError">密码错误</div>
-</div>
-
-<script>
-(function() {
-  // 检查是否已通过验证（sessionStorage，关闭标签页后失效）
-  if (sessionStorage.getItem('devAccess') === '1314112') {
-    document.getElementById('maintenanceOverlay').style.display = 'none';
-  }
-})();
-
-function checkDevPassword() {
-  const val = document.getElementById('devPassword').value;
-  if (val === '1314112') {
-    sessionStorage.setItem('devAccess', '1314112');
-    document.getElementById('maintenanceOverlay').style.display = 'none';
-  } else {
-    document.getElementById('devError').style.display = 'block';
-    document.getElementById('devPassword').value = '';
-  }
-}
-</script>
+<!-- 维护模式已关闭 -->
 
 
 <div class="container">
@@ -3061,7 +2962,7 @@ function toggleStickerFromPlus() {
   }
 
   // 重置对话记录（清最近30条）
-  function confirmResetChat() {
+  async function confirmResetChat() {
     if (!confirm('确定要重置最近的对话吗？\n\n· 清除最近30条消息\n· 更早的记录保留\n· 余额、好感度等不受影响')) return;
 
     // 读取并裁剪
@@ -3073,7 +2974,11 @@ function toggleStickerFromPlus() {
         kept = history.length > 30 ? history.slice(0, -30) : [];
       } catch(e) {}
     }
+
+    // 先写本地
     localStorage.setItem('chatHistory', JSON.stringify(kept));
+    // 防止 loadFromCloud 重新 merge 回旧记录
+    localStorage.setItem('chatResetConfirmed', '1');
 
     // 内存同步
     if (typeof chatHistory !== 'undefined') {
@@ -3087,8 +2992,10 @@ function toggleStickerFromPlus() {
     sessionStorage.removeItem('intimateSummarized');
     sessionStorage.removeItem('recentInnerThoughts');
 
-    // 标记：刷新后跳过云端恢复
-    localStorage.setItem('chatResetPending', '1');
+    // 立即同步到云端（不依赖 reload 后的 chatResetPending 机制）
+    if (typeof saveToCloud === 'function') {
+      try { await saveToCloud(); } catch(e) {}
+    }
 
     if (typeof showToast === 'function') showToast('🔄 最近对话已重置');
     setTimeout(() => location.reload(), 500);

@@ -1057,8 +1057,9 @@ function getGhostCard() {
     const nowMonthKey = now.getFullYear() * 100 + now.getMonth();
     const savedMonthKey = (saved.lastResetYear || 0) * 100 + (saved.lastResetMonth ?? 99);
     const _currentCareer = typeof getCareer === 'function' ? getCareer() : '';
+    const _currentLevel  = typeof getCareerLevel === 'function' ? getCareerLevel() : 0;
     const _savedCareer = saved._careerType || '';
-    const _calcKey = nowMonthKey + '_' + _currentCareer;
+    const _calcKey = nowMonthKey + '_' + _currentCareer + '_' + _currentLevel;
 
     if (saved._lastCalcKey !== _calcKey) {
       // 月初重置

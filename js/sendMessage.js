@@ -1754,35 +1754,24 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     // Sonnet 兜底已移除：Sonnet 接到调情内容会破防，体验比安全回复更差
     // Grok 失败直接走安全回复，不经过 Sonnet
     hideTyping();
-    // 任何情况下都不静默——已读不回比任何回复都差
-    // 连续安全回复计数：超过2次强制退出调情通道，防止死循环
-    const _safeCount = parseInt(sessionStorage.getItem('intimateSafeReplyCount') || '0') + 1;
-    sessionStorage.setItem('intimateSafeReplyCount', _safeCount);
-    if (_safeCount >= 2) {
-      sessionStorage.removeItem('intimateSafeReplyCount');
-      // 强制退出调情通道：清掉最近几条的_intimate标记
-      chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
-      saveHistory();
-    }
+    // 安全回复时立即退出调情通道，防止下次普通消息继续被误路由
+    sessionStorage.removeItem('intimateSafeReplyCount');
+    chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
     const _safeReplies = ['here.', 'still here.', "i'm here.", 'yeah.', 'go on.'];
     const _safeReply = _safeReplies[Math.floor(Math.random() * _safeReplies.length)];
     appendMessage('bot', _safeReply);
-    chatHistory.push({ role: 'assistant', content: _safeReply, _intimate: true, _time: Date.now() });
+    // 不标记 _intimate，防止污染历史导致下次普通消息继续走调情通道
+    chatHistory.push({ role: 'assistant', content: _safeReply, _time: Date.now() });
     saveHistory();
   } catch(e) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
-    const _safeCount2 = parseInt(sessionStorage.getItem('intimateSafeReplyCount') || '0') + 1;
-    sessionStorage.setItem('intimateSafeReplyCount', _safeCount2);
-    if (_safeCount2 >= 2) {
-      sessionStorage.removeItem('intimateSafeReplyCount');
-      chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
-      saveHistory();
-    }
+    sessionStorage.removeItem('intimateSafeReplyCount');
+    chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
     const _emergencyReplies = ['here.', 'still here.', "i'm here."];
     const _emergencyReply = _emergencyReplies[Math.floor(Math.random() * _emergencyReplies.length)];
     appendMessage('bot', _emergencyReply);
-    chatHistory.push({ role: 'assistant', content: _emergencyReply, _intimate: true, _time: Date.now() });
+    chatHistory.push({ role: 'assistant', content: _emergencyReply, _time: Date.now() });
     saveHistory();
   }
 }

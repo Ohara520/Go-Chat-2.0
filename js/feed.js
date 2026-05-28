@@ -162,13 +162,10 @@ function checkFeedBadge() {
   const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
 
   if (lastViewed === 0) {
-    // 从没看过 → 检查是否真的有帖子，没有就不显示红点
-    if (history.length === 0) {
-      localStorage.removeItem('feedHasNew');
-      badge.style.display = 'none';
-      return;
-    }
-    badge.style.display = 'block';
+    // 从没看过 → 只有 feedHasNew 是本次会话内由 Ghost 发帖触发的才显示
+    // 否则历史帖子不应触发红点（防止换设备/清缓存后假红点）
+    localStorage.removeItem('feedHasNew');
+    badge.style.display = 'none';
     return;
   }
   // 修复：加1秒容错，防止用户刚看完时间戳跟帖子时间完全相同导致假红点

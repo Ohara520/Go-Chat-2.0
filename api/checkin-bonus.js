@@ -13,22 +13,24 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'email and bonus required' });
   }
 
+  const cleanEmail = email.toLowerCase().trim();
+
   try {
     const { data, error } = await supabase
       .from('subscriptions')
       .select('used_count, monthly_quota, status, period_end')
-      .eq('email', email.toLowerCase().trim())
+      .eq('email', cleanEmail)
       .single();
 
     if (error || !data) {
-      // 没有订阅记录 → 往 topup_logs 插一条免费签到奖励
+      // 没有订阅记录 → 插入一条免费记录，给予 bonus 条数作为初始额度
       try {
-        await supabase.from('topup_logs').insert({
-          email: email.toLowerCase().trim(),
-          plan_name: '签到奖励',
-          quota_added: bonus,
-          note: 'checkin_bonus',
-          created_at: new Date().toISOString(),
+        await supabase.from('subscriptions').insert({
+          email: cleanEmail,
+          monthly_quota: bonus,
+          used_count: 0,
+          status: 'free',
+          updated_at: new Date().toISOString(),
         });
         return res.status(200).json({ ok: true, remaining: bonus });
       } catch(e) {
@@ -36,20 +38,17 @@ export default async function handler(req, res) {
       }
     }
 
-    // 注意：不再拦截过期用户，签到奖励对所有有订阅记录的用户都生效
-    // 原因：套餐过期时加条数，用户才有动力续费继续聊
-
-    // 减少 used_count（相当于退还条数），最小为0
-    const newUsed = Math.max(0, data.used_count - bonus);
+    // 直接增加 monthly_quota（总额度），无论 used_count 是多少都能生效
+    const newQuota = data.monthly_quota + bonus;
     await supabase
       .from('subscriptions')
       .update({
-        used_count: newUsed,
+        monthly_quota: newQuota,
         updated_at: new Date().toISOString(),
       })
-      .eq('email', email.toLowerCase().trim());
+      .eq('email', cleanEmail);
 
-    const remaining = data.monthly_quota - newUsed;
+    const remaining = newQuota - data.used_count;
     return res.status(200).json({ ok: true, remaining });
   } catch (err) {
     console.error('Checkin bonus error:', err);

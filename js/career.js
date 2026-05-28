@@ -167,11 +167,14 @@ function chooseCareer(careerType) {
   localStorage.setItem('careerLevel', '1');
   localStorage.setItem('careerStartDate', new Date().toISOString().split('T')[0]);
   localStorage.setItem('careerLastSwitch', Date.now().toString());
+  // 标记本地职业已更新，防止 loadFromCloud 用云端旧值覆盖
+  localStorage.setItem('careerChangedAt', Date.now().toString());
   localStorage.removeItem('careerLastSalaryMonth');
   localStorage.removeItem('streamerTipDate');
   localStorage.removeItem('programmerIncomeDate');
   localStorage.removeItem('writerBonusDate');
 
+  if (typeof touchLocalState === 'function') touchLocalState(); // 立即更新本地时间戳，让 cloudIsNewer 判断正确
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
   return true;

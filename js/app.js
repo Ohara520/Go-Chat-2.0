@@ -224,10 +224,17 @@ window.onload = async function() {
     if (_activeDate) {
       try {
         const _ds = JSON.parse(_activeDate);
-        if (_ds && !_ds.ended && typeof resumeDateScene === 'function') {
+        if (_ds && !_ds.ended) {
           openScreen('mainScreen');
           if (typeof showTabBar === 'function') showTabBar();
-          resumeDateScene();
+          if (typeof resumeDateScene === 'function') {
+            resumeDateScene();
+          } else {
+            // dates.js 可能还没加载完，延迟重试
+            setTimeout(() => {
+              if (typeof resumeDateScene === 'function') resumeDateScene();
+            }, 500);
+          }
         } else {
           openScreen('mainScreen');
           if (typeof showTabBar === 'function') showTabBar();

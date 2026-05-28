@@ -825,14 +825,31 @@ function confirmPurchase() {
   const itemLabel = txLabel + p.name;
   const category = p.isUserItem ? 'self' : 'for_him';
 
-  // 心愿单直接走自己的钱
+  // 心愿单：也提供黑卡选项（机票等大件商品）
   if (isWishlist) {
-    const bal = getBalance();
-    if (bal < total) { showToast('💔 余额不足！'); closeBuyModal(); return; }
-    setBalance(bal - total);
-    addTransaction({ icon: p.emoji, name: itemLabel, amount: -total });
-    renderWallet();
-    _finishPurchase(p, isWishlist, isLuxury, total);
+    if (typeof showCardSelector === 'function') {
+      showCardSelector(total, p.name,
+        () => {
+          const bal = getBalance();
+          if (bal < total) { showToast('💔 余额不足！'); closeBuyModal(); return; }
+          setBalance(bal - total);
+          addTransaction({ icon: p.emoji, name: itemLabel, amount: -total });
+          renderWallet();
+          _finishPurchase(p, isWishlist, isLuxury, total);
+        },
+        () => {
+          if (!spendGhostCard(total, p.name, 'self')) { showToast('💔 Ghost Card 额度不足！'); return; }
+          _finishPurchase(p, isWishlist, isLuxury, total);
+        }
+      );
+    } else {
+      const bal = getBalance();
+      if (bal < total) { showToast('💔 余额不足！'); closeBuyModal(); return; }
+      setBalance(bal - total);
+      addTransaction({ icon: p.emoji, name: itemLabel, amount: -total });
+      renderWallet();
+      _finishPurchase(p, isWishlist, isLuxury, total);
+    }
     return;
   }
 

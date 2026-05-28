@@ -557,7 +557,7 @@ function renderGiftShelf() {
         ${records.map(g => `
           <div class="gwall-item${g.isLuxury ? ' gwall-luxury' : ''}${g.isIntimate ? ' gwall-intimate' : ''}">
             <div class="gwall-item-emoji">${g.emoji}</div>
-            <div class="gwall-item-name">${_esc(g.name)}</div>
+            <div class="gwall-item-name">${_esc(g.name || '神秘礼物')}</div>
             <div class="gwall-item-date">${_formatShortDate(g.timestamp)}</div>
           </div>
         `).join('')}

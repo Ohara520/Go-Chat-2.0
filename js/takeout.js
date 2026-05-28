@@ -767,14 +767,25 @@ async function onGhostReceivedTakeout(order) {
       if (typeof changeAffection === 'function') changeAffection(_affDelta);
       if (typeof changeTrustHeat === 'function') changeTrustHeat(_trustDelta);
 
-      // 写进长期记忆
+      // 写进长期记忆（带时间戳，24小时后自动过期）
       try {
         const _ltm  = localStorage.getItem('longTermMemory') || '';
+        const _now  = Date.now();
+        const _dateStr = new Date(_now).toISOString().split('T')[0];
         const _note = told
-          ? `She ordered takeout for you — 「${order.nameEn || order.name}」. It arrived. You have it. Confirm if she asks.`
-          : `Takeout showed up — 「${order.nameEn || order.name}」. You didn't know she ordered it. You have it now. Confirm if she asks.`;
-        if (!_ltm.includes(order.nameEn || order.name)) {
-          localStorage.setItem('longTermMemory', (_ltm + '\n' + _note).trim().slice(-2000));
+          ? `[${_dateStr}] She ordered takeout for you — 「${order.nameEn || order.name}」. It arrived. You have it. Confirm if she asks.`
+          : `[${_dateStr}] Takeout showed up — 「${order.nameEn || order.name}」. You didn't know she ordered it. You have it now. Confirm if she asks.`;
+        // 清理超过24小时的外卖记录，防止日记/对话一直提到旧外卖
+        const _cutoff = new Date(_now - 24 * 3600 * 1000).toISOString().split('T')[0];
+        const _cleanedLtm = _ltm.split('\n').filter(line => {
+          const _m = line.match(/^\[(\d{4}-\d{2}-\d{2})\]/);
+          if (!_m) return true; // 没有日期标记的行保留
+          const _isTakeoutLine = /takeout|ordered food|ordered you/i.test(line);
+          if (_isTakeoutLine && _m[1] < _cutoff) return false; // 超过24小时的外卖记录删除
+          return true;
+        }).join('\n');
+        if (!_cleanedLtm.includes(order.nameEn || order.name)) {
+          localStorage.setItem('longTermMemory', (_cleanedLtm + '\n' + _note).trim().slice(-2000));
           if (typeof touchLocalState === 'function') touchLocalState();
         }
       } catch(e) {}

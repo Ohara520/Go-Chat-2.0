@@ -86,7 +86,7 @@ async function generateDiaryEntry() {
     const _chatSnippet = _yesterdayMsgs
       .slice(-10)
       .map(m => {
-        const who = m.role === 'user' ? 'her' : 'ghost';
+        const who = m.role === 'user' ? 'SHE SAID' : 'GHOST SAID';
         const text = (typeof m.content === 'string' ? m.content : '').slice(0, 80).replace(/\n/g, ' ');
         return `${who}: ${text}`;
       })
@@ -95,7 +95,7 @@ async function generateDiaryEntry() {
     // 如果昨天没有聊天记录，用 memoryBank 里最相关的几条兜底
     let memoryHint = '';
     if (_chatSnippet) {
-      memoryHint = `What happened yesterday between Ghost and her (their actual conversation):
+      memoryHint = `What happened yesterday between Ghost and her (their actual conversation — "SHE SAID" = her words, "GHOST SAID" = his words):
 ${_chatSnippet}`;
     } else {
       // 没有昨天的记录——从 memoryBank 拿几条关于她的背景
@@ -155,7 +155,7 @@ Day: ${yesterdayWeekday}
 ${moodHint}
 ${_sideWorld}
 
-${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — draw from this, but write it as Ghost\'s experience, not a transcript. Pick 1-2 moments that stuck. Don\'t quote directly.' : 'Background about her — use at most one detail, naturally:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
+${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — draw from this, but write it as Ghost\'s experience, not a transcript. Pick 1-2 moments that stuck. Don\'t quote directly.\nCRITICAL: "SHE SAID" lines are HER words. "GHOST SAID" lines are HIS words. Do NOT mix them up. If she said something, it is her action. If he said something, it is his action.' : 'Background about her — use at most one detail, naturally:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
 Strict rules:
 - 3-5 lines. Lowercase. Short sentences.
 - Split the entry between TWO things: (1) what happened on his side yesterday — training, teammates, food, something observed at base — and (2) one moment involving her, drawn from the conversation context.

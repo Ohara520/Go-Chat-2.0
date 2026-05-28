@@ -81,7 +81,7 @@ const CHARACTER_KEYS = [
   'ghostUnlocked_blood_type', 'ghostUnlocked_hometown',
   // 朋友圈 / 商城
   'coupleFeedHistory', 'coupleFeedDate', 'lastFeedPostAt',
-  'feedHasNew', 'organicFeedCount',
+  'organicFeedCount',
   'marketTriggered', 'purchasedItems', 'purchaseCounts',
   'intimateTriggered',
   // 心声
