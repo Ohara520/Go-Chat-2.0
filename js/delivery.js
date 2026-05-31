@@ -571,8 +571,13 @@ One or two lines. English only. Lowercase. No sweet talk. But not hollow either.
       } catch(e) {}
     }, replyDelay);
 
-    // 好感度
-    if (!pd.isLuxury) changeAffection(pd.price > 500 ? 2 : 1);
+    // 好感度 + 礼物记录（普通商品）
+    if (!pd.isLuxury) {
+      changeAffection(pd.price > 500 ? 2 : 1);
+      if (typeof feedEvent_boughtBigItem === 'function') {
+        feedEvent_boughtBigItem(delivery.name, pd.price || 0, false);
+      }
+    }
 
     // 奢侈品：第二条用 Sonnet，5秒后
     if (pd.isLuxury) {
@@ -722,6 +727,18 @@ English only. Lowercase. One line.]`
     fromCity:  localStorage.getItem('currentLocation') || 'UK',
     ghostLine,
   });
+
+  // 在聊天里发一条主动消息（如果当前在聊天页面）
+  const _chatContainer = document.getElementById('messagesContainer');
+  if (_chatContainer && ghostLine && typeof appendMessage === 'function') {
+    setTimeout(() => {
+      appendMessage('bot', ghostLine);
+      if (typeof chatHistory !== 'undefined') {
+        chatHistory.push({ role: 'assistant', content: ghostLine, _delivery: true });
+        if (typeof _safeDeliverySaveHistory === 'function') _safeDeliverySaveHistory();
+      }
+    }, 2000);
+  }
 
   showToast('📦 有来自 Ghost 的包裹！去商城查看');
 

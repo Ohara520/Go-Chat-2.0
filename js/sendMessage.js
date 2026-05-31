@@ -1283,9 +1283,56 @@ async function _processMergedMessage(text) {
     // ── Step 5: 文本清理 ───────────────────────────────────
     reply = reply.replace(/\s*—\s*/g, '\n').trim();
 
+    // 清理已知的模型坏习惯
+    reply = reply
+      // "my turn now" / "your turn" 结尾
+      .replace(/\.\s*(my turn now|your turn now|now it's my turn|now your turn)[.!]?\s*$/i, '.')
+      .replace(/\n(my turn now|your turn now|now it's my turn|now your turn)[.!]?\s*$/i, '')
+      // "smiling like an idiot" / "grinning here" 等
+      .replace(/[,.]?\s*(smiling like an idiot|grinning like an idiot|grinning here|smiling here|grinning to myself|smiling to myself)[.!]?\s*/gi, ' ')
+      // "damn" 作为开头词（调情路由到Grok，但Sonnet偶尔也会）
+      .replace(/^damn[.,]?\s*/i, '')
+      .trim();
+
     // ── Step 6: 渲染消息 ─────────────────────────────────────
     // 兜底清理 markdown 代码块标记
     reply = reply.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+    // 填充词检测：当前这条回复本身就是填充词，直接重试
+    const _fillerSet = ['yeah', "i'm here", 'go on', 'still here', 'mm', 'mhm', 'okay', 'ok'];
+    const _replyTrimmed = reply.toLowerCase().trim().replace(/[.,!?]+$/, '');
+    if (_fillerSet.includes(_replyTrimmed)) {
+      try {
+        const _fillerRetry = await callHaiku(
+          (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore()) +
+          '\n[FILLER DETECTED: Your reply was just a filler word. That is not a real response. You MUST say something real — react to what she actually said, ask something, or say what you are thinking. Do NOT output a single filler word.]',
+          [...cleanHistory.slice(-6), { role: 'user', content: reply }],
+          150
+        );
+        if (_fillerRetry && !isBreakout(_fillerRetry)) {
+          const _fr = _fillerRetry.trim().toLowerCase().replace(/[.,!?]+$/, '');
+          if (!_fillerSet.includes(_fr)) reply = _fillerRetry.trim();
+        }
+      } catch(e) {}
+    }
+
+    // 逐字重复检测：如果回复跟最近3条bot消息完全一样，触发重试
+    const _recentBotForDup = chatHistory.filter(m => m.role === 'assistant' && !m._system && !m._recalled).slice(-3).map(m => (m.content || '').trim().toLowerCase());
+    const _replyLower = reply.toLowerCase().trim();
+    if (_replyLower.length > 10 && _recentBotForDup.some(prev => prev === _replyLower)) {
+      // 完全重复 → 用 Haiku 重试一次
+      try {
+        const _dedupRetry = await callHaiku(
+          (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n[CRITICAL: Your last reply was an exact repeat of a previous message. You MUST say something completely different. Different words, different angle, different tone. Do not repeat yourself.]',
+          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond differently.' }],
+          150
+        );
+        if (_dedupRetry && !isBreakout(_dedupRetry) && _dedupRetry.trim().toLowerCase() !== _replyLower) {
+          reply = _dedupRetry.trim();
+        }
+      } catch(e) {}
+    }
+
     const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2);
     if (finalParts.length === 0) finalParts.push('...');
 
@@ -1528,6 +1575,13 @@ function _detectRepetitivePattern(history) {
   const botMsgs = history.filter(m => m.role === 'assistant' && !m._system && !m._recalled).slice(-6).map(m => (m.content || '').trim().toLowerCase());
   if (botMsgs.length < 2) return '';
 
+  // ── 0. 填充词检测（yeah/go on/I'm here 连续出现）──
+  const _fillerPhrases = ['yeah', "i'm here", 'go on', 'still here', 'mm', 'mhm', 'okay', 'ok'];
+  const _recentFiller = botMsgs.slice(-3).filter(m => _fillerPhrases.some(f => m.trim() === f || m.trim() === f + '.' || m.trim() === f + ','));
+  if (_recentFiller.length >= 2) {
+    return `[FILLER LOOP DETECTED] Your last replies were short filler ("yeah", "go on", "I'm here", etc.) — you are not actually engaging. This reply MUST respond to the actual content of what she said. Say something real. Ask something. React to a specific detail. Do NOT use filler words as a standalone reply.]`;
+  }
+
   // ── 1. 开头词重复（检查最近6条，超过半数同开头就报警）──
   const openings = botMsgs.map(t => t.split(/[\s.,!?]+/).slice(0, 3).join(' '));
   const openingCounts = {};
@@ -1684,7 +1738,11 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
         .replace(/^quiet\.\s*\n?/i, '')
         .replace(/^screen'?s?\s*(quiet|dark|low|still|says|glowing|down|at)[^.]*\.?\s*\n?/i, '')
         .replace(/^yeah[.,]?\s*\n?/i, '')
+        .replace(/^damn[.,]?\s*/i, '')  // 不让"damn"当开头词
         .replace(/^,\s*/i, '')
+        // 清理坏习惯短语
+        .replace(/[,.]?\s*(smiling like an idiot|grinning like an idiot|grinning here|smiling here|grinning to myself|smiling to myself)[.!]?\s*/gi, ' ')
+        .replace(/\.\s*(my turn now|your turn now|now it's my turn)[.!]?\s*$/i, '.')
         .trim();
 
       // 强制截断：最多3行（Grok 经常无视 max_tokens）
@@ -1751,27 +1809,22 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       }
     }
 
-    // Sonnet 兜底已移除：Sonnet 接到调情内容会破防，体验比安全回复更差
-    // Grok 失败直接走安全回复，不经过 Sonnet
+    // Grok 失败 → 提示网络问题，让用户重发
+    // 不走 Haiku/Sonnet 兜底——调情内容给它们会破防
     hideTyping();
-    // 安全回复时立即退出调情通道，防止下次普通消息继续被误路由
     sessionStorage.removeItem('intimateSafeReplyCount');
+    // 清除 _intimate 标记，防止下条消息继续被误路由到 Grok
     chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
-    const _safeReplies = ['here.', 'still here.', "i'm here.", 'yeah.', 'go on.'];
-    const _safeReply = _safeReplies[Math.floor(Math.random() * _safeReplies.length)];
-    appendMessage('bot', _safeReply);
-    // 不标记 _intimate，防止污染历史导致下次普通消息继续走调情通道
-    chatHistory.push({ role: 'assistant', content: _safeReply, _time: Date.now() });
+    appendMessage('bot', '网络波动，没收到，再发一次？');
+    chatHistory.push({ role: 'assistant', content: '网络波动，没收到，再发一次？', _time: Date.now() });
     saveHistory();
   } catch(e) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
     sessionStorage.removeItem('intimateSafeReplyCount');
     chatHistory.slice(-4).forEach(m => { if (m.role === 'assistant') delete m._intimate; });
-    const _emergencyReplies = ['here.', 'still here.', "i'm here."];
-    const _emergencyReply = _emergencyReplies[Math.floor(Math.random() * _emergencyReplies.length)];
-    appendMessage('bot', _emergencyReply);
-    chatHistory.push({ role: 'assistant', content: _emergencyReply, _time: Date.now() });
+    appendMessage('bot', '网络波动，没收到，再发一次？');
+    chatHistory.push({ role: 'assistant', content: '网络波动，没收到，再发一次？', _time: Date.now() });
     saveHistory();
   }
 }

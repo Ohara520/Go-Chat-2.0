@@ -119,8 +119,12 @@ async function loadFromCloud() {
         setIfMissing('careerStartDate', p.careerStartDate);
         setIfMissing('careerLastSalaryMonth', p.careerLastSalaryMonth);
       }
-      // Ghost日记
-      setIfMissing('ghostDiary', p.ghostDiary);
+      // Ghost日记：本地是空数组[]时也要从云端恢复
+      const _localDiary = localStorage.getItem('ghostDiary');
+      const _localDiaryEmpty = !_localDiary || _localDiary === '[]';
+      if (p.ghostDiary && (_localDiaryEmpty || !_localDiary)) {
+        localStorage.setItem('ghostDiary', typeof p.ghostDiary === 'string' ? p.ghostDiary : JSON.stringify(p.ghostDiary));
+      }
       // 用户设置：云端更新才覆盖；本地没有时也恢复（换设备场景）
       const setIfNewerOrMissing = (key, val) => {
         if (val == null || val === '') return;
@@ -346,7 +350,12 @@ async function loadFromCloud() {
 
       // 动态状态：云端更新才覆盖
       if (cloudIsNewer) {
-        if (s.trustHeat != null) localStorage.setItem('trustHeat', s.trustHeat);
+        // trustHeat 只取较大值，防止云端旧快照把本地积累的信任值覆盖掉
+        if (s.trustHeat != null) {
+          const _localTrust = parseInt(localStorage.getItem('trustHeat') || '0');
+          const _cloudTrust = parseInt(s.trustHeat);
+          localStorage.setItem('trustHeat', Math.max(_localTrust, _cloudTrust));
+        }
         if (s.attachmentPull != null) localStorage.setItem('attachmentPull', s.attachmentPull);
         if (s.jealousyLevel != null) localStorage.setItem('jealousyLevel', s.jealousyLevel);
         if (s.globalTurnCount != null) { _globalTurnCount = s.globalTurnCount; localStorage.setItem('globalTurnCount', s.globalTurnCount); }

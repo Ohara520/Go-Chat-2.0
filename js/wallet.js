@@ -66,6 +66,46 @@ function initWallet() {
       localStorage.setItem('relationshipUnlocked', 'true');
     }
   }
+  // v2：修复 v1 时 affection 不足60但现在已达到的用户
+  if (!localStorage.getItem('marriageTypeUpgrade_v2')) {
+    localStorage.setItem('marriageTypeUpgrade_v2', '1');
+    const _curType2 = localStorage.getItem('marriageType');
+    const _aff2 = parseInt(localStorage.getItem('affection') || '0');
+    if (_curType2 === 'slowBurn' && _aff2 >= 60) {
+      localStorage.setItem('marriageType', 'established');
+      localStorage.setItem('relationshipUnlocked', 'true');
+    }
+  }
+
+  // 安全网：所有补偿标记都已设置，但余额仍为0，说明数据被意外清空
+  // 把已发放的补偿金额写入 walletBaseBalance，防止用户钱包永远显示零
+  if (!localStorage.getItem('walletZeroFix_v1')) {
+    localStorage.setItem('walletZeroFix_v1', '1');
+    const _curBal = getBalance();
+    if (_curBal === 0) {
+      // 计算应有的最低基础余额（已发放的补偿之和）
+      let _minBase = 0;
+      if (localStorage.getItem('weddingGift_v1'))           _minBase += 200;
+      if (localStorage.getItem('maintenanceComp_20260409')) _minBase += 200;
+      if (localStorage.getItem('bugComp_20260516'))         _minBase += 888;
+      if (_minBase > 0) {
+        localStorage.setItem('walletBaseBalance', _minBase.toFixed(2));
+      }
+    }
+  }
+
+  // 老用户 trust 被云端快照覆盖修复：聊了很久但 trustHeat 被重置到低值
+  // 判断依据：有签到记录或聊天记录，说明是老用户，trust 不应该低于82
+  if (!localStorage.getItem('trustHeatFix_v1')) {
+    localStorage.setItem('trustHeatFix_v1', '1');
+    const _trust = parseInt(localStorage.getItem('trustHeat') || '0');
+    const _turns = parseInt(localStorage.getItem('globalTurnCount') || '0');
+    const _hasHistory = (JSON.parse(localStorage.getItem('chatHistory') || '[]')).length > 20;
+    // 聊超过50轮或有大量历史记录，认为是老用户，trust 至少应该到82
+    if ((_turns > 50 || _hasHistory) && _trust < 82) {
+      localStorage.setItem('trustHeat', '82');
+    }
+  }
 }
 
 function getBalance() {

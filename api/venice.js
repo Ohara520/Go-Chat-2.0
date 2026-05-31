@@ -1,13 +1,7 @@
 import OpenAI from 'openai';
 
-// 同 chat.js 的节点列表（OpenAI 兼容路径加 /v1）
 const BASE_URLS = [
   'https://api.yunjintao.com/v1',
-  'http://43.99.79.59:8001/v1',
-  'http://47.243.4.252:8001/v1',
-  'http://43.99.4.123:8001/v1',
-  'http://47.77.225.196:8001/v1',
-  'http://8.222.174.125:8001/v1',
 ];
 
 const PER_NODE_TIMEOUT_MS = 8000;

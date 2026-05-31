@@ -420,7 +420,7 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }, 22000);  // 延长超时：Grok响应慢，12s经常silent fail
+    }, 50000);  // 50s：给后端轮完6个节点（6×8s=48s）留足时间
     if (!res.ok) return '';
     const data = await res.json();
     if (_isApiErrorBody(data)) {
@@ -576,7 +576,7 @@ async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateM
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }, 22000);
+    }, 50000);  // 50s：给后端轮完6个节点（6×8s=48s）留足时间
     if (!res.ok) return '';
     const data = await res.json();
     if (_isApiErrorBody(data)) {
