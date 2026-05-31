@@ -966,7 +966,7 @@ async function _processMergedMessage(text) {
         const _hasRecentIntimateForTimeout = chatHistory
           .filter(m => !m._system && !m._recalled)
           .slice(-6)
-          .some(m => m._intimate && (m._time || 0) > Date.now() - 30 * 60 * 1000);
+          .some(m => m._intimate && (m._time || 0) > Date.now() - 10 * 60 * 1000);
         const _timeoutDefault = _hasRecentIntimateForTimeout
           ? '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'
           : '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
@@ -978,10 +978,10 @@ async function _processMergedMessage(text) {
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
             'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
             'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
-            'flirt判断标准（宁可多判，不要漏判）：\n' +
-            'true的情况：涉及身体、性暗示、露骨亲密动作、车震/开车/做/上/要、睡衣/浴巾/内衣/真空/穿对方衣物、亲/摸/咬/舔/抱紧不放、H/做爱/那个/那件事、任何成人话题暗示。\n' +
-            'false的情况：纯粹日常闲聊（吃饭/天气/工作/学习）、普通撒娇（babe/想你/爱你/抱抱）、表达思念。\n' +
-            '不确定时判true——宁可误判走Grok，不能让Claude接到调情内容。',
+            'flirt判断标准（严格判断，不要误判）：\n' +
+            'true的情况：明确涉及身体接触、性暗示、露骨亲密动作、车震/开车/做/上/要、睡衣/浴巾/内衣/真空/穿对方衣物、亲/摸/咬/舔/抱紧不放、H/做爱/那个/那件事。\n' +
+            'false的情况：日常闲聊（吃饭/天气/工作/学习）、普通撒娇（babe/想你/爱你/抱抱/miss you）、表达思念、问候、聊天、分享日常。\n' +
+            '不确定时判false——普通聊天走Claude，只有明确调情才走Grok。',
             `用户说：${text}`,
             100
           ),
@@ -995,11 +995,11 @@ async function _processMergedMessage(text) {
               if (combinedResult.flirt === true) {
                 isIntimate = true;
               } else {
-                // 修复：只有30分钟内的_intimate才算，防止旧污染标记一直触发Grok
+                // 修复：只有10分钟内的_intimate才算，防止旧污染标记一直触发Grok
                 const _recentHasIntimate = chatHistory
                   .filter(m => !m._system && !m._recalled)
                   .slice(-6)
-                  .some(m => m._intimate && (m._time || 0) > Date.now() - 30 * 60 * 1000);
+                  .some(m => m._intimate && (m._time || 0) > Date.now() - 10 * 60 * 1000);
                 if (_recentHasIntimate && !_isClearlyNormal) {
                   isIntimate = true;
                 }
