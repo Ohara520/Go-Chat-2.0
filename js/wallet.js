@@ -77,6 +77,22 @@ function initWallet() {
     }
   }
 
+  // 余额漂移误删补偿：balanceDriftFixed_20260523 把合法余额误删了
+  // 受影响用户：本地余额比云端高500+，被清理后余额暴跌
+  // 补偿：确保余额不低于已发放补偿之和（1288）
+  if (!localStorage.getItem('driftVictimComp_v1')) {
+    localStorage.setItem('driftVictimComp_v1', '1');
+    const _curBal = getBalance();
+    let _minExpected = 0;
+    if (localStorage.getItem('weddingGift_v1'))           _minExpected += 200;
+    if (localStorage.getItem('maintenanceComp_20260409')) _minExpected += 200;
+    if (localStorage.getItem('bugComp_20260516'))         _minExpected += 888;
+    if (_minExpected > 0 && _curBal < _minExpected) {
+      const _diff = _minExpected - _curBal;
+      addTransaction({ icon: '💰', name: '余额异常补偿', amount: Math.ceil(_diff) });
+    }
+  }
+
   // 安全网：所有补偿标记都已设置，但余额仍为0，说明数据被意外清空
   // 把已发放的补偿金额写入 walletBaseBalance，防止用户钱包永远显示零
   if (!localStorage.getItem('walletZeroFix_v1')) {
@@ -162,8 +178,8 @@ function addTransaction(tx) {
   localStorage.setItem('transactions', JSON.stringify(list));
   // 超过50条时自动压缩，防止无限增长
   _compactTransactions();
-  // 交易数据已写入 localStorage，走防抖统一存云端，不再每笔都直连数据库
-  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  // 交易数据写入后立即触发紧急保存（2秒防抖），防止关页面前没存上云端
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
 }
 
 function formatTxTime(timeStr) {

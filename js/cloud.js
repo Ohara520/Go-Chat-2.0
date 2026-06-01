@@ -512,35 +512,13 @@ async function loadFromCloud() {
         }
       }
 
-      // ── 余额漂移修正（在 transactions 合并之后执行）──────────
-      // 更新标记日期，让之前打过旧标记的用户也能重新跑一次
+      // ── 余额漂移修正已禁用 ──────────────────────────────────
+      // 原逻辑用云端旧快照作为"正确值"，导致本地积累的合法余额被误删
+      // 例：用户本地3000+，云端快照几百 → 差值>500 → 清理transactions → 余额暴跌
+      // 直接禁用，不再执行任何余额修正
       if (!localStorage.getItem('balanceDriftFixed_20260523')) {
         localStorage.setItem('balanceDriftFixed_20260523', '1');
-        const _cloudBase = parseFloat(s.walletBaseBalance || '0');
-        const _cloudTxSum = (s.transactions || [])
-          .filter(t => !t.ghostCard)
-          .reduce((sum, t) => sum + (t.amount || 0), 0);
-        const _correctBalance = _cloudBase + _cloudTxSum;
-        // 合并后重新读取本地余额
-        const _localBase2 = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
-        const _localTxSum2 = JSON.parse(localStorage.getItem('transactions') || '[]')
-          .filter(t => !t.ghostCard)
-          .reduce((sum, t) => sum + (t.amount || 0), 0);
-        const _currentBalance2 = _localBase2 + _localTxSum2;
-        // 只修正明显虚高（超出云端正确值500以上），且不能把余额降到低于云端正确值
-        // 不再强制重置为云端旧值，防止把本地新收入（工资/签到）也一起抹掉
-        if (_currentBalance2 - _correctBalance > 500 && _correctBalance > 0) {
-          console.warn('[cloud] 余额异常修正:', _currentBalance2, '→', _correctBalance);
-          // 只清理云端没有的重复transactions，不动walletBaseBalance
-          if (Array.isArray(s.transactions) && s.transactions.length > 0) {
-            const _cloudIds = new Set(s.transactions.filter(t => t.id).map(t => t.id));
-            const _localTx = JSON.parse(localStorage.getItem('transactions') || '[]');
-            // 保留：云端有的 + 本地有id但云端没有的（可能是新产生的合法交易）
-            // 只删除：没有id的重复条目（这些是被bug重复插入的）
-            const _cleanedTx = _localTx.filter(t => t.id);
-            localStorage.setItem('transactions', JSON.stringify(_cleanedTx));
-          }
-        }
+        // 不做任何操作，只打标记防止旧版本重新触发
       }
 
       // 进行中的约会 session：云端有且本地没有才恢复（防止覆盖本地更新的进度）
