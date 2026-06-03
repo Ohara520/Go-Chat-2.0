@@ -249,7 +249,7 @@ async function switchCharacter(newCharId) {
   // 解锁：切换完成，允许自动保存
   window._characterSwitching = false;
 
-  // 9. 同步云端
+  // 10. 同步云端
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
 
   console.log(`[character] 切换完成: ${currentCharId} → ${newCharId}`);

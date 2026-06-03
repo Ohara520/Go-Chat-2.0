@@ -20,11 +20,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { model, max_tokens, system, messages } = req.body || {};
+    const { model, max_tokens, system, messages, timeout_ms } = req.body || {};
 
     if (!model || !messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Invalid request' });
     }
+
+    // 看图(vision)请求体积大、耗时长，允许调用方按需调高超时（钳制在 8s~25s）。
+    // 普通文字聊天不传 timeout_ms，仍走默认 8s 快速切换。
+    const perNodeTimeout = (typeof timeout_ms === 'number')
+      ? Math.max(PER_NODE_TIMEOUT_MS, Math.min(timeout_ms, 25000))
+      : PER_NODE_TIMEOUT_MS;
 
     let lastErr = null;
     let lastStatus = null;
@@ -34,7 +40,7 @@ export default async function handler(req, res) {
         const client = new Anthropic({
           apiKey: process.env.ANTHROPIC_API_KEY,
           baseURL,
-          timeout: PER_NODE_TIMEOUT_MS,
+          timeout: perNodeTimeout,
           maxRetries: 0, // SDK 自带重试关掉，避免叠加延迟
         });
 

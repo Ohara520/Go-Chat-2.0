@@ -244,7 +244,10 @@ function initLocation() {
     localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
   } else {
     // 真正到了换地点时间 → 随机新地点
-    const roll = Math.random() * 100;
+    // 按实际权重总和掷骰（旧版硬编码 *100 但权重和为 80，
+    // 导致约 20% 的 roll 落空、回退到 LOCATIONS[0]，Hereford 被超额选中）
+    const totalWeight = LOCATIONS.reduce((s, l) => s + (l.weight || 0), 0);
+    const roll = Math.random() * totalWeight;
     let cumulative = 0;
     chosen = LOCATIONS[0];
     for (const loc of LOCATIONS) {
@@ -355,11 +358,15 @@ async function loadMyInviteCode() {
   }
 }
 
-function copyInviteCode() {
-  const code = document.getElementById('myInviteCode')?.textContent || '';
-  if (!code || code === '加载中…' || code === '暂无邀请码') return;
+// 复制邀请码：传 code 则复制该码（邀请列表里的复制按钮），
+// 不传则回退读 #myInviteCode（我的邀请码区块）
+function copyInviteCode(code) {
+  if (!code) {
+    code = document.getElementById('myInviteCode')?.textContent || '';
+    if (!code || code === '加载中…' || code === '暂无邀请码') return;
+  }
   navigator.clipboard.writeText(code).then(() => {
-    showToast('邀请码已复制 ✅');
+    if (typeof showToast === 'function') showToast('邀请码已复制 ✅');
   }).catch(() => {
     // 兜底方案
     const ta = document.createElement('textarea');
@@ -368,7 +375,7 @@ function copyInviteCode() {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    showToast('邀请码已复制 ✅');
+    if (typeof showToast === 'function') showToast('邀请码已复制 ✅');
   });
 }
 
@@ -480,7 +487,10 @@ function saveSecret(key, value) {
   if (key === 'userBirthday') {
     const match = val.match(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
     if (val && !match) { showToast('生日格式不对，请输入 MM-DD，例如 03-15'); return; }
+    // 修复：先存值再渲染日历，否则日历读到的是旧生日
+    localStorage.setItem(key, val);
     updateCalendarAfterBirthday();
+    return;
   }
   localStorage.setItem(key, val);
 }
@@ -603,20 +613,6 @@ async function loadMyInviteCodes() {
   } catch(e) {
     container.innerHTML = '<div style="font-size:12px;color:#9aba88;">加载失败，请稍后重试</div>';
   }
-}
-
-function copyInviteCode(code) {
-  navigator.clipboard.writeText(code).then(() => {
-    if (typeof showToast === 'function') showToast('邀请码已复制 🔗');
-  }).catch(() => {
-    const el = document.createElement('textarea');
-    el.value = code;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-    if (typeof showToast === 'function') showToast('邀请码已复制 🔗');
-  });
 }
 
 function selectZodiac(label, el) {

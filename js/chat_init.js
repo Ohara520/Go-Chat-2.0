@@ -451,20 +451,18 @@ function refreshChatScreen() {
     return;
   }
 
-  // 只追加新消息，不重渲整个列表（防止闪屏）
-  const realMsgs = chatHistory.filter(m => !m._system && !m._recalled);
-  const newCount = realMsgs.length;
-  if (newCount > _renderedMsgCount) {
-    const newMsgs = realMsgs.slice(_renderedMsgCount);
-    newMsgs.forEach(msg => {
-      if (msg.role === 'user') {
-        appendMessage('user', msg.content, false);
-      } else if (msg.role === 'assistant' && !msg._recalled) {
-        const parts = msg.content.split(/\n---\n/).filter(p => p.trim());
-        parts.forEach(p => appendMessage('bot', p.trim(), false));
-      }
-    });
-    _renderedMsgCount = newCount;
+  // 修复 #3 重复回复：增量追加依赖 _renderedMsgCount，但实时发送
+  // （sendMessage / 事件 / 快递等）push 进 chatHistory 时不会更新这个计数，
+  // 导致回到聊天页时把已渲染过的消息当成"新消息"再追加一遍，且按 \n---\n
+  // 拆段造成整条/部分重复。改为整列表幂等重渲（与 initChat 一致），
+  // renderChatHistory 会先清空容器再重建，天然不会重复，并且能正确还原
+  // 表情包/图片/转账卡片（增量路径会丢这些）。
+  const realCount = chatHistory.filter(m => !m._system && !m._recalled).length;
+  if (realCount !== _renderedMsgCount) {
+    if (typeof renderChatHistory === 'function') {
+      renderChatHistory(chatHistory);
+    }
+    _renderedMsgCount = realCount;
     scrollToBottom();
   }
 

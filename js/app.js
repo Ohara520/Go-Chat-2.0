@@ -66,7 +66,14 @@ function openScreen(id) {
     }
     if (id === 'walletScreen'   && typeof renderWallet      === 'function') renderWallet();
     if (id === 'careerScreen'     && typeof updateWorkUI      === 'function') updateWorkUI();
-    if (id === 'diaryScreen'       && typeof renderVocabScreen    === 'function') renderVocabScreen();
+    // 修复(#25)：原来这里把 diaryScreen 派发给已删除的 renderVocabScreen，
+    // 它会去操作不存在的 vocab DOM 抛错，导致 openScreen 整个中断——卡片的
+    // onclick 里 openScreen() 之后的 setTimeout(生成+渲染) 永远不注册，
+    // 于是所有人日记都是空白、从不生成。改成直接驱动日记生成与渲染。
+    if (id === 'diaryScreen') {
+      if (typeof generateDiaryEntry === 'function') { Promise.resolve(generateDiaryEntry()).then(() => { if (typeof renderDiary === 'function') renderDiary(); }).catch(() => { if (typeof renderDiary === 'function') renderDiary(); }); }
+      else if (typeof renderDiary === 'function') renderDiary();
+    }
     if (id === 'collectionScreen'  && typeof renderCollectionScreen === 'function') renderCollectionScreen();
     if (id === 'calendarScreen'     && typeof initCalendar           === 'function') initCalendar();
     if (id === 'secretScreen'       && typeof loadSecretScreen        === 'function') loadSecretScreen();

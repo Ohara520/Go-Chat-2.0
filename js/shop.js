@@ -893,7 +893,12 @@ function _finishPurchase(p, isWishlist, isLuxury, total) {
     setTimeout(() => showToast('✈️ 三件套集齐了！见面模式已解锁'), 1500);
   }
 
-  clearProductTrigger(p.name);
+  // 修复(#24)：clearProductTrigger 定义在 triggers.js，是这里唯一没加 typeof 守卫的
+  // 外部调用。一旦它抛错，_finishPurchase 会在 addDelivery 之前中断——钱已扣，
+  // 但快递对象从没创建，于是"正在邮寄/礼物架/丢件投诉"三处都查无此包裹（礼物消失）。
+  if (typeof clearProductTrigger === 'function') {
+    try { clearProductTrigger(p.name); } catch(e) { console.warn('[shop] clearProductTrigger 失败:', e); }
+  }
   if (pendingCategory === 'intimate') {
     const _iT = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
     delete _iT[p.name]; localStorage.setItem('intimateTriggered', JSON.stringify(_iT));

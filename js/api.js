@@ -6,8 +6,8 @@
 // ============================================================
 
 // ===== 模型常量 =====
-const MODEL_OPUS   = 'claude-sonnet-4-5-20250929';   // 主聊天
-const MODEL_SONNET = 'claude-sonnet-4-5-20250929';   // 心声/快递/外卖等
+const MODEL_OPUS   = 'claude-sonnet-4-6';            // 主聊天（4.5→4.6）
+const MODEL_SONNET = 'claude-sonnet-4-6';            // 心声/快递/外卖等（4.5→4.6）
 const MODEL_HAIKU  = 'claude-haiku-4-5-20251001';
 
 function getMainModel() {

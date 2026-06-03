@@ -398,8 +398,21 @@ English only. No translation. No AVATAR_SET tag.]`;
     console.log('[photo] 发给模型的图片数量:', imageContents.length, '第一张base64长度:', base64List[0]?.length);
 
     const lastUserText = cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.';
+    // 修复(#20)：构造合法的对话数组。
+    // 旧代码 `.slice(0, -1)` 会连真正的上一条用户消息也删掉，且数组可能以
+    // assistant 开头 → Anthropic 报 400 → 主模型直接失败掉进 'noted.' 兜底。
+    // 这里：去掉占位的 [用户发了…] 行，再裁掉开头的 assistant 直到以 user 开头。
+    function _buildPhotoHistory() {
+      let arr = cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了'));
+      // 去掉末尾那条占位用户消息（图片本身用下面的多模态块表达）
+      if (arr.length && arr[arr.length - 1].role === 'user') arr = arr.slice(0, -1);
+      // Anthropic 要求 messages[0] 必须是 user
+      while (arr.length && arr[0].role === 'assistant') arr = arr.slice(1);
+      return arr;
+    }
+    const _photoHistory = _buildPhotoHistory();
     const msgsWithPhoto = [
-      ...cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了')).slice(0, -1),
+      ..._photoHistory,
       {
         role: 'user',
         content: [...imageContents, { type: 'text', text: lastUserText }]
@@ -416,16 +429,11 @@ English only. No translation. No AVATAR_SET tag.]`;
         body: JSON.stringify({
           model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
           max_tokens: 300,
+          timeout_ms: 22000, // 看图比纯文字慢，给后端节点更长超时
           system: _sys + '\n' + photoHint,
-          messages: [
-            ...cleanMsgs.filter(m => m.content && !m.content.includes('[用户发了')).slice(0, -1),
-            {
-              role: 'user',
-              content: [...imageContents, { type: 'text', text: cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || '.' }]
-            }
-          ]
+          messages: msgsWithPhoto
         })
-      }, 30000);
+      }, 24000);
       if (sRes.ok) {
         const sData = await sRes.json();
         const text = sData.content?.[0]?.text?.trim() || '';
@@ -465,11 +473,16 @@ English only. No translation. No AVATAR_SET tag.]`;
       }
     }
 
-    if (!reply) reply = 'noted.';
+    // 修复(#20)：两个模型都失败时，旧代码硬塞 'noted.'，读起来像敷衍/冷淡。
+    // 改成几句符合 Ghost(丈夫)语气的兜底，随机挑一句，至少不出戏。
+    if (!reply) {
+      const _fallbacks = ["look at you.", "noted — and saved.", "yeah? show me again later.", "mm. keeping that one."];
+      reply = _fallbacks[Math.floor(Math.random() * _fallbacks.length)];
+    }
 
     // AVATAR_SET 已废弃，头像只由用户明确命令触发
     reply = reply.replace(/\n?AVATAR_SET\n?/gi, '').trim();
-    if (!reply) reply = 'noted.';
+    if (!reply) reply = "look at you.";
 
     if (typeof hideTyping === 'function') hideTyping();
 
@@ -483,7 +496,7 @@ English only. No translation. No AVATAR_SET tag.]`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-5-20250929',
+          model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
           max_tokens: 100,
           system: 'Describe the image in 1-2 sentences. Specific details: colors, objects, people, mood. English only. Start with "She sent a photo of".',
           messages: [{

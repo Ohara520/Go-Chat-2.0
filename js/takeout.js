@@ -709,7 +709,7 @@ function checkTakeoutUpdates() {
 // Ghost 收到外卖
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-async function onGhostReceivedTakeout(order) {
+async function onGhostReceivedTakeout(order, force = false) {
   if (typeof showToast === 'function') showToast(`✅ ${order.emoji} ${order.name} 已送到 Ghost！`);
 
   // ── 外卖台词防重复池 ────────────────────────────────────
@@ -791,8 +791,11 @@ async function onGhostReceivedTakeout(order) {
       } catch(e) {}
 
       // Ghost 用 S 说一句反应（调情中存 pending 不打断）
-      const _isFlirting = sessionStorage.getItem('loveOverride') === 'true'
-        || (chatHistory || []).slice(-4).some(m => m._intimate);
+      // 修复(#23)：从 pendingTakeoutReactions 回放时 force=true，绕过调情判断，
+      // 否则 checkPendingTakeoutReactions 又调本函数、又因 _isFlirting 为 true 重新
+      // 存回 pending，无限推迟，签收回复永远不出现（外卖显示签收但聊天没反应）。
+      const _isFlirting = !force && (sessionStorage.getItem('loveOverride') === 'true'
+        || (chatHistory || []).slice(-4).some(m => m._intimate));
       if (_isFlirting) {
         const _pt = JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]');
         _pt.push({ order, savedAt: Date.now() });
@@ -826,7 +829,7 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+                model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
                 max_tokens: 100,
                 system: _takeoutSystem,
                 messages: [
@@ -994,7 +997,7 @@ function checkPendingTakeoutReactions() {
     if (!pending.length) return;
     localStorage.removeItem('pendingTakeoutReactions');
     pending.forEach((item, idx) => {
-      setTimeout(() => onGhostReceivedTakeout(item.order), idx * 4000);
+      setTimeout(() => onGhostReceivedTakeout(item.order, true), idx * 4000);
     });
   } catch(e) {}
 }

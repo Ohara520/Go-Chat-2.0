@@ -974,7 +974,7 @@ async function ghostSendInitMessage(offlineHours) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514',
+        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
         max_tokens: 150,
         ...(() => { const s = buildSystemPrompt(); return { system: s, systemParts: buildSystemPromptParts(s) }; })(),
         messages: [...(typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []),
@@ -1072,8 +1072,14 @@ function getGhostCard() {
         saved.spentThisMonth = 0;
         saved.lastResetMonth = now.getMonth();
         saved.lastResetYear  = now.getFullYear();
-        // 旧余额保留，叠加新月额度，上限3个月防无限堆积
-        saved.balance = Math.min((saved.balance || 0) + _resetLimit, _resetLimit * 3);
+        // 旧余额保留，叠加新月额度，3个月封顶防止无限堆积。
+        // 修复(#19)：封顶必须基于历史峰值额度，且绝不主动缩减已有余额。
+        // 否则某个月心情差/吃醋把额度临时压到1000时，cap=_resetLimit*3=3000，
+        // 会把之前累积的~6000余额砍半（用户报告"5.20有六千多现在变三千"）。
+        const _prevBalance = saved.balance || 0;
+        const _capBase = Math.max(_resetLimit, saved._peakLimit || 0, saved.monthlyLimit || 0);
+        const _accumCap = Math.max(_capBase * 3, _prevBalance); // 永不低于现有余额
+        saved.balance = Math.min(_prevBalance + _resetLimit, _accumCap);
       }
 
       // 职业切换重算上限：同样只升不降
@@ -1210,7 +1216,7 @@ async function _ghostCardReaction(amount, itemName, category, card) {
     const _sys = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
     const _res = await fetchWithTimeout('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-20250514', max_tokens: 60, system: _sys, messages: [...(chatHistory||[]).filter(m=>!m._system).slice(-4), { role:'user', content: prompt }] })
+      body: JSON.stringify({ model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6', max_tokens: 60, system: _sys, messages: [...(chatHistory||[]).filter(m=>!m._system).slice(-4), { role:'user', content: prompt }] })
     }, 10000);
     const _data = await _res.json();
     const _reply = (_data.content?.[0]?.text || '').trim();

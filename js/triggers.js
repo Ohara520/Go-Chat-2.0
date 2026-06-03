@@ -164,22 +164,24 @@ emotion强度：轻/中/重`,
         const cooldownMs = 3 * 24 * 3600 * 1000;
 
         const availableProducts = cat.products.filter(name => !purchased.includes(name));
-        if (availableProducts.length === 0) return;
-
-        const alreadyTriggered = availableProducts.some(
-          name => triggered[name] && now - triggered[name].timestamp < cooldownMs
-        );
-        if (!alreadyTriggered) {
-          availableProducts.forEach(name => {
-            triggered[name] = { reason: cat.reason, timestamp: now };
-          });
-          localStorage.setItem('marketTriggered', JSON.stringify(triggered));
+        // 修复：原版这里 return 会跳过整个函数（含步骤4地点触发），改成只跳过本分支
+        if (availableProducts.length > 0) {
+          const alreadyTriggered = availableProducts.some(
+            name => triggered[name] && now - triggered[name].timestamp < cooldownMs
+          );
+          if (!alreadyTriggered) {
+            availableProducts.forEach(name => {
+              triggered[name] = { reason: cat.reason, timestamp: now };
+            });
+            localStorage.setItem('marketTriggered', JSON.stringify(triggered));
+          }
         }
       }
     }
 
     // ── 3. 情绪反寄触发 ───────────────────────────────────
-    if (result.emotion?.triggered) {
+    // 修复：用 IIFE 隔离局部 return，原版这些 return 会跳过整个函数（含步骤4）
+    if (result.emotion?.triggered) (() => {
       const type      = result.emotion.type;
       const intensity = result.emotion.intensity;
 
@@ -234,7 +236,7 @@ emotion强度：轻/中/重`,
       } else {
         localStorage.setItem('pendingReversePackages', JSON.stringify(pending));
       }
-    }
+    })();
 
     // ── 4. 地点特产触发 ───────────────────────────────────
     // 【修复】原版传了 botText，新版只传 userText，判断更准确

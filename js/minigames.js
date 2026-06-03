@@ -58,7 +58,7 @@ function startPomodoro() {
   pomodoroTotalSeconds = selectedJob.minutes * 60;
   pomodoroSecondsLeft = pomodoroTotalSeconds;
 
-  // 保存进度到 sessionStorage，用于页面切换后恢复
+  // 保存进度到 localStorage，用于页面切换后恢复
   localStorage.setItem('pomodoroProgress', JSON.stringify({
     startTime: Date.now(),
     totalSeconds: pomodoroTotalSeconds,
@@ -615,8 +615,10 @@ function resumePomodoroIfNeeded() {
     const elapsed = Math.floor((Date.now() - progress.startTime) / 1000);
     const remaining = progress.totalSeconds - elapsed;
 
-    if (remaining <= 0) {
-      // 计时结束了，直接结算
+    // 修复：暂停态优先判断。原版 remaining<=0 在前，
+    // 一个暂停时长超过原定总时长的计时器会被误判完成、自动发钱
+    if (!progress.paused && remaining <= 0) {
+      // 非暂停且计时结束 → 直接结算
       localStorage.removeItem('pomodoroProgress');
       selectedJob = progress.job;
       pomodoroTotalSeconds = progress.totalSeconds;
@@ -628,8 +630,8 @@ function resumePomodoroIfNeeded() {
     // 恢复计时状态
     selectedJob = progress.job;
     pomodoroTotalSeconds = progress.totalSeconds;
-    // 暂停状态：用保存的剩余秒数；否则用经过时间计算
-    pomodoroSecondsLeft = progress.paused ? (progress.remainingSeconds || remaining) : remaining;
+    // 暂停状态：用保存的剩余秒数；否则用经过时间计算（夹紧非负）
+    pomodoroSecondsLeft = progress.paused ? Math.max(0, progress.remainingSeconds || remaining) : remaining;
 
     document.getElementById('jobSelector').style.display = 'none';
     document.getElementById('startBtn').style.display = 'none';

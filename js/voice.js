@@ -233,7 +233,7 @@ function maybeTriggerVoice(botReply) {
   if (intimacy < VOICE_CONFIG.minIntimacyForVoice) return;
   if (Math.random() > VOICE_CONFIG.voiceChance) return;
 
-  // 每天最多触发8条语音
+  // 每天最多触发5条语音
   const _dayKey = 'voiceCount_' + new Date().toDateString();
   const _todayCount = parseInt(localStorage.getItem(_dayKey) || '0');
   if (_todayCount >= 5) return;

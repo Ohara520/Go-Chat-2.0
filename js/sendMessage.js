@@ -92,6 +92,16 @@ let _isSending = false;
 let _chatInited = false;
 let _renderedMsgCount = 0;
 let _currentAbortController = null;
+
+// 实时发送完成后把 _renderedMsgCount 同步到当前真实消息数。
+// 这样回到聊天页时 refreshChatScreen 发现没有新增就跳过重渲（无闪屏）；
+// 若有后台 push（事件/快递在别的页面）导致不一致，refreshChatScreen 会整列表幂等重渲兜底。
+function _syncRenderedCount() {
+  try {
+    if (typeof chatHistory === 'undefined' || !Array.isArray(chatHistory)) return;
+    _renderedMsgCount = chatHistory.filter(m => !m._system && !m._recalled).length;
+  } catch (e) {}
+}
 let _sendVersion = 0;
 // _globalTurnCount 声明在 state.js，此处不重复声明
 
@@ -571,8 +581,16 @@ async function _processMergedMessage(text) {
   // 用户主动要求Ghost发朋友圈
   const feedRequestKws = ['发条朋友圈','发个朋友圈','发朋友圈','po一条','晒一下','post something','发一条','你发一条','你po'];
   if (feedRequestKws.some(k => text.toLowerCase().includes(k.toLowerCase()))) {
-    feedEvent_dailyMoment();
-    setTimeout(() => maybeTriggerFeedPost('user_request'), 3000);
+    // 修复(#22)：原来调 maybeTriggerFeedPost()，它会从事件池里挑"最高分"事件，
+    // 常常是 user 侧事件(actor:'user') → 走 showUserDraftCard → 以"我方"发布，
+    // 导致"让他发朋友圈结果变成我们发的"。改为直接调专用的 handleUserFeedRequest，
+    // 它强制以 Ghost(botNickname) 作者发帖。
+    if (typeof handleUserFeedRequest === 'function') {
+      setTimeout(() => { handleUserFeedRequest().catch(() => {}); }, 3000);
+    } else {
+      feedEvent_dailyMoment();
+      setTimeout(() => maybeTriggerFeedPost('user_request'), 3000);
+    }
   }
 
   // ── 已读延迟（嘴硬场景，收窄条件）────────────────────────
@@ -1453,6 +1471,7 @@ async function _processMergedMessage(text) {
     });
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
+    _syncRenderedCount();
 
     // ── 承诺检测 ─────────────────────────────────────────────
     try {
@@ -1567,6 +1586,8 @@ async function _processMergedMessage(text) {
     if (_currentAbortController) {
       _currentAbortController = null;
     }
+    // 主路径任何分支结束后同步渲染计数，防止回到聊天页重复追加
+    _syncRenderedCount();
   }
 }
 
@@ -1789,6 +1810,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
             if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
             incrementTodayCount();
             if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+            _syncRenderedCount();
             return;
           }
         }
@@ -1805,6 +1827,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
         if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
         incrementTodayCount();
         if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+        _syncRenderedCount();
         return;
       }
     }
@@ -1818,6 +1841,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     appendMessage('bot', '网络波动，没收到，再发一次？');
     chatHistory.push({ role: 'assistant', content: '网络波动，没收到，再发一次？', _time: Date.now() });
     saveHistory();
+    _syncRenderedCount();
   } catch(e) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
@@ -1826,6 +1850,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     appendMessage('bot', '网络波动，没收到，再发一次？');
     chatHistory.push({ role: 'assistant', content: '网络波动，没收到，再发一次？', _time: Date.now() });
     saveHistory();
+    _syncRenderedCount();
   }
 }
 

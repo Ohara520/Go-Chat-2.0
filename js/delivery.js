@@ -96,7 +96,7 @@ function addDelivery(product, isGhostSend, isLuxury) {
   const lostAtStage = isLost ? Math.floor(Math.random() * 3) + 1 : -1;
 
   const delivery = {
-    id: now,
+    id: now + '_' + Math.random().toString(36).slice(2, 8),
     name: product.name,
     emoji: product.emoji,
     isGhostSend,

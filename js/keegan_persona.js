@@ -603,7 +603,6 @@ function buildKeeganSystemPrompt() {
   // 固定层
   const fixedPrompt = buildKeeganFixedPrompt(userName);
   const relBlock    = getKeeganRelationshipBlock();
-  const unlockInstruction = buildUnlockInstruction(keeganBirthday, keeganZodiac, keeganZodiacEn);
 
   // 动态层
   const dynamicPrompt = `[CURRENT STATE]
@@ -685,5 +684,5 @@ ONLY via SEND_GIFT tag. Never hint or promise without the tag.
 Rare — not more than once every few weeks.
 `;
 
-  return fixedPrompt + relBlock + '\n\n' + unlockInstruction + '\n\n' + dynamicPrompt;
+  return fixedPrompt + relBlock + '\n\n' + dynamicPrompt;
 }

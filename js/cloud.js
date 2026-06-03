@@ -214,13 +214,37 @@ async function loadFromCloud() {
           if (!charData || typeof charData !== 'object') return;
           _charKeys.forEach(key => {
             if (charData[key] !== undefined && charData[key] !== null) {
+              // chatHistory 特殊处理（修复退出重进丢记录）：
+              // profile.characters 快照只在节流 saveToCloud 时更新，是陈旧的；
+              // 第1步已把最新的 chat_history 列合并进标准 chatHistory。
+              // 当前角色绝不能用陈旧快照覆盖标准 key，否则刚合并的最新消息被冲掉，
+              // 下次 saveChatHistoryNow 再写回云端 → 永久丢失。
+              if (key === 'chatHistory' && charId === _currentChar) {
+                const mergedNow = localStorage.getItem('chatHistory');
+                let mergedArr = [];
+                try { mergedArr = JSON.parse(mergedNow || '[]'); } catch(e) {}
+                if (mergedArr.length > 0) {
+                  // 第1步已产出最新记录：回写前缀 key 保持一致，跳过快照覆盖
+                  localStorage.setItem(`${charId}_chatHistory`, mergedNow);
+                  return;
+                }
+                // 标准 key 为空（异常）：允许快照兜底恢复，继续往下写
+              }
               const val = typeof charData[key] === 'string'
                 ? charData[key]
                 : JSON.stringify(charData[key]);
               localStorage.setItem(`${charId}_${key}`, val);
               // 当前角色的数据同时写进标准 key
               if (charId === _currentChar) {
-                localStorage.setItem(key, val);
+                // 修复 #5（新动态忽闪 / 实时数据被冲）：
+                // p.characters 是节流 saveToCloud 时的快照，往往比本地旧。
+                // 若无条件用它覆盖标准 key，会把刚生成、还没来得及上云的实时
+                // 数据（coupleFeedHistory 朋友圈动态 / deliveries 快递 / affection 等）
+                // 冲掉，表现为"出现又消失"。只有云端更新、或本地标准 key 为空
+                // （换设备恢复）时才覆盖。chatHistory 已在上方单独保护，保持原行为。
+                if (key === 'chatHistory' || cloudIsNewer || !localStorage.getItem(key)) {
+                  localStorage.setItem(key, val);
+                }
               }
             }
           });

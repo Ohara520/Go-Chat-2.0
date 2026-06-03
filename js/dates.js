@@ -20,8 +20,8 @@ const DATE_BASE_THRESHOLD = 10;
 const DATE_THRESHOLD_STEP = 5;
 
 // 一次约会最大 AI 轮数
-// 三件套见面约会：20-30轮；普通约会：8轮
-const DATE_MAX_AI_TURNS = 8;
+// 三件套见面约会：20-30轮；普通约会：15轮
+const DATE_MAX_AI_TURNS = 15;
 function getDateMaxTurns(isReunionDate) {
   if (isReunionDate) return 20 + Math.floor(Math.random() * 11); // 20-30轮随机
   return DATE_MAX_AI_TURNS;
@@ -944,7 +944,12 @@ function renderDateScene() {
   }).join('');
 
   const remainingAI = (_activeDate.maxTurns || DATE_MAX_AI_TURNS) - aiTurnsUsed;
-  const inputDisabled = ended || _activeDate._waitingReply;
+  // 修复(#21)：聊够轮数后，sendDateTurn() 会静默 return 不发也不清空输入框，
+  // 但旧代码没把"到上限"算进 inputDisabled，导致输入框和发送键还是亮的、
+  // 能打字、点发送没反应——正是用户报告的"字卡在框里点发送没反应"。
+  // 把到上限当成终止态：禁用输入和发送，引导去点"结束这次约会"。
+  const capReached = remainingAI <= 0;
+  const inputDisabled = ended || _activeDate._waitingReply || capReached;
 
   let footerHTML;
   if (ended) {
@@ -952,10 +957,13 @@ function renderDateScene() {
       <button class="date-end-save-btn" onclick="finalizeDateMemory()">📷 把这次约会存进相册</button>
     `;
   } else {
+    const _hint = capReached
+      ? '聊够啦 · 点「结束这次约会」收尾吧'
+      : `还能聊 ${remainingAI} 轮 · 想停随时停`;
     footerHTML = `
       <textarea class="date-scene-input"
         id="dateSceneInput"
-        placeholder="${_activeDate._waitingReply ? '他在听…' : '说点什么…'}"
+        placeholder="${capReached ? '这次就聊到这儿～' : (_activeDate._waitingReply ? '他在听…' : '说点什么…')}"
         ${inputDisabled ? 'disabled' : ''}
         rows="2"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDateTurn();}"></textarea>
@@ -963,7 +971,7 @@ function renderDateScene() {
         <button class="date-scene-end-btn" onclick="endDateScene()" ${_activeDate._waitingReply ? 'disabled' : ''}>结束这次约会</button>
         <button class="date-scene-send-btn" onclick="sendDateTurn()" ${inputDisabled ? 'disabled' : ''}>发送</button>
       </div>
-      <div class="date-scene-hint">还能聊 ${remainingAI} 轮 · 想停随时停</div>
+      <div class="date-scene-hint">${_hint}</div>
     `;
   }
 

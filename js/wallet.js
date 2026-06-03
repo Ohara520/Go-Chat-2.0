@@ -122,6 +122,24 @@ function initWallet() {
       localStorage.setItem('trustHeat', '82');
     }
   }
+
+  // 黑卡余额被月初重置cap砍半补偿(#19)：旧逻辑用临时压制后的额度*3做封顶，
+  // 心情差的月份会把累积余额(如6000)砍到3000。受影响特征：当前余额明显低于
+  // 历史峰值额度能累积的合理上限(_peakLimit*2)。一次性恢复到 _peakLimit*3。
+  if (!localStorage.getItem('ghostCardCapFix_20260603')) {
+    localStorage.setItem('ghostCardCapFix_20260603', '1');
+    try {
+      const _gc = JSON.parse(localStorage.getItem('ghostCard') || 'null');
+      if (_gc && typeof _gc.balance === 'number') {
+        const _peak = _gc._peakLimit || _gc.monthlyLimit || 0;
+        if (_peak > 0 && _gc.balance < _peak * 2) {
+          _gc.balance = _peak * 3;
+          localStorage.setItem('ghostCard', JSON.stringify(_gc));
+          if (typeof renderGhostCardWallet === 'function') renderGhostCardWallet();
+        }
+      }
+    } catch(e) {}
+  }
 }
 
 function getBalance() {

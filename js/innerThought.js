@@ -109,7 +109,7 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   else if (heldBack)       { thoughtType = 'contrast';  triggerChance = 0.40; }
   else if (noticedDetail)  { thoughtType = 'noticed';   triggerChance = 0.40; }
   else {
-    // 日常随机：35%（旧版25%，太低，提高让心声更活跃）
+    // 日常随机：20%
     thoughtType = 'contrast';
     triggerChance = 0.20;
   }
@@ -287,7 +287,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
   }
 
   // 记录最近心声防重复（session级别，最多5条）
-  if (en && !en.match(/^(noticed\.|didn't like that\.|missed it\.|just easier this way\.|maybe\.)$/)) {
+  if (en && !en.match(/^(noticed\.|didn't like that\.|missed it\.|just easier this way\.|maybe\.|filed it away\.)$/)) {
     try {
       const recent = JSON.parse(sessionStorage.getItem('recentInnerThoughts') || '[]');
       recent.unshift(en);

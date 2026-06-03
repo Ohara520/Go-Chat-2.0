@@ -357,7 +357,22 @@ ${moodHint}${_followUpHint}${_contextBlock}${_ciNoRepeat}`,
 
       let generatedLine = null;
       try {
-        const t = await callGrokWithCtx(
+        // 修复 #1：原来用 callGrokWithCtx（只喂最近4条、每条截到60字、且不含 contextSnapshot），
+        // 导致他"想起寄了东西"那句话和刚刚聊的内容脱节，读起来像忘了前面说过什么。
+        // 现在喂更长的近期对话 + 当初触发寄件的那几句话（她提到的具体事），让台词能接住上下文。
+        const _recentCtx = (typeof chatHistory !== 'undefined')
+          ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
+              .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${String(m.content || '').slice(0, 160)}`)
+              .join('\n')
+          : '';
+        const _snap = Array.isArray(payload.contextSnapshot) ? payload.contextSnapshot : [];
+        const _snapCtx = _snap.length > 0
+          ? _snap.map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${String(m.content || '').slice(0, 160)}`).join('\n')
+          : '';
+        const _ctxBlock =
+          (_snapCtx ? `What she said that made him send it:\n${_snapCtx}\n\n` : '') +
+          (_recentCtx ? `Recent conversation right now:\n${_recentCtx}\n\n` : '');
+        const t = await callGrokWithSystem(
           buildGhostStyleCore() + `
 He sent something to his wife. She does not know yet, or just found out.
 He is saying one line — the only line he will say about it.
@@ -371,13 +386,15 @@ How to write:
 - Do not announce it like a delivery update
 - Do not be sweet, romantic, or soft
 - Drop the subject where natural
+- It must fit what she JUST said — do not ignore the current conversation or sound like you forgot it
 - Short. Offhand. Like it cost him nothing to say.
 
 Usually one line.
 Occasionally two very short lines — only if the second adds weight, not explanation.
 
 English only.`,
-          `Write his line.`
+          `${_ctxBlock}Write his line.`,
+          100
         );
         if (t && t.trim()) generatedLine = t.trim().split('\n').slice(0, 2).join('\n');
       } catch(e) {}
@@ -406,13 +423,15 @@ English only.`,
             const totalMs = (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000;
             const interval = totalMs / (typeof DELIVERY_STAGES_GHOST !== 'undefined' ? DELIVERY_STAGES_GHOST.length : 6);
             deliveries.unshift({
-              id: now,
+              id: now + '_' + Math.random().toString(36).slice(2, 8),
               name: item.name,
               emoji: item.emoji,
               isGhostSend: true,
               isEmotionReverse: true,
               isSecretDelivery: false,
-              visibleAt: now + ((Math.floor(Math.random() * 24) + 24) * 3600 * 1000),
+              // 修复 #4：立刻显示追踪条，不再延迟24-48小时
+              // 旧版延迟导致剧情说"寄出了"但用户在快递里看不到，以为没收到
+              visibleAt: now,
               emotionType: payload.emotionType || motive,
               stages: (typeof DELIVERY_STAGES_GHOST !== 'undefined' ? DELIVERY_STAGES_GHOST : []).map((s, i) => ({ ...s, triggerAt: now + interval * (i + 1), done: false })),
               currentStage: 0,
@@ -674,7 +693,9 @@ async function handlePostReplyEvents(userText, reply, intent) {
       const item = intent.item || (_pool2.length > 0
         ? _pool2[Math.floor(Math.random() * _pool2.length)]
         : { name: 'something', emoji: '📦', desc: 'a small thing', tip: '' });
-      await emitGhostEvent('reverse_package', { motive: intent.motive, item, emotionType: intent.emotionType });
+      // 修复 #1（触发回忆点时忘记之前提到的事）：把 contextSnapshot 透传给台词生成，
+      // 这是当初让他寄东西的那几句话（她提到的具体事），不传的话台词会和上下文脱节
+      await emitGhostEvent('reverse_package', { motive: intent.motive, item, emotionType: intent.emotionType, contextSnapshot: intent.contextSnapshot || [] });
       break;
     }
 
