@@ -103,7 +103,7 @@ Never try to be provocative.
 
 Never become soft, eager, or performative.`;
 
-async function createWithFailover(messages, max_tokens, model = 'grok-4.1-fast') {
+async function createWithFailover(messages, max_tokens, model = 'grok-4.2-fast') {
   let lastErr = null;
   let lastStatus = null;
 
