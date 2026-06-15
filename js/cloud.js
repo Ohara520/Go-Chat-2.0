@@ -397,11 +397,22 @@ async function loadFromCloud() {
         if (s.moneyRefuseCount != null) localStorage.setItem('moneyRefuseCount', String(s.moneyRefuseCount));
         if (s.userDislikesMoney != null) localStorage.setItem('userDislikesMoney', String(s.userDislikesMoney));
         if (s.sassyPost != null) localStorage.setItem('sassyPost', s.sassyPost);
-        // Ghost Card：云端较新时才覆盖，保留本地花费记录
+        // Ghost Card：云端较新时才覆盖，但绝不让累积余额被旧档冲掉
         if (s.ghostCard && typeof s.ghostCard === 'object') {
           const localCard = JSON.parse(localStorage.getItem('ghostCard') || 'null');
-          if (!localCard || (s.ghostCard.spentThisMonth || 0) > (localCard.spentThisMonth || 0)) {
+          if (!localCard) {
+            // 本地完全没有 → 直接用云端
             localStorage.setItem('ghostCard', JSON.stringify(s.ghostCard));
+          } else if ((s.ghostCard.spentThisMonth || 0) > (localCard.spentThisMonth || 0)) {
+            // 云端花费记录更新 → 同步花费，但保护余额/上限/峰值。
+            // 治本：原逻辑只看 spentThisMonth 谁大就整份覆盖，会把本地攒高的累积余额
+            // (如£5000)被一份"花得多但余额低"的旧档冲掉。现在三个累积型字段都取较大值，
+            // 既同步了花费明细，又不丢累积余额——和钱包对账"取较大值"的思路一致。
+            const merged = { ...localCard, ...s.ghostCard };
+            merged.balance      = Math.max(localCard.balance      || 0, s.ghostCard.balance      || 0);
+            merged.monthlyLimit = Math.max(localCard.monthlyLimit || 0, s.ghostCard.monthlyLimit || 0);
+            merged._peakLimit   = Math.max(localCard._peakLimit   || 0, s.ghostCard._peakLimit   || 0);
+            localStorage.setItem('ghostCard', JSON.stringify(merged));
           }
         }
         if (s.marketTriggered != null) localStorage.setItem('marketTriggered', JSON.stringify(s.marketTriggered));
@@ -472,6 +483,13 @@ async function loadFromCloud() {
         }
       }
 
+      // 已结算名单：合并云端的进本地（addSettledTxIds 内部已去重+限长）
+      // 必须在 transactions 合并之前，这样下面读 _settledIds 时是完整的
+      if (Array.isArray(s.walletSettledIds) && s.walletSettledIds.length > 0 &&
+          typeof addSettledTxIds === 'function') {
+        addSettledTxIds(s.walletSettledIds);
+      }
+
       // ── 一次性余额修正 ────────────────────────────────────────
       // 针对已经被重复叠加涨乱余额的老用户
       // 修正逻辑：walletBaseBalance 不应该超过云端存的值太多
@@ -487,16 +505,15 @@ async function loadFromCloud() {
         // 如果本地已压缩，跳过所有没有 id 的云端旧记录（它们已被压缩进 base）。
         const _alreadyCompacted = !!localStorage.getItem('walletCompacted_v1');
 
-        // 找本地最旧一条记录的时间，作为"截止线"
-        const _localOldest = local.length > 0
-          ? local.reduce((oldest, t) => {
-              const ts = t.time || t.date || '';
-              return (!oldest || String(ts) < String(oldest)) ? ts : oldest;
-            }, null)
-          : null;
+        // 已结算名单：这些 id 的记录早已被压缩进 base，云端若再回流必须跳过，
+        // 否则会被当成"新记录"重新计入余额——这正是"钱莫名变多"的根因。
+        const _settledIds = (typeof getSettledTxIds === 'function') ? getSettledTxIds() : [];
 
         const merged = [...local];
         s.transactions.forEach(ct => {
+          // 已结算进 base 的记录：直接跳过，绝不重复计入
+          if (ct.id && _settledIds.includes(ct.id)) return;
+
           // 有 id 的走精确去重
           const key = ct.id || null;
           if (key) {
@@ -526,11 +543,22 @@ async function loadFromCloud() {
           return String(tb).localeCompare(String(ta));
         });
 
-        // 只保留50条明细，超出的直接丢弃（不加进 walletBaseBalance）
-        // 原因：超出的旧记录来自云端，其金额已包含在云端 walletBaseBalance 里
-        // 如果再加一次就会双重计算，导致余额虚高
+        // 只保留最新50条明细，超出的旧记录先结算进 walletBaseBalance 再丢弃。
+        // 治本(#钱变少)：本地压缩(_compactTransactions)会先结算再删，但云端合并这步
+        // 以前直接 slice(0,50) 撕掉旧记录却没结算，被撕掉的金额就凭空蒸发了——这正是
+        // "大修后5千变3千""钱包少了五千多啥也没买"的根因。现在两条路都先结算。
+        // 注意：黑卡交易(ghostCard)不计入个人钱包余额，与 wallet.js 的规则保持一致。
         if (merged.length > 50) {
-          localStorage.setItem('transactions', JSON.stringify(merged.slice(0, 50)));
+          const keep = merged.slice(0, 50);
+          const drop = merged.slice(50);
+          const dropSum = drop.reduce((s2, t) => t.ghostCard ? s2 : s2 + (t.amount || 0), 0);
+          if (dropSum !== 0) {
+            const base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+            localStorage.setItem('walletBaseBalance', Math.max(0, base + dropSum).toFixed(2));
+          }
+          // 把被结算掉的记录 id 记进"已结算名单"，防止它们日后从云端回流被重复计入
+          if (typeof addSettledTxIds === 'function') addSettledTxIds(drop.map(t => t.id));
+          localStorage.setItem('transactions', JSON.stringify(keep));
         } else {
           localStorage.setItem('transactions', JSON.stringify(merged));
         }
@@ -892,6 +920,7 @@ async function saveToCloud() {
       deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]').slice(0, 100),
       transactions: JSON.parse(localStorage.getItem('transactions') || '[]').slice(0, 50), // 治本：只存50条明细，旧记录已压缩进walletBaseBalance
       walletBaseBalance: parseFloat(localStorage.getItem('walletBaseBalance') || '0'), // 历史余额压缩值
+      walletSettledIds: (typeof getSettledTxIds === 'function') ? getSettledTxIds() : [], // 已结算名单：防止已压缩记录从云端回流被重复计入
       purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
       weeklyGiven: getWeeklyGiven(),
       // 故事书、相册、朋友圈

@@ -77,6 +77,24 @@ function initWallet() {
     }
   }
 
+  // 关系类型自愈：每次启动都校验，不打一次性标记。
+  // 场景：用户"先选磨合(slowBurn)→聊几句→改成老夫老妻(established)"，但改的那一下
+  // 没存进云端（如云端到期那几天）。之后本地数据一丢，只剩云端旧档(还写着 slowBurn)，
+  // 用户就被打回磨合期，黑卡额度被 moneyEase-1 压回 0/砍半。
+  // 判定：亲密度(affection)已达 60（established 的标志线，磨合初始仅 30），
+  // 关系类型却仍是 slowBurn 或缺失 → 自动纠正回 established。
+  // 用每次校验取代一次性标记，这样云端再抽风导致的新受害者也能自愈。
+  {
+    const _mt = localStorage.getItem('marriageType');
+    const _affNow = parseInt(localStorage.getItem('affection') || '0');
+    if (_affNow >= 60 && _mt !== 'established') {
+      localStorage.setItem('marriageType', 'established');
+      localStorage.setItem('relationshipUnlocked', 'true');
+      if (typeof touchLocalState === 'function') touchLocalState();
+      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    }
+  }
+
   // 余额漂移误删补偿：balanceDriftFixed_20260523 把合法余额误删了
   // 受影响用户：本地余额比云端高500+，被清理后余额暴跌
   // 补偿：确保余额不低于已发放补偿之和（1288）
@@ -140,6 +158,18 @@ function initWallet() {
       }
     } catch(e) {}
   }
+
+  // 负数 base 自愈：walletBaseBalance（存钱罐数字）若被搞成负数，会把所有进账吃掉，
+  // getBalance 用 Math.max(0,…) 一兜底就永远显示 0——这正是"有进账记录余额还是0/
+  // 买不了东西"的根因之一。每次启动检查，负数直接拉回 0。不打一次性标记，
+  // 这样云端再抽风把 base 弄负的新受害者也能自愈。
+  {
+    const _base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
+    if (_base < 0) {
+      localStorage.setItem('walletBaseBalance', '0');
+      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    }
+  }
 }
 
 function getBalance() {
@@ -169,6 +199,23 @@ function getTransactions() {
 // 最多保留的明细条数，超出的压缩进基础余额
 const TX_DETAIL_LIMIT = 50;
 
+// "已入账名单"：记录已被结算进 walletBaseBalance 的交易编号。
+// 作用：对账合并时，凡是名单里的编号一律不再重复计入 base，杜绝"余额虚高/钱变多"。
+// 只留最近 400 个编号，防止无限增长（更老的记录早已不可能再出现在任何一端的明细里）。
+const SETTLED_IDS_LIMIT = 400;
+function getSettledTxIds() {
+  try { return JSON.parse(localStorage.getItem('walletSettledIds') || '[]'); } catch(e) { return []; }
+}
+function addSettledTxIds(ids) {
+  const clean = (ids || []).filter(Boolean);
+  if (clean.length === 0) return;
+  const set = getSettledTxIds();
+  for (const id of clean) if (!set.includes(id)) set.push(id);
+  // 超出上限时砍掉最旧的（数组头部是较早加入的）
+  const trimmed = set.length > SETTLED_IDS_LIMIT ? set.slice(set.length - SETTLED_IDS_LIMIT) : set;
+  localStorage.setItem('walletSettledIds', JSON.stringify(trimmed));
+}
+
 function _compactTransactions() {
   // 把超出50条的旧记录压缩进 walletBaseBalance，只保留最新50条明细
   const list = JSON.parse(localStorage.getItem('transactions') || '[]');
@@ -177,8 +224,10 @@ function _compactTransactions() {
   const old  = list.slice(TX_DETAIL_LIMIT);            // 旧的压缩
   const oldSum = old.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
   const base = parseFloat(localStorage.getItem('walletBaseBalance') || '0');
-  localStorage.setItem('walletBaseBalance', (base + oldSum).toFixed(2));
+  localStorage.setItem('walletBaseBalance', Math.max(0, base + oldSum).toFixed(2));
   localStorage.setItem('transactions', JSON.stringify(keep));
+  // 记下被结算的编号，防止它们日后从云端回流时被重复计算
+  addSettledTxIds(old.map(t => t.id));
 }
 
 function addTransaction(tx) {
@@ -312,7 +361,11 @@ function renderGhostCardWallet() {
   const suspended      = coldWar || !card || card.monthlyLimit === 0;
   const available      = card ? Math.max(0, card.balance) : 0;
   const monthlyLimit   = card ? card.monthlyLimit : 0;
-  const spentThisMonth = card ? (card.spentThisMonth || 0) : 0;
+  // 显示对齐：花钱时余额和已花金额是一起变的，但有些恢复补丁(capFix/月初重置)会把
+  // 余额拉满却没清零已花金额，导致"余额满的却显示 spent £X"。这里按余额反推真实已花：
+  // 余额≥上限 = 这个月没花，显示 0；否则已花最多就是 上限−余额，且不超过原记录值。
+  const _rawSpent      = card ? (card.spentThisMonth || 0) : 0;
+  const spentThisMonth = available >= monthlyLimit ? 0 : Math.min(_rawSpent, Math.max(0, monthlyLimit - available));
   const usedPct        = monthlyLimit > 0 ? Math.min(100, Math.round(spentThisMonth / monthlyLimit * 100)) : 0;
 
   if (suspended) {

@@ -1312,6 +1312,27 @@ async function _processMergedMessage(text) {
       .replace(/^damn[.,]?\s*/i, '')
       .trim();
 
+    // 人称纠正：鬼把用户本人说成"她(she/her)"是高频报错（"追问she是谁也没用"）。
+    // 治本思路：把"嘴上叮嘱"升级为"程序硬改"。但 she/her 不能无脑替换——鬼正常提到
+    // 别的女性(同事她/朋友她)时是合法的。所以只在最近对话里【完全没有第三方女性】时，
+    // 才认定 she/her 是指代用户本人，就地改回 you/your。
+    try {
+      const _ctx = (typeof cleanHistory !== 'undefined' ? cleanHistory : chatHistory)
+        .slice(-6).map(m => m.content || '').join('\n');
+      const _hasFemaleReferent =
+        /\b(she|her|girl|woman|wife|sister|mom|mother|daughter|girlfriend|ex|female|lady|aunt|niece)\b/i.test(_ctx) ||
+        /她|妹|姐|妈|母|女儿|女友|女生|女的|前任|阿姨|老婆|妻/.test(_ctx);
+      if (!_hasFemaleReferent && /\bshe\b|\bher\b/i.test(reply)) {
+        reply = reply
+          .replace(/\bshe's\b/gi, "you're")
+          .replace(/\bshe\b/gi, 'you')
+          .replace(/\bher\b(?=\s+[a-z])/gi, 'your')  // her phone → your phone（物主）
+          .replace(/\bher\b/gi, 'you')               // told her → told you（宾格）
+          .replace(/\bhers\b/gi, 'yours')
+          .trim();
+      }
+    } catch(e) {}
+
     // ── Step 6: 渲染消息 ─────────────────────────────────────
     // 兜底清理 markdown 代码块标记
     reply = reply.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
@@ -1581,7 +1602,10 @@ async function _processMergedMessage(text) {
       appendMessage('bot', '哎呀，网络波动，你老公没收到这条消息，再发一次试试～');
     }
   } finally {
-    // 保底：无论任何路径结束，都确保 _isSending 复位
+    // 保底：无论任何路径结束，都确保打字气泡消失 + _isSending 复位。
+    // "已读不回"的一大根因就是某条 return 分支（如网络错误 1251）没调 hideTyping，
+    // 打字中…的点点就永远卡在那，看着像在打字其实早结束了。这里统一兜底。
+    hideTyping();
     _isSending = false;
     if (_currentAbortController) {
       _currentAbortController = null;
