@@ -141,6 +141,27 @@ function initWallet() {
     }
   }
 
+  // trust 自愈（每次启动校验，不打一次性标记）——修黑卡余额一直为 0 的根因。
+  // 背景：黑卡额度真正看的是 trust（state.js getGhostResponseState：trust<45 → moneyEase 0 → 额度 0），
+  // 不是 marriageType。上面 trustHeatFix_v1 用一次性标记，跑过一次就插旗永不再查——
+  // 若用户是在"旗子已插上"之后才被云端旧档打回低 trust（如云端到期那几天没同步），
+  // 就再也救不回来，表现为"老夫老妻重选也没用，黑卡还是 0"。
+  // 这里改成每次启动都校验：是老用户(有聊天/签到记录)但 trust 异常低，就拉回安全值，
+  // 这样云端再抽风导致的新受害者也能自愈。和上面 marriageType 的每次校验同一思路。
+  {
+    const _trustNow = parseInt(localStorage.getItem('trustHeat') || '75');
+    const _turnsNow = parseInt(localStorage.getItem('globalTurnCount') || '0');
+    const _histLen  = (() => { try { return JSON.parse(localStorage.getItem('chatHistory') || '[]').length; } catch(e) { return 0; } })();
+    const _signedIn = parseInt(localStorage.getItem('visitStreak') || '0') > 1;
+    const _isVeteran = _turnsNow > 50 || _histLen > 20 || _signedIn;
+    // 老用户 trust 不该低于 65（established 区间下限）。低于就是被覆盖了，拉回 75。
+    if (_isVeteran && _trustNow < 65) {
+      localStorage.setItem('trustHeat', '75');
+      if (typeof touchLocalState === 'function') touchLocalState();
+      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    }
+  }
+
   // 黑卡余额被月初重置cap砍半补偿(#19)：旧逻辑用临时压制后的额度*3做封顶，
   // 心情差的月份会把累积余额(如6000)砍到3000。受影响特征：当前余额明显低于
   // 历史峰值额度能累积的合理上限(_peakLimit*2)。一次性恢复到 _peakLimit*3。

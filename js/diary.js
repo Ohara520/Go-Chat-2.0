@@ -202,16 +202,20 @@ Strict rules:
       entry = '';
     }
 
-    if (!entry || entry.length < 20) {
-      entry = _getFallbackEntry(location, weather);
-    }
-
-    // 清理
-    entry = entry
+    // 清理（先清理，再判断长度）
+    // 修复(日记空白)：原来顺序是「先判断长度→再清理」。如果模型返回一段够长(>20)但
+    //   整段都是会被清掉的内容(整段 ```代码块``` 或整段 *星号动作*)，长度判断会放行、
+    //   不走兜底，清理后 entry 变成空串，最终 if(entry) 为假 → 既不存也不兜底 → 那天日记空白。
+    //   改成先清理再判断长度，清完不够长就一定上兜底，杜绝空白。
+    entry = (entry || '')
       .replace(/```[\s\S]*?```/g, '')
       .replace(/^["']|["']$/g, '')
       .replace(/\*[^*]+\*/g, '')
       .trim();
+
+    if (!entry || entry.length < 20) {
+      entry = _getFallbackEntry(location, weather);
+    }
 
     if (entry) {
       // 再次检查防止并发写入
