@@ -791,7 +791,11 @@ async function _processMergedMessage(text) {
     //   3. 模糊请求 → 不触发，由 triggers.js Haiku 事后判断
     const _specialtyKws = /带点|寄点|给我带|给我寄|寄给我|从你那.{0,5}[寄带买]|你那边.{0,5}寄|bring.{0,15}me|send.{0,25}me|from.{0,5}your.{0,5}side/i;
     // 更显式的"想要他寄东西"请求（包含明确的"想要"语义）
-    const _explicitGiftKws = /给我寄|寄个|寄.*给我|送我.*东西|带个.*回来|带点.*回来|想要你寄|你给我买|给我买.*的|我想要你.*送|你寄.*给我|帮我.*买.*寄|send me|ship me|get me a/i;
+    // 收窄(D类误伤)：原来用 `寄.*给我`/`给我买.*的` 这种隔空 .* 匹配，闲聊里
+    //   "上次你寄的快递我给我妈看了" 这类会凑巧命中，导致鬼凭空乱寄东西、白吃周配额。
+    //   改为近距离 .{0,6} 匹配，并去掉太泛的英文裸词(send me/ship me 会误伤 "send me a photo")，
+    //   英文必须带明确的寄/邮语境(mail/ship ... to me)。
+    const _explicitGiftKws = /给我寄|寄个|寄.{0,6}给我|送我.{0,4}东西|带.{0,4}回来|想要你寄|你给我买|给我买.{0,6}的|我想要你.{0,4}送|你寄.{0,4}给我|帮我.{0,4}买.{0,4}寄|mail me|ship me a|ship .{0,15}to me|send me a (gift|package|parcel|something)/i;
     const _isExplicitGiftRequest = _explicitGiftKws.test(text);
     const _isAnySpecialtyRequest = _specialtyKws.test(text);
 

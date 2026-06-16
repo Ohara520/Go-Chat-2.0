@@ -711,8 +711,10 @@ function touchLocalState() {
 
 function scheduleCloudSave(urgent = false) {
   if (_saveTimer) clearTimeout(_saveTimer);
-  // 普通操作5秒防抖；urgent=true时2秒（发消息、充值等重要操作用）
-  const delay = urgent ? 2000 : 5000;
+  // 磁盘 IO 优化（2026-06-16）：普通操作防抖 5s→15s，攒一批再整行存，减少整行重写次数。
+  // urgent=true（发消息、充值等重要操作）保持 2s，重要数据仍及时落库。
+  // 离开页面时 beforeunload / visibilitychange 都有强制保存兜底，拉长防抖不会丢数据。
+  const delay = urgent ? 2000 : 15000;
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
     saveToCloud().catch(console.error);
@@ -747,12 +749,29 @@ async function saveChatHistoryNow() {
     const _chatChar = localStorage.getItem('currentCharacter') || 'ghost';
     localStorage.setItem(`${_chatChar}_chatHistory`, JSON.stringify(chatHistoryData));
 
-    await sb.from('user_data').upsert({
-      user_id: userId,
-      chat_history: chatHistoryData,
-      chat_updated_at: now,
-      updated_at: now,
-    }, { onConflict: 'user_id' });
+    // ── 磁盘 IO 优化（2026-06-16）──────────────────────────────
+    // 旧版用 upsert 整行写入：哪怕只改聊天记录，数据库也会重写整行（含头像/钱包/
+    // 快递等几十个字段）+ 双倍 WAL，磁盘 IO 被烧爆。
+    // 新版：发消息是高频操作，改成只 update 聊天相关的几列，不碰其它字段。
+    // 兜底：全新用户可能还没有这一行，update 影响 0 行时回退到 upsert 建行，保证不丢。
+    const { data: _updated, error: _updErr } = await sb
+      .from('user_data')
+      .update({
+        chat_history: chatHistoryData,
+        chat_updated_at: now,
+        updated_at: now,
+      })
+      .eq('user_id', userId)
+      .select('user_id');
+    // 没更新到任何行（新用户首存）→ 建行
+    if (!_updErr && (!_updated || _updated.length === 0)) {
+      await sb.from('user_data').upsert({
+        user_id: userId,
+        chat_history: chatHistoryData,
+        chat_updated_at: now,
+        updated_at: now,
+      }, { onConflict: 'user_id' });
+    }
   } catch(e) {
     console.warn('[cloud] 聊天记录快速保存失败:', e);
   }
@@ -777,17 +796,18 @@ async function saveToCloud() {
     return;
   }
 
-  // 5秒节流：如果距上次写入不足5秒，等到5秒后再写（且只写最后一次）
+  // 磁盘 IO 优化（2026-06-16）：完整存档最小间隔 5s→10s，进一步降低整行重写频率。
+  // 不足间隔时不丢弃，而是延后到满 10s 再写最后一次（保证最终一致）。
   const now = Date.now();
   const sinceLastSave = now - _lastSyncTime;
-  if (sinceLastSave < 5000 && _lastSyncTime > 0) {
+  if (sinceLastSave < 10000 && _lastSyncTime > 0) {
     if (!_saveThrottleTimer) {
       _savePending = true;
       _saveThrottleTimer = setTimeout(async () => {
         _saveThrottleTimer = null;
         _savePending = false;
         await saveToCloud();
-      }, 5000 - sinceLastSave);
+      }, 10000 - sinceLastSave);
     }
     return;
   }
