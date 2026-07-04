@@ -174,6 +174,18 @@ function cleanBotText(text, scene = 'normal') {
   // 6.5 过滤第三人称旁白方括号（[She told him...] [He already knew...] 等模型滑落成叙事者的内容）
   text = text.replace(/\[(?:She|He|she|he|Ghost|They|they)[^\]]{0,600}\]/g, '').trim();
 
+  // 6.6 占位符兜底：模型偶尔吐出 [your name]/{name}/[city] 等模板占位符（很出戏）
+  try {
+    const _uname = (localStorage.getItem('userName') || '').trim();
+    // 名字类占位符 → 替换成真名（没名字则删掉）
+    const _nameRe = /[\[\{]{1,2}\s*(your\s*name|user\s*name|username|her\s*name|my\s*name|name|昵称|你的名字|用户名)\s*[\]\}]{1,2}/gi;
+    text = _uname ? text.replace(_nameRe, _uname) : text.replace(_nameRe, '');
+    // 其它常见模板占位符 → 删掉（城市/地点/日期/时间/年龄/insert xxx 等）
+    text = text.replace(/[\[\{]{1,2}\s*(pet\s*name|nickname|city|location|place|country|date|time|day|age|insert[^\]\}]{0,40})\s*[\]\}]{1,2}/gi, '');
+    // 清理替换后可能残留的多余空格/空格前的标点
+    text = text.replace(/[ \t]{2,}/g, ' ').replace(/\s+([,.!?，。！？])/g, '$1').trim();
+  } catch(e) {}
+
   // 6.6 过滤多行第三人称旁白块（以 [She/He 开头、跨行的叙事段落）
   text = text.replace(/\[(?:She|He|she|he|Ghost)[^\]]*(?:\n[^\]]*){0,10}\]/g, '').trim();
 

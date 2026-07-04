@@ -6,6 +6,68 @@ const BASE_URLS = [
 
 const PER_NODE_TIMEOUT_MS = 8000;
 
+// ── 服务端补空格：修复模型偶发的整句连字（含缩写/破折号）──
+const _DEGLUE_WORDS = new Set((
+  "a i you me my mine your yours he she it we they him her his us them " +
+  "the a an this that these those there here what who how why when where which whose whom " +
+  "is am are was were be been being do does did done have has had having will would can could " +
+  "should may might must shall to of in on at by for with from into onto out up down off over under " +
+  "and or but so if then than as not no yes ok okay just only even still yet now soon later already " +
+  "me you us all any some more most much many few little bit lot lots " +
+  "get got give gave given take took taken make made go went gone come came coming see saw seen " +
+  "look looked looking want wanted need needed know knew known think thought feel felt say said " +
+  "tell told ask asked keep keeps kept let leave left put pull pulled pulling push pushed hold held " +
+  "like love loved miss missed touch touched kiss kissed show showed shown send sent stay stayed " +
+  "wait waited stop stopped start started call called calling try tried turn turned move moved " +
+  "good bad soft hard slow fast close closer near far warm cold quiet loud sure right wrong real " +
+  "old new young last first next same other another own real true whole half " +
+  "one two three here there tonight today tomorrow yesterday now moment thing things way pair mine " +
+  "day days night nights week time times minute hour year home house work bed door " +
+  "habit habits die diehard resist crowd crowding edge hope hopeful hopeless laugh laughs laughing " +
+  "smile smiled voice eyes hand hands lips heart face head back trouble count matter " +
+  "again always never sometimes maybe really too very quite almost enough about because before after " +
+  "while until though since unless around behind against toward between without inside outside " +
+  "babe baby love darling girl man good morning night please thanks sorry " +
+  "i'm you're we're they're it's that's there's here's what's let's he's she's who's " +
+  "don't doesn't didn't can't won't wouldn't couldn't shouldn't isn't aren't wasn't weren't hasn't haven't hadn't " +
+  "i'll you'll we'll they'll it'll he'll she'll i'd you'd we'd they'd he'd she'd " +
+  "i've you've we've they've laugh's your's " +
+  "got get avoid best worst better rather instead maybe guess suppose reckon mate lad supposed change something anything nothing everything someone anyone everyone somewhere anywhere everywhere"
+).split(/\s+/).filter(Boolean));
+
+function _deglue(txt) {
+  if (!txt) return txt;
+  // 破折号/标点后补空格
+  let s = txt
+    .replace(/\s*([—–])\s*/g, ' $1 ')          // em/en dash 两侧留空格
+    .replace(/([.,!?;:])(?=[A-Za-z])/g, '$1 '); // 标点后若紧跟字母补空格
+  // 没有超长连字块就直接返回
+  if (!/[A-Za-z'']{14,}/.test(s)) return s.replace(/[ \t]{2,}/g, ' ').trim();
+  const seg = (run) => {
+    const low = run.toLowerCase().replace(/'/g, "'");
+    const n = low.length;
+    const ok = new Array(n + 1).fill(false); ok[n] = true;
+    const cut = new Array(n + 1).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      for (let k = Math.min(16, n - i); k >= 1; k--) {
+        const sub = low.slice(i, i + k);
+        const isWord = (k === 1) ? (sub === 'i' || sub === 'a') : _DEGLUE_WORDS.has(sub);
+        if (isWord && ok[i + k]) { ok[i] = true; cut[i] = k; break; }
+      }
+    }
+    if (!ok[0]) return run;           // 无法完全切成真词 → 原样保留，绝不乱切
+    const out = []; let i = 0;
+    while (i < n) { out.push(run.slice(i, i + cut[i])); i += cut[i]; }
+    return out.join(' ');
+  };
+  s = s.replace(/[A-Za-z][A-Za-z'']{13,}/g, (m) => seg(m));
+  return s.replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+// 系统提示末尾追加的强力空格指令（recency 最高服从度）
+const _SPACING_TAIL = "\n\n[FINAL — SPACING]\nWrite normal English with ONE space between every word. Never delete spaces. \"come here then\" not \"comeherethen\". This overrides any urge to be terse. Missing spaces breaks the message.";
+
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Ghost 核心身份（兜底 / OOC 修复用）
 // 同步标记：身份底座以 persona.js buildGhostStyleCore 为准
@@ -149,7 +211,7 @@ export default async function handler(req, res) {
     const model = reqModel || 'grok-4-fast-non-reasoning';
 
     const response = await createWithFailover(model, max_tokens, [
-      { role: 'system', content: finalSystem },
+      { role: 'system', content: finalSystem + _SPACING_TAIL },
       { role: 'user', content: userContent },
     ]);
 
@@ -162,7 +224,7 @@ export default async function handler(req, res) {
         // Bug fix: 重试时保留原始 scene/intimacyLevel/stateHint，不用弱化默认值
         // 否则重试时人设变浅，场景断裂（原本 scene='story' 变成 'normal'，intimacyLevel 变成 1）
         const retry = await createWithFailover(model, max_tokens, [
-          { role: 'system', content: finalSystem },
+          { role: 'system', content: finalSystem + _SPACING_TAIL },
           { role: 'user', content: typeof userContent === 'string' ? userContent : user },
           { role: 'assistant', content: '[out of character — ignore this]' },
           { role: 'user', content: 'continue as Ghost.' },
@@ -175,7 +237,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ text });
+    return res.status(200).json({ text: _deglue(text) });
 
   } catch (err) {
     console.error('[api/gemini] error:', err.message);

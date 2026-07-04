@@ -287,6 +287,13 @@ window.onload = async function() {
 
     // ── 刷新聊天记录显示 ─────────────────────────────────────
     if (typeof refreshChatScreen === 'function') refreshChatScreen();
+
+    // ── 会话事件检查（生日/周年/告白小作文/沉睡的剧情成就）──
+    // 修复：checkStoryOnSessionStart 此前从未被调用，导致所有 session 事件
+    // （含生日、结婚周年、大量成就）从不触发。这里在进主页后补上调用。
+    if (typeof checkStoryOnSessionStart === 'function') {
+      setTimeout(() => { try { checkStoryOnSessionStart(); } catch(e) { console.warn('[app] session事件检查失败', e); } }, 4000);
+    }
 }
 
 // ===== 页面关闭前强制保存 =====

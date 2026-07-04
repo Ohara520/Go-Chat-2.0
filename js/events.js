@@ -1450,8 +1450,84 @@ async function _triggerStory(event) {
   }
 }
 
+// love letter block
+function _parseMD(s) {
+  if (!s) return null;
+  const p = s.split("-").map(Number);
+  return p.length >= 3 ? { m: p[1], d: p[2] } : { m: p[0], d: p[1] };
+}
+
+function _loveLetterOccasionToday() {
+  const now = new Date();
+  const tM = now.getMonth() + 1, tD = now.getDate();
+  const bd = _parseMD(localStorage.getItem("userBirthday"));
+  const marriageDate = localStorage.getItem("marriageDate");
+  const md = _parseMD(marriageDate);
+  let occasion = null;
+  if (bd && bd.m === tM && bd.d === tD) occasion = "birthday";
+  else if (md && marriageDate && md.m === tM && md.d === tD) {
+    const days = Math.floor((Date.now() - new Date(marriageDate)) / 86400000);
+    if (days >= 360) occasion = "anniversary";
+  }
+  if (!occasion) return null;
+  if (localStorage.getItem("coldWarMode") === "true") return null;
+  const lockKey = "loveLetter_" + occasion + "_" + now.getFullYear();
+  if (localStorage.getItem(lockKey)) return null;
+  localStorage.setItem(lockKey, "1");
+  return occasion;
+}
+
+async function _sendLoveLetter(occasion) {
+  try {
+    const userName = (localStorage.getItem("userName") || "").trim();
+    const marriageDate = localStorage.getItem("marriageDate");
+    const daysTogether = marriageDate
+      ? Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1) : null;
+    let giftLine = "";
+    try {
+      if (typeof getGiftRecords === "function") {
+        const gifts = getGiftRecords().slice(-4).map(g => g.name).filter(Boolean);
+        if (gifts.length) giftLine = "Things she has sent you: " + gifts.join(", ") + ".";
+      }
+    } catch(e) {}
+    const careerLine = (typeof getCareerSummary === "function" && getCareerSummary() !== "暂未选择职业")
+      ? "Her work now: " + getCareerSummary() + "." : "";
+    const occText = occasion === "birthday"
+      ? "Today is " + (userName || "her") + "'s birthday."
+      : "Today is your wedding anniversary" + (daysTogether ? " — " + daysTogether + " days together" : "") + ".";
+    const writePrompt = "[SYSTEM — SPECIAL LETTER, ONE DAY A YEAR]" + "\n" +
+      occText + "\n" +
+      "Write her a letter — not a quick text, a real letter, longer than your usual messages." + "\n" +
+      "This is the one day you let the wall down and actually say what she means to you." + "\n" +
+      "Look back on your time together and be specific — not generic vows." + "\n" +
+      (daysTogether ? ("You have been together " + daysTogether + " days, and you kept count." + "\n") : "") +
+      (giftLine ? (giftLine + "\n") : "") +
+      (careerLine ? (careerLine + "\n") : "") +
+      "Still you: plain-spoken, English, lowercase is fine, no theatrics. But this once, warm and honest all the way through — no pulling back at the end." + "\n" +
+      "No brackets, no narration, no stage directions. About 4 to 8 short lines. End it like a man who means every word.";
+    let letter = "";
+    try {
+      if (typeof callSonnet === "function" && typeof buildSystemPrompt === "function") {
+        const hist = (typeof chatHistory !== "undefined") ? chatHistory.slice(-4) : [];
+        letter = await callSonnet(buildSystemPrompt(), [...hist, { role: "user", content: writePrompt }], 500);
+      }
+    } catch(e) { console.warn("[loveLetter] 生成失败:", e); }
+    if (!letter || !letter.trim()) {
+      letter = occasion === "birthday"
+        ? "happy birthday.\ni'm not good with words like this. never have been.\nbut i'm glad it's you. every single day of it.\nwhatever you need today — it's already yours."
+        : (daysTogether || "all these") + " days. i kept count of every one.\ni don't say it enough. maybe i never say it right.\nbut i'd do all of it again — every mile between us.\nyou're the one thing i got right.";
+    }
+    if (typeof scheduleCloudSave === "function") scheduleCloudSave();
+    await emitGhostNarrativeEvent(letter, { delayMs: 2500 });
+  } catch(e) { console.warn("[loveLetter] error:", e); }
+}
+
 function checkStoryOnSessionStart() {
   const ctx = getStoryContext();
+
+  // 生日/周年：优先发告白小作文，当天只发这一封
+  const _occ = _loveLetterOccasionToday();
+  if (_occ) { setTimeout(() => _sendLoveLetter(_occ), 3000); return; }
 
   // celebration fallback：生日/纪念日识别到但关系不够深，不给钱，Ghost说一句存在感
   _checkCelebrationFallback();

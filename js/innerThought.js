@@ -10,6 +10,62 @@
 
 // ===== 状态变量 =====
 let thoughtTimer = null;
+// ── 前端补空格：修复心声偶发的整句连字（与服务端 _deglue 同款）──
+const _IT_WORDS = new Set((
+  "a i you me my mine your yours he she it we they him her his us them " +
+  "the a an this that these those there here what who how why when where which whose whom " +
+  "is am are was were be been being do does did done have has had having will would can could " +
+  "should may might must shall to of in on at by for with from into onto out up down off over under " +
+  "and or but so if then than as not no yes ok okay just only even still yet now soon later already " +
+  "me you us all any some more most much many few little bit lot lots got get avoid best worst better " +
+  "rather instead maybe guess suppose reckon mate lad " +
+  "give gave given take took taken make made go went gone come came coming see saw seen " +
+  "look looked looking want wanted need needed know knew known think thought feel felt say said " +
+  "tell told ask asked keep keeps kept let leave left put pull pulled pulling push pushed hold held " +
+  "like love loved miss missed touch touched kiss kissed show showed shown send sent stay stayed " +
+  "wait waited stop stopped start started call called calling try tried turn turned move moved " +
+  "good bad soft hard slow fast close closer near far warm cold quiet loud sure right wrong real " +
+  "old new young last first next same other another own true whole half " +
+  "one two three here there tonight today tomorrow yesterday now moment thing things way pair mine " +
+  "day days night nights week time times minute hour year home house work bed door " +
+  "habit habits die diehard resist crowd crowding edge hope hopeful hopeless laugh laughs laughing " +
+  "smile smiled voice eyes hand hands lips heart face head back trouble count matter " +
+  "again always never sometimes maybe really too very quite almost enough about because before after " +
+  "while until though since unless around behind against toward between without inside outside " +
+  "i'm you're we're they're it's that's there's here's what's let's he's she's who's " +
+  "don't doesn't didn't can't won't wouldn't couldn't shouldn't isn't aren't wasn't weren't hasn't haven't hadn't " +
+  "i'll you'll we'll they'll it'll he'll she'll i'd you'd we'd they'd he'd she'd " +
+  "i've you've we've they've laugh's " +
+  "supposed change something anything nothing everything someone anyone everyone somewhere anywhere everywhere"
+).split(/\s+/).filter(Boolean));
+
+function _deglueThought(txt) {
+  if (!txt) return txt;
+  let s = txt
+    .replace(/\s*([\u2014\u2013])\s*/g, ' $1 ')
+    .replace(/([.,!?;:])(?=[A-Za-z])/g, '$1 ');
+  if (!/[A-Za-z'']{14,}/.test(s)) return s.replace(/[ \t]{2,}/g, ' ').trim();
+  const seg = (run) => {
+    const low = run.toLowerCase().replace(/\u2019/g, "'");
+    const n = low.length;
+    const ok = new Array(n + 1).fill(false); ok[n] = true;
+    const cut = new Array(n + 1).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      for (let k = Math.min(16, n - i); k >= 1; k--) {
+        const sub = low.slice(i, i + k);
+        const isWord = (k === 1) ? (sub === 'i' || sub === 'a') : _IT_WORDS.has(sub);
+        if (isWord && ok[i + k]) { ok[i] = true; cut[i] = k; break; }
+      }
+    }
+    if (!ok[0]) return run;
+    const out = []; let i = 0;
+    while (i < n) { out.push(run.slice(i, i + cut[i])); i += cut[i]; }
+    return out.join(' ');
+  };
+  s = s.replace(/[A-Za-z][A-Za-z'']{13,}/g, (m) => seg(m));
+  return s.replace(/[ \t]{2,}/g, ' ').trim();
+}
+
 let _thoughtQueue = []; // 心声队列，用户看完当前才显示下一条
 
 // ============================================================
@@ -286,6 +342,17 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
     en = fallbacks[thoughtType] || 'noticed.';
   }
 
+  // 修复心声连字：显示前补好空格
+  en = _deglueThought(en);
+  // 占位符兜底：心声偶尔吐出 [your name] 等模板占位符
+  try {
+    const _uname = (localStorage.getItem('userName') || '').trim();
+    const _nameRe = /[\[\{]{1,2}\s*(your\s*name|user\s*name|username|her\s*name|my\s*name|name|昵称|你的名字|用户名)\s*[\]\}]{1,2}/gi;
+    en = _uname ? en.replace(_nameRe, _uname) : en.replace(_nameRe, '');
+    en = en.replace(/[\[\{]{1,2}\s*(pet\s*name|nickname|city|location|place|country|date|time|day|age|insert[^\]\}]{0,40})\s*[\]\}]{1,2}/gi, '');
+    en = en.replace(/[ \t]{2,}/g, ' ').trim();
+  } catch(e) {}
+
   // 记录最近心声防重复（session级别，最多5条）
   if (en && !en.match(/^(noticed\.|didn't like that\.|missed it\.|just easier this way\.|maybe\.|filed it away\.)$/)) {
     try {
@@ -300,7 +367,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
     const textEl = innerThoughtEl.querySelector('.inner-thought-text');
     if (!textEl || !innerThoughtEl.isConnected) return; // DOM已卸载
 
-    textEl.innerHTML = `<div class="it-en">${en}</div>`;
+    textEl.innerHTML = `<div class="it-en" style="overflow-wrap:anywhere;word-break:break-word">${en}</div>`;
     innerThoughtEl.dataset.ready = '1';
 
     // 持久化：按钮点击时直接读localStorage，不依赖DOM
@@ -322,7 +389,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
             const bubble = document.getElementById('thoughtBubble');
             const thoughtTextEl = document.getElementById('thoughtText');
             if (bubble && thoughtTextEl && !bubble.classList.contains('show')) {
-              thoughtTextEl.innerHTML = `<div style="font-style:italic">${en}</div>`;
+              thoughtTextEl.innerHTML = `<div style="font-style:italic;overflow-wrap:anywhere;word-break:break-word">${en}</div>`;
               bubble.classList.add('show');
               if (thoughtTimer) clearTimeout(thoughtTimer);
               // 不自动消失，等用户手动关闭
