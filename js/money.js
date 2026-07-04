@@ -736,7 +736,7 @@ Write KEEP on its own line at the end.]`;
     if (typeof hideTyping === 'function') hideTyping();
     if (typeof updateToRead === 'function') updateToRead();
 
-    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START)\n?/g, '')
+    reply = reply.replace(/\n?(REFUND|\bKEEP\b|COLD_WAR_START)\n?/g, '')
                  .replace(/\s{2,}/g, ' ').trim();
 
     if (typeof incrementTodayCount === 'function') incrementTodayCount();
@@ -858,7 +858,7 @@ async function handlePendingTransfer(amount, userReason) {
 
     if (!reply) reply = shouldRefund ? 'sent it back.' : 'got it.';
     if (typeof hideTyping === 'function') hideTyping();
-    reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z]))\n?/g, '').replace(/\s{2,}/g, ' ').trim();
+    reply = reply.replace(/\n?(REFUND|\bKEEP\b)\n?/g, '').replace(/\s{2,}/g, ' ').trim();
 
     if (shouldRefund) {
       const bal = typeof getBalance === 'function' ? getBalance() : 0;
@@ -986,7 +986,7 @@ async function ghostSendInitMessage(offlineHours) {
     if (typeof hideTyping === 'function') hideTyping();
     let reply = data.content?.[0]?.text?.trim() || '';
     if (reply) {
-      reply = reply.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
+      reply = reply.replace(/\n?(REFUND|\bKEEP\b|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
       if (typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {
         chatHistory.push({ role: 'assistant', content: reply });

@@ -144,7 +144,7 @@ function cleanBotText(text, scene = 'normal') {
   text = text.replace(/^ghost\s*:\s*/i, '').trim();
 
   // 2. 清除系统控制tag
-  text = text.replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
+  text = text.replace(/\n?(REFUND|\bKEEP\b|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
 
   // 3. 清除 unlock tag 残留（旧系统已移除，仅做清理防止模型偶尔输出）
   text = text.replace(/\{[^}\]]*"unlock"[^}\]]*[\]]*\}/g, '').trim();
@@ -399,7 +399,7 @@ function renderChatHistory(chatHistory) {
     if (msg.role === 'user') {
       // 系统注入消息不渲染，但转账卡片要重建
       if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') ||
-          /\b(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z]))\b/.test(msg.content)) {
+          /\b(REFUND|\bKEEP\b)\b/.test(msg.content)) {
         if (msg._userTransfer) {
           showUserTransferCard(container, msg._userTransfer.amount);
         }
