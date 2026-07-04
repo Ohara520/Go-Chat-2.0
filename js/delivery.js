@@ -921,12 +921,12 @@ function renderDeliveryTracker() {
   tracker.innerHTML = visible.map((d) => {
     const isGhost = d.isGhostSend;
     if (d.isLostConfirmed) {
-      return `<span class="delivery-tag" onclick="openDeliveryModalById(${d.id})" style="background:rgba(255,235,235,0.9);border-color:rgba(240,100,100,0.5);color:#b91c1c;">
+      return `<span class="delivery-tag" onclick="openDeliveryModalById('${d.id}')" style="background:rgba(255,235,235,0.9);border-color:rgba(240,100,100,0.5);color:#b91c1c;">
         <span style="font-size:10px">❌</span>
         ${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
       </span>`;
     }
-    return `<span class="delivery-tag" onclick="openDeliveryModalById(${d.id})" style="${isGhost ? 'background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.5);' : ''}">
+    return `<span class="delivery-tag" onclick="openDeliveryModalById('${d.id}')" style="${isGhost ? 'background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.5);' : ''}">
       <div class="delivery-tag-dot" style="${isGhost ? 'background:#a855f7;' : ''}"></div>
       ${isGhost ? '💌 ' : ''}${d.emoji} ${d.name.length > 6 ? d.name.slice(0,6)+'…' : d.name}
     </span>`;

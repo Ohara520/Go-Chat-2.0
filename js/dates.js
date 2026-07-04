@@ -512,69 +512,170 @@ if (document.readyState === 'loading') {
 // ④ 物品架页面渲染
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// ═══════════════════════════════════════════════════════════
+// 声之匣 · 音频剧场（替代旧礼物小屋界面；礼物记录后台保留、不展示）
+// ── 加新剧场：只需在 AUDIO_DRAMAS 数组里加一条即可，不用动界面 ──
+// ═══════════════════════════════════════════════════════════
+const AUDIO_DRAMAS = [
+  {
+    id: 'date_theatre',
+    title: '约会',
+    cover: '🎬',
+    audioUrl: '',                 // ← 填你的音频直链（mp3/m4a）
+    subtitle: '',                 // 整段字幕（可选）
+    cues: null,                   // 逐句字幕（可选）：[{ t: 0, text: '...' }, ...]
+    mystery: false,               // 约会是明的，未解锁也显示名字
+    lockedHint: '送够礼物 / 集齐三件套，他就在声音里赴约',
+    unlock: () => { try { return getDateUnlockState().isUnlocked; } catch(e) { return false; } },
+  },
+  {
+    id: 'reunion',
+    title: '面基',
+    cover: '✈️',
+    audioUrl: '',
+    subtitle: '',
+    cues: null,
+    mystery: true,                // 神秘：未解锁不剧透
+    lockedHint: '',
+    unlock: () => { try { return getDateUnlockState().reunionComplete; } catch(e) { return false; } },
+  },
+  {
+    id: 'flirty_call',
+    title: '暧昧来电',
+    cover: '📞',
+    audioUrl: '',
+    subtitle: '',
+    cues: null,
+    mystery: true,
+    lockedHint: '',
+    unlock: () => { try { return getGiftRecords().filter(g => g.isIntimate).length >= 3; } catch(e) { return false; } },
+  },
+];
+
+function _dramaUnlocked(d) { try { return !!d.unlock(); } catch(e) { return false; } }
+
+// 渲染声之匣（沿用 renderGiftShelf 名字，所有入口无需改）
 function renderGiftShelf() {
   const screen = document.getElementById('shelfScreen');
   if (!screen) return;
   const body = screen.querySelector('.shelf-body');
   if (!body) return;
 
-  const records = getGiftRecords().slice().reverse();
-  const st = getDateUnlockState();
-  const pct = Math.round(st.progress * 100);
-  const remaining = Math.max(0, st.threshold - st.giftsSince);
+  const unlockedCount = AUDIO_DRAMAS.filter(_dramaUnlocked).length;
 
-  // ── 约会进度条 ──
-  const progressHTML = `
-    <div class="gwall-progress-card">
-      <div class="gwall-progress-title">
-        ${st.isUnlocked
-          ? `💑 他可以飞过来了！`
-          : `✈️ 再送 <b>${remaining}</b> 件，他就飞过来`}
-      </div>
-      <div class="gwall-progress-bar-wrap">
-        <div class="gwall-progress-bar-fill" style="width:${pct}%"></div>
-      </div>
-      <div class="gwall-progress-num">${st.giftsSince} / ${st.threshold} 件</div>
-      ${st.isUnlocked
-        ? `<button class="gwall-date-btn" onclick="openScreen('dateHubScreen')">去选城市 →</button>`
-        : ''}
-    </div>
-  `;
-
-  // ── 礼物墙 ──
-  let giftsHTML;
-  if (records.length === 0) {
-    giftsHTML = `
-      <div class="gwall-empty">
-        <div class="gwall-empty-emoji">🎁</div>
-        <div class="gwall-empty-title">还没送过东西</div>
-        <div class="gwall-empty-desc">从商城寄点什么给他，<br/>每件礼物都会留在这里。</div>
-      </div>
-    `;
-  } else {
-    giftsHTML = `
-      <div class="gwall-grid">
-        ${records.map(g => `
-          <div class="gwall-item${g.isLuxury ? ' gwall-luxury' : ''}${g.isIntimate ? ' gwall-intimate' : ''}">
-            <div class="gwall-item-emoji">${g.emoji}</div>
-            <div class="gwall-item-name">${_esc(g.name || '神秘礼物')}</div>
-            <div class="gwall-item-date">${_formatShortDate(g.timestamp)}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  }
+  const cards = AUDIO_DRAMAS.map(d => {
+    if (_dramaUnlocked(d)) {
+      const hasAudio = !!d.audioUrl;
+      return `
+        <div class="sv-card sv-unlocked" onclick="_openDramaPlayer('${d.id}')">
+          <div class="sv-cover">${d.cover || '🎧'}</div>
+          <div class="sv-title">${_esc(d.title)}</div>
+          <div class="sv-play">${hasAudio ? '▶ 收听' : '敬请期待'}</div>
+        </div>`;
+    }
+    // 未解锁
+    return `
+      <div class="sv-card sv-locked" onclick="showToast('${d.mystery ? '还有一段声音，等你解锁～' : (d.lockedHint || '继续和他相处～')}')">
+        <div class="sv-cover sv-lock">🔒</div>
+        <div class="sv-title">${d.mystery ? '？ ？ ？' : _esc(d.title)}</div>
+        <div class="sv-hint">${d.mystery ? '还未解锁的声音' : _esc(d.lockedHint || '继续和他相处')}</div>
+      </div>`;
+  }).join('');
 
   body.innerHTML = `
-    <div class="gwall-header">
-      <div class="gwall-header-title">🏠 Ghost 的小屋</div>
-      <div class="gwall-header-sub">${records.length > 0 ? `你送过他 ${records.length} 件东西` : '你送的每件东西，都在这儿留着'}</div>
+    <div class="sv-header">
+      <div class="sv-header-title">🎧 声之匣</div>
+      <div class="sv-header-sub">西蒙的声音，都收在这里 · 已解锁 ${unlockedCount}/${AUDIO_DRAMAS.length}</div>
     </div>
-    ${progressHTML}
-    ${giftsHTML}
+    <div class="sv-grid">${cards}</div>
   `;
 }
 window.renderGiftShelf = renderGiftShelf;
+
+// ── 音频播放器 ──────────────────────────────────────────────
+let _dramaAudio = null;
+
+function _openDramaPlayer(id) {
+  const d = AUDIO_DRAMAS.find(x => x.id === id);
+  if (!d) return;
+  if (!d.audioUrl) {
+    if (typeof showToast === 'function') showToast('这段声音还在路上，敬请期待～');
+    return;
+  }
+  let modal = document.getElementById('svPlayerModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'svPlayerModal';
+    modal.className = 'sv-player-modal';
+    modal.innerHTML =
+      '<div class="sv-player-box">' +
+        '<button class="sv-player-close" onclick="_closeDramaPlayer()">✕</button>' +
+        '<div class="sv-player-cover" id="svPlayerCover"></div>' +
+        '<div class="sv-player-title" id="svPlayerTitle"></div>' +
+        '<div class="sv-player-controls">' +
+          '<button class="sv-player-btn" id="svPlayBtn" onclick="_toggleDrama()">▶</button>' +
+          '<div class="sv-player-bar" id="svPlayerBar" onclick="_seekDrama(event)"><div class="sv-player-fill" id="svPlayerFill"></div></div>' +
+          '<div class="sv-player-time" id="svPlayerTime">0:00</div>' +
+        '</div>' +
+        '<div class="sv-player-subtitle" id="svPlayerSubtitle"></div>' +
+      '</div>';
+    document.body.appendChild(modal);
+  }
+  document.getElementById('svPlayerCover').textContent = d.cover || '🎧';
+  document.getElementById('svPlayerTitle').textContent = d.title || '';
+  document.getElementById('svPlayerSubtitle').textContent = (d.cues && d.cues.length) ? '' : (d.subtitle || '');
+  modal.classList.add('show');
+
+  if (_dramaAudio) { try { _dramaAudio.pause(); } catch(e){} _dramaAudio = null; }
+  _dramaAudio = new Audio(d.audioUrl);
+  _dramaAudio._cues = d.cues || null;
+  _dramaAudio.addEventListener('timeupdate', _onDramaTime);
+  _dramaAudio.addEventListener('ended', () => { const b = document.getElementById('svPlayBtn'); if (b) b.textContent = '▶'; });
+  _dramaAudio.play().then(() => { const b = document.getElementById('svPlayBtn'); if (b) b.textContent = '⏸'; }).catch(() => {});
+}
+
+function _toggleDrama() {
+  if (!_dramaAudio) return;
+  const b = document.getElementById('svPlayBtn');
+  if (_dramaAudio.paused) { _dramaAudio.play(); if (b) b.textContent = '⏸'; }
+  else { _dramaAudio.pause(); if (b) b.textContent = '▶'; }
+}
+
+function _seekDrama(e) {
+  if (!_dramaAudio || !_dramaAudio.duration) return;
+  const bar = document.getElementById('svPlayerBar');
+  const r = bar.getBoundingClientRect();
+  const p = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  _dramaAudio.currentTime = p * _dramaAudio.duration;
+}
+
+function _onDramaTime() {
+  const a = _dramaAudio;
+  if (!a) return;
+  const fill = document.getElementById('svPlayerFill');
+  const time = document.getElementById('svPlayerTime');
+  if (a.duration && fill) fill.style.width = (a.currentTime / a.duration * 100) + '%';
+  if (time) time.textContent = _fmtDramaTime(a.currentTime);
+  if (a._cues && a._cues.length) {
+    let line = '';
+    for (const c of a._cues) { if (a.currentTime >= c.t) line = c.text; else break; }
+    const s = document.getElementById('svPlayerSubtitle');
+    if (s && s.textContent !== line) s.textContent = line;
+  }
+}
+
+function _fmtDramaTime(s) { s = Math.floor(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+function _closeDramaPlayer() {
+  if (_dramaAudio) { try { _dramaAudio.pause(); } catch(e){} _dramaAudio = null; }
+  const m = document.getElementById('svPlayerModal');
+  if (m) m.classList.remove('show');
+}
+
+window._openDramaPlayer = _openDramaPlayer;
+window._toggleDrama = _toggleDrama;
+window._seekDrama = _seekDrama;
+window._closeDramaPlayer = _closeDramaPlayer;
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
