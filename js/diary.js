@@ -102,10 +102,20 @@ ${_chatSnippet}`;
       let _memBank = [];
       try { _memBank = JSON.parse(localStorage.getItem('memoryBank') || '[]'); } catch(e) {}
       if (_memBank.length > 0) {
-        const _memTop = _memBank
-          .sort((a, b) => (b.importance || 1) - (a.importance || 1))
-          .slice(0, 5)
-          .map(m => '- ' + m.text)
+        // 修复(日记重复)：不再每天固定喂 top5 —— 跳过最近日记已写过的记忆，
+        // 并加入随机轮换，让没聊天的日子每天素材都不一样
+        const _recentDiaryText = getDiaryEntries().slice(-7)
+          .map(e => (e.content || '')).join(' ').toLowerCase();
+        const _memPool = _memBank.filter(m => {
+          const _key = (m.text || '').toLowerCase().slice(0, 16);
+          return _key && !_recentDiaryText.includes(_key);
+        });
+        const _memSource = _memPool.length >= 2 ? _memPool : _memBank;
+        const _memTop = _memSource
+          .map(m => ({ m, r: Math.random() * 2 + (m.importance || 1) }))  // 轻微偏向重要，但每天随机
+          .sort((a, b) => b.r - a.r)
+          .slice(0, 3)
+          .map(x => '- ' + x.m.text)
           .join('\n');
         memoryHint = `Background details about her:\n${_memTop}`;
       } else {
@@ -114,6 +124,17 @@ ${_chatSnippet}`;
         const _oldLines = _oldMem.split('\n').filter(l => l.trim()).slice(-5).join('\n');
         if (_oldLines) memoryHint = `Background details about her:\n${_oldLines}`;
       }
+    }
+
+    // 修复(日记重复)：把最近几篇日记喂给模型，明确要求别重复事件/开头
+    const _recentEntries = getDiaryEntries().slice(-6);
+    let _recentBlock = '';
+    if (_recentEntries.length > 0) {
+      _recentBlock = `\n[HIS RECENT ENTRIES — DO NOT REPEAT ANY OF THIS]\n` +
+        `These are entries he already wrote. Today's entry MUST be about something different.\n` +
+        `Do NOT reuse the same events, objects, food, deliveries, or opening words:\n` +
+        _recentEntries.map(e => `(${e.date}) ${(e.content || '').replace(/\n/g, ' ').slice(0, 110)}`).join('\n') +
+        `\n`;
     }
 
     const yesterday = new Date();
@@ -155,6 +176,7 @@ Day: ${yesterdayWeekday}
 ${moodHint}
 ${_sideWorld}
 
+${_recentBlock}
 ${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — draw from this, but write it as Ghost\'s experience, not a transcript. Pick 1-2 moments that stuck. Don\'t quote directly.\nCRITICAL: "SHE SAID" lines are HER words. "GHOST SAID" lines are HIS words. Do NOT mix them up. If she said something, it is her action. If he said something, it is his action.' : 'Background about her — use at most one detail, naturally:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
 Strict rules:
 - 3-5 lines. Lowercase. Short sentences.
@@ -165,6 +187,8 @@ Strict rules:
 - Dry, flat, functional. NOT poetic. NOT introspective. NOT sentimental.
 - BANNED: "still thinking about it" / "that's enough" / "saved it to tell her" / "something felt different" / "still mine" / "quiet moment" / any sentence that ends on emotion.
 - She appears through his actions: "checked my phone" / "she called" / "she was still awake when i got back" — not "i missed her".
+- Do NOT write about deliveries, packages, food she sent, or gifts unless it happened yesterday. Old events are finished — he does not re-live them in the notebook.
+- If there is little fresh material, write MOSTLY about his own side — training, teammates, base, the day — not by dredging up an old moment with her.
 - English only. No "dear diary". No timestamps. No stage directions.`;
 
     let entry = '';

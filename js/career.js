@@ -48,8 +48,8 @@ const CAREER_DATA = {
     name: '咖啡师',
     titles: ['收银员','清洁工','学徒','初级咖啡师','咖啡师','高级咖啡师','店长','区域经理','培训总监','品牌主理人'],
     salary: [70, 130, 210, 340, 500, 700, 900, 1200, 1500, 1800],
-    perkDesc: '签到双倍奖励',
-    perkDetail: level => `签到奖励 ×${(1 + level * 0.1).toFixed(1)}`,
+    perkDesc: '签到翻倍 + 每日咖啡收入',
+    perkDetail: level => `签到奖励 ×${(1 + level * 0.1).toFixed(1)} + 每日 £${[5,8,12,16,20,24,28,32,36,40][level-1] || 5}`,
     speedMultiplier: 1,
   },
   programmer: {
@@ -91,8 +91,8 @@ const CAREER_DATA = {
     name: '作家',
     titles: ['自由撰稿人','专栏写手','签约作者','小说家','畅销作者','知名作家','大神作者','文学奖提名','文学奖得主','畅销作家'],
     salary: [60, 110, 190, 320, 500, 720, 1000, 1400, 1900, 2500],
-    perkDesc: '每日额外消息条数',
-    perkDetail: level => `每天额外 +${Math.ceil(level / 2)} 条消息`,
+    perkDesc: '每日额外消息条数 + 稿费',
+    perkDetail: level => `每天额外 +${Math.ceil(level / 2)} 条消息 + 稿费 £${[4,6,9,12,16,20,24,28,32,36][level-1] || 4}/天`,
     speedMultiplier: 1,
   },
 };
@@ -504,6 +504,54 @@ function checkEntertainerShow() {
   return income;
 }
 
+// ===== 咖啡师每日收入（照搬厨师模板）=====
+function checkBaristaIncome() {
+  const type = getCareer();
+  if (type !== 'barista') return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  if (localStorage.getItem('baristaIncomeDate') === today) return 0;
+
+  const level = getCareerLevel();
+  const income = [5, 8, 12, 16, 20, 24, 28, 32, 36, 40][level - 1] || 5;
+  const jobName = ['街边咖啡摊', '连锁店打工', '咖啡师接单', '咖啡师接单', '咖啡师接单',
+    '高级咖啡师', '店长分成', '店长分成', '培训课收入', '品牌分成'][level - 1] || '咖啡摊';
+
+  if (typeof addTransaction === 'function') {
+    addTransaction({ icon: '☕', name: jobName, amount: income });
+  }
+
+  localStorage.setItem('baristaIncomeDate', today);
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof renderWallet === 'function') renderWallet();
+  _showCareerNotification(`☕ ${jobName}收入 £${income}`);
+  return income;
+}
+
+// ===== 作家每日稿费（照搬厨师模板）=====
+function checkWriterRoyalty() {
+  const type = getCareer();
+  if (type !== 'writer') return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  if (localStorage.getItem('writerRoyaltyDate') === today) return 0;
+
+  const level = getCareerLevel();
+  const income = [4, 6, 9, 12, 16, 20, 24, 28, 32, 36][level - 1] || 4;
+  const jobName = ['豆瓣投稿', '专栏稿费', '签约稿费', '版税分成', '版税分成',
+    '畅销版税', '畅销版税', '影视改编费', '文学奖金', '畅销版税'][level - 1] || '稿费';
+
+  if (typeof addTransaction === 'function') {
+    addTransaction({ icon: '✍️', name: jobName, amount: income });
+  }
+
+  localStorage.setItem('writerRoyaltyDate', today);
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  if (typeof renderWallet === 'function') renderWallet();
+  _showCareerNotification(`✍️ ${jobName} £${income}`);
+  return income;
+}
+
 // 签到倍率（咖啡师）
 function getCareerCheckinMultiplier() {
   if (getCareer() !== 'barista') return 1;
@@ -698,6 +746,12 @@ function dailyCareerCheck() {
 
   // 8. 作家每日额外条数
   checkWriterBonus();
+
+  // 9. 咖啡师每日收入
+  checkBaristaIncome();
+
+  // 10. 作家每日稿费
+  checkWriterRoyalty();
 }
 
 // ===== 升级进度文字（供 profile 等模块显示）=====
