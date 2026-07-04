@@ -74,17 +74,6 @@ const TAKEOUT_MENUS = {
     { id: 'mcr6', cat: 'side',  emoji: '🍮', name: '曼彻斯特挞',    nameEn: 'Manchester Tart',           price:  5, desc: '覆盆子酱配卡仕达酱，椰蓉收尾，本地经典甜品' },
     { id: 'mcr7', cat: 'drink', emoji: '☕', name: '白咖啡+糕点',   nameEn: 'Flat White + Pastry',       price:  7, desc: '北角区咖啡店出品，浓缩加奶，配当日现烤糕点', hot: true },
     { id: 'mcr8', cat: 'drink', emoji: '🍺', name: '本地生啤',      nameEn: 'Local Ale',                 price:  5, desc: '曼彻斯特精酿，麦香浓，不甜腻，下班标配' },
-    // ── 外卖翻新：曼城新增普通菜 ──
-    { id: 'mcr9',  cat: 'main',  emoji: '🍲', name: '兰开夏火锅',    nameEn: 'Lancashire Hotpot',        price: 12, desc: '羊肉土豆慢炖一整天，北英格兰冬天的命根子，砂锅上桌还咕嘟着' },
-    { id: 'mcr10', cat: 'main',  emoji: '🍗', name: '烤鸡卷饼',      nameEn: 'Peri Peri Wrap',            price:  9, desc: '柯利班街的葡式辣鸡，裹进大饼里，辣酱管够' },
-    { id: 'mcr11', cat: 'side',  emoji: '🥧', name: '猪肉香肠卷',    nameEn: 'Sausage Roll',              price:  4, desc: '酥皮裹粗颗粒香肠肉，刚出炉最好，垫肚子首选' },
-    { id: 'mcr12', cat: 'drink', emoji: '🧋', name: '奶茶',          nameEn: 'Bubble Tea',                price:  5, desc: '中国城新开那家，珍珠煮得软，甜度可调' },
-    // ── 厨师专属·家常温情菜（Lv.3 解锁）──
-    { id: 'mcr_c1', cat: 'main', emoji: '🍳', name: '他妈妈的周日烤肉', nameEn: "Mum's Sunday Roast",     price: 11, desc: '烤牛肉配约克郡布丁和肉汁——他从小吃到大的味道，只有你能点给他', chefLevel: 3 },
-    { id: 'mcr_c2', cat: 'main', emoji: '🥔', name: '芝士焗土豆泥',   nameEn: 'Cheesy Mash Pie',           price:  9, desc: '厚厚一层烤到金黄的芝士盖着奶油土豆泥，家常、扎实、暖胃', chefLevel: 3 },
-    // ── 厨师专属·主厨私房菜（Lv.6 解锁）──
-    { id: 'mcr_p1', cat: 'main', emoji: '🦞', name: '威灵顿龙虾',     nameEn: 'Lobster Wellington',        price: 26, desc: '酥皮裹龙虾与松露，你亲手做的那种级别，摆盘讲究，只此一份', chefLevel: 6 },
-    { id: 'mcr_p2', cat: 'main', emoji: '🥩', name: '慢烤和牛肋',     nameEn: 'Slow-cooked Wagyu Rib',     price: 30, desc: '低温慢烤十二小时，入口即化，配红酒酱汁——米其林厨房出品', chefLevel: 6 },
   ],
 
   edinburgh: [
@@ -94,11 +83,6 @@ const TAKEOUT_MENUS = {
     { id: 'edn4', cat: 'side',  emoji: '🥧', name: '苏格兰肉馅饼',  nameEn: 'Scotch Pie',               price:  6, desc: '羊肉馅，硬皮，实在，冷天吃最对' },
     { id: 'edn5', cat: 'drink', emoji: '☕', name: '白咖啡',        nameEn: 'Flat White',                price:  4, desc: '本地烘焙出品，做得认真，不花哨' },
     { id: 'edn6', cat: 'drink', emoji: '🥃', name: '威士忌小样',    nameEn: 'Single Malt Sample',        price:  8, desc: '爱丁堡酒厂出的试饮装，产地直出，别一口闷' },
-    { id: 'edn7', cat: 'main',  emoji: '🐟', name: '炸鱼薯条',      nameEn: 'Fish Supper',               price: 11, desc: '苏格兰叫法是fish supper，鳕鱼裹厚面糊现炸，配盐和醋，海边风味', hot: true },
-    { id: 'edn8', cat: 'side',  emoji: '🥐', name: '黄油酥饼',      nameEn: 'Shortbread',                price:  4, desc: '苏格兰国民酥饼，纯黄油烤制，一掰就碎，配茶最好' },
-    { id: 'edn9', cat: 'side',  emoji: '🍫', name: '油炸玛氏巧克力', nameEn: 'Deep-fried Mars Bar',       price:  5, desc: '苏格兰炸物界的传奇，巧克力棒裹面糊下油锅，甜到上头，你敢试吗' },
-    { id: 'edn_c1', cat: 'main', emoji: '🍲', name: '苏格兰浓汤',    nameEn: 'Cullen Skink',              price: 10, desc: '烟熏黑线鳕、土豆和洋葱熬的奶油浓汤，苏格兰渔村家常，他说冷天喝这个最顶事', chefLevel: 3 },
-    { id: 'edn_p1', cat: 'main', emoji: '🦌', name: '威士忌炖鹿肉',  nameEn: 'Venison in Whisky',         price: 28, desc: '苏格兰高地鹿肉配单一麦芽慢炖，酒香浸进肉里——他给你露一手的那种', chefLevel: 6 },
   ],
 
   hereford: [
@@ -108,11 +92,6 @@ const TAKEOUT_MENUS = {
     { id: 'hfd4', cat: 'side',  emoji: '🧀', name: '奶酪吐司',      nameEn: 'Cheese on Toast',           price:  4, desc: '切达奶酪厚铺，烤到起泡，英式懒人食物代表' },
     { id: 'hfd5', cat: 'drink', emoji: '🍎', name: '苹果酒',        nameEn: 'Hereford Cider',            price:  6, desc: 'Hereford苹果酒产区出品，清甜微酸，这边著名', hot: true },
     { id: 'hfd6', cat: 'drink', emoji: '☕', name: '白咖啡',        nameEn: 'Flat White',                price:  4, desc: '基地周边小咖啡馆，够喝' },
-    { id: 'hfd7', cat: 'main',  emoji: '🍖', name: '烤羊排',        nameEn: 'Roast Lamb',                price: 13, desc: '本地牧场羊肉，迷迭香烤制，配薄荷酱，周末小馆子的招牌', hot: true },
-    { id: 'hfd8', cat: 'side',  emoji: '🥓', name: '培根卷',        nameEn: 'Bacon Bap',                 price:  4, desc: '厚切培根夹进软面包，挤一圈棕酱，训练完最想来一个' },
-    { id: 'hfd9', cat: 'side',  emoji: '🍰', name: '维多利亚海绵蛋糕', nameEn: 'Victoria Sponge',         price:  5, desc: '果酱夹奶油的经典英式下午茶蛋糕，甜得朴实' },
-    { id: 'hfd_c1', cat: 'main', emoji: '🥧', name: '牧羊人派',     nameEn: "Shepherd's Pie",            price:  9, desc: '羊肉末炖菜上盖厚土豆泥烤到金黄，军营家常味，他说这是最扛饿的一口', chefLevel: 3 },
-    { id: 'hfd_p1', cat: 'main', emoji: '🥩', name: '惠灵顿牛排',   nameEn: 'Beef Wellington',           price: 29, desc: '酥皮裹菲力与蘑菇酱，切开粉嫩多汁——他休假在家给你做过一次的硬菜', chefLevel: 6 },
   ],
 
   london: [
@@ -123,11 +102,6 @@ const TAKEOUT_MENUS = {
     { id: 'ldn5', cat: 'side',  emoji: '🐟', name: '炸鱼薯条',      nameEn: 'Fish & Chips',              price: 13, desc: '正宗薯条店，报纸包裹，鳕鱼现炸，经典不出错' },
     { id: 'ldn6', cat: 'drink', emoji: '☕', name: '特调白咖啡',    nameEn: 'Flat White',                price:  5, desc: '精品咖啡馆出品，他喝得快' },
     { id: 'ldn7', cat: 'drink', emoji: '🧃', name: '鲜榨果汁',      nameEn: 'Fresh Juice',               price:  4, desc: '市场现榨，橙汁或苹果汁，看当天' },
-    { id: 'ldn8', cat: 'main',  emoji: '🍗', name: '烤鸡主日餐',    nameEn: 'Sunday Roast Chicken',      price: 14, desc: '酒馆周日限定，烤鸡配烤土豆、约克郡布丁和肉汁，一周就等这顿', hot: true },
-    { id: 'ldn9', cat: 'side',  emoji: '🥧', name: '康沃尔肉派',    nameEn: 'Cornish Pasty',             price:  5, desc: '厚实酥皮裹牛肉土豆，矿工午餐起家，单手拿着就能吃' },
-    { id: 'ldn10', cat: 'side', emoji: '🧁', name: '英式司康',      nameEn: 'Scone & Clotted Cream',     price:  6, desc: '配凝脂奶油和草莓酱，先抹奶油还是先抹酱，伦敦人能吵一整天' },
-    { id: 'ldn_c1', cat: 'main', emoji: '🫓', name: '烤芝士三明治', nameEn: 'Toastie',                   price:  8, desc: '厚切面包夹三种奶酪压烤，边角焦脆拉丝，他深夜值班后最想要的那口', chefLevel: 3 },
-    { id: 'ldn_p1', cat: 'main', emoji: '🦆', name: '橙汁烤鸭胸',   nameEn: 'Duck à l\'Orange',          price: 27, desc: '鸭胸煎到皮脆，配橙香酱汁，摆盘讲究——他难得正经下厨的水准', chefLevel: 6 },
   ],
 
   germany: [
@@ -137,11 +111,6 @@ const TAKEOUT_MENUS = {
     { id: 'deu4', cat: 'side',  emoji: '🥗', name: '德式土豆沙拉',  nameEn: 'Kartoffelsalat',            price:  6, desc: '温热版，培根碎配醋汁，不是美式那种加蛋黄酱的' },
     { id: 'deu5', cat: 'drink', emoji: '☕', name: '黑咖啡',        nameEn: 'Schwarzer Kaffee',          price:  3, desc: '德式滴滤，浓度高，不加奶，直接喝' },
     { id: 'deu6', cat: 'drink', emoji: '🍺', name: '精酿啤酒',      nameEn: 'Craft Beer',                price:  6, desc: '本地小酿酒厂出品，每次口味不一样', hot: true },
-    { id: 'deu7', cat: 'main',  emoji: '🌭', name: '咖喱香肠配薯条', nameEn: 'Currywurst & Pommes',       price:  9, desc: '柏林街头之魂，香肠切段浇咖喱番茄酱，撒咖喱粉，配薯条', hot: true },
-    { id: 'deu8', cat: 'main',  emoji: '🍖', name: '维也纳炸肉排',  nameEn: 'Schnitzel',                 price: 13, desc: '猪肉锤薄裹面包糠炸金黄，挤柠檬汁，配土豆沙拉，大得盖过盘子' },
-    { id: 'deu9', cat: 'side',  emoji: '🍰', name: '黑森林蛋糕',    nameEn: 'Black Forest Cake',         price:  6, desc: '樱桃酒巧克力海绵配奶油和黑樱桃，德国甜品的门面担当' },
-    { id: 'deu_c1', cat: 'main', emoji: '🥘', name: '炖牛肉配面疙瘩', nameEn: 'Gulasch & Spätzle',        price: 10, desc: '慢炖牛肉配手工面疙瘩，浓汤裹面，德国冬天的家常暖锅，他驻训时房东常做', chefLevel: 3 },
-    { id: 'deu_p1', cat: 'main', emoji: '🦢', name: '烤鹅配红甘蓝',  nameEn: 'Roast Goose',               price: 26, desc: '圣诞级别的烤鹅，皮脆油亮配红甘蓝和团子，一年做不了几回的大菜', chefLevel: 6 },
   ],
 
   norway: [
@@ -151,11 +120,6 @@ const TAKEOUT_MENUS = {
     { id: 'nor4', cat: 'side',  emoji: '🧇', name: '华夫饼配果酱',  nameEn: 'Waffle & Jam',              price:  6, desc: '挪威心形华夫饼，配酸奶油和草莓酱，不像甜品更像主食' },
     { id: 'nor5', cat: 'drink', emoji: '☕', name: '黑咖啡',        nameEn: 'Kaffe',                     price:  4, desc: '挪威人均咖啡消耗量全球前三，这杯说明问题' },
     { id: 'nor6', cat: 'drink', emoji: '🍫', name: '热巧克力',      nameEn: 'Varm Kakao',                price:  5, desc: '冷天标配，浓稠，是真的融化巧克力，不是冲粉' },
-    { id: 'nor7', cat: 'main',  emoji: '🌭', name: '挪威热狗',      nameEn: 'Pølse i Lompe',             price:  7, desc: '香肠裹土豆薄饼，加脆洋葱和虾沙拉酱，挪威加油站的国民快餐', hot: true },
-    { id: 'nor8', cat: 'side',  emoji: '🍥', name: '肉桂卷',        nameEn: 'Skillingsbolle',            price:  5, desc: '卑尔根招牌大肉桂卷，外脆内软，肉桂糖心流心，配咖啡绝配' },
-    { id: 'nor9', cat: 'side',  emoji: '🐟', name: '腌三文鱼',      nameEn: 'Gravlaks',                  price:  9, desc: '莳萝和盐腌渍的生三文鱼薄片，配芥末酱和黑面包，北欧经典冷盘' },
-    { id: 'nor_c1', cat: 'main', emoji: '🍲', name: '挪威鱼汤',     nameEn: 'Fiskesuppe',                price: 11, desc: '奶油底海鲜汤，三文鱼鳕鱼和根茎菜，鲜甜暖身，他说极地驻训时最想念这一锅', chefLevel: 3 },
-    { id: 'nor_p1', cat: 'main', emoji: '🦌', name: '慢炖驯鹿里脊',  nameEn: 'Reinsdyrfilet',             price: 30, desc: '驯鹿里脊煎到三分，配杜松子酱和棕奶酪，北欧顶级野味——他难得的隆重手艺', chefLevel: 6 },
   ],
 
   poland: [
@@ -165,11 +129,6 @@ const TAKEOUT_MENUS = {
     { id: 'pol4', cat: 'side',  emoji: '🥐', name: '奶酪酥饼',      nameEn: 'Sernik Slice',              price:  5, desc: '波兰奶酪蛋糕，质地密实，不过甜，配咖啡刚好' },
     { id: 'pol5', cat: 'drink', emoji: '☕', name: '黑咖啡',        nameEn: 'Kawa',                      price:  3, desc: '波兰咖啡文化很认真，这杯不会让你失望' },
     { id: 'pol6', cat: 'drink', emoji: '🍺', name: '本地啤酒',      nameEn: 'Piwo',                      price:  5, desc: 'Żywiec或Tyskie，波兰最常见的两个牌子，随机' },
-    { id: 'pol7', cat: 'main',  emoji: '🍖', name: '炸猪排配土豆',  nameEn: 'Kotlet Schabowy',           price: 11, desc: '波兰版炸肉排，猪里脊锤薄裹糠炸，配土豆泥和腌黄瓜，周日午餐标配', hot: true },
-    { id: 'pol8', cat: 'main',  emoji: '🥬', name: '猎人炖菜',      nameEn: 'Bigos',                     price: 10, desc: '酸菜、鲜白菜和多种肉一起慢炖，越炖越入味，波兰人过冬的命根子' },
-    { id: 'pol9', cat: 'side',  emoji: '🍩', name: '波兰甜甜圈',    nameEn: 'Pączki',                    price:  4, desc: '玫瑰果酱夹心的炸甜甜圈，撒糖霜，肥美星期四人手一个' },
-    { id: 'pol_c1', cat: 'main', emoji: '🥟', name: '奶奶的手工饺子', nameEn: "Babcia's Pierogi",         price:  9, desc: '土豆奶酪馅手工饺子，煎到两面金黄配焦洋葱，最费功夫的家常味，他说这个得慢慢包', chefLevel: 3 },
-    { id: 'pol_p1', cat: 'main', emoji: '🦆', name: '烤鸭配苹果',   nameEn: 'Kaczka z Jabłkami',         price: 25, desc: '整鸭塞苹果慢烤，皮脆肉嫩配红酒李子酱，波兰节庆大菜，他偶尔郑重其事做一回', chefLevel: 6 },
   ],
 
   amsterdam: [
@@ -180,11 +139,6 @@ const TAKEOUT_MENUS = {
     { id: 'ams5', cat: 'side',  emoji: '🍪', name: '焦糖夹心饼',    nameEn: 'Stroopwafel',               price:  5, desc: '荷兰国民饼干，焦糖糖浆夹心，放热咖啡上化开最好吃' },
     { id: 'ams6', cat: 'drink', emoji: '☕', name: '白咖啡',        nameEn: 'Flat White',                price:  4, desc: '荷兰咖啡文化成熟，这杯水准稳定' },
     { id: 'ams7', cat: 'drink', emoji: '🍺', name: '海尼根生啤',    nameEn: 'Heineken Draft',            price:  6, desc: '发源地喝和其他地方不一样，新鲜度有区别', hot: true },
-    { id: 'ams8', cat: 'main',  emoji: '🍟', name: '荷式薯条',      nameEn: 'Patatje Oorlog',            price:  7, desc: '厚切薯条浇蛋黄酱、沙嗲酱和生洋葱，名字直译是"战争薯条"，乱得好吃', hot: true },
-    { id: 'ams9', cat: 'side',  emoji: '🧀', name: '陈年高达奶酪',  nameEn: 'Aged Gouda',                price:  6, desc: '奶酪市场现切的老高达，结晶颗粒感，咸香浓郁，配芥末最好' },
-    { id: 'ams10', cat: 'main', emoji: '🥞', name: '荷兰厚松饼',    nameEn: 'Pannenkoek',                price:  8, desc: '盘子那么大的荷兰薄煎饼，可甜可咸，培根配糖浆是经典邪道吃法' },
-    { id: 'ams_c1', cat: 'main', emoji: '🍲', name: '荷式豌豆汤',   nameEn: 'Snert',                     price:  9, desc: '浓到勺子能立住的豌豆汤，配烟熏香肠和黑麦面包，运河结冰时的家常暖汤', chefLevel: 3 },
-    { id: 'ams_p1', cat: 'main', emoji: '🦞', name: '白酒煮青口',   nameEn: 'Mosselen',                  price: 24, desc: '泽兰青口白葡萄酒煮，配薯条和蒜香蛋黄酱，一大锅——他兴致来了才张罗的', chefLevel: 6 },
   ],
 
   paris: [
@@ -194,11 +148,6 @@ const TAKEOUT_MENUS = {
     { id: 'par4', cat: 'side',  emoji: '🥐', name: '黄油可颂',      nameEn: 'Croissant au Beurre',       price:  4, desc: '巴黎烘焙坊出品，层次分明，奶油味足，早晚都能吃' },
     { id: 'par5', cat: 'side',  emoji: '🧁', name: '马卡龙礼盒',    nameEn: 'Macarons',                  price:  8, desc: '法式杏仁饼，六颗装，口味看当天，不是超甜那种' },
     { id: 'par6', cat: 'drink', emoji: '☕', name: '浓缩咖啡',      nameEn: 'Café Espresso',             price:  3, desc: '法式小杯，站在吧台喝，一口下去，清醒' },
-    { id: 'par10', cat: 'main',  emoji: '🥖', name: '火腿黄油三明治', nameEn: 'Jambon-Beurre',            price:  7, desc: '一截长棍面包，抹厚黄油夹火腿，简单到极致，法国人日常的午餐之王', hot: true },
-    { id: 'par8', cat: 'main',  emoji: '🧅', name: '法式洋葱汤',    nameEn: 'Soupe à l\'Oignon',         price:  9, desc: '洋葱慢炒到焦糖色熬汤，盖厚面包和格鲁耶尔奶酪烤到融化拉丝，冬夜救赎' },
-    { id: 'par9', cat: 'side',  emoji: '🥞', name: '可丽饼',        nameEn: 'Crêpe Sucrée',              price:  5, desc: '街边现摊的薄可丽饼，抹榛子酱或撒糖挤柠檬，边走边吃' },
-    { id: 'par_c1', cat: 'main', emoji: '🍳', name: '奶油蘑菇烘蛋', nameEn: 'Omelette aux Champignons',  price:  8, desc: '外层微焦内里流心的法式厚蛋，裹奶油蘑菇，看着简单最考功夫，他学厨时练过千百遍', chefLevel: 3 },
-    { id: 'par_p1', cat: 'main', emoji: '🍷', name: '红酒烩牛肉',   nameEn: 'Bœuf Bourguignon',          price: 26, desc: '勃艮第红酒炖牛肉，配培根蘑菇珍珠洋葱，炖足三小时——他给你煮过的那道法式经典', chefLevel: 6 },
     { id: 'par7', cat: 'drink', emoji: '🍷', name: '红酒',          nameEn: 'Vin Rouge',                 price:  8, desc: '餐厅推荐的当日酒款，不贵，但喝得出用心', hot: true },
   ],
 
@@ -208,12 +157,6 @@ const TAKEOUT_MENUS = {
     { id: 'dub3', cat: 'main',  emoji: '🍳', name: '爱尔兰全早餐',  nameEn: 'Full Irish Breakfast',      price: 10, desc: '培根、煎蛋、黑白布丁、炒豆、土司，爱尔兰版全英早餐' },
     { id: 'dub4', cat: 'side',  emoji: '🍟', name: '薯条配醋',      nameEn: 'Chips & Vinegar',           price:  5, desc: '麦芽醋浇薯条，爱尔兰人的固执，不接受其他酱' },
     { id: 'dub5', cat: 'drink', emoji: '🍺', name: '健力士生啤',    nameEn: 'Guinness Draft',            price:  7, desc: '发源地的健力士和其他地方确实不一样，倒法也有讲究', hot: true },
-    { id: 'dub10', cat: 'main',  emoji: '🐟', name: '炸鱼薯条',      nameEn: 'Fish & Chips',              price: 11, desc: '都柏林海边老店，新鲜鳕鱼裹脆浆现炸，报纸一包，撒盐和麦芽醋', hot: true },
-    { id: 'dub7', cat: 'main',  emoji: '🥔', name: '培根卷心菜配土豆泥', nameEn: 'Bacon & Cabbage',      price: 10, desc: '爱尔兰最家常的一锅，咸培根煮卷心菜配黄油土豆泥，朴实到骨子里' },
-    { id: 'dub8', cat: 'side',  emoji: '🍞', name: '苏打面包',      nameEn: 'Soda Bread',                price:  4, desc: '不用酵母的爱尔兰快速面包，外壳硬实内里绵密，抹黄油配汤最好' },
-    { id: 'dub9', cat: 'side',  emoji: '🥧', name: '贝利芝士蛋糕',  nameEn: 'Baileys Cheesecake',        price:  6, desc: '掺了贝利甜酒的芝士蛋糕，奶香里透着酒香，爱尔兰式的甜蜜收尾' },
-    { id: 'dub_c1', cat: 'main', emoji: '🥣', name: '海鲜杂烩浓汤',  nameEn: 'Seafood Chowder',           price: 10, desc: '奶油底熬鲑鱼、青口和土豆，配苏打面包蘸着吃，西海岸渔村家常，他说阴雨天就该喝这个', chefLevel: 3 },
-    { id: 'dub_p1', cat: 'main', emoji: '🥩', name: '黑啤炖牛肉',   nameEn: 'Guinness Beef Stew',        price: 24, desc: '健力士黑啤慢炖牛肋肉，浓稠挂勺配根茎菜，炖到肉一抿就化——他难得下厨的招牌', chefLevel: 6 },
     { id: 'dub6', cat: 'drink', emoji: '☕', name: '爱尔兰咖啡',    nameEn: 'Irish Coffee',              price:  6, desc: '热咖啡加威士忌，顶部浮鲜奶油，不是甜品是饮品' },
   ],
 
@@ -226,12 +169,6 @@ const TAKEOUT_MENUS = {
     { id: 'tky6', cat: 'side',  emoji: '🍙', name: '饭团',          nameEn: 'Onigiri',                   price:  4, desc: '便利店级别但是真的好吃，海苔包裹，口味随机' },
     { id: 'tky7', cat: 'drink', emoji: '🍵', name: '抹茶拿铁',      nameEn: 'Matcha Latte',              price:  5, desc: '宇治抹茶粉，不苦不腻，比星巴克那种正宗很多', hot: true },
     { id: 'tky8', cat: 'drink', emoji: '🥤', name: '日本啤酒',      nameEn: 'Asahi / Sapporo',           price:  5, desc: '朝日或札幌，罐装，冰镇，配什么都行' },
-    { id: 'tky9', cat: 'main',  emoji: '🍗', name: '日式炸鸡',      nameEn: 'Karaage',                   price:  9, desc: '腌了姜蒜酱油的鸡块裹淀粉炸得外脆多汁，居酒屋头牌，配啤酒绝配', hot: true },
-    { id: 'tky10', cat: 'main', emoji: '🥟', name: '煎饺',          nameEn: 'Gyoza',                     price:  7, desc: '底面煎脆的猪肉白菜饺子，配醋和辣油，拉面店的黄金搭档' },
-    { id: 'tky11', cat: 'side', emoji: '🐙', name: '章鱼烧',        nameEn: 'Takoyaki',                  price:  6, desc: '外软内嫩的章鱼小丸子，浇酱汁撒木鱼花，刚出炉烫嘴也停不下来' },
-    { id: 'tky12', cat: 'side', emoji: '🥮', name: '铜锣烧',        nameEn: 'Dorayaki',                  price:  4, desc: '两片蜂蜜松饼夹红豆馅，甜而不腻，哆啦A梦最爱的那个' },
-    { id: 'tky_c1', cat: 'main', emoji: '🍲', name: '关东煮',       nameEn: 'Oden',                      price:  9, desc: '昆布高汤慢煮萝卜、鸡蛋、鱼糕和魔芋，越煮越入味，他驻训时便利店常买的暖胃夜宵', chefLevel: 3 },
-    { id: 'tky_p1', cat: 'main', emoji: '🍱', name: '怀石便当',     nameEn: 'Kaiseki Bento',             price: 28, desc: '一格一格精致摆盘的时令怀石，刺身、天妇罗、玉子烧样样讲究——他认真起来的手艺', chefLevel: 6 },
   ],
 };
 
@@ -378,14 +315,7 @@ function _renderShopTab(body, city) {
   }
 
   const menu  = TAKEOUT_MENUS[city] || [];
-  // 厨师专属菜：非厨师 / 等级不够 → 不显示（chefLevel 字段控制）
-  const _isChefTk = typeof getCareer === 'function' && getCareer() === 'chef';
-  const _chefLvTk = _isChefTk && typeof getCareerLevel === 'function' ? getCareerLevel() : 0;
-  const items = menu.filter(m => {
-    if (m.cat !== _menuTab) return false;
-    if (m.chefLevel) return _isChefTk && _chefLvTk >= m.chefLevel;
-    return true;
-  });
+  const items = menu.filter(m => m.cat === _menuTab);
   const cats  = { main: '正餐', side: '小食', drink: '饮品' };
 
   const banner = coldWar
@@ -410,7 +340,6 @@ function _renderShopTab(body, city) {
         <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">
           <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fde8c0;color:#8a4800;font-weight:600;">${cats[item.cat]}</span>
           ${item.hot ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#ffe0c0;color:#b03000;font-weight:600;">常点</span>` : ''}
-          ${item.chefLevel ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#f0d0f0;color:#802080;font-weight:600;">👩‍🍳 厨师专属</span>` : ''}
           ${hasDiscount ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#e0f0d0;color:#3a7020;font-weight:600;">厨师折扣</span>` : ''}
         </div>
       </div>
@@ -946,11 +875,11 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
           // API 失败或破防时兜底
           if (!_line) {
             const _fallbacks = [
-              `got it. ${order.nameEn || order.name}.`,
-              `it's here. thanks.`,
-              `just arrived. not bad.`,
-              `${order.nameEn || order.name}. still warm.`,
-              `noted. eating.`,
+              `${order.nameEn || order.name} just got here. still warm.\nyou didn't have to. but i'm not complaining.`,
+              `it's here — ${order.nameEn || order.name}.\nyou were thinking about me. noted.`,
+              `${order.nameEn || order.name} arrived. smells good.\nyou keep doing this. i keep letting you.`,
+              `got the ${order.nameEn || order.name}.\ndidn't expect it. sitting down to eat now.`,
+              `${order.nameEn || order.name}, still hot.\nyou always know when i haven't eaten.`,
             ];
             _line = _fallbacks[Math.floor(Math.random() * _fallbacks.length)];
           }
@@ -966,7 +895,7 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
         } catch(e) {
           console.warn('[外卖] 回复生成失败:', e);
           // 网络错误也兜底
-          const _fb = [`got it.`, `it's here.`, `eating.`];
+          const _fb = [`it's here. still warm. you didn't have to.`, `got it — sitting down to eat now. thanks, love.`, `arrived safe. you always know when i'm hungry.`];
           const _fallbackLine = _fb[Math.floor(Math.random() * _fb.length)];
           if (typeof appendMessage === 'function') appendMessage('bot', _fallbackLine);
           if (typeof chatHistory !== 'undefined') {

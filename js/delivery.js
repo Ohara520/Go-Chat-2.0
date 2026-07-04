@@ -352,7 +352,7 @@ function checkDeliveryUpdates() {
               const _note = `You sent her 「${d.name}」 on ${_dateStr}${_reasonTag}. She received it. If she brings it up, acknowledge — this was from you. Do not deny sending it.`;
               if (!_ltm.includes(d.name)) {
                 const _ltmLines = (_ltm + '\n' + _note).trim().split('\n').filter(l => l.trim());
-                const _ltmTrimmed = _ltmLines.length > 15 ? _ltmLines.slice(-15).join('\n') : _ltmLines.join('\n');
+                const _ltmTrimmed = _ltmLines.length > 30 ? _ltmLines.slice(-30).join('\n') : _ltmLines.join('\n');
                 localStorage.setItem('longTermMemory', _ltmTrimmed);
                 if (typeof touchLocalState === 'function') touchLocalState();
                 if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
@@ -366,7 +366,7 @@ function checkDeliveryUpdates() {
               const _note = `She sent you 「${d.name}」. You received it. If she asks, confirm.`;
               if (!_ltm.includes(d.name)) {
                 const _ltmLines = (_ltm + '\n' + _note).trim().split('\n').filter(l => l.trim());
-                const _ltmTrimmed = _ltmLines.length > 15 ? _ltmLines.slice(-15).join('\n') : _ltmLines.join('\n');
+                const _ltmTrimmed = _ltmLines.length > 30 ? _ltmLines.slice(-30).join('\n') : _ltmLines.join('\n');
                 localStorage.setItem('longTermMemory', _ltmTrimmed);
                 if (typeof touchLocalState === 'function') touchLocalState();
               }
@@ -685,7 +685,7 @@ async function showMysteryPackage(delivery) {
     const _note = `You sent her 「${delivery.name}」. She received it.`;
     if (!_ltm.includes(delivery.name)) {
       const _ltmLines = (_ltm + '\n' + _note).trim().split('\n').filter(l => l.trim());
-                const _ltmTrimmed = _ltmLines.length > 15 ? _ltmLines.slice(-15).join('\n') : _ltmLines.join('\n');
+                const _ltmTrimmed = _ltmLines.length > 30 ? _ltmLines.slice(-30).join('\n') : _ltmLines.join('\n');
                 localStorage.setItem('longTermMemory', _ltmTrimmed);
       if (typeof touchLocalState === 'function') touchLocalState();
     }

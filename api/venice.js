@@ -32,13 +32,28 @@ const _DEGLUE_WORDS = new Set((
   "i'll you'll we'll they'll it'll he'll she'll i'd you'd we'd they'd he'd she'd i've you've we've they've " +
   "gonna wanna gotta lemme " +
   "something anything nothing everything someone anyone everyone somewhere anywhere everywhere nowhere " +
-  "exactly already always never sometimes ever supposed change relationship complicated understand everything something beautiful comfortable conversation immediately absolutely different remember together whatever forever probably actually finally honestly seriously"
+  "exactly already always never sometimes ever supposed change no push button figure face soon those person people mind mine sound round found around ground word world could would should relationship complicated understand everything something beautiful comfortable conversation immediately absolutely different remember together whatever forever probably actually finally honestly seriously"
 ).split(/\s+/).filter(Boolean));
 
 function _deglue(txt) {
   if (!txt) return txt;
   let s = txt.replace(/\s*([\u2014\u2013])\s*/g, ' $1 ').replace(/([.,!?;:])(?=[A-Za-z])/g, '$1 ');
-  if (!/[A-Za-z'\u2019]{11,}/.test(s)) return s.replace(/[ \t]{2,}/g, ' ').trim();
+  if (!/[A-Za-z'\u2019]{8,}/.test(s)) return s.replace(/[ \t]{2,}/g, ' ').trim();
+  const _isW = (sub) => {
+    if (sub.length === 1) return sub === 'i' || sub === 'a';
+    if (_DEGLUE_WORDS.has(sub)) return true;
+    const _suf = ['s','es','ed','ing','er','ers','est','ly','ies','ings'];
+    for (const suf of _suf) {
+      if (sub.length > suf.length + 1 && sub.endsWith(suf)) {
+        const base = sub.slice(0, -suf.length);
+        if (_DEGLUE_WORDS.has(base)) return true;
+        if ((suf==='ing'||suf==='ed'||suf==='er') && _DEGLUE_WORDS.has(base+'e')) return true;
+        if ((suf==='ing'||suf==='ed'||suf==='er') && base.length>=3 && base[base.length-1]===base[base.length-2] && _DEGLUE_WORDS.has(base.slice(0,-1))) return true;
+        if (suf==='ies' && _DEGLUE_WORDS.has(base+'y')) return true;
+      }
+    }
+    return false;
+  };
   const _seg = (run) => {
     const low = run.toLowerCase().replace(/\u2019/g, "'");
     const n = low.length;
@@ -46,24 +61,15 @@ function _deglue(txt) {
     const cut = new Array(n + 1).fill(0);
     for (let i = n - 1; i >= 0; i--) {
       for (let k = Math.min(18, n - i); k >= 1; k--) {
-        const sub = low.slice(i, i + k);
-        const isW = (k === 1) ? (sub === 'i' || sub === 'a' || sub === 'o') : _DEGLUE_WORDS.has(sub);
-        if (isW && ok[i + k]) { ok[i] = true; cut[i] = k; break; }
+        if (_isW(low.slice(i, i + k)) && ok[i + k]) { ok[i] = true; cut[i] = k; break; }
       }
     }
-    if (ok[0]) { const out = []; let i = 0; while (i < n) { out.push(run.slice(i, i + cut[i])); i += cut[i]; } return out.join(' '); }
-    const out = []; let i = 0; let buf = '';
-    while (i < n) {
-      let L = 0;
-      for (let k = Math.min(18, n - i); k >= 2; k--) { if (_DEGLUE_WORDS.has(low.slice(i, i + k))) { L = k; break; } }
-      if (!L && (low[i] === 'i' || low[i] === 'a')) { if (i + 1 >= n || _DEGLUE_WORDS.has(low.slice(i+1, i+3)) || _DEGLUE_WORDS.has(low.slice(i+1, i+4))) L = 1; }
-      if (L) { if (buf) { out.push(buf); buf = ''; } out.push(run.slice(i, i + L)); i += L; }
-      else { buf += run.slice(i, i + 1); i += 1; }
-    }
-    if (buf) out.push(buf);
+    if (!ok[0]) return run;
+    const out = []; let i = 0;
+    while (i < n) { out.push(run.slice(i, i + cut[i])); i += cut[i]; }
     return out.join(' ');
   };
-  s = s.replace(/[A-Za-z][A-Za-z'\u2019]{9,}/g, (m) => _seg(m));
+  s = s.replace(/[A-Za-z][A-Za-z'\u2019]{7,}/g, (m) => _seg(m));
   return s.replace(/[ \t]{2,}/g, ' ').trim();
 }
 
