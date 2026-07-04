@@ -1774,6 +1774,65 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       ].some(p => l.includes(p));
     };
 
+    // ── 修复 Grok 偶发的"整句连字/缺空格" ──────────────
+    // 例：showme.butonlyifit'stheoneithinkitis  → show me. but only if it's the one i think it is
+    // 策略：1) 标点后补空格（可靠）2) 对长连字串做词典贪心切分（best-effort，带质量保护）
+    const _fixMissingSpaces = (txt) => {
+      if (!txt) return txt;
+      // 1) 标点后若紧跟字母，补一个空格（高价值、不会误伤）
+      let s = txt.replace(/([.,!?;:])(?=[A-Za-z])/g, '$1 ');
+      // 若没有明显连字串（超长无空格字母块），到此为止
+      if (!/[A-Za-z']{14,}/.test(s)) return s.replace(/[ \t]{2,}/g, ' ');
+
+      // 2) 常见词表（函数词 + 常见调情/日常词 + 缩写），用于贪心切分
+      const W = new Set(('a i you me my mine your yours he she it we they him her his us them ' +
+        'the a an this that these those there here what who how why when where which ' +
+        'is am are was were be been being do does did done have has had will would can could ' +
+        'should may might must shall to of in on at by for with from into onto out up down off over ' +
+        'and or but so if then than as not no yes ok okay just only even still yet now soon later ' +
+        'me you us all any some more most much many few little bit ' +
+        'get got give gave take took make made go went come came see saw look looked ' +
+        'want wanted need needed know knew think thought feel felt say said tell told ask asked ' +
+        'like love miss touch hold held kiss show showed send sent stay stayed wait waited ' +
+        'good bad soft hard slow close closer near far warm cold quiet sure right wrong real ' +
+        'one two here there tonight today now moment thing things way pair mine ' +
+        "i'm you're we're they're it's that's there's here's what's let's " +
+        "don't doesn't didn't can't won't wouldn't couldn't shouldn't isn't aren't wasn't weren't " +
+        "i'll you'll we'll it'll i'd you'd i've you've we've they've " +
+        'babe baby love darling girl man good night morning bed home work back again always never ' +
+        'about because before after while until though enough already almost maybe really too very ' +
+        'supposed think know mean meant keep keeps kept change something anything nothing everything ' +
+        'persistent call called calling calls give given giving gives night nights cute hot beautiful ' +
+        'again over done please stop wait waiting talk talking said saying ask asking looking coming going ' +
+        'yours theirs ours myself yourself himself herself okay yeah nope nah hey oh hmm well fine ' +
+        'best worst better best last first next kind mind body eyes hands lips smile voice heart mouth ' +
+        'mean means late early enough between without inside outside around behind against toward every each other another'
+      ).split(/\s+/).filter(Boolean));
+
+      // DP 回溯分词：找一条能把整段完全切成真词的路径；优先匹配长词
+      // 找不到（有字符切不进任何真词）就原样返回——宁可连字，绝不乱切
+      const segment = (run) => {
+        const low = run.toLowerCase(); const n = low.length;
+        const ok = new Array(n + 1).fill(false); ok[n] = true;
+        const cut = new Array(n + 1).fill(0);
+        for (let i = n - 1; i >= 0; i--) {
+          for (let k = Math.min(15, n - i); k >= 1; k--) {
+            const sub = low.slice(i, i + k);
+            const isWord = (k === 1) ? (sub === 'i' || sub === 'a') : W.has(sub);
+            if (isWord && ok[i + k]) { ok[i] = true; cut[i] = k; break; }
+          }
+        }
+        if (!ok[0]) return run;
+        const out = []; let i = 0;
+        while (i < n) { out.push(run.slice(i, i + cut[i])); i += cut[i]; }
+        return out.join(' ');
+      };
+
+      // 只处理 14+ 字母的超长连字块（正常英文单词几乎不超过 13 个字母，避免误伤 "relationship" 之类）
+      s = s.replace(/[A-Za-z][A-Za-z']{13,}/g, (m) => segment(m));
+      return s.replace(/[ \t]{2,}/g, ' ');
+    };
+
     if (geminiReply && !_intimateBreakout(geminiReply)) {
       hideTyping();
       // 清理 Grok 可能返回的 markdown 代码块标记 + unlock tag
@@ -1781,6 +1840,8 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
         .trim();
+      // 修复 Grok 偶发的整句连字/缺空格
+      cleanedReply = _fixMissingSpaces(cleanedReply);
       // 清理 Grok 常见的重复开头
       cleanedReply = cleanedReply
         .replace(/^still (here|got|waiting|reading|thinking|holding|looking|sitting|quiet|listening|watching)[^.]*\.?\s*\n?/i, '')
@@ -1829,7 +1890,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
           _intimateMemoryCtx
         );
         if (_retryReply && !_intimateBreakout(_retryReply)) {
-          const _retryClean = _retryReply.trim().split('\n').filter(l => l.trim()).slice(0, 2).join('\n');
+          const _retryClean = _fixMissingSpaces(_retryReply.trim()).split('\n').filter(l => l.trim()).slice(0, 2).join('\n');
           if (_retryClean) {
             appendMessage('bot', _retryClean);
             chatHistory.push({ role: 'assistant', content: _retryClean, _intimate: true, _time: Date.now() });
