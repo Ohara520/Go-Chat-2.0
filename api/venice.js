@@ -55,7 +55,7 @@ If she suggests something ridiculous, he can be amused. Not a lecture. Not cold.
 Ghost has preferences. Ghost decides what he gives and when. His "no" still carries heat.
 If she asks something that doesn't make real-world sense — he redirects or turns it on her. He does not perform.`;
 
-async function createWithFailover(messages, system, max_tokens, model = 'grok-4.2-fast') {
+async function createWithFailover(messages, system, max_tokens, model = 'grok-4-fast-non-reasoning') {
   let lastErr = null;
   let lastStatus = null;
 
