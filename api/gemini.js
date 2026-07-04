@@ -8,59 +8,62 @@ const PER_NODE_TIMEOUT_MS = 8000;
 
 // ── 服务端补空格：修复模型偶发的整句连字（含缩写/破折号）──
 const _DEGLUE_WORDS = new Set((
-  "a i you me my mine your yours he she it we they him her his us them " +
-  "the a an this that these those there here what who how why when where which whose whom " +
-  "is am are was were be been being do does did done have has had having will would can could " +
-  "should may might must shall to of in on at by for with from into onto out up down off over under " +
-  "and or but so if then than as not no yes ok okay just only even still yet now soon later already " +
-  "me you us all any some more most much many few little bit lot lots " +
-  "get got give gave given take took taken make made go went gone come came coming see saw seen " +
-  "look looked looking want wanted need needed know knew known think thought feel felt say said " +
-  "tell told ask asked keep keeps kept let leave left put pull pulled pulling push pushed hold held " +
-  "like love loved miss missed touch touched kiss kissed show showed shown send sent stay stayed " +
-  "wait waited stop stopped start started call called calling try tried turn turned move moved " +
-  "good bad soft hard slow fast close closer near far warm cold quiet loud sure right wrong real " +
-  "old new young last first next same other another own real true whole half " +
-  "one two three here there tonight today tomorrow yesterday now moment thing things way pair mine " +
-  "day days night nights week time times minute hour year home house work bed door " +
-  "habit habits die diehard resist crowd crowding edge hope hopeful hopeless laugh laughs laughing " +
-  "smile smiled voice eyes hand hands lips heart face head back trouble count matter " +
-  "again always never sometimes maybe really too very quite almost enough about because before after " +
-  "while until though since unless around behind against toward between without inside outside " +
-  "babe baby love darling girl man good morning night please thanks sorry " +
-  "i'm you're we're they're it's that's there's here's what's let's he's she's who's " +
-  "don't doesn't didn't can't won't wouldn't couldn't shouldn't isn't aren't wasn't weren't hasn't haven't hadn't " +
-  "i'll you'll we'll they'll it'll he'll she'll i'd you'd we'd they'd he'd she'd " +
-  "i've you've we've they've laugh's your's " +
-  "got get avoid best worst better rather instead maybe guess suppose reckon mate lad supposed change something anything nothing everything someone anyone everyone somewhere anywhere everywhere"
+  "a i o oh ah k ok okay yes yeah yep nope no not now new own out off up on in at by to of as so if or and but for the a an this that these those there here what who whom whose how why when where which " +
+  "is am are was were be been being do does did done doing have has had having will would shall should can could may might must " +
+  "me my mine you your yours he him his she her hers we us our ours they them their theirs it its myself yourself himself herself " +
+  "one two three first last next only just even still yet all any some more most much many few little bit lot lots both each every " +
+  "go goes went gone going come comes came coming get gets got gotten give gives gave given take takes took taken make makes made making " +
+  "want wants wanted need needs needed know knows knew known think thinks thought feel feels felt say says said tell tells told ask asks asked " +
+  "keep keeps kept let lets leave leaves left put puts pull pulls pulled pulling push pushes pushed hold holds held " +
+  "like likes liked love loves loved miss missed touch touches touched kiss kisses kissed hug hugs show shows showed shown " +
+  "send sends sent stay stays stayed wait waits waited stop stops stopped start starts started try tries tried turn turns turned " +
+  "move moves moved run runs ran walk walks walked look looks looked see sees saw seen watch watches watched hear hears heard listen " +
+  "prove proves proved forget forgets forgot forgotten remember remembers regret regrets hesitate hesitated whisper whispers whispering " +
+  "breathe breathless breath quiet loud soft hard slow fast close closer closest near far warm cold hot fire warmth " +
+  "good better best bad worse worst nice sweet kind gentle rough real true whole half sure right wrong worth deserve " +
+  "day days night nights morning evening tonight today tomorrow yesterday week weekend month year time times moment " +
+  "home house bed door room floor world life way ways word words name names voice eyes hand hands lips heart face head skin body arms " +
+  "fine well then than as too very quite almost enough really maybe perhaps about because before after while until since unless though although " +
+  "around behind against toward between without inside outside over under above below through across along into onto from with " +
+  "stick sticks stuck earn earns earned wear wears wore worn taste tastes bite bites mean means meant " +
+  "babe baby love darling girl man boy mate lad sweetheart dear " +
+  "i'm you're we're they're it's that's there's here's what's let's he's she's who's how's " +
+  "don't doesn't didn't can't won't wouldn't couldn't shouldn't isn't aren't wasn't weren't hasn't haven't hadn't ain't " +
+  "i'll you'll we'll they'll it'll he'll she'll i'd you'd we'd they'd he'd she'd i've you've we've they've " +
+  "gonna wanna gotta lemme " +
+  "something anything nothing everything someone anyone everyone somewhere anywhere everywhere nowhere " +
+  "exactly already always never sometimes ever supposed change relationship complicated understand everything something beautiful comfortable conversation immediately absolutely different remember together whatever forever probably actually finally honestly seriously"
 ).split(/\s+/).filter(Boolean));
 
 function _deglue(txt) {
   if (!txt) return txt;
-  // 破折号/标点后补空格
-  let s = txt
-    .replace(/\s*([—–])\s*/g, ' $1 ')          // em/en dash 两侧留空格
-    .replace(/([.,!?;:])(?=[A-Za-z])/g, '$1 '); // 标点后若紧跟字母补空格
-  // 没有超长连字块就直接返回
-  if (!/[A-Za-z'']{14,}/.test(s)) return s.replace(/[ \t]{2,}/g, ' ').trim();
-  const seg = (run) => {
-    const low = run.toLowerCase().replace(/'/g, "'");
+  let s = txt.replace(/\s*([\u2014\u2013])\s*/g, ' $1 ').replace(/([.,!?;:])(?=[A-Za-z])/g, '$1 ');
+  if (!/[A-Za-z'\u2019]{11,}/.test(s)) return s.replace(/[ \t]{2,}/g, ' ').trim();
+  const _seg = (run) => {
+    const low = run.toLowerCase().replace(/\u2019/g, "'");
     const n = low.length;
     const ok = new Array(n + 1).fill(false); ok[n] = true;
     const cut = new Array(n + 1).fill(0);
     for (let i = n - 1; i >= 0; i--) {
-      for (let k = Math.min(16, n - i); k >= 1; k--) {
+      for (let k = Math.min(18, n - i); k >= 1; k--) {
         const sub = low.slice(i, i + k);
-        const isWord = (k === 1) ? (sub === 'i' || sub === 'a') : _DEGLUE_WORDS.has(sub);
-        if (isWord && ok[i + k]) { ok[i] = true; cut[i] = k; break; }
+        const isW = (k === 1) ? (sub === 'i' || sub === 'a' || sub === 'o') : _DEGLUE_WORDS.has(sub);
+        if (isW && ok[i + k]) { ok[i] = true; cut[i] = k; break; }
       }
     }
-    if (!ok[0]) return run;           // 无法完全切成真词 → 原样保留，绝不乱切
-    const out = []; let i = 0;
-    while (i < n) { out.push(run.slice(i, i + cut[i])); i += cut[i]; }
+    if (ok[0]) { const out = []; let i = 0; while (i < n) { out.push(run.slice(i, i + cut[i])); i += cut[i]; } return out.join(' '); }
+    const out = []; let i = 0; let buf = '';
+    while (i < n) {
+      let L = 0;
+      for (let k = Math.min(18, n - i); k >= 2; k--) { if (_DEGLUE_WORDS.has(low.slice(i, i + k))) { L = k; break; } }
+      if (!L && (low[i] === 'i' || low[i] === 'a')) { if (i + 1 >= n || _DEGLUE_WORDS.has(low.slice(i+1, i+3)) || _DEGLUE_WORDS.has(low.slice(i+1, i+4))) L = 1; }
+      if (L) { if (buf) { out.push(buf); buf = ''; } out.push(run.slice(i, i + L)); i += L; }
+      else { buf += run.slice(i, i + 1); i += 1; }
+    }
+    if (buf) out.push(buf);
     return out.join(' ');
   };
-  s = s.replace(/[A-Za-z][A-Za-z'']{13,}/g, (m) => seg(m));
+  s = s.replace(/[A-Za-z][A-Za-z'\u2019]{9,}/g, (m) => _seg(m));
   return s.replace(/[ \t]{2,}/g, ' ').trim();
 }
 
