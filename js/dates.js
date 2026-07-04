@@ -1279,12 +1279,12 @@ function refreshShelfCardBadge() {
   if (!card) return;
   const desc = card.querySelector('.card-desc');
   if (!desc) return;
-  const total = getGiftRecords().length;
-  if (total > 0) {
-    desc.textContent = `${total} 件礼物在架上`;
-  } else {
-    desc.textContent = '送过他的东西';
-  }
+  // 声之匣：显示已解锁的音频剧场数量
+  try {
+    const unlocked = (typeof AUDIO_DRAMAS !== 'undefined')
+      ? AUDIO_DRAMAS.filter(d => { try { return !!d.unlock(); } catch(e){ return false; } }).length : 0;
+    desc.textContent = unlocked > 0 ? `${unlocked} 段声音已解锁` : '西蒙的声音';
+  } catch(e) { desc.textContent = '西蒙的声音'; }
 }
 window.refreshShelfCardBadge = refreshShelfCardBadge;
 

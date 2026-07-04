@@ -628,17 +628,10 @@
       </div>
       <div class="card shelf-card" id="shelfCard"
            onclick="openScreen('shelfScreen');setTimeout(()=>{if(typeof renderGiftShelf==='function')renderGiftShelf();},80);"
-           style="background:linear-gradient(135deg,rgba(220,180,255,0.42),rgba(255,200,220,0.32)) !important;border:1px solid rgba(180,120,200,0.32) !important;">
-        <div class="card-icon">🏠</div>
-        <div class="card-title">他的小屋</div>
-        <div class="card-desc">送过他的东西</div>
-      </div>
-      <div class="card date-card" id="dateCard"
-           onclick="openScreen('dateHubScreen');setTimeout(()=>{if(typeof renderDateHub==='function')renderDateHub();},80);"
-           style="background:linear-gradient(135deg,rgba(255,180,210,0.50),rgba(220,140,200,0.40)) !important;border:1px solid rgba(220,130,180,0.40) !important;">
-        <div class="card-icon">💑</div>
-        <div class="card-title">约会</div>
-        <div class="card-desc">让他飞来看你</div>
+           style="background:linear-gradient(135deg,rgba(180,220,180,0.42),rgba(200,240,210,0.32)) !important;border:1px solid rgba(120,180,120,0.32) !important;">
+        <div class="card-icon">🎧</div>
+        <div class="card-title">声之匣</div>
+        <div class="card-desc">西蒙的声音</div>
       </div>
     </div>
 
@@ -1200,7 +1193,7 @@
   <div class="screen" id="shelfScreen">
     <div class="screen-header">
       <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
-      <div class="screen-title">他的小屋</div>
+      <div class="screen-title">🎧 声之匣</div>
     </div>
     <div class="shelf-body">
       <!-- renderGiftShelf() 动态填充 -->
@@ -1670,7 +1663,6 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/chat_init.js"></script>
 <script src="js/app.js"></script>
 <script src="js/dates.js"></script>
-<script src="js/dates_voice_patch.js"></script>
 
 <!-- ═══ 选角弹窗 ═══ -->
 <div id="charSelectOverlay" style="
