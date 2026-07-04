@@ -493,9 +493,58 @@ let currentCategory = 'clothing';
 let pendingProduct = null;
 let pendingCategory = null;
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 自愈：修复"买了但快递对象从没创建"导致的礼物消失（历史遗留 + 兜底）
+// 症状：售罄 + 故事书有记录，但物流/礼物架/丢件三处都查无此包裹
+// 做法：已购买、但既不在途也不在礼物架的实物商品 → 补一张"不会再丢"的快递，正常送达上架
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function _healOrphanPurchases() {
+  try {
+    const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
+    if (!purchased.length) return;
+
+    const healed      = JSON.parse(localStorage.getItem('orphanHealed') || '[]');
+    const deliveries  = JSON.parse(localStorage.getItem('deliveries') || '[]');
+    const history     = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
+    const inTransit   = new Set(deliveries.map(d => d.name));
+    const inHistory   = new Set(history.map(d => d.name));
+
+    const allProducts = [];
+    try {
+      Object.values(MARKET_PRODUCTS || {}).forEach(arr => {
+        if (Array.isArray(arr)) allProducts.push(...arr);
+      });
+    } catch(e) {}
+
+    let changed = false;
+    purchased.forEach(name => {
+      if (healed.includes(name)) return;
+      if (inTransit.has(name) || inHistory.has(name)) return;
+      const prod = allProducts.find(p => p.name === name);
+      if (!prod) return;
+      const shippable = (prod.isUserItem || prod.isGhostGift) && !prod.isHomeItem && !prod.isReunion;
+      if (!shippable) return;
+      if (typeof addDelivery === 'function') {
+        addDelivery({ ...prod, noLost: true }, false, !!prod.unlock);
+        healed.push(name);
+        changed = true;
+        console.log('[shop] 自愈补发孤儿快递:', name);
+      }
+    });
+
+    if (changed) {
+      localStorage.setItem('orphanHealed', JSON.stringify(healed));
+      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    }
+  } catch(e) {
+    console.warn('[shop] 孤儿快递自愈失败:', e);
+  }
+}
+
 function initMarket() {
   const el = document.getElementById('marketBalanceDisplay');
   if (el) el.textContent = '£' + getBalance().toFixed(2);
+  _healOrphanPurchases();   // 自愈：救回"买了但快递从没创建"的孤儿礼物
   renderDeliveryTracker();
   renderMarket(currentCategory || 'clothing');
   checkDeliveryUpdates();

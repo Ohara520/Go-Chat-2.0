@@ -75,6 +75,13 @@ const DELIVERY_STAGES_SELF = [
 // 创建快递（用户寄给Ghost）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// 保留全部在途快递，只对已完成的做上限——防止在途件被挤掉导致礼物消失
+function _capDeliveries(deliveries, limitDone = 20) {
+  const pending  = deliveries.filter(d => !d.done && !d.isLostConfirmed);
+  const finished = deliveries.filter(d => d.done || d.isLostConfirmed).slice(0, limitDone);
+  localStorage.setItem('deliveries', JSON.stringify([...pending, ...finished]));
+}
+
 function addDelivery(product, isGhostSend, isLuxury) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
   let totalMs = isGhostSend
@@ -123,7 +130,9 @@ function addDelivery(product, isGhostSend, isLuxury) {
   };
 
   deliveries.unshift(delivery);
-  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
+  // 修复(礼物消失)：在途快递一律保留，只对已完成/已确认丢件的做 20 条上限，
+  // 防止在途快递被挤出数组后既不送达也不上架、凭空消失
+  _capDeliveries(deliveries);
   renderDeliveryTracker();
 }
 
@@ -242,7 +251,7 @@ function addGhostReverseDelivery(item, emotionType) {
     isLostConfirmed: false,
     productData: { price: 0, name: item.name, emoji: item.emoji, desc: item.desc, tip: item.tip || '' }
   });
-  localStorage.setItem('deliveries', JSON.stringify(deliveries.slice(0, 20)));
+  _capDeliveries(deliveries);
 
   // 修复：100%主动告知，去掉沉默路径
   // 寄了东西就直接告诉她，同时追踪条立刻显示
