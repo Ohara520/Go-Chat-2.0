@@ -1421,6 +1421,99 @@ const STORY_EVENTS = [
     }
   },
 
+
+  // ━━━ 翻新新增成就（session 检查，数据可稳定触发）━━━
+
+  // 职业线
+  { id: 'career_start', icon: '💼', title: '初登新岗', desc: '你选择了第一份职业，开始有了自己的节奏。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getCareer === 'function' && getCareer() && getCareer() !== 'none' && !ctx.triggered('career_start'),
+    execute: async () => {} },
+
+  { id: 'career_lv5', icon: '📈', title: '小有所成', desc: '职业升到 Lv.5——你在自己的世界里站稳了。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getCareerLevel === 'function' && getCareerLevel() >= 5 && !ctx.triggered('career_lv5'),
+    execute: async () => {} },
+
+  { id: 'career_max', icon: '👑', title: '登峰之日', desc: '职业满级——他说你比他还拼。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getCareerLevel === 'function' && getCareerLevel() >= 10 && !ctx.triggered('career_max'),
+    execute: async () => {} },
+
+  // 财富线
+  { id: 'rich_10k', icon: '💰', title: '囊中渐丰', desc: '存款第一次突破 £10000。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getBalance === 'function' && getBalance() >= 10000 && !ctx.triggered('rich_10k'),
+    execute: async () => {} },
+
+  { id: 'rich_50k', icon: '🏦', title: '千金在握', desc: '存款突破 £50000——你把日子过成了自己的底气。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getBalance === 'function' && getBalance() >= 50000 && !ctx.triggered('rich_50k'),
+    execute: async () => {} },
+
+  // 礼物 / 消费线
+  { id: 'gift_luxury', icon: '💎', title: '初赠贵礼', desc: '你第一次送出一件贵重的礼物。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getGiftRecords === 'function' && getGiftRecords().some(g => g.isLuxury || (g.price || 0) >= 500) && !ctx.triggered('gift_luxury'),
+    execute: async () => {} },
+
+  { id: 'gift_shelf_10', icon: '🗄️', title: '满架皆你', desc: '礼物架集满 10 件——全是你送的。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getGiftRecords === 'function' && getGiftRecords().length >= 10 && !ctx.triggered('gift_shelf_10'),
+    execute: async () => {} },
+
+  { id: 'ghost_card_first', icon: '💳', title: '以卡相付', desc: '你第一次刷了他给你的 Ghost Card。',
+    triggerOn: 'session',
+    condition: (ctx) => {
+      try { return JSON.parse(localStorage.getItem('ghostCardRecentSpend') || '[]').length >= 1 && !ctx.triggered('ghost_card_first'); }
+      catch(e) { return false; }
+    },
+    execute: async () => {} },
+
+  // 外卖线
+  { id: 'takeout_5cities', icon: '🗺️', title: '食过五城', desc: '你给他点过 5 个不同城市的外卖——他走到哪，你喂到哪。',
+    triggerOn: 'session',
+    condition: (ctx) => {
+      try {
+        const hist = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+        const cities = new Set(hist.map(h => h.cityLabel).filter(Boolean));
+        return cities.size >= 5 && !ctx.triggered('takeout_5cities');
+      } catch(e) { return false; }
+    },
+    execute: async () => {} },
+
+  { id: 'chef_unlock', icon: '👩‍🍳', title: '主厨之姿', desc: '你成为厨师并升到 Lv.6，解锁了只做给他的私房菜。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getCareer === 'function' && getCareer() === 'chef' && getCareerLevel() >= 6 && !ctx.triggered('chef_unlock'),
+    execute: async () => {} },
+
+  // 陪伴里程碑
+  { id: 'days_200', icon: '🌱', title: '二百日常', desc: '在一起 200 天——平淡里长出了根。',
+    triggerOn: 'session',
+    condition: (ctx) => ctx.marriageDays >= 200 && !ctx.triggered('days_200'),
+    execute: async () => {} },
+
+  { id: 'days_500', icon: '🌳', title: '五百同行', desc: '在一起 500 天——你们把日子走成了年轮。',
+    triggerOn: 'session',
+    condition: (ctx) => ctx.marriageDays >= 500 && !ctx.triggered('days_500'),
+    execute: async () => {} },
+
+  // 陪伴 / 签到
+  { id: 'checkin_30', icon: '📅', title: '久伴成习', desc: '连续来了 30 天——你成了他日子里的固定项。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getCheckinStreak === 'function' && getCheckinStreak() >= 30 && !ctx.triggered('checkin_30'),
+    execute: async () => {} },
+
+  { id: 'checkin_100', icon: '🔥', title: '百日不辍', desc: '连续签到 100 天——风雨无阻的那种在乎。',
+    triggerOn: 'session',
+    condition: (ctx) => typeof getCheckinStreak === 'function' && getCheckinStreak() >= 100 && !ctx.triggered('checkin_100'),
+    execute: async () => {} },
+
+  // 情感深度
+  { id: 'affection_max', icon: '❤️‍🔥', title: '情根深种', desc: '好感度到了顶——他不再假装若无其事。',
+    triggerOn: 'session',
+    condition: (ctx) => ctx.affection >= 95 && !ctx.triggered('affection_max'),
+    execute: async () => {} },
 ];
 
 function markStoryDone(event) {
