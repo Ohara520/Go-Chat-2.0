@@ -1,0 +1,9 @@
+# 依赖包（本地安装用，不进仓库）
+node_modules/
+
+# 依赖锁文件（Vercel 会自己处理）
+package-lock.json
+
+# 系统/编辑器杂项
+.DS_Store
+*.log
