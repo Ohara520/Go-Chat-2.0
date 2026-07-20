@@ -246,7 +246,11 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ text: _deglue(text) });
+    const _final = _deglue(text);
+    // 检测严重吞空格 → 标记需要重试（与 /api/venice 同款判据）
+    const _gluedRuns = _final.match(/[A-Za-z']{10,}/g) || [];
+    const needsRetry = _gluedRuns.some(r => r.length >= 15) || _gluedRuns.length >= 2;
+    return res.status(200).json({ text: _final, needsRetry });
 
   } catch (err) {
     console.error('[api/gemini] error:', err.message);

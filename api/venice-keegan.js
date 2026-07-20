@@ -158,7 +158,12 @@ export default async function handler(req, res) {
     );
 
     const text = response.choices?.[0]?.message?.content?.trim() || '';
-    return res.status(200).json({ text });
+
+    // 检测严重吞空格 → 标记需要重试（与 /api/venice 同款判据）
+    const _gluedRuns = text.match(/[A-Za-z']{10,}/g) || [];
+    const needsRetry = _gluedRuns.some(r => r.length >= 15) || _gluedRuns.length >= 2;
+
+    return res.status(200).json({ text, needsRetry });
 
   } catch (err) {
     console.error('[api/venice-keegan] error:', err.message);

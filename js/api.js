@@ -354,26 +354,35 @@ async function fetchDeepSeek(systemPrompt, userContent, maxTokens = 200) {
  * @returns {string} 回复文本，失败返回空字符串
  */
 async function callGrok(user, maxTokens = 300, imageBase64 = null, scene = 'normal', stateHint = '', intimacyLevel = 1) {
-  try {
-    const body = { user, max_tokens: maxTokens, scene };
-    if (imageBase64) body.image_base64 = imageBase64;
-    if (stateHint) body.stateHint = stateHint;
-    if (intimacyLevel !== undefined) body.intimacyLevel = intimacyLevel;
-    const res = await fetchWithTimeout('/api/gemini', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }, 10000);
-    if (!res.ok) return '';
-    const data = await res.json();
-    if (_isApiErrorBody(data)) {
-      console.warn('[callGrok] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
-      return '';
+  const body = { user, max_tokens: maxTokens, scene };
+  if (imageBase64) body.image_base64 = imageBase64;
+  if (stateHint) body.stateHint = stateHint;
+  if (intimacyLevel !== undefined) body.intimacyLevel = intimacyLevel;
+  // 最多 2 次：Grok 偶发整句吞空格（needsRetry），自动重发一次
+  // 带图请求不重试（体积大、耗时长，重发不划算）
+  const _maxAttempts = imageBase64 ? 1 : 2;
+  let _lastText = '';
+  for (let attempt = 0; attempt < _maxAttempts; attempt++) {
+    try {
+      const res = await fetchWithTimeout('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 10000);
+      if (!res.ok) return _lastText;
+      const data = await res.json();
+      if (_isApiErrorBody(data)) {
+        console.warn('[callGrok] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+        return _lastText;
+      }
+      const text = data.text?.trim() || '';
+      if (text) _lastText = text;
+      if (!data.needsRetry) return text;
+    } catch (e) {
+      return _lastText;
     }
-    return data.text?.trim() || '';
-  } catch (e) {
-    return '';
   }
+  return _lastText;
 }
 
 /**
@@ -381,26 +390,33 @@ async function callGrok(user, maxTokens = 300, imageBase64 = null, scene = 'norm
  * 修复：后端 /api/gemini 不读 system 字段，合并到 user 消息里
  */
 async function callGrokWithSystem(system, user, maxTokens = 300) {
-  try {
-    // 后端 gemini.js 有自己的内建人设，不读请求里的 system
-    // 把自定义 system 合并进 user，确保 Grok 看得到
-    const combinedUser = system ? (system + '\n\n' + user) : user;
-    const body = { user: combinedUser, max_tokens: maxTokens };
-    const res = await fetchWithTimeout('/api/gemini', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }, 10000);
-    if (!res.ok) return '';
-    const data = await res.json();
-    if (_isApiErrorBody(data)) {
-      console.warn('[callGrokWithSystem] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
-      return '';
+  // 后端 gemini.js 有自己的内建人设，不读请求里的 system
+  // 把自定义 system 合并进 user，确保 Grok 看得到
+  const combinedUser = system ? (system + '\n\n' + user) : user;
+  const body = { user: combinedUser, max_tokens: maxTokens };
+  // 最多 2 次：Grok 偶发整句吞空格（needsRetry），自动重发一次
+  let _lastText = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 10000);
+      if (!res.ok) return _lastText;
+      const data = await res.json();
+      if (_isApiErrorBody(data)) {
+        console.warn('[callGrokWithSystem] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+        return _lastText;
+      }
+      const text = data.text?.trim() || '';
+      if (text) _lastText = text;
+      if (!data.needsRetry) return text;
+    } catch (e) {
+      return _lastText;
     }
-    return data.text?.trim() || '';
-  } catch (e) {
-    return '';
   }
+  return _lastText;
 }
 
 /**
@@ -413,24 +429,32 @@ async function callGrokWithSystem(system, user, maxTokens = 300) {
  * @returns {string} 回复文本，失败返回空字符串
  */
 async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
-  try {
-    const body = { system, user, max_tokens: maxTokens };
-    if (intimateMemory) body.intimateMemory = intimateMemory;
-    const res = await fetchWithTimeout('/api/venice', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }, 50000);  // 50s：给后端轮完6个节点（6×8s=48s）留足时间
-    if (!res.ok) return '';
-    const data = await res.json();
-    if (_isApiErrorBody(data)) {
-      console.warn('[callVenice] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
-      return '';
+  const body = { system, user, max_tokens: maxTokens };
+  if (intimateMemory) body.intimateMemory = intimateMemory;
+  // 最多 2 次：Grok 偶发整句吞空格（needsRetry），自动重发一次取更好的结果
+  let _lastText = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout('/api/venice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 50000);  // 50s：给后端轮完6个节点（6×8s=48s）留足时间
+      if (!res.ok) return _lastText;
+      const data = await res.json();
+      if (_isApiErrorBody(data)) {
+        console.warn('[callVenice] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+        return _lastText;
+      }
+      const text = data.text?.trim() || '';
+      if (text) _lastText = text;           // 记住结果，重试失败时兜底
+      if (!data.needsRetry) return text;    // 空格正常，直接用
+      // needsRetry=true → 继续下一轮重发；循环结束仍未拿到好结果则用 _lastText
+    } catch (e) {
+      return _lastText;
     }
-    return data.text?.trim() || '';
-  } catch (e) {
-    return '';
   }
+  return _lastText;
 }
 
 // ===== DeepSeek 生成调用 =====
@@ -565,28 +589,35 @@ async function isBreakoutAsync(text) {
 
 // 支持多角色的 Venice 调用（自动路由到当前角色的调情 API）
 async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateMemory = '', recentGhostReplies = []) {
-  try {
-    const endpoint = typeof getCurrentVeniceEndpoint === 'function'
-      ? getCurrentVeniceEndpoint()
-      : '/api/venice';
-    const body = { system, user, max_tokens: maxTokens };
-    if (intimateMemory) body.intimateMemory = intimateMemory;
-    if (recentGhostReplies && recentGhostReplies.length > 0) body.recentGhostReplies = recentGhostReplies;
-    const res = await fetchWithTimeout(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }, 50000);  // 50s：给后端轮完6个节点（6×8s=48s）留足时间
-    if (!res.ok) return '';
-    const data = await res.json();
-    if (_isApiErrorBody(data)) {
-      console.warn('[callVeniceForCurrentChar] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
-      return '';
+  const endpoint = typeof getCurrentVeniceEndpoint === 'function'
+    ? getCurrentVeniceEndpoint()
+    : '/api/venice';
+  const body = { system, user, max_tokens: maxTokens };
+  if (intimateMemory) body.intimateMemory = intimateMemory;
+  if (recentGhostReplies && recentGhostReplies.length > 0) body.recentGhostReplies = recentGhostReplies;
+  // 最多 2 次：Grok 偶发整句吞空格（needsRetry），自动重发一次取更好的结果
+  let _lastText = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 50000);  // 50s：给后端轮完6个节点（6×8s=48s）留足时间
+      if (!res.ok) return _lastText;
+      const data = await res.json();
+      if (_isApiErrorBody(data)) {
+        console.warn('[callVeniceForCurrentChar] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+        return _lastText;
+      }
+      const text = data.text?.trim() || '';
+      if (text) _lastText = text;
+      if (!data.needsRetry) return text;
+    } catch (e) {
+      return _lastText;
     }
-    return data.text?.trim() || '';
-  } catch (e) {
-    return '';
   }
+  return _lastText;
 }
 
 // ===== JSON安全解析 =====

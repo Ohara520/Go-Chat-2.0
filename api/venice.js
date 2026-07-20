@@ -203,7 +203,14 @@ export default async function handler(req, res) {
     );
 
     const text = _deglue(response.choices?.[0]?.message?.content?.trim() || '');
-    return res.status(200).json({ text });
+
+    // 检测严重吞空格 → 标记需要重试
+    // 判据：有一个 15+ 字母的超长粘连串，或 2 个以上 10+ 的串
+    // （已验证：能命中整句连字，且不误伤 everything/unbelievable 这类正常长词）
+    const _gluedRuns = text.match(/[A-Za-z']{10,}/g) || [];
+    const needsRetry = _gluedRuns.some(r => r.length >= 15) || _gluedRuns.length >= 2;
+
+    return res.status(200).json({ text, needsRetry });
 
   } catch (err) {
     console.error('[api/venice] all nodes failed:', err.message);
