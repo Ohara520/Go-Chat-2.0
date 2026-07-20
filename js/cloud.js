@@ -627,7 +627,7 @@ async function loadFromCloud() {
         });
         localStorage.setItem(key, JSON.stringify(merged.slice(0, maxLen)));
       };
-      mergeArrays('storyBook', s.storyBook, 30);
+      mergeArrays('storyBook', s.storyBook, 200);  // 成就有限集合，上限放大防止合并时被截断
       mergeArrays('collections', s.collections, 400);
       mergeArrays('dateMemories', s.dateMemories, 50);
 
@@ -944,8 +944,10 @@ async function saveToCloud() {
       purchasedItems: JSON.parse(localStorage.getItem('purchasedItems') || '[]'),
       weeklyGiven: getWeeklyGiven(),
       // 故事书、相册、朋友圈
-      // 故事书、相册、朋友圈——只存最近10条，减小体积
-      storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 10),
+      // 成就（storyBook）是有限集合(~42个)且对象很小，全存不截断。
+      // 旧版 slice(0,10) 只存最老的10个，新解锁的上传丢失 → 换设备/清缓存后成就消失、
+      // 且因 !triggered(id) 重新成立而被重复触发、获取日期刷新。上限给 200 留足余量。
+      storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 200),
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 400),
       dateMemories: JSON.parse(localStorage.getItem('dateMemories') || '[]').slice(0, 50),
       giftRecords: JSON.parse(localStorage.getItem('giftRecords') || '[]').slice(0, 100),
