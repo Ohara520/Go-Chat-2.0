@@ -221,7 +221,7 @@ export default async function handler(req, res) {
       userContent = user;
     }
 
-    const model = reqModel || 'grok-4-fast';
+    const model = reqModel || 'grok-4.3';
 
     const response = await createWithFailover(model, max_tokens, [
       { role: 'system', content: finalSystem + _SPACING_TAIL },
