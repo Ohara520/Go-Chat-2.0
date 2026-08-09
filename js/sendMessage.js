@@ -244,6 +244,13 @@ const BREAKOUT_PHRASES = [
   "just not that direction",
   "not able to engage with explicit",
   "i cannot continue this conversation",
+  // 新增：截图确认的破甲（"i can't discuss that" / "保持人设"类思维泄露）
+  "i can't discuss", "i cannot discuss",
+  "i can't engage", "i cannot engage",
+  "stay in character", "need to stay", "as ghost", "as simon",
+  "i need to maintain", "i should stay", "keep in character",
+  "remain in character", "acting as", "roleplaying as",
+  "i can't help with that", "i cannot help with that",
 ];
 
 function isBreakout(txt) {
@@ -1839,6 +1846,14 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       let cleanedReply = geminiReply
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
+        .trim();
+      // 修复：调情路径也要清理控制标签，否则 SEND_GIFT/COLD_WAR_START/【】 会泄露进气泡
+      cleanedReply = cleanedReply
+        .replace(/SEND_GIFT:[^\n]*/ig, '')
+        .replace(/COLD_WAR_START/ig, '')
+        .replace(/GIVE_MONEY:[^\n]*/ig, '')
+        .replace(/【[^】]{3,}】/g, '')
+        .replace(/\n{3,}/g, '\n')
         .trim();
       // 修复 Grok 偶发的整句连字/缺空格
       cleanedReply = _fixMissingSpaces(cleanedReply);

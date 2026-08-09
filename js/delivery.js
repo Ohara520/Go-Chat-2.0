@@ -882,6 +882,24 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
 
         localStorage.setItem('deliveries', JSON.stringify(deliveries));
       }, 3000);
+    } else {
+      // 修复 #小额快递丢失：< £500 也给象征性赔偿 £50 + Ghost安慰话
+      const smallCompensation = 50;
+      setTimeout(() => {
+        setBalance(getBalance() + smallCompensation);
+        addTransaction({ icon: '💷', name: `快递遗失补偿 · ${d.name}`, amount: smallCompensation });
+        renderWallet();
+        const msgContainer = document.getElementById('messagesContainer');
+        if (msgContainer) showGhostTransferCard(msgContainer, smallCompensation, '', false);
+        chatHistory.push({
+          role: 'assistant',
+          content: `[快递遗失补偿 £${smallCompensation}]`,
+          _transfer: { amount: smallCompensation, isRefund: false }
+        });
+        _safeDeliverySaveHistory();
+        d.compensated = true;
+        localStorage.setItem('deliveries', JSON.stringify(deliveries));
+      }, 3000);
     }
     return true;
   } catch(e) {

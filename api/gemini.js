@@ -151,6 +151,10 @@ function isOOC(text) {
     "i need to be direct", "i need to be honest",
     "i appreciate the creative", "not doing this",
     "we're done here", "i won't engage",
+    // 新增：拦住"保持人设"类破甲
+    "stay in character", "need to stay", "as ghost", "as simon",
+    "i need to maintain", "i should stay", "keep in character",
+    "remain in character", "acting as", "roleplaying as",
   ].some(p => lower.includes(p));
 }
 
@@ -217,7 +221,7 @@ export default async function handler(req, res) {
       userContent = user;
     }
 
-    const model = reqModel || 'grok-4-fast-non-reasoning';
+    const model = reqModel || 'grok-4-fast';
 
     const response = await createWithFailover(model, max_tokens, [
       { role: 'system', content: finalSystem + _SPACING_TAIL },

@@ -185,13 +185,17 @@ emotion强度：轻/中/重`,
       const type      = result.emotion.type;
       const intensity = result.emotion.intensity;
 
+      // 修复 #情绪反寄频繁：先检查全局冷却（3天内任何类型只能触发一次）
+      const lastAnyReverse = parseInt(localStorage.getItem('lastAnyReverseAt') || '0');
+      if (Date.now() - lastAnyReverse < 3 * 24 * 3600 * 1000) return;
+
       // 3天冷却（同类型情绪）
       const coolKey  = 'reverseShipCool_' + type;
       const lastTime = parseInt(localStorage.getItem(coolKey) || '0');
       if (Date.now() - lastTime < 3 * 24 * 3600 * 1000) return;
 
-      // 概率：轻60% 中80% 重95%
-      const probMap = { '轻': 0.60, '中': 0.80, '重': 0.95 };
+      // 概率：轻40% 中60% 重80%（降低触发率，原版 60/80/95 太高）
+      const probMap = { '轻': 0.40, '中': 0.60, '重': 0.80 };
       const prob = probMap[intensity] || 0.50;
       if (Math.random() > prob) return;
 
