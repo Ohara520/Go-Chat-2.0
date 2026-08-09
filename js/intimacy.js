@@ -461,11 +461,11 @@ function detectIntimateIntent(userText) {
     return 'explicit';
   }
 
-  if (/摸摸|蹭蹭|贴贴|咬我|舔我|撩你|你好坏|坏死了|流氓|kiss|touch me|want you|naughty|tease|床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|色色|涩涩|勾引|身体.*摸|摸.*身体|🍆|🍑|💦|👅|🫦|咬你|咬一口|舔你|舔一下|亲你|亲一口|想要你|想被你|骑你|骑上来|乳夹|乳头|奶头|调教|绑住|捆住|跳蛋|按摩棒|蕾丝|内衣|内裤|裸睡|浴巾/i.test(t)) {
+  if (/摸摸|蹭蹭|贴贴|咬我|舔我|撩你|你好坏|坏死了|流氓|touch me|want you|naughty|tease|床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|色色|涩涩|勾引|身体.*摸|摸.*身体|🍆|🍑|💦|👅|🫦|咬你|咬一口|舔你|舔一下|亲你|亲一口|想要你|想被你|骑你|骑上来|乳夹|乳头|奶头|调教|绑住|捆住|跳蛋|按摩棒|蕾丝|内衣|内裤|裸睡|浴巾/i.test(t)) {
     return 'flirt';
   }
 
-  if (/抱抱|亲亲|么么|想你|miss you|想抱|贴贴|蹭|依|宝贝|baby|抱我|hold me/i.test(t)) {
+  if (/抱抱|亲亲|么么|想你|miss you|想抱|贴贴|蹭|依|宝贝|baby|抱我|hold me|kiss/i.test(t)) {
     return 'affection';
   }
 
