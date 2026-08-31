@@ -457,11 +457,11 @@ function getIntimacyLevel() { return getIntimacyCap(); }
 function detectIntimateIntent(userText) {
   const t = (userText || '').toLowerCase();
 
-  if (/勃起|硬了|几厘米|多长|尺寸|几寸|进去|插|做爱|sex|cock|dick|pussy|cum|orgasm|erect|inches|how big|how long.*下面|下面.*多长|射了|高潮|湿了|好湿|好深|鸡鸡|阴茎|下面|私处/i.test(t)) {
+  if (/勃起|几厘米|做爱|sex|cock|dick|pussy|cum|orgasm|erect|how big|射了|高潮|好湿|好深|鸡鸡|阴茎|私处|插我|插进|插入|你的下面|我的下面|舔.*下面|摸.*下面/i.test(t)) {
     return 'explicit';
   }
 
-  if (/摸摸|蹭蹭|贴贴|咬我|舔我|撩你|你好坏|坏死了|流氓|touch me|want you|naughty|tease|床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|色色|涩涩|勾引|身体.*摸|摸.*身体|🍆|🍑|💦|👅|🫦|咬你|咬一口|舔你|舔一下|亲你|亲一口|想要你|想被你|骑你|骑上来|调教|绑住|捆住|跳蛋|按摩棒|蕾丝|内衣|内裤|裸睡|浴巾/i.test(t)) {
+  if (/摸摸|蹭蹭|贴贴|咬我|咬你|咬一口|舔我|舔你|撩你|你好坏|坏死了|流氓|touch me|want you|naughty|tease|床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|色色|涩涩|勾引|摸.*胸|胸.*摸|亲.*胸|舔.*胸|你的胸|我的胸|身体.*摸|摸.*身体|🍆|🍑|💦|👅|🫦|舔一下|亲你|亲一口|想要你|想被你|骑你|骑上来|调教|绑住|捆住|跳蛋|按摩棒|蕾丝|内衣|内裤|裸睡|浴巾/i.test(t)) {
     return 'flirt';
   }
 

@@ -142,7 +142,7 @@ function pickReadyPendingEvent() {
 function decideMainIntent(text, pendingEvent) {
   if (pendingEvent) return 'event';
   const t = (text || '').toLowerCase();
-  if (/touch me|want you|naughty|tease me|摸摸|蹭蹭|贴贴|咬|舔|撩|涩涩|色色/.test(t)) return 'intimate';
+  if (/touch me|want you|naughty|tease me|摸摸|蹭蹭|贴贴|咬我|咬你|咬一口|舔我|舔你|撩你|撩我|涩涩|色色/.test(t)) return 'intimate';
   if (/难过|伤心|哭|委屈|不开心|崩溃|hurt|sad|crying|upset|awful/.test(t)) return 'emotional';
   if (/给我钱|转我|好穷|买不起|要钱|零花钱|缺钱|没钱/.test(t)) return 'money';
   return 'routine';
@@ -893,7 +893,7 @@ async function _processMergedMessage(text) {
       /touch me|want you|naughty|tease me/i,
       /床.*一起|被窝.*一起|睡觉.*一起|一起.*睡|一起.*床/,
       /性感|色色|涩涩|勾引/,
-      /胸|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
+      /摸.*胸|胸.*摸|亲.*胸|舔.*胸|你的胸|我的胸|身体.*摸|摸.*身体|肚子.*摸|摸.*肚子/,
       /intimate|turn.*on|turned.*on/i,
       // 生理问题也走G，但由 intimacy.js 的 anti-spike 控制节奏
       /勃起|硬了|几厘米|尺寸|几寸|进去|cock|dick|pussy|erect|inches/i,
