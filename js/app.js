@@ -195,6 +195,12 @@ window.onload = async function() {
         if (bar) bar.style.width = barPct + '%';
     }, 300);
 
+    // ── 账号身份就绪：等登录检测确认 user_id、必要时清空上一账号的脏数据 ──
+    // 必须在 loadFromCloud 之前完成，否则会用残留旧 user_id 查询/污染云端（账号串号 bug）
+    if (window.__authReady) {
+        try { await window.__authReady; } catch(e) {}
+    }
+
     // ── 云端数据加载（带超时，防止无限等待卡住用户）─────────
     if (typeof loadFromCloud === 'function') {
         try {

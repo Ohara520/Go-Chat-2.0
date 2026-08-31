@@ -1500,11 +1500,23 @@ window.sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const sbClient = window.sbClient;
 
 // 登录检测
-(async function() {
+// 暴露 Promise：app.js 的 window.onload 必须 await 它，确保"账号切换清空脏数据"
+// 一定在 loadFromCloud() 之前完成，否则会用残留旧 user_id 查询/污染云端。
+window.__authReady = (async function() {
   const { data: { session } } = await sbClient.auth.getSession();
   if (!session) {
     window.location.href = '/login.html';
+    return;
   } else {
+    // 修复账号串号：如果本次登录的用户与本地残留的 user_id 不一致，
+    // 说明在同一设备换了账号（没走 logout / session 过期直登别号）。
+    // 必须先清空上一个用户的本地数据，否则会被当作"本地已有"继承，
+    // 再被 saveToCloud 覆盖到新账号的云端（头像/职业/余额串号）。
+    const _prevUserId = localStorage.getItem('sb_user_id');
+    if (_prevUserId && _prevUserId !== session.user.id) {
+      localStorage.clear();
+      sessionStorage.clear();
+    }
     localStorage.setItem('sb_user_id', session.user.id);
     localStorage.setItem('sb_user_email', session.user.email);
     const emailEl = document.getElementById('account-email');
@@ -1545,9 +1557,10 @@ async function handleLogout() {
     if (typeof saveToCloud === 'function') await saveToCloud();
   } catch(e) {}
   await sbClient.auth.signOut();
-  localStorage.removeItem('sb_user_id');
-  localStorage.removeItem('sb_user_email');
-  localStorage.removeItem('userEmail');
+  // 修复账号串号：登出时清空所有本地数据，防止下一个账号在同一设备登录时
+  // 继承上一个用户的头像/职业/余额，并把脏数据 saveToCloud 覆盖到 TA 的云端
+  localStorage.clear();
+  sessionStorage.clear();
   window.location.href = '/login.html';
 }
 
