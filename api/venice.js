@@ -154,7 +154,12 @@ async function createWithFailover(messages, system, max_tokens, model = 'grok-4-
       });
       return response;
     } catch (err) {
-      console.warn(`[api/venice] node failed: ${baseURL}`, { msg: err.message, status: err.status });
+      console.warn(`[api/venice] node failed: ${baseURL}`, {
+        msg: err.message,
+        status: err.status,
+        code: err.code,
+        response: err.response?.data || err.response?.statusText
+      });
       lastErr = err;
       lastStatus = err.status;
       if (err.status === 401 || err.status === 403 || err.status === 400) break;
@@ -213,7 +218,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ text, needsRetry });
 
   } catch (err) {
-    console.error('[api/venice] all nodes failed:', err.message);
+    console.error('[api/venice] all nodes failed:', {
+      msg: err.message,
+      status: err.status,
+      code: err.code,
+      response: err.response?.data
+    });
 
     let userMessage = '网络繁忙，请稍后再试';
     let statusCode = 500;

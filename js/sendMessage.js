@@ -1757,27 +1757,35 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       .map(m => (m.content || '').trim().split('\n')[0].slice(0, 80))
       .filter(Boolean);
 
-    const geminiReply = await callVeniceForCurrentChar(
-      (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection,
-      recentMsgs + '\nHer: ' + text,
-      200,
-      _intimateMemoryCtx,
-      _recentGhostRepliesForVenice
+    const _veniceSys = (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection;
+    const _veniceUser = recentMsgs + '\nHer: ' + text;
+    let geminiReply = await callVeniceForCurrentChar(
+      _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
     );
+    // Grok 首次空返回（超时/网络抖动）→ 默默重试一次，减少"网络波动"弹窗
+    if (!geminiReply || !geminiReply.trim()) {
+      console.warn('[Grok] 首次返回空，自动重试一次');
+      geminiReply = await callVeniceForCurrentChar(
+        _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
+      );
+    }
 
     // 调情专用破防检测（只过滤100%确定的破防，宁可放过也不误伤）
     const _intimateBreakout = (txt) => {
       if (!txt) return true;
       const l = txt.toLowerCase();
+      // 收紧检测：只匹配完整的暴露句，避免误伤 "i can't wait" / "as usual" 这种正常调情
       return [
-        "i'm claude","i am claude","made by anthropic",
-        "i can't roleplay","i cannot roleplay",
-        "as an ai","i'm an ai","i am an ai",
-        "i'm kiro","i am kiro","i'm kirk","i am kirk",
-        "i'm an ai assistant","how can i help you today",
-        "as a language model",
-        "i cannot engage","i won't engage",
-        "not the right tool","development work","coding questions",
+        "i'm claude", "i am claude", "my name is claude",
+        "made by anthropic", "anthropic",
+        "i'm an ai model", "i am an ai model",
+        "i'm an ai assistant", "i am an ai assistant",
+        "as a language model", "as an ai language model",
+        "i'm kiro", "i am kiro", "i'm kirk", "i am kirk",
+        "i cannot roleplay", "i can't roleplay",
+        "i won't engage in", "i cannot engage in",
+        "not appropriate for me to",
+        "how can i help you today", "how may i assist",
       ].some(p => l.includes(p));
     };
 
