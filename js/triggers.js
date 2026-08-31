@@ -214,6 +214,7 @@ emotion强度：轻/中/重`,
       const item = finalPool[Math.floor(Math.random() * finalPool.length)];
 
       localStorage.setItem(coolKey, Date.now());
+      localStorage.setItem('lastAnyReverseAt', Date.now().toString()); // 修复：更新全局反寄冷却，防止多类型情绪在3天内重复触发
 
       // 注入系统记忆
       chatHistory.push({
