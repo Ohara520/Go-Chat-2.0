@@ -224,6 +224,23 @@ function checkCareerLevelUp() {
     }
 
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+
+    // 时间线：记录升职
+    if (typeof addTimelineEvent === 'function') {
+      const careerData = CAREER_DATA[type];
+      const newTitle = careerData.titles[newLevel - 1];
+      addTimelineEvent({
+        type: 'career',
+        title: `升职到 ${newTitle}`,
+        relatedData: {
+          careerType: type,
+          oldLevel: currentLevel,
+          newLevel: newLevel,
+          title: newTitle
+        }
+      });
+    }
+
     return { oldLevel: currentLevel, newLevel, career: CAREER_DATA[type] };
   }
   return false;
@@ -460,12 +477,18 @@ function checkEntertainerShow() {
   const type = getCareer();
   if (type !== 'entertainer') return 0;
 
-  // 7天内只能触发一次
-  const lastShow = parseInt(localStorage.getItem('entertainerLastShow') || '0');
-  if (lastShow && Date.now() - lastShow < 7 * 24 * 3600 * 1000) return 0;
+  // 修复：改为固定周六发放，不再是随机触发
+  // 周六检测：每周只发一次
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=周日, 6=周六
 
-  // 每天 15% 概率触发（一周内大概率至少触发一次）
-  if (Math.random() > 0.15) return 0;
+  // 只在周六检查
+  if (dayOfWeek !== 6) return 0;
+
+  // 检查本周是否已发放（用周key标记）
+  const weekKey = getWeekKey(); // 格式：2026-W33
+  const lastShowWeek = localStorage.getItem('entertainerLastShowWeek') || '';
+  if (lastShowWeek === weekKey) return 0; // 本周已发
 
   const level = getCareerLevel();
   const showMin = [30, 40, 60, 80, 100, 150, 200, 300, 400, 500][level - 1] || 30;
@@ -493,7 +516,7 @@ function checkEntertainerShow() {
     });
   }
 
-  localStorage.setItem('entertainerLastShow', Date.now().toString());
+  localStorage.setItem('entertainerLastShowWeek', weekKey);
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
   if (viral) {

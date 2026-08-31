@@ -588,6 +588,15 @@ One or two lines. English only. Lowercase. No sweet talk. But not hollow either.
       }
     }
 
+    // 时间线：记录贵重礼物（≥£1000）
+    if (pd.price >= 1000 && typeof addTimelineEvent === 'function') {
+      addTimelineEvent({
+        type: 'gift_received',
+        amount: pd.price,
+        relatedData: { itemName: delivery.name, isLuxury: pd.isLuxury }
+      });
+    }
+
     // 奢侈品：第二条用 Sonnet，5秒后
     if (pd.isLuxury) {
       setTimeout(async () => {

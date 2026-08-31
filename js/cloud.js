@@ -28,7 +28,8 @@ async function loadFromCloud() {
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
-    if (error || !data) return;
+    if (error) throw new Error('Supabase query failed: ' + error.message);
+    if (!data) return; // 新用户首次登录，云端无数据是正常的，允许继续
 
     // ── 时间戳 ──────────────────────────────────────────────
     // 根本修复：用 stateSavedAt 判断 state_snapshot 是否比本地新
@@ -1007,10 +1008,17 @@ async function saveToCloud() {
       mood: parseInt(localStorage.getItem('moodLevel') || '7'),
       affection: parseInt(localStorage.getItem('affection') || '50'),
       long_term_memory: localStorage.getItem('longTermMemory') || '',
-      profile: profile,
-      state_snapshot: stateSnapshot,
       updated_at: nowIso,
     };
+    // 关键防御：只在 profile 和 state_snapshot 非空时写入，防止空快照覆盖云端
+    // profile 核心标志：userName 和 marriageDate 至少有一个
+    const _profileHasCore = profile.userName || profile.marriageDate;
+    if (_profileHasCore) {
+      upsertData.profile = profile;
+      upsertData.state_snapshot = stateSnapshot;
+    } else {
+      console.warn('[cloud] profile 为空，跳过 profile/state_snapshot 字段写入，防止覆盖云端');
+    }
     // 只在有内容时才存，防止空值覆盖云端已有数据
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
     // 钱包余额从transactions实时计算，确保与本地显示一致

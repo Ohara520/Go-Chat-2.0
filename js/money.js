@@ -440,8 +440,15 @@ function getMonthKey() {
   return now.getFullYear() + '_m' + (now.getMonth() + 1);
 }
 
-// 兼容旧名称，内部改为月度
-function getWeekKey() { return getMonthKey(); }
+// 修复：getWeekKey 改为返回真正的周编号（ISO week number）
+// 格式：2026-W33
+function getWeekKey() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+  const weekNum = Math.ceil((days + start.getDay() + 1) / 7);
+  return now.getFullYear() + '-W' + String(weekNum).padStart(2, '0');
+}
 
 function getWeeklyGiven() {
   return parseInt(localStorage.getItem('monthlyGiven_' + getMonthKey()) || '0');
@@ -771,6 +778,16 @@ Write KEEP on its own line at the end.]`;
       if (!localStorage.getItem('firstUserGiftAccepted')) {
         localStorage.setItem('firstUserGiftAccepted', 'true');
       }
+
+      // 时间线：记录大额转账（≥£500）
+      if (acceptAmount >= 500 && typeof addTimelineEvent === 'function') {
+        addTimelineEvent({
+          type: 'transfer',
+          amount: acceptAmount,
+          relatedData: { originalAmount: amount, refunded: refundAmount }
+        });
+      }
+
       updateUserTransferCard(cardId, true);
       if (reply && typeof appendMessage === 'function') appendMessage('bot', reply);
       if (typeof chatHistory !== 'undefined') {

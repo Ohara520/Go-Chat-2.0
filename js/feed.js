@@ -62,6 +62,30 @@ function buildSharedMemories() {
     });
   });
 
+  // 时间线事件 → major（只取不与快递/朋友圈重复的类型：初遇/转账/告白/升职/购置）
+  // gift_received 已由 deliveries 覆盖，cold_war 已由 feeds 覆盖，此处跳过避免重复
+  const timelineEvents = (typeof getTimelineEvents === 'function') ? getTimelineEvents() : [];
+  const _tlBadge = {
+    milestone: '里程碑 · 我们',
+    transfer: '生活 · 她转账',
+    confession: '心动 · 那句话',
+    career: '成长 · 事业',
+    purchase: '生活 · 大件',
+  };
+  timelineEvents
+    .filter(e => ['milestone','transfer','confession','career','purchase'].includes(e.type))
+    .forEach(e => {
+      memories.push({
+        id: 'tl_' + e.id,
+        type: 'timeline', tier: e.type === 'transfer' ? 'middle' : 'major',
+        title: `${e.icon || '✨'} ${e.title}`,
+        sub: e.ghostReaction || (e.amount ? `£${e.amount.toLocaleString()}` : ''),
+        timestamp: e.timestamp || 0,
+        date: e.timestamp ? new Date(e.timestamp).toISOString().slice(0, 10) : '',
+        badge: _tlBadge[e.type] || '时间线'
+      });
+    });
+
   // 按时间排序
   memories.sort((a, b) => b.timestamp - a.timestamp);
   return memories;

@@ -983,6 +983,14 @@ const STORY_EVENTS = [
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚第一次对你说了"我爱你"。]`, 8);
       if (res) await emitGhostNarrativeEvent(res);
       setRelationshipFlag('saidILoveYou');
+
+      // 时间线：记录第一次说 I love you
+      if (typeof addTimelineEvent === 'function') {
+        addTimelineEvent({
+          type: 'confession',
+          title: '她第一次说 I love you'
+        });
+      }
     }
   },
 
@@ -1194,6 +1202,16 @@ const STORY_EVENTS = [
       // 记录和好时间——供 '先行一步' 节点判断是否在3天内
       localStorage.setItem('coldWarRepairedAt', Date.now());
       changeTrustHeat(15);
+
+      // 时间线：记录冷战结束
+      if (typeof addTimelineEvent === 'function') {
+        const coldWarStart = parseInt(localStorage.getItem('coldWarStart') || '0');
+        const duration = coldWarStart ? Math.floor((Date.now() - coldWarStart) / 86400000) : 0;
+        addTimelineEvent({
+          type: 'cold_war_end',
+          relatedData: { duration }
+        });
+      }
     }
   },
 

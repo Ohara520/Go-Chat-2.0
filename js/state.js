@@ -935,6 +935,13 @@ function startColdWar() {
   coldWarTimer = setInterval(() => checkColdWarApologyCondition(), 20 * 60 * 1000);
   if (typeof feedEvent_coldWarStarted === 'function') feedEvent_coldWarStarted();
   refreshStatusEmoji();
+
+  // 时间线：记录冷战开始
+  if (typeof addTimelineEvent === 'function') {
+    addTimelineEvent({
+      type: 'cold_war_start'
+    });
+  }
 }
 
 function endColdWar(userApologized = false) {

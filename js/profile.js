@@ -1100,6 +1100,23 @@ async function triggerHomeItemMoment(product) {
     }
   } catch(e) {}
 
+  // 时间线：记录购置房产/车/地（大件）
+  if (typeof addTimelineEvent === 'function' && ['house', 'land', 'car'].includes(product.homeType)) {
+    const titleMap = {
+      car:   `买了 ${product.name}`,
+      house: `买下了 ${product.name}`,
+      land:  `拥有了 ${product.name}`,
+    };
+    const iconMap = { car: '🚗', house: '🏠', land: '🌿' };
+    addTimelineEvent({
+      type: 'purchase',
+      title: titleMap[product.homeType] || `买了 ${product.name}`,
+      icon: iconMap[product.homeType] || '🏠',
+      amount: product.price,
+      relatedData: { homeType: product.homeType, tier: product.tier, itemName: product.name }
+    });
+  }
+
   if (typeof feedEvent_boughtBigItem === 'function') feedEvent_boughtBigItem(product.name, product.price || 0, true);
   setTimeout(() => { if (typeof maybeTriggerFeedPost === 'function') maybeTriggerFeedPost('event_arrived'); }, 500);
 }

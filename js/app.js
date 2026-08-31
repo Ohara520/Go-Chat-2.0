@@ -144,6 +144,11 @@ async function startChat() {
             String(today.getMonth()+1).padStart(2,'0') + '-' +
             String(today.getDate()).padStart(2,'0');
         localStorage.setItem('marriageDate', dateStr);
+
+        // 时间线：记录第一次见面（仅首次）
+        if (typeof addTimelineEvent === 'function') {
+            addTimelineEvent({ type: 'milestone', title: '第一次遇见他', icon: '💕' });
+        }
     }
     openScreen('mainScreen');
     if (typeof showTabBar === 'function') showTabBar();
