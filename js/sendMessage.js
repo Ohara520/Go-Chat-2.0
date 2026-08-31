@@ -1024,12 +1024,14 @@ async function _processMergedMessage(text) {
               if (combinedResult.flirt === true) {
                 isIntimate = true;
               } else {
-                // 修复：只有10分钟内的_intimate才算，防止旧污染标记一直触发Grok
+                // 修复：收紧余温强制路由——只有消息本身有调情倾向（emotion=撒娇+不是明确日常），才留在Grok
+                // 防止调情后说"鸡胸肉"/"蚊子咬"这种完全无关的消息被强制送给Grok
                 const _recentHasIntimate = chatHistory
                   .filter(m => !m._system && !m._recalled)
                   .slice(-6)
                   .some(m => m._intimate && (m._time || 0) > Date.now() - 10 * 60 * 1000);
-                if (_recentHasIntimate && !_isClearlyNormal) {
+                const _isAffectionate = combinedResult.emotion === '撒娇' || combinedResult.need === '撒娇';
+                if (_recentHasIntimate && !_isClearlyNormal && _isAffectionate) {
                   isIntimate = true;
                 }
               }

@@ -604,7 +604,12 @@ async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateM
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }, 50000);  // 50s：给后端轮完6个节点（6×8s=48s）留足时间
-      if (!res.ok) return _lastText;
+      if (!res.ok) {
+        let _errBody = '';
+        try { _errBody = JSON.stringify(await res.json()); } catch (_) { try { _errBody = await res.text(); } catch (_) {} }
+        console.error(`[Venice失败] HTTP ${res.status} ${res.statusText} @ ${endpoint} | body:`, _errBody);
+        return _lastText;
+      }
       const data = await res.json();
       if (_isApiErrorBody(data)) {
         console.warn('[callVeniceForCurrentChar] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
