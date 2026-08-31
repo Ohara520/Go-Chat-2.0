@@ -132,7 +132,7 @@ Never run words together. "show me" not "showme". "you're here" not "you'rehere"
 Never delete the spaces to look terse. Lowercase is fine — missing spaces is not.
 Punctuation is always followed by a space before the next word.`;
 
-async function createWithFailover(messages, system, max_tokens, model = 'grok-4.2-fast') {
+async function createWithFailover(messages, system, max_tokens, model = 'grok-4.3') {
   let lastErr = null;
   let lastStatus = null;
 
