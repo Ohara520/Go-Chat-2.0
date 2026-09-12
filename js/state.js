@@ -284,6 +284,160 @@ function applyConflictHandledWellTrustBonus(delta = 2) {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 记忆系统：短期记忆与长期记忆
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 更新短期记忆（提取最近对话的未完成上下文）
+ */
+async function updateShortTermMemory(reply, text) {
+  try {
+    if (!reply || reply.length < 3) return;
+    const recent = chatHistory.filter(m => !m._system && !m._recalled).slice(-5)
+      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 150)}`).join('\n');
+    const prompt = `Extract key context from recent conversation (unfinished topics, emotional state, pending questions). Keep under 100 words.\n\n${recent}`;
+    const shortMem = await callHaiku('You extract conversation context.', [{ role: 'user', content: prompt }], 150);
+    if (shortMem && shortMem.length > 10) {
+      localStorage.setItem('shortTermMemory', shortMem.trim());
+    }
+  } catch (e) {
+    console.warn('Short-term memory update failed:', e);
+  }
+}
+
+/**
+ * 更新长期记忆（提取重要信息：里程碑、秘密、偏好、事件）
+ */
+async function updateLongTermMemory(reply, text) {
+  try {
+    const recentMessages = chatHistory.filter(m => !m._system && !m._recalled).slice(-6);
+    const conversationText = recentMessages
+      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content}`)
+      .join('\n');
+
+    const prompt = `Extract ONE important long-term memory from this conversation.
+Focus on:
+- Personal details she shared (preferences, fears, dreams, past events)
+- Relationship milestones (first time saying something important, breakthroughs)
+- Recurring patterns (what she always does, what matters to her)
+
+Format: JSON only
+{
+  "type": "milestone|secret|preference|event",
+  "content": "Brief memory in 1-2 sentences from Ghost's POV",
+  "importance": 1-10,
+  "tags": ["keyword1", "keyword2"]
+}
+
+If nothing important, return: {"content": ""}
+
+Recent conversation:
+${conversationText}`;
+
+    const raw = await callDeepSeek(prompt, 300);
+    const memory = safeParseJSON(raw);
+
+    if (memory && memory.content && memory.content.length > 5) {
+      saveLongTermMemoryEntry(memory);
+    }
+  } catch (e) {
+    console.error('长期记忆提取失败:', e);
+  }
+}
+
+/**
+ * 保存长期记忆到 localStorage
+ */
+function saveLongTermMemoryEntry(memory) {
+  const memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+  const isDuplicate = memories.some(m =>
+    m.content.toLowerCase().includes(memory.content.toLowerCase().slice(0, 30))
+  );
+  if (isDuplicate) return;
+
+  const newMemory = {
+    id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    type: memory.type || 'event',
+    content: memory.content,
+    importance: memory.importance || 5,
+    timestamp: Date.now(),
+    lastRecalled: 0,
+    tags: memory.tags || []
+  };
+
+  memories.push(newMemory);
+  memories.sort((a, b) => b.importance - a.importance);
+  const trimmed = memories.slice(0, 50);
+  localStorage.setItem('longTermMemories', JSON.stringify(trimmed));
+  console.log('💾 保存长期记忆:', newMemory.content.slice(0, 50));
+}
+
+/**
+ * 检索相关长期记忆（在构建 system prompt 时调用）
+ * @param {string} userMessage 用户最新消息
+ * @param {number} limit 返回记忆数量，默认3条
+ * @returns {string} 格式化的记忆文本
+ */
+function recallLongTermMemory(userMessage, limit = 3) {
+  const memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+  if (memories.length === 0) return '';
+
+  const userLower = userMessage.toLowerCase();
+
+  // 计算相关性分数
+  const scored = memories.map(m => {
+    let score = 0;
+
+    // 标签匹配
+    m.tags.forEach(tag => {
+      if (userLower.includes(tag.toLowerCase())) score += 5;
+    });
+
+    // 内容关键词匹配
+    const keywords = m.content.toLowerCase().split(/\s+/);
+    keywords.forEach(word => {
+      if (word.length > 3 && userLower.includes(word)) score += 2;
+    });
+
+    // 重要性权重
+    score += m.importance;
+
+    // 时间衰减（越久远的记忆，权重略降）
+    const daysPassed = (Date.now() - m.timestamp) / (1000 * 60 * 60 * 24);
+    if (daysPassed > 7) score -= 1;
+    if (daysPassed > 30) score -= 2;
+
+    // 最近被调用过的记忆，降低优先级（避免重复）
+    if (m.lastRecalled > 0) {
+      const hoursSinceRecall = (Date.now() - m.lastRecalled) / (1000 * 60 * 60);
+      if (hoursSinceRecall < 24) score -= 3;
+    }
+
+    return { ...m, score };
+  });
+
+  // 排序并取top N
+  scored.sort((a, b) => b.score - a.score);
+  const relevant = scored.slice(0, limit).filter(m => m.score > 0);
+
+  if (relevant.length === 0) return '';
+
+  // 更新最后调用时间
+  relevant.forEach(m => {
+    const idx = memories.findIndex(mem => mem.id === m.id);
+    if (idx !== -1) {
+      memories[idx].lastRecalled = Date.now();
+    }
+  });
+  localStorage.setItem('longTermMemories', JSON.stringify(memories));
+
+  // 格式化返回
+  const formatted = relevant.map(m => `- ${m.content}`).join('\n');
+  return `\n[LONG-TERM MEMORY]\nThings you remember about her:\n${formatted}\n`;
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Attachment Pull
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

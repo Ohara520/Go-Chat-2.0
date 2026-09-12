@@ -374,49 +374,7 @@ function saveLongTermMemory(memory) {
   if (typeof touchLocalState === 'function') touchLocalState();
 }
 
-async function updateLongTermMemory(forceUpdate = false) {
-  // 每2轮触发一次；情绪关键词出现时立刻触发（forceUpdate = true）
-  const _tc = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
-  if (!forceUpdate && _tc % 2 !== 0) return;
-
-  const existingMemory = getLongTermMemory();
-  const recentMessages = chatHistory
-    .filter(m => !m._system)
-    .slice(-20)
-    .map(m => `${m.role === 'user' ? '她' : 'Ghost'}: ${m.content.slice(0, 150)}`)
-    .join('\n');
-  if (!recentMessages) return;
-
-  const _memLimit = (() => {
-    if (typeof _subCache !== 'undefined' && _subCache?.memory_limit) return _subCache.memory_limit;
-    return 20;
-  })();
-
-  // 字数从20字提升到40字，给细节留更多空间
-  const memorySystemPrompt = `你是Ghost的记忆提取器。从对话中提取需要记住的信息，分类列出，每条不超过40字，总计最多${_memLimit}条。只返回列表，不要其他文字。格式：- xxx
-
-需要记录的内容：
-【关于她】喜好、口癖、习惯、状态、近况、随口提到的细节（宠物名字、家人情况等也要记）
-【两人之间】称呼/绰号、inside joke、约定、关系里程碑
-【关于Ghost自己说过的】他主动透露的喜好/习惯/观点
-【她的聊天风格】话多话少、常用词、几点来找他、语气节奏
-【礼物与快递】互寄过什么、收到后的反应
-【重要情绪事件】她哭过/难过/生病/说了重要的话，要单独记一条`;
-
-  const memoryUserPrompt = `现有记忆：\n${existingMemory}\n\n最近对话：\n${recentMessages}\n\n请更新记忆列表，保留重要的旧记忆，加入新的重要信息。细节宁可多记，不要漏掉。`;
-
-  try {
-    const newMemory = await fetchDeepSeek(memorySystemPrompt, memoryUserPrompt, 600);
-    if (newMemory) {
-      // 滑动窗口：超过 _memLimit 条就丢掉最老的，保持总条数稳定
-      const lines = newMemory.split('\n').filter(l => l.trim().startsWith('-'));
-      const trimmed = lines.length > _memLimit
-        ? lines.slice(-_memLimit).join('\n')  // 只保留最新的 N 条
-        : newMemory;
-      saveLongTermMemory(trimmed);
-    }
-  } catch(e) {}
-}
+// 旧的 updateLongTermMemory 已移至 state.js，使用新的结构化记忆系统
 
 // ===== 主入口：sendMessage =====
 async function sendMessage() {
@@ -1585,12 +1543,15 @@ async function _processMergedMessage(text) {
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
     const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
-    // 每2轮更新一次记忆；遇到情绪/重要信息关键词立刻更新
-    const _emotionMemoryTrigger = /哭|难过|生病|受伤|失业|分手|去世|崩溃|很累|好累|撑不住|重要|告诉你|其实我|养了|有只|叫做|名字叫|crying|sick|hurt|lost|important|actually|i have a/i.test(text);
-    if (_emotionMemoryTrigger) {
-      try { updateLongTermMemory(true); } catch(e) {}
-    } else if (_currentTurn % 2 === 0) {
-      try { updateLongTermMemory(); } catch(e) {}
+
+    // 🔧 新记忆系统：短期记忆每次更新，长期记忆每5轮更新
+    if (reply.length > 50 && !reply.includes('___NETWORK_ERROR___')) {
+      setTimeout(() => {
+        updateShortTermMemory(reply, text).catch(e => console.warn('短期记忆更新失败:', e));
+        if (_currentTurn % 5 === 0) {
+          updateLongTermMemory(reply, text).catch(e => console.warn('长期记忆更新失败:', e));
+        }
+      }, 2000);
     }
 
     // 心声生成（修复 #055: innerThoughtEl来自appendMessage返回值，不会混入主气泡）

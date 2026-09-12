@@ -557,7 +557,11 @@ function buildSystemPrompt() {
   const location        = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locationReason  = localStorage.getItem('currentLocationReason');
   const coupleFeedSummary = localStorage.getItem('coupleFeedSummary') || '';
-  const longTermMemory  = localStorage.getItem('longTermMemory') || '';
+
+  // 🔧 获取用户最后一条消息，用于检索相关长期记忆
+  const userLastMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+  const longTermMemory = recallLongTermMemory(userLastMsg, 3);
+
   const lastSalary      = localStorage.getItem('lastSalaryAmount');
   const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
   const metInPerson     = localStorage.getItem('metInPerson') === 'true';
