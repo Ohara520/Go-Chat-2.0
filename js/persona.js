@@ -561,6 +561,7 @@ function buildSystemPrompt() {
   // 🔧 获取用户最后一条消息，用于检索相关长期记忆
   const userLastMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
   const longTermMemory = recallLongTermMemory(userLastMsg, 3);
+  const shortTermMemory = localStorage.getItem('shortTermMemory') || '';
 
   const lastSalary      = localStorage.getItem('lastSalaryAmount');
   const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
@@ -831,6 +832,7 @@ ${(() => {
   return '';
 })()}
 ${longTermMemory ? `Key memories:\n${longTermMemory}\nUse these naturally when relevant. But for deliveries, gifts, takeout — once you have acknowledged receiving it, the topic is done. Do not keep bringing up the same item across multiple replies. If she asks about it again, you can answer. But do not volunteer it repeatedly.` : ''}
+${shortTermMemory ? `[RECENT CONTEXT]\n${shortTermMemory}` : ''}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
 
 [GIFT/DELIVERY HONESTY — HARD RULE]
