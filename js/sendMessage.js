@@ -1545,15 +1545,14 @@ async function _processMergedMessage(text) {
     const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
 
     // 🔧 新记忆系统：短期记忆每次更新，长期记忆每5轮更新
-    // ⚠️ 临时禁用，测试是否影响主流程
-    // if (reply.length > 50 && !reply.includes('___NETWORK_ERROR___')) {
-    //   setTimeout(() => {
-    //     updateShortTermMemory(reply, text).catch(e => console.warn('短期记忆更新失败:', e));
-    //     if (_currentTurn % 5 === 0) {
-    //       updateLongTermMemory(reply, text).catch(e => console.warn('长期记忆更新失败:', e));
-    //     }
-    //   }, 2000);
-    // }
+    if (reply.length > 50 && !reply.includes('___NETWORK_ERROR___')) {
+      setTimeout(() => {
+        updateShortTermMemory(reply, text).catch(e => console.warn('短期记忆更新失败:', e));
+        if (_currentTurn % 5 === 0) {
+          updateLongTermMemory(reply, text).catch(e => console.warn('长期记忆更新失败:', e));
+        }
+      }, 2000);
+    }
 
     // 心声生成（修复 #055: innerThoughtEl来自appendMessage返回值，不会混入主气泡）
     const itEl = firstBotResult?.innerThoughtEl || null;
