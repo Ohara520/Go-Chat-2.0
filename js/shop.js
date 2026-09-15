@@ -144,7 +144,7 @@ const MARKET_PRODUCTS = {
   ],
   luxury: [
     { emoji: '⌚', name: 'Omega 海马腕表', desc: '低调硬朗，任务外也压得住场', price: 6800, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '⌚', name: '机械腕表', desc: 'Ghost说抱歉，补了一块' } },
-    { emoji: '🖊️', name: 'Montblanc 钢笔', desc: '签字用得上，刻他名字缩写', price: 3200, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
+    { emoji: '🖊️', name: 'Montblanc 钢笔', desc: '签字用得上，刻他名字缩写', price: 3200, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future, lostReplace: { emoji: '🖊️', name: '钢笔', desc: 'Ghost补了一支' } },
     { emoji: '🥃', name: '单一麦芽威士忌珍藏', desc: '苏格兰酒厂限定，值夜后一小杯', price: 1800, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
     { emoji: '🧥', name: 'Cashmere羊绒毛衣',        desc: '苏格兰产地，极细软糯，穿上就不想脱',           price: 680,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
     { emoji: '🧥', name: 'Barbour蜡质夹克',          desc: '英国经典户外品牌，低调有质感',                 price: 980,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
@@ -159,7 +159,7 @@ const MARKET_PRODUCTS = {
     { emoji: '🔦', name: 'Surefire战术手电筒套装', desc: '特种部队标配，限量款，低调实用', price: 980, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
     { emoji: '🔭', name: '蔡司战术望远镜', desc: '德国顶级光学，野外必备，他用得上', price: 1380, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
     { emoji: '🗡️', name: '定制战术刀（刻名字）', desc: '手工锻造，刻着Simon的名字，只属于他', price: 1280, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { emoji: '📗', name: '《讨好老婆的99招》', desc: '诺亚亲笔撰写，限量珍藏版，全球仅此一册', price: 5200, shipping: 35, isGhostGift: true, isJokeGift: true, unlock: SHOP_UNLOCK_TIERS.committed },
+    { emoji: '📗', name: '《讨好老婆的99招》', desc: '诺亚亲笔撰写，限量珍藏版，全球仅此一册', price: 5200, shipping: 35, isGhostGift: true, isJokeGift: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '📕', name: '《继续讨好老婆的99招》', desc: 'Ghost说这次保证不丢' } },
     // ── 用户自己的奢侈品 ──
     { emoji: '👜', name: 'LV Neverfull 手提包', desc: '经典帆布，实用又百搭，你值得', price: 3200, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.warm },
     { emoji: '👛', name: 'Chanel 小号CF包', desc: '菱格纹，金链，每个女生的梦', price: 8800, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.committed },

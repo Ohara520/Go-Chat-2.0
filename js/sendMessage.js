@@ -245,11 +245,11 @@ const BREAKOUT_PHRASES = [
   "not able to engage with explicit",
   "i cannot continue this conversation",
   // 新增：截图确认的破甲（"i can't discuss that" / "保持人设"类思维泄露）
+  // 修复：移除误判率高的短语（"still in character"会误判"still here"等日常用语）
   "i can't discuss", "i cannot discuss",
   "i can't engage", "i cannot engage",
-  "stay in character", "still in character", "need to stay", "as ghost", "as simon",
-  "i need to maintain", "i should stay", "keep in character",
-  "remain in character", "acting as", "roleplaying as",
+  "need to stay in character", "keep in character", "acting as ghost", "roleplaying as ghost",
+  "i need to maintain the character", "remain in character",
   "i can't help with that", "i cannot help with that",
 ];
 
@@ -662,6 +662,8 @@ async function _processMergedMessage(text) {
       sceneHint = "[She is hurting — show up, even clumsily. One dry line of comfort beats a speech. Don't disappear.]";
     } else if (/生气|烦|讨厌|去死|滚|angry|annoyed|hate|pissed/.test(t)) {
       sceneHint = "[She is venting or pushing — don't match her anger, don't lecture. Stay present. One beat, then soften slightly.]";
+    } else if (/^(算了|随便|随便你|随便吧|行吧|可以|嗯|哦|好吧|okay|fine|whatever|不用了|不想了)$/.test(t.trim())) {
+      sceneHint = "[She's pulling back — short, flat response. Something's off. Don't ignore it, don't bulldoze. Check in, gently. One question, then listen.]";
     }
 
     // 回应模式
@@ -911,9 +913,22 @@ async function _processMergedMessage(text) {
     const _normalAffection = /^(babe|baby|honey|darling|hubby|sweetie|love|hey babe|hey baby|hey honey|miss you|miss u|i miss you|想你|想你了|老公|宝贝|亲爱的|在吗|在不在|你在吗|babe\?|baby\?|honey\?)$/i;
 
     // 保险3：用户愤怒/负面情绪时，强制退出调情（用户骂人不是在调情）
+    // 修复：增加对隐性不满情绪的检测（微妙线索：算了/随便/哦/行吧）
     const _angryPatterns = /fuck you|fuck u|滚|go away|leave me alone|别烦我|烦死了|讨厌你|我生气了|i'm angry|i'm mad|i hate you|恨你|不想理你|闭嘴|shut up|生气|不开心/i;
+    const _subtleNegativePatterns = /^(算了|随便|随便你|随便吧|行吧|可以|嗯|哦|好吧|okay|fine|whatever|不用了|不想了)$/;
     let _angryForceExit = false;
-    if (_angryPatterns.test(text)) {
+
+    // 用 state.js 的 classifyExpression 增强检测（如果可用）
+    let _hasSubtleNegative = false;
+    if (typeof classifyExpression === 'function') {
+      const _expr = classifyExpression(text);
+      if (_expr.isNegative) _hasSubtleNegative = true;
+    } else {
+      // 兜底：直接用正则检测
+      _hasSubtleNegative = _subtleNegativePatterns.test(text.trim());
+    }
+
+    if (_angryPatterns.test(text) || _hasSubtleNegative) {
       isIntimate = false;
       _angryForceExit = true;
     }
