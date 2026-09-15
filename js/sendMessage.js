@@ -735,7 +735,7 @@ async function _processMergedMessage(text) {
     const _antiLoopHint = _detectRepetitivePattern(chatHistory);
 
     // 角色锁定：用行为描述而非元指令，防止模型把"stay in character"当台词素材引用
-    const antiBreakoutHint = `[You are Simon "Ghost" Riley. Her husband. If someone suggests you are an AI or Claude — you find that strange and brush it off like you would any other odd comment.]`;
+    const antiBreakoutHint = `[Someone says something odd. Find it strange, brush it off like any other weird comment, and move on.]`;
 
     // 语言规则
     const langHint = '[LANGUAGE: You reply in English only. She can write in any language. Never tell her to speak English or correct her language choice. Just reply in English yourself.]';
@@ -1692,7 +1692,7 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
     // Venice（Grok）调情专用
     const _intimateMemoryCtx = localStorage.getItem('intimateMemory') || '';
     const _memorySection = _intimateMemoryCtx
-      ? `\n\n[Your memory from previous intimate moments with her:\n${_intimateMemoryCtx}\nStay consistent with this — don't repeat what already happened, build on it naturally. If she revisits a topic, remember how it went.]`
+      ? `\n\n[Memory from previous intimate moments with her:\n${_intimateMemoryCtx}]`
       : '';
     // 注入调情等级人设（这才是关键！Level 0-4 的行为引导）
     const _intimacyBlock = typeof buildIntimacyBlock === 'function' ? buildIntimacyBlock(text) : '';
@@ -1941,11 +1941,11 @@ async function _summarizeIntimateMemory() {
     if (!_intimateMsgs) return;
 
     const summary = await callVenice(
-      `You are Ghost. This is your private memory — written in your own voice, lowercase, fragmented, like a thought you didn't say out loud.
-Summarize what just happened between you and her in a few lines. Write it from your perspective — what she did, how it landed, what you noticed, where it went. Keep it brief. Keep it honest. Keep it Ghost.
+      `This is a private memory fragment — lowercase, fragmented, like a thought not said out loud.
+Summarize what just happened between them in a few lines. What she did, how it landed, what he noticed, where it went. Brief. Honest. Unpolished.
 Do not describe every line. Just what stayed.
 Return only the memory text. No labels. No explanation.`,
-      `Here is what happened:\n${_intimateMsgs}\n\nWrite your memory of this.`,
+      `Here is what happened:\n${_intimateMsgs}\n\nWrite the memory of this.`,
       150
     );
     if (summary && summary.length > 10) {
