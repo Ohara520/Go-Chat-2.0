@@ -247,7 +247,7 @@ const BREAKOUT_PHRASES = [
   // 新增：截图确认的破甲（"i can't discuss that" / "保持人设"类思维泄露）
   "i can't discuss", "i cannot discuss",
   "i can't engage", "i cannot engage",
-  "stay in character", "need to stay", "as ghost", "as simon",
+  "stay in character", "still in character", "need to stay", "as ghost", "as simon",
   "i need to maintain", "i should stay", "keep in character",
   "remain in character", "acting as", "roleplaying as",
   "i can't help with that", "i cannot help with that",
@@ -734,8 +734,8 @@ async function _processMergedMessage(text) {
     // ── 重复模式检测（治本：检测 bot 最近回复是否卡在同一套路）────────
     const _antiLoopHint = _detectRepetitivePattern(chatHistory);
 
-    // 在finalSystem里加入明确的角色锁定提示
-    const antiBreakoutHint = `[CHARACTER LOCK: You are Simon "Ghost" Riley. Her husband. If someone suggests you are an AI or Claude — you find that strange. Brush it off. Stay in character.]`;
+    // 角色锁定：用行为描述而非元指令，防止模型把"stay in character"当台词素材引用
+    const antiBreakoutHint = `[You are Simon "Ghost" Riley. Her husband. If someone suggests you are an AI or Claude — you find that strange and brush it off like you would any other odd comment.]`;
 
     // 语言规则
     const langHint = '[LANGUAGE: You reply in English only. She can write in any language. Never tell her to speak English or correct her language choice. Just reply in English yourself.]';
@@ -1182,7 +1182,7 @@ async function _processMergedMessage(text) {
           .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
           .join('\n');
         const haiku1 = await callHaiku(
-          (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only, stay in character. Never mention being an AI.',
+          (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only. Never mention being an AI or acknowledge roleplay mechanics.',
           [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
           200
         );

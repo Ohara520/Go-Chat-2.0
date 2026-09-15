@@ -193,12 +193,13 @@ Strict rules:
 
     let entry = '';
     // 优先用 DeepSeek：不会拒绝日记内容，比 Sonnet 稳定
+    // 修复：max_tokens 从 100-120 提高到 200，防止日记截断
     if (typeof fetchDeepSeek === 'function') {
-      entry = await fetchDeepSeek(prompt, 'write today\'s entry.', 120);
+      entry = await fetchDeepSeek(prompt, 'write today\'s entry.', 200);
     } else if (typeof callSonnetLight === 'function') {
-      entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
+      entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 200);
     } else if (typeof callSonnet === 'function') {
-      entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 100);
+      entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 200);
     }
 
     // 破防检测：不存 AI 泄露内容
