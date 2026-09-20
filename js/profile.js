@@ -413,7 +413,7 @@ function initProfile() {
   if (locEl) locEl.textContent = `${location}  ${locationZH[location] || ''}`;
 
   const ageEl = document.getElementById('profileAge');
-  if (ageEl) ageEl.textContent = '35';
+  if (ageEl) ageEl.textContent = '32';
 
   const profileNameEl = document.getElementById('profileDisplayName');
   if (profileNameEl) profileNameEl.textContent = remark || 'Simon Riley';

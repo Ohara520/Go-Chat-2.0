@@ -349,9 +349,11 @@ ${conversationText}`;
  * 保存长期记忆到 localStorage
  */
 function saveLongTermMemoryEntry(memory) {
-  const memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+  let memories;
+  try { memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]'); } catch(e) { memories = []; }
+  if (!Array.isArray(memories)) memories = [];
   const isDuplicate = memories.some(m =>
-    m.content.toLowerCase().includes(memory.content.toLowerCase().slice(0, 30))
+    m.content && m.content.toLowerCase().includes(memory.content.toLowerCase().slice(0, 30))
   );
   if (isDuplicate) return;
 
@@ -370,6 +372,11 @@ function saveLongTermMemoryEntry(memory) {
   const trimmed = memories.slice(0, 50);
   localStorage.setItem('longTermMemories', JSON.stringify(trimmed));
   console.log('💾 保存长期记忆:', newMemory.content.slice(0, 50));
+
+  // 同步进世界书：用 tags 作触发词，让 AI 抽到的记忆也能被关键词检索到
+  if (typeof addWorldBookEntry === 'function' && Array.isArray(newMemory.tags) && newMemory.tags.length) {
+    try { addWorldBookEntry({ keywords: newMemory.tags, content: newMemory.content, source: 'auto' }); } catch (e) {}
+  }
 }
 
 /**
@@ -379,8 +386,9 @@ function saveLongTermMemoryEntry(memory) {
  * @returns {string} 格式化的记忆文本
  */
 function recallLongTermMemory(userMessage, limit = 3) {
-  const memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
-  if (memories.length === 0) return '';
+  let memories;
+  try { memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]'); } catch(e) { memories = []; }
+  if (!Array.isArray(memories) || memories.length === 0) return '';
 
   const userLower = userMessage.toLowerCase();
 
@@ -388,13 +396,15 @@ function recallLongTermMemory(userMessage, limit = 3) {
   const scored = memories.map(m => {
     let score = 0;
 
-    // 标签匹配
-    m.tags.forEach(tag => {
-      if (userLower.includes(tag.toLowerCase())) score += 5;
-    });
+    // 标签匹配（tags 可能缺失或非数组，加守卫防止 forEach 抛错）
+    if (Array.isArray(m.tags)) {
+      m.tags.forEach(tag => {
+        if (tag && userLower.includes(tag.toLowerCase())) score += 5;
+      });
+    }
 
     // 内容关键词匹配
-    const keywords = m.content.toLowerCase().split(/\s+/);
+    const keywords = (m.content || '').toLowerCase().split(/\s+/);
     keywords.forEach(word => {
       if (word.length > 3 && userLower.includes(word)) score += 2;
     });
@@ -505,12 +515,15 @@ function checkJealousyTimeDecay() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function getAffection() {
-  return parseInt(localStorage.getItem('affection') || '60');
+  return parseFloat(localStorage.getItem('affection') || '60');
 }
 
 function setAffection(val) {
   const floor = localStorage.getItem('marriageType') === 'established' ? 65 : 60;
-  val = Math.max(floor, Math.min(100, Math.round(val)));
+  // 保留1位小数而不是 Math.round 取整：好感度设计上有 ±0.5、+0.2 这类小增量
+  // （撒娇、昵称、负面情绪）。取整会让 +0.2 永远丢失、+0.5 变成 +1、-0.5 被抹平，
+  // 导致好感度只增不减（非对称膨胀）。保留小数让这些增量正常累积。
+  val = Math.max(floor, Math.min(100, Math.round(val * 10) / 10));
   const prev = getAffection();
   localStorage.setItem('affection', val);
   _touch();
@@ -1147,8 +1160,10 @@ function checkColdWarApologyCondition() {
 async function ghostApologize() {
   if (localStorage.getItem('coldWarMode') !== 'true') return;
   const prompt = '[System: The cold war has gone on too long. Ghost breaks the silence in his own way — not a formal apology, just a gesture. Dry. Brief. Present.]';
+  let _apologyMarker = null;
   if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'user', content: prompt, _system: true });
+    _apologyMarker = { role: 'user', content: prompt, _system: true };
+    chatHistory.push(_apologyMarker);
     if (typeof saveHistory === 'function') saveHistory();
   }
   if (typeof showTyping === 'function') showTyping();
@@ -1177,6 +1192,20 @@ async function ghostApologize() {
     endColdWar(false);
   } catch(e) {
     if (typeof hideTyping === 'function') hideTyping();
+    // 修复冷战卡死：道歉请求失败时，调用方已清掉计时器且 coldWarMode 仍是 true，
+    // 若不处理则冷战永远出不来（直到刷新页面）。这里回滚孤立的 _system 标记消息，
+    // 并重新武装计时器，让 20 分钟后再试一次，保证冷战最终能结束。
+    if (_apologyMarker && typeof chatHistory !== 'undefined') {
+      const _idx = chatHistory.indexOf(_apologyMarker);
+      if (_idx !== -1) {
+        chatHistory.splice(_idx, 1);
+        if (typeof saveHistory === 'function') saveHistory();
+      }
+    }
+    if (localStorage.getItem('coldWarMode') === 'true') {
+      if (coldWarTimer) { clearInterval(coldWarTimer); coldWarTimer = null; }
+      coldWarTimer = setInterval(() => checkColdWarApologyCondition(), 20 * 60 * 1000);
+    }
   }
 }
 

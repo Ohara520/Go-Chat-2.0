@@ -651,6 +651,27 @@ async function loadFromCloud() {
       mergeArrays('deliveryHistory', s.deliveryHistory, 50);
       mergeArrays('takeoutHistory', s.takeoutHistory, 50);
 
+      // 长期记忆（结构化数组）：按 id 合并去重，按 importance 排序，与 saveLongTermMemoryEntry 一致
+      if (Array.isArray(s.longTermMemories) && s.longTermMemories.length > 0) {
+        const localMems = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+        const merged = [...localMems];
+        s.longTermMemories.forEach(cm => {
+          if (!merged.find(lm => lm.id === cm.id)) merged.push(cm);
+        });
+        merged.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+        localStorage.setItem('longTermMemories', JSON.stringify(merged.slice(0, 50)));
+      }
+
+      // 世界书（关键词记忆）：按 id 合并去重
+      if (Array.isArray(s.worldBook) && s.worldBook.length > 0) {
+        const localWb = JSON.parse(localStorage.getItem('worldBook') || '[]');
+        const mergedWb = [...localWb];
+        s.worldBook.forEach(cw => {
+          if (!mergedWb.find(lw => lw.id === cw.id)) mergedWb.push(cw);
+        });
+        localStorage.setItem('worldBook', JSON.stringify(mergedWb.slice(0, 100)));
+      }
+
       // 外卖进行中订单：按id合并，本地有就用本地（进度更新）
       if (Array.isArray(s.takeoutOrders)) {
         const localTk = JSON.parse(localStorage.getItem('takeoutOrders') || '[]');
@@ -698,6 +719,10 @@ async function loadFromCloud() {
     }
   } catch(e) {
     console.log('[cloud] 加载失败，使用本地数据', e);
+    // 必须 re-throw：调用方(app.js window.onload)用 Promise.race + catch 来
+    // 设置 cloudLoadFailed 保存锁。若在此吞掉错误，真正的查询报错(网络/权限/SQL)
+    // 就不会触发保存锁，只有 8s 超时才会——报错时本地旧数据仍会覆盖云端(掉档)。
+    throw e;
   }
 }
 // 保存数据到云端（防抖，3秒内无新变化才存，保证最后一次也能存上）
@@ -949,6 +974,10 @@ async function saveToCloud() {
       // 旧版 slice(0,10) 只存最老的10个，新解锁的上传丢失 → 换设备/清缓存后成就消失、
       // 且因 !triggered(id) 重新成立而被重复触发、获取日期刷新。上限给 200 留足余量。
       storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 200),
+      // 主人设(Ghost)真正使用的结构化长期记忆数组，state.js 的 recallLongTermMemory 读它。
+      // 此前只同步单数 longTermMemory 字符串，这个复数数组从不上云 → 换设备丢记忆。
+      longTermMemories: JSON.parse(localStorage.getItem('longTermMemories') || '[]').slice(0, 50),
+      worldBook: JSON.parse(localStorage.getItem('worldBook') || '[]').slice(0, 100),
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 400),
       dateMemories: JSON.parse(localStorage.getItem('dateMemories') || '[]').slice(0, 50),
       giftRecords: JSON.parse(localStorage.getItem('giftRecords') || '[]').slice(0, 100),
@@ -1005,9 +1034,6 @@ async function saveToCloud() {
     const nowIso = new Date().toISOString();
     const upsertData = {
       user_id: userId,
-      mood: parseInt(localStorage.getItem('moodLevel') || '7'),
-      affection: parseInt(localStorage.getItem('affection') || '50'),
-      long_term_memory: localStorage.getItem('longTermMemory') || '',
       updated_at: nowIso,
     };
     // 关键防御：只在 profile 和 state_snapshot 非空时写入，防止空快照覆盖云端
@@ -1016,8 +1042,14 @@ async function saveToCloud() {
     if (_profileHasCore) {
       upsertData.profile = profile;
       upsertData.state_snapshot = stateSnapshot;
+      // mood/affection/long_term_memory 也必须走同一守卫：
+      // 换设备/本地未加载时 profile 为空，这三个字段若裸写会用默认值('7'/'50'/'')
+      // 覆盖云端真实值——这正是 8-31 掉档 bug 的漏网字段。
+      upsertData.mood = parseInt(localStorage.getItem('moodLevel') || '7');
+      upsertData.affection = parseInt(localStorage.getItem('affection') || '50');
+      upsertData.long_term_memory = localStorage.getItem('longTermMemory') || '';
     } else {
-      console.warn('[cloud] profile 为空，跳过 profile/state_snapshot 字段写入，防止覆盖云端');
+      console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/mood/affection/long_term_memory 字段写入，防止覆盖云端');
     }
     // 只在有内容时才存，防止空值覆盖云端已有数据
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;

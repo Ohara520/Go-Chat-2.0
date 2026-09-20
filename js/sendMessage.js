@@ -150,7 +150,8 @@ function decideMainIntent(text, pendingEvent) {
 
 async function handlePostReplyActions(text, reply, intent, pendingEvent) {
   try {
-    consumeQuota().catch(() => {});
+    // 注意：不在此处扣配额。主链路已在拿到回复处(约1389行)扣过一次，
+    // 此函数只从主链路(1583)调用，若再扣会导致同一条消息扣两次。
     localStorage.setItem('lastUserMessageAt', Date.now().toString());
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
     const todayKey = 'dailyChatDone_' + new Date().toDateString();
@@ -505,6 +506,9 @@ async function _processMergedMessage(text) {
     }
   }
 
+  // 先捕获上一条消息时间戳，再覆盖为现在——_timeGapHint(下方) 要用旧值算间隔，
+  // 否则读到的永远是刚写入的 now，_gapMin 恒为 0，时间流逝提示成了死代码。
+  const _prevUserMessageAt = parseInt(localStorage.getItem('lastUserMessageAt') || '0');
   localStorage.setItem('lastUserMessageAt', Date.now());
 
   // 合并消息：更新最后一条历史记录（让模型看到完整意图）
@@ -608,13 +612,26 @@ async function _processMergedMessage(text) {
     // v3 BUG-DELIVERY FIX: 让 _delivery 标记的 _system 消息穿透，
     //   让 Sonnet 主聊天能看到"礼物已签收/已寄出"这种关键事实
     //   否则用户问"你收到我寄的咖啡吗"时 Ghost 会说"没收到"
-    const cleanHistory = chatHistory
-      .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled && !m._intimate)
-      .slice(-16)
-      .map(m => ({
-        role: m.role,
-        content: m.content
-      }));
+    const cleanHistory = (() => {
+      const _filtered = chatHistory
+        .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled && !m._intimate)
+        .slice(-16)
+        .map(m => ({ role: m.role, content: m.content }));
+      // 过滤掉调情/召回消息后，中间可能留下相邻同角色（如两条 user 之间的 assistant
+      // 被剔除），或开头变成 assistant。部分中转/模型对 role 不交替会返回 400。
+      // 这里合并相邻同角色、去掉开头的 assistant，保证 user/assistant 交替且以 user 收尾。
+      const _merged = [];
+      for (const m of _filtered) {
+        const _last = _merged[_merged.length - 1];
+        if (_last && _last.role === m.role) {
+          _last.content = `${_last.content}\n${m.content}`;
+        } else {
+          _merged.push({ ...m });
+        }
+      }
+      while (_merged.length && _merged[0].role === 'assistant') _merged.shift();
+      return _merged;
+    })();
 
     // ── System Prompt 构建 ───────────────────────────────────
     const _baseSystem = buildSystemPrompt();
@@ -699,7 +716,7 @@ async function _processMergedMessage(text) {
 
     // 时间流逝感知
     const _timeGapHint = (() => {
-      const _lastAt = parseInt(localStorage.getItem('lastUserMessageAt') || '0');
+      const _lastAt = _prevUserMessageAt;
       if (!_lastAt) return '';
       const _gapMin = Math.floor((Date.now() - _lastAt) / 60000);
       if (_gapMin < 30) return '';
@@ -823,21 +840,9 @@ async function _processMergedMessage(text) {
       _specialtyHint = '[She is asking for something from your location. Don\'t make a hard promise. Acknowledge softly ("mm" / "yeah" / one flat line) or deflect lightly. The system may send it on its own.]';
     }
 
-    const finalSystem = [
-      _baseSystem,
-      antiBreakoutHint,
-      antiCountHint,
-      emotionHint,
-      _cardHint,
-      _specialtyHint,
-      _timeGapHint,
-      _antiLoopHint,
-      sceneHint || '[React directly to what she just said. Take it at face value.]',
-      responseMode,
-      workHint,
-      avatarHint,
-      langHint
-    ].filter(Boolean).join('\n');
+    // 注意：finalSystem 的拼装被移到主 API 调用前（约 1147 行）。
+    // 原来在此处拼装会赶在 emotionHint(1043)/照片 sceneHint(1128)/余韵 sceneHint(1095)
+    // 赋值之前——这些提示 join 成字符串后再改变量已无效，导致情绪/看图提示永远进不去。
 
     // ── 图片检测 ─────────────────────────────────────────────
     const lastPhotoMsg = chatHistory.filter(m => m.role === 'user' && m._photoBase64 && !m._system).slice(-1)[0];
@@ -1145,6 +1150,22 @@ async function _processMergedMessage(text) {
     }
 
     // ── 主API调用（Sonnet + systemParts缓存）────────────────
+    // finalSystem 在此处拼装：此时 emotionHint / 照片 sceneHint / 余韵 sceneHint 都已赋值完毕
+    const finalSystem = [
+      _baseSystem,
+      antiBreakoutHint,
+      antiCountHint,
+      emotionHint,
+      _cardHint,
+      _specialtyHint,
+      _timeGapHint,
+      _antiLoopHint,
+      sceneHint || '[React directly to what she just said. Take it at face value.]',
+      responseMode,
+      workHint,
+      avatarHint,
+      langHint
+    ].filter(Boolean).join('\n');
     const _abortCtrl = _currentAbortController;
     const response = await fetchSonnetWithCache(
       finalSystem,
@@ -1909,16 +1930,22 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       } else {
         // 只取第一段，防止 Grok 多段输出导致重复消息
         const parts = cleanedReply.split('\n---\n').filter(p => p.trim());
-        const firstPart = parts[0];
-        if (firstPart) appendMessage('bot', firstPart.trim());
-        chatHistory.push({ role: 'assistant', content: firstPart ? firstPart.trim() : cleanedReply, _intimate: true, _time: Date.now() });
-        saveHistory();
-        if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-        if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
-        incrementTodayCount();
-        if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
-        _syncRenderedCount();
-        return;
+        const firstPart = parts[0] ? parts[0].trim() : '';
+        // 修复：清洗控制标签/重复开头后 cleanedReply 可能变空。原代码仍会 push 一条
+        // content:'' 的空 assistant 消息（还带 _intimate 标记），污染下一次请求上下文。
+        // 空回复视为失败，不 push、不 return，落到下面的"网络波动"兜底。
+        if (firstPart) {
+          appendMessage('bot', firstPart);
+          chatHistory.push({ role: 'assistant', content: firstPart, _intimate: true, _time: Date.now() });
+          saveHistory();
+          if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+          if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
+          incrementTodayCount();
+          if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
+          _syncRenderedCount();
+          return;
+        }
+        console.warn('[Grok] 清洗后回复为空，走网络波动兜底');
       }
     }
 

@@ -4,7 +4,7 @@ function _ensureGhostProfileDefaults() {
     const _months = [31,28,31,30,31,30,31,31,30,31,30,31];
     const _m = Math.floor(Math.random() * 12) + 1;
     const _d = Math.floor(Math.random() * _months[_m-1]) + 1;
-    const _y = 1991 + Math.floor(Math.random() * 4);
+    const _y = 1994; // 年龄锁死 32 岁，生日年份固定，避免与 prompt 的 "32 years old" 打架
     const _bday = `${_y}-${String(_m).padStart(2,'0')}-${String(_d).padStart(2,'0')}`;
     localStorage.setItem('ghostBirthday', _bday);
     const _zodiacMap = [
@@ -26,17 +26,14 @@ function _ensureGhostProfileDefaults() {
     localStorage.setItem('ghostZodiac', _zodiac);
     localStorage.setItem('ghostZodiacEn', _zodiacEnMap[_zodiac] || _zodiac);
   }
-  if (!localStorage.getItem('ghostHeight')) {
-    const _heights = ['182cm','183cm','185cm','186cm','188cm','189cm','190cm','191cm'];
-    localStorage.setItem('ghostHeight', _heights[Math.floor(Math.random() * _heights.length)]);
-  }
-  if (!localStorage.getItem('ghostWeight')) {
-    const _w = 88 + Math.floor(Math.random() * 10);
-    localStorage.setItem('ghostWeight', _w + 'kg');
-  }
-  if (!localStorage.getItem('ghostBloodType')) {
-    const _types = ['A','A','B','O','O','O','AB'];
-    localStorage.setItem('ghostBloodType', _types[Math.floor(Math.random() * _types.length)]);
+  // 身高锁死 193cm（无条件覆盖，含老用户的旧随机值）
+  localStorage.setItem('ghostHeight', '193cm');
+  // 老用户生日年份归一到 1994（保留月日/星座），与锁死的 32 岁保持一致
+  {
+    const _bd = localStorage.getItem('ghostBirthday');
+    if (_bd && _bd.slice(0, 4) !== '1994') {
+      localStorage.setItem('ghostBirthday', '1994' + _bd.slice(4));
+    }
   }
   if (!localStorage.getItem('ghostHometown')) {
     localStorage.setItem('ghostHometown', 'Manchester, UK');
