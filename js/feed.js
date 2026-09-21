@@ -1709,8 +1709,10 @@ async function openFeedCompose() {
       </div>
       <textarea id="feedComposeText" class="feed-compose-text" placeholder="这一刻的想法…" maxlength="200"></textarea>
       <div id="feedComposePhotoRow" class="feed-compose-photo-row"></div>
+      <input type="file" id="feedComposeFileInput" accept="image/*" style="display:none">
       <div class="feed-compose-actions">
-        <button id="feedComposePickBtn" class="feed-compose-pick">从相册选图</button>
+        <button id="feedComposePickDevice" class="feed-compose-pick">＋ 手机相册</button>
+        <button id="feedComposePickChat" class="feed-compose-pick-alt">聊天照片</button>
         <div style="flex:1"></div>
         <button id="feedComposeCancel" class="feed-compose-cancel">取消</button>
         <button id="feedComposeSend" class="feed-compose-send">发布</button>
@@ -1720,8 +1722,39 @@ async function openFeedCompose() {
 
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.getElementById('feedComposeCancel').onclick = () => modal.remove();
-  document.getElementById('feedComposePickBtn').onclick = openFeedAlbumPicker;
+  document.getElementById('feedComposePickChat').onclick = openFeedAlbumPicker;
+  const fileInput = document.getElementById('feedComposeFileInput');
+  document.getElementById('feedComposePickDevice').onclick = () => fileInput.click();
+  fileInput.onchange = () => onFeedDeviceFilePicked(fileInput);
   document.getElementById('feedComposeSend').onclick = submitFeedCompose;
+}
+
+// 从手机真实相册选图：压缩→存 IndexedDB→引用（不进 localStorage，避免掉档）
+async function onFeedDeviceFilePicked(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const row = document.getElementById('feedComposePhotoRow');
+  if (row) row.innerHTML = '<div class="feed-compose-empty">处理中…</div>';
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = () => rej(fr.error);
+      fr.readAsDataURL(file);
+    });
+    const base64 = (typeof compressImageToBase64 === 'function')
+      ? await compressImageToBase64(dataUrl, 1000, 0.82)
+      : dataUrl;
+    const key = 'feedupload_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const ok = await savePhotosToIDB(key, [base64]);
+    if (!ok) { if (row) row.innerHTML = '<div class="feed-compose-empty">图片太大，换一张试试</div>'; return; }
+    _feedComposePhoto = { idbKey: key, idbIndex: 0 };
+    if (row) row.innerHTML = `<div class="feed-compose-thumb selected"><img src="${base64}" alt=""></div>`;
+  } catch(e) {
+    if (row) row.innerHTML = '<div class="feed-compose-empty">读取失败，换一张试试</div>';
+  } finally {
+    input.value = ''; // 允许再次选同一张
+  }
 }
 
 async function openFeedAlbumPicker() {

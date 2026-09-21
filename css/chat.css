@@ -1012,8 +1012,14 @@
 .feed-compose-thumb.selected { border-color: #5a9a46; }
 .feed-compose-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .feed-compose-empty { font-size: 12px; color: #b0b0a0; padding: 10px 2px; }
-.feed-compose-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.feed-compose-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .feed-compose-pick {
+    padding: 8px 14px; border: none;
+    background: linear-gradient(135deg, #6aab52, #4a7a2a); color: #fff;
+    font-size: 13px; font-weight: 600;
+    border-radius: 10px; cursor: pointer;
+}
+.feed-compose-pick-alt {
     padding: 8px 14px; border: 1px solid rgba(90,154,70,0.3);
     background: transparent; color: #4a7a2a; font-size: 13px;
     border-radius: 10px; cursor: pointer;
