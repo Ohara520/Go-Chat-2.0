@@ -1588,7 +1588,7 @@ function _loveLetterOccasionToday() {
   if (bd && bd.m === tM && bd.d === tD) occasion = "birthday";
   else if (md && marriageDate && md.m === tM && md.d === tD) {
     const days = Math.floor((Date.now() - new Date(marriageDate)) / 86400000);
-    if (days >= 360) occasion = "anniversary";
+    if (days >= 365) occasion = "anniversary";
   }
   if (!occasion) return null;
   if (localStorage.getItem("coldWarMode") === "true") return null;
