@@ -404,6 +404,15 @@ async function sendMessage() {
   chatHistory.push({ role: 'user', content: text });
   saveHistory();
 
+  // 时序状态层：从这条消息识别她在做什么（去上班/洗澡/睡觉…），带时间戳存下
+  if (typeof trackUserActivityFromMessage === 'function') {
+    try { trackUserActivityFromMessage(text); } catch(e) {}
+  }
+  // 沉默间隔：先算出与上一条的间隔（≥4h 记成"刚回来"），再更新时间戳
+  if (typeof noteUserReturn === 'function') {
+    try { noteUserReturn(); } catch(e) {}
+  }
+
   // 消息合并队列（300ms内连发合并成一条给模型）
   _pendingMessages.push(text);
   if (_mergeTimer) clearTimeout(_mergeTimer);
@@ -533,7 +542,15 @@ async function _processMergedMessage(text) {
     // 导致"让他发朋友圈结果变成我们发的"。改为直接调专用的 handleUserFeedRequest，
     // 它强制以 Ghost(botNickname) 作者发帖。
     if (typeof handleUserFeedRequest === 'function') {
-      setTimeout(() => { handleUserFeedRequest().catch(() => {}); }, 3000);
+      setTimeout(async () => {
+        const res = await handleUserFeedRequest(text).catch(() => null);
+        // 被拒绝（6小时冷却 / 生成失败）→ 让他在聊天里真的甩一句，别默默失败
+        if (res && res.ok === false && res.reply) {
+          appendMessage('assistant', res.reply);
+          chatHistory.push({ role: 'assistant', content: res.reply, _time: Date.now() });
+          saveHistory();
+        }
+      }, 3000);
     } else {
       feedEvent_dailyMoment();
       setTimeout(() => maybeTriggerFeedPost('user_request'), 3000);

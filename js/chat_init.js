@@ -60,6 +60,78 @@ function scheduleProactiveMessage() {
   _proactiveTimer = setTimeout(maybeProactiveMessage, delay);
 }
 
+// ── 机会 → 理由 → 行动/none ──
+// 读时序状态层 + 世界书，凑不出理由就返回 null（= 安静，不发）
+// trust/mood 只作"愿不愿开口"的倾向，不是唯一开关
+function _buildProactiveOpportunity() {
+  const candidates = [];
+
+  // 理由1：她之前说去做某事，现在大概做完了 → ask（关心式追问，不是问候）
+  let userAct = null;
+  try { userAct = JSON.parse(localStorage.getItem('userActivity') || 'null'); } catch(e) {}
+  if (userAct && typeof getActivityStatus === 'function') {
+    const st = getActivityStatus(userAct, Date.now());
+    if (st && st.status === 'probably_finished') {
+      candidates.push({
+        reason: 'ask', weight: 3,
+        hint: `Earlier she said she was ${userAct.label}. Enough time has passed that she's probably done now. A dry, short follow-up — is she back, did it go alright. Not soft, not a ritual. He just clocked that she went quiet doing that thing.`
+      });
+    }
+  }
+
+  // 理由2：世界书里有跟她有关的事 → noticed（看到什么想起她，不解释触发点）
+  let wbEntry = null;
+  try {
+    const wb = (typeof getWorldBookEntries === 'function')
+      ? getWorldBookEntries().filter(e => e && e.enabled !== false && e.content) : [];
+    if (wb.length) wbEntry = wb[Math.floor(Math.random() * wb.length)];
+  } catch(e) {}
+  if (wbEntry) {
+    candidates.push({
+      reason: 'noticed', weight: 2,
+      hint: `Something in his day made him think of this about her: "${(wbEntry.content||'').slice(0,120)}". He does NOT quote it back or explain what triggered it — he just sends the thought it produced. Oblique. Not sentimental.`
+    });
+  }
+
+  // 理由3：他自己当前的状态/事 → complain(偏负面) 或 share
+  const ghostState = (typeof getGhostActivityState === 'function')
+    ? getGhostActivityState() : (sessionStorage.getItem('ghostState') || '');
+  if (ghostState) {
+    const negative = /烦|差|疼|伤|冷|坏|取消|延误|睡不着|不好|紧|酸|难受|问题|叫停|等/.test(ghostState);
+    candidates.push({
+      reason: negative ? 'complain' : 'share', weight: 2,
+      hint: negative
+        ? `His current state: ${ghostState}. He's not fishing for sympathy — he just says the thing, flat, the way you grumble to the one person you don't perform for.`
+        : `His current state: ${ghostState}. Something small from his side he'd actually bother telling her — an observation or a fragment. Not a bulletin, not "reaching out".`
+    });
+  }
+
+  // 理由4：今日细节 → share（弱信号）
+  const todayDetail = sessionStorage.getItem('todayDetail') || '';
+  if (todayDetail) {
+    candidates.push({
+      reason: 'share', weight: 1,
+      hint: `Today's context: ${todayDetail}. If it gives him something real to say, say it. If not, ignore it.`
+    });
+  }
+
+  if (!candidates.length) return null; // 没材料 → 安静
+
+  // trust/mood → 开口倾向：高则更愿意发，低则更可能忍着（有材料也不一定发）
+  const trust = (typeof getTrustHeat === 'function') ? getTrustHeat() : 60;
+  const mood  = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
+  const tendency = ((trust + mood * 10) / 2) / 100;      // 0~1
+  const actChance = 0.4 + tendency * 0.45;               // ~0.4 到 ~0.85
+  if (Math.random() > actChance) return null;            // → none，这次忍住
+
+  // 加权抽一个理由
+  const total = candidates.reduce((s, c) => s + c.weight, 0);
+  let roll = Math.random() * total;
+  let chosen = candidates[0];
+  for (const c of candidates) { roll -= c.weight; if (roll < 0) { chosen = c; break; } }
+  return chosen;
+}
+
 async function maybeProactiveMessage() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
   if (coldWar) { scheduleProactiveMessage(); return; }
@@ -80,12 +152,6 @@ async function maybeProactiveMessage() {
   const todayCount = parseInt(localStorage.getItem(todayKey) || '0');
   if (todayCount >= 2) { scheduleProactiveMessage(); return; }
 
-  // 触发概率
-  const trust = getTrustHeat ? getTrustHeat() : 60;
-  const mood = getMoodLevel ? getMoodLevel() : 7;
-  const triggerChance = 0.3 * ((trust + mood * 10) / 2) / 100;
-  if (Math.random() > triggerChance) { scheduleProactiveMessage(); return; }
-
   // 最近5分钟有消息，不打扰
   const lastMsg = chatHistory.filter(m => m.role === 'assistant').slice(-1)[0];
   if (lastMsg && lastMsg._time && Date.now() - lastMsg._time < 5 * 60 * 1000) {
@@ -98,11 +164,12 @@ async function maybeProactiveMessage() {
     scheduleProactiveMessage(); return;
   }
 
-  localStorage.setItem(todayKey, todayCount + 1);
+  // 机会 → 理由：凑不出理由（或这次选择忍住）就安静，不占用今日额度
+  const opportunity = _buildProactiveOpportunity();
+  if (!opportunity) { scheduleProactiveMessage(); return; }
 
-  const todayDetail = sessionStorage.getItem('todayDetail') || '';
-  const ghostState = sessionStorage.getItem('ghostState') || '';
-  const stateHint = ghostState ? ` He is currently: ${ghostState}. The message may naturally relate to what he's doing or thinking right now — or not. Let it feel unforced.` : '';
+  // 到这一步才算真要发，扣今日额度
+  localStorage.setItem(todayKey, todayCount + 1);
 
   // 防重复池
   const _proPool = (() => { try { return JSON.parse(localStorage.getItem('proactiveReplyPool') || '[]'); } catch(e) { return []; } })();
@@ -110,14 +177,7 @@ async function maybeProactiveMessage() {
     ? `\nDo not reuse phrasing from these recent lines: ${_proPool.map(l => `"${l}"`).join(', ')}. Change angle entirely.`
     : '';
 
-  // 检测她最后一条消息是否提到去做某事
-  const _lastUserMsg = chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '';
-  const _leftSignal = /去吃|去洗|去睡|去忙|先去|回来|eating|shower|bath|sleep|brb|busy now/i.test(_lastUserMsg);
-  const _followUpHint = _leftSignal
-    ? `\nShe mentioned leaving or doing something before going quiet. This message can be a dry follow-up — is she back, did she eat, is she okay. Keep it short. Not soft.`
-    : '';
-
-  const systemNote = `[PROACTIVE — something just crossed his mind. He sends one line without framing it as reaching out. No greeting. No "hey". Just a statement, observation, or fragment — like he thought of something and sent it. Short. Self-contained. Not a check-in. Not asking how she is. Just something real.${stateHint}${todayDetail ? ` Today's context: ${todayDetail}` : ''}${_followUpHint}${_proNoRepeat} English only, lowercase.]`;
+  const systemNote = `[PROACTIVE — he breaks the silence because of ONE specific reason, below. Not a check-in, not "hey", not "how are you". No greeting. One short line, self-contained, lowercase, English only. It should read like a thought he actually had, not a message he decided to send.\n\nReason he's reaching out: ${opportunity.hint}${_proNoRepeat}]`;
 
   try {
     showTyping();
@@ -131,7 +191,11 @@ async function maybeProactiveMessage() {
     hideTyping();
 
     const cleaned = (reply || '').replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
-    if (!cleaned || /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)/i.test(cleaned)) {
+    // ask 理由本来就是要问一句，允许问句；其它理由挡掉"how are you / what are you up to"这类空问候
+    const _looksGeneric = opportunity.reason === 'ask'
+      ? /^(how are you|what('| a)re you (up to|doing)|你好吗|在(干嘛|吗))/i.test(cleaned)
+      : /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)\b/i.test(cleaned);
+    if (!cleaned || _looksGeneric) {
       scheduleProactiveMessage(); return;
     }
     // 存入防重复池

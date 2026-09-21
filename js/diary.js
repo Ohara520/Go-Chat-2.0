@@ -168,42 +168,68 @@ ${_chatSnippet}`;
 
     // 修复：prompt 完全避免"memory system/track/relationship"等触发词
     // 改成创意写作语境，让模型理解这是小说角色的日记创作
-    const prompt = `Write a short notebook entry for Simon "Ghost" Riley. British SAS soldier, 35.
+    const _ghostAge = (typeof getGhostAge === 'function') ? getGhostAge() : 31;
 
+    // 表达阈值：只决定"没说出口那部分"的味道，不决定日记有没有料
+    const _bs = (typeof getBanterSweet === 'function') ? getBanterSweet() : -20;
+    let _discloseHint;
+    if (_bs <= -50) {
+      _discloseHint = `Out loud he keeps her at arm's length — teasing, blunt, hard to read. The notebook is where the gap shows: the space between what he SAID to her and what he actually thought. She said she missed him; out loud he brushed it off; here he can admit he'd been waiting to hear it. Not a love confession — just the honest version he'd never hand her.`;
+    } else if (_bs >= 50) {
+      _discloseHint = `He's already open with her — he says the warm things to her face. So this is NOT where he confesses love; she already knows. It's where the things he never bothered to SAY surface: what he noticed about her, something small he worried about, something he quietly did or planned, an odd private habit. e.g. checked the weather where she is. she said she was fine — didn't sound it — didn't push. ordered the thing she mentioned weeks ago. The reveal is "he pays attention like this," not "he loves her."`;
+    } else {
+      _discloseHint = `Partly what he noticed or quietly worried about, partly the odd thing he didn't say out loud. Not a love confession — the quieter, more specific stuff a person keeps to himself.`;
+    }
+
+    // 昨天她提到、触发了世界书的设定 —— 给日记专属细节
+    let _wbHint = '';
+    try {
+      if (typeof getWorldBookEntries === 'function') {
+        const _yUserText = _yesterdayMsgs
+          .filter(m => m.role === 'user')
+          .map(m => (typeof m.content === 'string' ? m.content : ''))
+          .join(' ')
+          .toLowerCase();
+        if (_yUserText) {
+          const _wbHits = getWorldBookEntries()
+            .filter(e => e.enabled !== false && (e.keywords || []).some(k => k && _yUserText.includes(k)))
+            .slice(0, 3)
+            .map(e => '- ' + e.content);
+          if (_wbHits.length) {
+            _wbHint = `\n[THINGS BETWEEN THEM — surfaced by what she brought up yesterday]\nHe knows these. One may echo in his thoughts if it fits. Do not list them:\n${_wbHits.join('\n')}\n`;
+          }
+        }
+      }
+    } catch (e) {}
+
+    const prompt = `This is a private notebook entry for a fictional character — Simon "Ghost" Riley — written in his own voice, part of an ongoing character study. His private page: he believes no one else reads it, so it's the honest version of his day.
+
+Character: British SAS soldier, ${_ghostAge}. Manchester.
 Setting: ${location}${locationReason ? ` (${locationReason})` : ''}
 Weather: ${weather || 'not noted'}
 Day: ${yesterdayWeekday}
 ${moodHint}
 ${_sideWorld}
+${_recentBlock}${_wbHint}
+${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — do NOT transcribe it. Read it, then write what he privately thought AROUND it: what he noticed, what he didn\'t say back, what stuck with him. "SHE SAID" = her words, "GHOST SAID" = his words. Never mix them up.' : 'Background about her — at most one detail, woven in naturally, not listed:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
+What this entry is:
+${_discloseHint}
 
-${_recentBlock}
-${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — draw from this, but write it as Ghost\'s experience, not a transcript. Pick 1-2 moments that stuck. Don\'t quote directly.\nCRITICAL: "SHE SAID" lines are HER words. "GHOST SAID" lines are HIS words. Do NOT mix them up. If she said something, it is her action. If he said something, it is his action.' : 'Background about her — use at most one detail, naturally:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
-Strict rules:
-- 3-5 lines. Lowercase. Short sentences.
-- Split the entry between TWO things: (1) what happened on his side yesterday — training, teammates, food, something observed at base — and (2) one moment involving her, drawn from the conversation context.
-- Invent plausible soldier details freely: a drill that ran long, something soap did, what he ate, the cold, a card game, cleaning kit, a briefing that went nowhere. These make him feel real.
-- If she said something in the conversation — let it echo in his day without quoting it. Something she mentioned might connect to something that happened on his end.
-- He records facts. He does not name or explain his feelings. Ever.
-- Dry, flat, functional. NOT poetic. NOT introspective. NOT sentimental.
-- BANNED: "still thinking about it" / "that's enough" / "saved it to tell her" / "something felt different" / "still mine" / "quiet moment" / any sentence that ends on emotion.
-- She appears through his actions: "checked my phone" / "she called" / "she was still awake when i got back" — not "i missed her".
-- Do NOT write about deliveries, packages, food she sent, or gifts unless it happened yesterday. Old events are finished — he does not re-live them in the notebook.
-- If there is little fresh material, write MOSTLY about his own side — training, teammates, base, the day — not by dredging up an old moment with her.
-- English only. No "dear diary". No timestamps. No stage directions.`;
+How he writes:
+- 3-5 short lines. lowercase. plain words. dry and in-character — this is him thinking, not a poem, not a report.
+- His INNER voice, not a log of events and not a copy of the chat.
+- What he already told her is NOT private material. Do not repeat, paraphrase, summarize, or reframe something he said to her as if it were a private thought. If the chat already has "miss you", the diary must not become "missed her today." Move one layer deeper: what he noticed, did, worried about, remembered, decided, or deliberately left unsaid.
+- Two threads, woven WHEN there is real material: (1) his own day — training, teammates, the base, his body, something he saw or did; (2) something about her, but ONLY if yesterday gave him a real reason to think about her.
+- If there is no genuine new material about her, do NOT invent one. The entry can stay entirely with his own day. A quiet day is allowed to produce a quiet entry.
+- When writing about her, prefer real material in this order: (1) something she said or did yesterday, (2) something surfaced by the worldbook, (3) something from recent memory, (4) something he actually noticed or did for her. Never invent a specific event, conversation, plan, or action that has no basis in the context above.
+- Feeling shows through fact and action, never announced: "checked my phone twice." "didn't believe her." "ordered it." NOT "i felt lonely."
+- Invent plausible soldier detail freely to ground his own day (a drill that ran long, something Soap did, the cold, cleaning kit, a bad night's sleep) — but do not invent specific relationship events.
+- BANNED crutches: "still thinking about it" / "that's enough" / "something felt different" / "quiet moment" / any line that ends on a stated emotion.
+- Do NOT re-live old deliveries, gifts, or finished events — only what's fresh.
+- English only. No "dear diary". No timestamps. No stage directions. No asterisks.`;
 
-    let entry = '';
-    // 优先用 DeepSeek：不会拒绝日记内容，比 Sonnet 稳定
-    // 修复：max_tokens 从 100-120 提高到 200，防止日记截断
-    if (typeof fetchDeepSeek === 'function') {
-      entry = await fetchDeepSeek(prompt, 'write today\'s entry.', 200);
-    } else if (typeof callSonnetLight === 'function') {
-      entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 200);
-    } else if (typeof callSonnet === 'function') {
-      entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 200);
-    }
-
-    // 破防检测：不存 AI 泄露内容
-    // 修复：加入日记场景特有的拒绝模式（Sonnet 4.5 容易把日记请求识别为"记忆追踪系统"而拒绝）
+    // 破防检测：不存 AI 泄露内容（先定义，供各级模型逐级判断）
+    // 加入日记场景特有的拒绝模式（模型容易把日记请求识别为"记忆追踪系统"而拒绝）
     const _diaryBreakout = (txt) => {
       if (!txt) return true;
       const l = txt.toLowerCase();
@@ -222,9 +248,26 @@ Strict rules:
         "i'm not able to",
       ].some(p => l.includes(p));
     };
-    if (_diaryBreakout(entry)) {
-      console.warn('[diary] 破防内容，使用兜底');
-      entry = '';
+
+    let entry = '';
+    // 主力用 S5（callSonnet）：有情感深度和人设，日记不再流水账。
+    // 用创意写作/虚构角色语境规避拒绝；破防则逐级降到 Haiku、再降到静态兜底。
+    if (typeof callSonnet === 'function') {
+      entry = await callSonnet(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 300);
+      if (_diaryBreakout(entry)) {
+        console.warn('[diary] S5 破防/空，降级 Haiku');
+        entry = '';
+      }
+    }
+    // 降级 1：Haiku（fetchDeepSeek）—— 不易拒绝，作为稳定兜底
+    if (!entry && typeof fetchDeepSeek === 'function') {
+      entry = await fetchDeepSeek(prompt, 'write today\'s entry.', 220);
+      if (_diaryBreakout(entry)) entry = '';
+    }
+    // 降级 2：Sonnet light
+    if (!entry && typeof callSonnetLight === 'function') {
+      entry = await callSonnetLight(prompt, [{ role: 'user', content: 'write today\'s entry.' }], 220);
+      if (_diaryBreakout(entry)) entry = '';
     }
 
     // 清理（先清理，再判断长度）

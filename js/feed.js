@@ -186,10 +186,16 @@ function checkFeedBadge() {
   const posts = (typeof getFeedPosts === 'function' ? getFeedPosts() : []);
 
   if (lastViewed === 0) {
-    // 从没看过 → 只有 feedHasNew 是本次会话内由发帖触发的才显示
-    // 否则历史帖子不应触发红点（防止换设备/清缓存后假红点）
-    localStorage.removeItem('feedHasNew');
-    badge.style.display = 'none';
+    // 从没看过朋友圈：只有"本次会话真发过帖"才亮红点（Ghost 刚发了新的）；
+    // 否则是换设备/清缓存后的历史帖子，抹掉防假红点。
+    let postedThisSession = false;
+    try { postedThisSession = sessionStorage.getItem('feedPostedThisSession') === '1'; } catch(e) {}
+    if (postedThisSession) {
+      badge.style.display = 'block';
+    } else {
+      localStorage.removeItem('feedHasNew');
+      badge.style.display = 'none';
+    }
     return;
   }
   // 修复：加1秒容错，防止用户刚看完时间戳跟帖子时间完全相同导致假红点
@@ -715,17 +721,27 @@ function feedEvent_sheIsBack(absentHours) {
 // ── 用户在聊天里要求 Ghost 发朋友圈 ──────────────────
 // 每天最多1次，超过了 Ghost 会拒绝
 // 返回: { ok: true } 或 { ok: false, reply: '拒绝文案' }
-async function handleUserFeedRequest() {
-  const todayKey = 'ghostFeedReqToday_' + (typeof getTodayDateStr === 'function' ? getTodayDateStr() : new Date().toISOString().slice(0, 10));
+async function handleUserFeedRequest(userText = '') {
+  // 限次：两条"用户要求发"之间至少隔 6 小时（防止一直让他发）。
+  // 用独立 key，不和他自己发的日常动态互相干扰。
+  const REQ_COOLDOWN = 6 * 3600 * 1000;
+  const lastReqAt = parseInt(localStorage.getItem('lastUserFeedReqAt') || '0');
+  const _banter = (typeof getBanterSweet === 'function') ? getBanterSweet() : -20;
 
-  // 今天已经发过了 → Ghost 拒绝
-  if (localStorage.getItem(todayKey)) {
-    const declines = [
-      "already posted today. once is enough.",
+  // 冷却期内 → Ghost 拒绝，拒绝口气也跟着 banterSweet 走
+  if (lastReqAt && Date.now() - lastReqAt < REQ_COOLDOWN) {
+    const declines = _banter >= 50 ? [
+      "posted for you already. ask me again later, yeah?",
+      "gave you one not long ago. don't push it — tonight, maybe.",
+      "one's up already. next one later.",
+    ] : _banter <= -50 ? [
       "no. i don't post that much.",
-      "said what i had to say already.",
-      "not doing two in one day.",
       "one's my limit. you know that.",
+      "not doing two this close. don't start.",
+    ] : [
+      "already posted. once is enough for now.",
+      "said what i had to say already.",
+      "not doing two so close together.",
     ];
     return { ok: false, reply: declines[Math.floor(Math.random() * declines.length)] };
   }
@@ -746,15 +762,28 @@ async function handleUserFeedRequest() {
     .filter(p => p.author === 'ghost')
     .slice(0, 6).map(p => `"${p.en}"`).join('\n');
 
-  try {
-    const systemPrompt = `You are Simon "Ghost" Riley. She asked you to post something. You wouldn't normally, but you do it — your way. Dry, minimal, lowercase English. Return JSON only.`;
-    const userPrompt = `She just asked you to post on your feed. Here's what you two were just talking about:
+  // 口气：跟着表达风格轴走。她定"要发什么"，他定"怎么说"。
+  const toneLine = _banter >= 50
+    ? `Your mood is warmer lately — you can admit it fairly straight, still dry, no theatrics. A little "fine, she wins" honesty is fine.`
+    : _banter <= -50
+    ? `You're in a stubborn, teasing mood — do it, but grudgingly. Mock-annoyed, act like it's costing you, admit it sideways. The affection hides under the complaint.`
+    : `Do it your usual way — dry, understated, a bit reluctant but not cold.`;
 
+  try {
+    const systemPrompt = `You are Simon "Ghost" Riley. She asked you to post something on your feed. You wouldn't normally, but you do it — your way. Dry, minimal, lowercase English. Return JSON only.`;
+    const userPrompt = `She just asked you to post on your feed. Her exact request:
+"${(userText || '').slice(0, 200)}"
+
+What you two were just talking about:
 ${recentChat || '(nothing specific)'}
 
 Location: ${location}
 
-Write one post. It should feel like it came from the conversation — but obliquely. Don't quote anything she said. Don't explain. Just one line that only makes sense to the two of you.
+RULE: She controls WHAT you have to say (the point she's making you make). You control HOW you say it. If she's making you admit something (lost a bet, owe her, etc.), the admission has to actually land — don't dodge the point — but phrase it as yourself, never word-for-word what she told you to write.
+
+${toneLine}
+
+Write one post. One line. Don't quote her. Don't explain the backstory. It should read like something only the two of you fully get, but the thing she wanted admitted is clearly in there.
 
 ${_recentPosts ? `Do NOT echo these recent posts:\n${_recentPosts}` : ''}
 
@@ -789,7 +818,7 @@ Return JSON only: {"en":"...","zh":"..."}`;
       comments,
       sourceEvent: 'user_requested'
     });
-    localStorage.setItem(todayKey, '1');
+    localStorage.setItem('lastUserFeedReqAt', String(Date.now()));
     localStorage.setItem('lastFeedPostAt', String(Date.now()));
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
@@ -1535,6 +1564,8 @@ function insertFeedPost(post) {
 
   list.unshift(post);
   saveFeedPosts(list); // saveFeedPosts 内部截断 + 写 coupleFeedSummary
+  // 标记"本次会话真发过帖"——给红点检查用，区分"刚发的新帖"和"换设备/清缓存的旧帖"
+  try { sessionStorage.setItem('feedPostedThisSession', '1'); } catch(e) {}
 }
 
 // ----- 用户草稿弹窗 -----

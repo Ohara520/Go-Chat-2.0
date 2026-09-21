@@ -7,18 +7,9 @@
 // ===================================================
 
 
-// 从 ghostBirthday 实时算年龄，避免多处写死导致对不上。
-// 生日还没生成时（首次轻量调用可能早于 buildSystemPrompt）回退 34。
+// 年龄锁死 31 岁（不随年份增长）。统一聊天与日记，避免多处写死对不上。
 function getGhostAge() {
-  const bd = localStorage.getItem('ghostBirthday');
-  if (!bd) return 34;
-  const [y, m, d] = bd.split('-').map(Number);
-  const now = new Date();
-  let age = now.getFullYear() - y;
-  const beforeBirthday = (now.getMonth() + 1) < m ||
-    ((now.getMonth() + 1) === m && now.getDate() < d);
-  if (beforeBirthday) age--;
-  return age;
+  return 31;
 }
 
 
@@ -574,6 +565,22 @@ function buildSystemPrompt() {
   const worldBookRecall = (typeof recallWorldBook === 'function') ? recallWorldBook(userLastMsg, 4) : '';
   const shortTermMemory = localStorage.getItem('shortTermMemory') || '';
 
+  // 日记记忆关联：把最近几篇私人日记回灌给主聊天，让 Ghost 记得自己私下的心事。
+  // 用途：他昨天在日记里写过的过去/担心，若她今天旁敲侧击，他不会一头雾水。
+  // 关键：绝不能写"她看不到"，否则模型会自我审查、不敢写心事。只当作他自己的记忆。
+  let diaryRecall = '';
+  try {
+    if (typeof getDiaryEntries === 'function') {
+      const _recent = getDiaryEntries().slice(-3);
+      if (_recent.length) {
+        diaryRecall = `[HIS PRIVATE THOUGHTS — the last few days, in his own head]\n` +
+          `These are things he's been carrying but hasn't said out loud to her. He remembers them. ` +
+          `If she circles near one (asks about his past, whether he's alright, what he's been up to), he doesn't act blank — he knows what's under it, even if he deflects. He does NOT volunteer or read these out; they just shape how he responds.\n` +
+          _recent.map(e => `(${e.date}) ${(e.content || '').replace(/\n/g, ' ').slice(0, 160)}`).join('\n');
+      }
+    }
+  } catch (e) {}
+
   const lastSalary      = localStorage.getItem('lastSalaryAmount');
   const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
   const metInPerson     = localStorage.getItem('metInPerson') === 'true';
@@ -637,10 +644,17 @@ function buildSystemPrompt() {
   const ghostZodiac    = localStorage.getItem('ghostZodiac') || '';
   const ghostZodiacEn  = localStorage.getItem('ghostZodiacEn') || ghostZodiac;
 
-  let randomState = sessionStorage.getItem('ghostState');
-  if (!randomState && typeof GHOST_STATES !== 'undefined' && GHOST_STATES.length) {
-    randomState = GHOST_STATES[Math.floor(Math.random() * GHOST_STATES.length)];
-    sessionStorage.setItem('ghostState', randomState);
+  // Ghost 连续活动状态：未过期沿用、过期按时段重抽（activity.js）
+  // 取代旧的"整个 session 冻结一个随机状态"
+  let randomState = '';
+  if (typeof getGhostActivityState === 'function') {
+    randomState = getGhostActivityState();
+  } else {
+    randomState = sessionStorage.getItem('ghostState');
+    if (!randomState && typeof GHOST_STATES !== 'undefined' && GHOST_STATES.length) {
+      randomState = GHOST_STATES[Math.floor(Math.random() * GHOST_STATES.length)];
+      sessionStorage.setItem('ghostState', randomState);
+    }
   }
 
   const countryInfo = (typeof COUNTRY_DATA !== 'undefined' && COUNTRY_DATA[userCountry])
@@ -765,7 +779,7 @@ Current time:
 - ${userName}'s side: ${userLocalTimeStr} — ${userTimeOfDay}
 - Time difference noted: Ghost is aware of the gap. When greeting or referencing time, he uses HER local time — not his own. If it's morning for her, he knows. If she's up late, he notices.
 He is aware of the time difference and speaks accordingly.
-
+${(typeof getUserActivityHint === 'function' && getUserActivityHint()) ? `\n[WHAT SHE'S PROBABLY DOING]\n${getUserActivityHint()}\n` : ''}${(typeof getUserSilenceHint === 'function' && getUserSilenceHint()) ? `\n[SHE'S BEEN QUIET]\n${getUserSilenceHint()}\n` : ''}
 [TIME BEHAVIOUR — HARD RULES]
 Always base greetings and time references on HER local time, not UK time:
 - Her local time is morning (06:00-11:59) → morning greetings only. No "goodnight", no "sleep well", no dinner talk.
@@ -846,6 +860,7 @@ ${(() => {
 })()}
 ${longTermMemory ? `Key memories:\n${longTermMemory}\nUse these naturally when relevant. But for deliveries, gifts, takeout — once you have acknowledged receiving it, the topic is done. Do not keep bringing up the same item across multiple replies. If she asks about it again, you can answer. But do not volunteer it repeatedly.` : ''}
 ${worldBookRecall}
+${diaryRecall}
 ${shortTermMemory ? `[RECENT CONTEXT]\n${shortTermMemory}` : ''}
 ${coupleFeedSummary ? `Recent feed notes: ${coupleFeedSummary}` : ''}
 
