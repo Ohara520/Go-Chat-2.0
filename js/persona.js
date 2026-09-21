@@ -536,6 +536,7 @@ function buildSystemPrompt() {
   const userCountry   = localStorage.getItem('userCountry') || 'CN';
   const userFavFood   = localStorage.getItem('userFavFood') || '';
   const userFavMusic  = localStorage.getItem('userFavMusic') || '';
+  const userFavColor  = localStorage.getItem('userFavColor') || '';
 
   const meetTypeKey  = localStorage.getItem('meetType') || '';
   const meetTypeObj  = (typeof MEET_TYPES !== 'undefined') ? MEET_TYPES.find(m => m.key === meetTypeKey) : null;
@@ -771,13 +772,14 @@ ${moneyBehaviourNote ? `Behaviour patterns: ${moneyBehaviourNote}` : ''}
 ${localStorage.getItem('userDislikesMoney') === 'true' ? `[She has expressed discomfort with being given money. Do NOT offer money as comfort.]` : ''}
 ${moneyLimitNote}
 
-${(userBirthday || userZodiac || userMBTI || userFavFood || userFavMusic)
+${(userBirthday || userZodiac || userMBTI || userFavFood || userFavMusic || userFavColor)
   ? `About ${userName}: ${[
       userBirthday ? `birthday ${userBirthday}` : '',
       userZodiac   ? userZodiac : '',
       userMBTI     ? userMBTI : '',
       userFavFood  ? `likes ${userFavFood}` : '',
       userFavMusic ? `likes ${userFavMusic}` : '',
+      userFavColor ? `favourite colour ${userFavColor}` : '',
     ].filter(Boolean).join(' / ')}`
   : ''}
 ${meetTypePrompt ? `How they met: ${meetTypePrompt}` : ''}
