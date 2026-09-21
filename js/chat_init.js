@@ -315,27 +315,6 @@ async function initChat() {
     } catch(e) {}
   }, 2000);
 
-  // 纪念日/整数天检测 → 弹用户草稿
-  const _marriageDate = localStorage.getItem('marriageDate');
-  if (_marriageDate) {
-    const _days = Math.max(1, Math.floor((Date.now() - new Date(_marriageDate).getTime()) / 86400000) + 1);
-    const _isMilestone = _days === 52 || (_days % 100 === 0 && _days > 0) || _days === 365;
-    const _isAnniversary = _days >= 365 && (() => {
-      const [, mm, dd] = _marriageDate.split('-').map(Number);
-      const now = new Date();
-      return now.getMonth() + 1 === mm && now.getDate() === dd;
-    })();
-    const _milestoneKey = 'milestoneDraftShown_' + _days;
-    if ((_isMilestone || _isAnniversary) && !localStorage.getItem(_milestoneKey)) {
-      localStorage.setItem(_milestoneKey, '1');
-      setTimeout(() => {
-        if (typeof showUserDraftCard === 'function') {
-          showUserDraftCard({ type: 'anniversary', actor: 'user', meta: { days: _days, isAnniversary: _isAnniversary } });
-        }
-      }, 8000);
-    }
-  }
-
   // 检查各类待触发事件
   if (localStorage.getItem('pendingSeriousTalk') === 'true') {
     setTimeout(() => { if (typeof triggerSeriousTalk === 'function') triggerSeriousTalk(); }, 2000);

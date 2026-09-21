@@ -711,25 +711,6 @@ function feedEvent_sheIsBack(absentHours) {
   });
 }
 
-// 里程碑纪念日：52天、100天、200天等
-// 由 profile.js 的 renderProfileMain() 调用，检测到当天是里程碑时触发
-function feedEvent_milestone(days, isAnniversary = false) {
-  const key = 'feedMilestonePushed_' + days;
-  if (localStorage.getItem(key)) return; // 每个里程碑只推一次
-  localStorage.setItem(key, '1');
-  pushFeedEvent({
-    type: 'anniversary',
-    actor: 'user', // 用户草稿路径
-    mood: 'soft',
-    intensity: days >= 365 ? 5 : days >= 100 ? 4 : 3,
-    shareability: 0.8,
-    privacy: 'semi',
-    dueAt: Date.now(),
-    expiresAt: Date.now() + 24 * 3600 * 1000,
-    meta: { days, isAnniversary }
-  });
-}
-window.feedEvent_milestone = feedEvent_milestone;
 
 // ── 用户在聊天里要求 Ghost 发朋友圈 ──────────────────
 // 每天最多1次，超过了 Ghost 会拒绝
