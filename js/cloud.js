@@ -662,14 +662,17 @@ async function loadFromCloud() {
         localStorage.setItem('longTermMemories', JSON.stringify(merged.slice(0, 50)));
       }
 
-      // 世界书（关键词记忆）：按 id 合并去重
+      // 世界书（关键词记忆）：按 id 合并去重。上限 200，锁定的永不被裁掉。
       if (Array.isArray(s.worldBook) && s.worldBook.length > 0) {
         const localWb = JSON.parse(localStorage.getItem('worldBook') || '[]');
         const mergedWb = [...localWb];
         s.worldBook.forEach(cw => {
           if (!mergedWb.find(lw => lw.id === cw.id)) mergedWb.push(cw);
         });
-        localStorage.setItem('worldBook', JSON.stringify(mergedWb.slice(0, 100)));
+        const lockedWb = mergedWb.filter(e => e.locked);
+        const unlockedWb = mergedWb.filter(e => !e.locked);
+        const cappedWb = [...lockedWb, ...unlockedWb.slice(0, Math.max(0, 200 - lockedWb.length))];
+        localStorage.setItem('worldBook', JSON.stringify(cappedWb));
       }
 
       // 外卖进行中订单：按id合并，本地有就用本地（进度更新）
@@ -977,7 +980,12 @@ async function saveToCloud() {
       // 主人设(Ghost)真正使用的结构化长期记忆数组，state.js 的 recallLongTermMemory 读它。
       // 此前只同步单数 longTermMemory 字符串，这个复数数组从不上云 → 换设备丢记忆。
       longTermMemories: JSON.parse(localStorage.getItem('longTermMemories') || '[]').slice(0, 50),
-      worldBook: JSON.parse(localStorage.getItem('worldBook') || '[]').slice(0, 100),
+      worldBook: (() => {
+        const wb = JSON.parse(localStorage.getItem('worldBook') || '[]');
+        const lk = wb.filter(e => e.locked);
+        const un = wb.filter(e => !e.locked);
+        return [...lk, ...un.slice(0, Math.max(0, 200 - lk.length))];
+      })(),
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 400),
       dateMemories: JSON.parse(localStorage.getItem('dateMemories') || '[]').slice(0, 50),
       giftRecords: JSON.parse(localStorage.getItem('giftRecords') || '[]').slice(0, 100),

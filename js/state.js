@@ -315,16 +315,21 @@ async function updateLongTermMemory(reply, text) {
       .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content}`)
       .join('\n');
 
-    const prompt = `Extract ONE important long-term memory from this conversation.
+    const prompt = `Extract ONE important long-term memory from this conversation, ONLY if something is genuinely worth remembering long-term.
 Focus on:
 - Personal details she shared (preferences, fears, dreams, past events)
 - Relationship milestones (first time saying something important, breakthroughs)
 - Recurring patterns (what she always does, what matters to her)
 
+CRITICAL rules:
+- Preserve EXACT relationships and facts. If she said grandmother, do NOT write mother. If she said a specific name/place/number, keep it exactly. Never generalize or guess a relationship.
+- "tags" must be 2-4 core words that ACTUALLY APPEAR in the memory content (people, places, objects, topics named in it). Do NOT invent words that were not discussed. No random or associative keywords.
+- Only extract if it matters beyond this moment. Small talk, greetings, and passing remarks are NOT memories — for those return {"content": ""}.
+
 Format: JSON only
 {
   "type": "milestone|secret|preference|event",
-  "content": "Brief memory in 1-2 sentences from Ghost's POV",
+  "content": "Brief memory in 1-2 sentences from Ghost's POV, faithful to what she actually said",
   "importance": 1-10,
   "tags": ["keyword1", "keyword2"]
 }
@@ -337,7 +342,10 @@ ${conversationText}`;
     const raw = await callDeepSeek(prompt, 300);
     const memory = safeParseJSON(raw);
 
-    if (memory && memory.content && memory.content.length > 5) {
+    // 重要性门槛：DeepSeek 给的 importance 低于 4 的当作日常闲聊，不入库
+    // （缺失 importance 时按 5 处理，保持旧行为不误杀）
+    const imp = typeof memory?.importance === 'number' ? memory.importance : 5;
+    if (memory && memory.content && memory.content.length > 5 && imp >= 4) {
       saveLongTermMemoryEntry(memory);
     }
   } catch (e) {

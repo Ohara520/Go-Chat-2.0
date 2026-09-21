@@ -16,13 +16,17 @@ function _wbLoad() {
 }
 
 function _wbSave(arr) {
-  const trimmed = Array.isArray(arr) ? arr.slice(0, 100) : [];
+  // 上限 200 条，但锁定的条目永不淘汰
+  if (!Array.isArray(arr)) arr = [];
+  const locked = arr.filter(e => e.locked);
+  const unlocked = arr.filter(e => !e.locked);
+  const trimmed = [...locked, ...unlocked.slice(0, Math.max(0, 200 - locked.length))];
   localStorage.setItem('worldBook', JSON.stringify(trimmed));
   if (typeof touchLocalState === 'function') touchLocalState();
 }
 
 // 新增/更新一条世界书。keywords 可传数组或逗号分隔字符串。
-function addWorldBookEntry({ keywords, content, source = 'manual', id = null }) {
+function addWorldBookEntry({ keywords, content, source = 'manual', id = null, locked = false }) {
   if (!content || !content.trim()) return null;
   const kw = (Array.isArray(keywords) ? keywords : String(keywords || '').split(/[,，、\s]+/))
     .map(k => k.trim().toLowerCase()).filter(Boolean);
@@ -38,7 +42,7 @@ function addWorldBookEntry({ keywords, content, source = 'manual', id = null }) 
       return arr[idx];
     }
   }
-  // content 去重：同内容不重复存
+  // content 去重：同内容不重复存（锁定的条目更不会被自动记忆覆盖）
   if (arr.some(e => e.content.trim().toLowerCase() === content.trim().toLowerCase())) return null;
 
   const entry = {
@@ -47,12 +51,19 @@ function addWorldBookEntry({ keywords, content, source = 'manual', id = null }) 
     content: content.trim(),
     enabled: true,
     source,
+    locked: !!locked,
     created: Date.now(),
     lastHit: 0,
   };
   arr.push(entry);
   _wbSave(arr);
   return entry;
+}
+
+function setWorldBookLocked(id, locked) {
+  const arr = _wbLoad();
+  const e = arr.find(x => x.id === id);
+  if (e) { e.locked = !!locked; _wbSave(arr); }
 }
 
 function removeWorldBookEntry(id) {
@@ -112,33 +123,56 @@ function renderWorldBook() {
     list.innerHTML = `<div style="text-align:center;color:#a8c8a0;font-size:13px;padding:40px 0;">还没有记忆条目<br>点上面「添加记忆」，或聊着聊着他会自己记住</div>`;
     return;
   }
-  // 手动的排前面，其次按最近命中
+  // 锁定的置顶，其次手动的，最后按最近命中
   entries.sort((a, b) => {
+    if (!!a.locked !== !!b.locked) return a.locked ? -1 : 1;
     if ((a.source === 'manual') !== (b.source === 'manual')) return a.source === 'manual' ? -1 : 1;
     return (b.lastHit || 0) - (a.lastHit || 0);
   });
   list.innerHTML = entries.map(e => {
     const tags = (e.keywords || []).map(k =>
-      `<span style="display:inline-block;background:rgba(90,160,70,0.12);color:#3d7a2d;font-size:11px;padding:2px 8px;border-radius:8px;margin:0 4px 4px 0;">${_wbEsc(k)}</span>`
+      `<span style="display:inline-block;background:rgba(90,160,70,0.12);color:#3d7a2d;font-size:11px;padding:2px 8px;border-radius:8px;margin:0 4px 4px 0;word-break:break-word;">${_wbEsc(k)}</span>`
     ).join('');
     const badge = e.source === 'auto'
       ? `<span style="font-size:10px;color:#a8a8a8;">自动</span>`
       : `<span style="font-size:10px;color:#7dba5a;">手动</span>`;
+    const lockMark = e.locked ? `<span style="font-size:11px;color:#c99a2e;margin-left:6px;">🔒 锁定</span>` : '';
     const off = e.enabled === false;
+    // 只有手动条目能锁定（用户自建的才允许永久保护）
+    const lockBtn = e.source === 'manual'
+      ? `<span onclick="event.stopPropagation();toggleWorldBookLock('${e.id}')" style="font-size:12px;color:${e.locked ? '#c99a2e' : '#b0b0b0'};cursor:pointer;">${e.locked ? '解锁' : '锁定'}</span>`
+      : '';
     return `<div style="background:rgba(255,255,255,0.6);backdrop-filter:blur(14px);border-radius:14px;
-      padding:12px 14px;border:1px solid rgba(255,255,255,0.85);margin-bottom:10px;${off ? 'opacity:0.5;' : ''}">
+      padding:12px 14px;border:1px solid ${e.locked ? 'rgba(201,154,46,0.4)' : 'rgba(255,255,255,0.85)'};margin-bottom:10px;box-sizing:border-box;max-width:100%;overflow:hidden;${off ? 'opacity:0.5;' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div>${badge}</div>
+        <div>${badge}${lockMark}</div>
         <div style="display:flex;gap:12px;">
-          <span onclick="toggleWorldBookEntry('${e.id}')" style="font-size:12px;color:#7aaa7a;cursor:pointer;">${off ? '启用' : '停用'}</span>
-          <span onclick="openWorldBookEditor('${e.id}')" style="font-size:12px;color:#5a9a46;cursor:pointer;">编辑</span>
-          <span onclick="deleteWorldBookEntry('${e.id}')" style="font-size:12px;color:#e57373;cursor:pointer;">删除</span>
+          ${lockBtn}
+          <span onclick="event.stopPropagation();toggleWorldBookEntry('${e.id}')" style="font-size:12px;color:#7aaa7a;cursor:pointer;">${off ? '启用' : '停用'}</span>
+          <span onclick="event.stopPropagation();openWorldBookEditor('${e.id}')" style="font-size:12px;color:#5a9a46;cursor:pointer;">编辑</span>
+          <span onclick="event.stopPropagation();deleteWorldBookEntry('${e.id}')" style="font-size:12px;color:#e57373;cursor:pointer;">删除</span>
         </div>
       </div>
       <div style="margin-bottom:6px;">${tags}</div>
-      <div style="font-size:13px;color:#1e3d20;line-height:1.6;">${_wbEsc(e.content)}</div>
+      <div class="wb-content" data-expanded="0" onclick="toggleWorldBookExpand(this)"
+        style="font-size:13px;color:#1e3d20;line-height:1.6;overflow-wrap:break-word;word-break:break-word;cursor:pointer;
+        display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${_wbEsc(e.content)}</div>
     </div>`;
   }).join('');
+}
+
+// 点击内容区展开/收起（折叠时最多显示2行）
+function toggleWorldBookExpand(el) {
+  const expanded = el.dataset.expanded === '1';
+  if (expanded) {
+    el.dataset.expanded = '0';
+    el.style.webkitLineClamp = '2';
+    el.style.display = '-webkit-box';
+  } else {
+    el.dataset.expanded = '1';
+    el.style.webkitLineClamp = 'unset';
+    el.style.display = 'block';
+  }
 }
 
 function _wbEsc(s) {
@@ -200,4 +234,13 @@ function toggleWorldBookEntry(id) {
   const e = getWorldBookEntries().find(x => x.id === id);
   if (e) setWorldBookEnabled(id, e.enabled === false);
   renderWorldBook();
+}
+
+function toggleWorldBookLock(id) {
+  const e = getWorldBookEntries().find(x => x.id === id);
+  if (!e) return;
+  setWorldBookLocked(id, !e.locked);
+  renderWorldBook();
+  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+  if (typeof showToast === 'function') showToast(e.locked ? '已解锁' : '已锁定 🔒 永不被覆盖');
 }
