@@ -196,11 +196,13 @@ async function saveAvatarUrlToProfile(url) {
 
 // ===== 更新Ghost头像 =====
 function updateGhostAvatar(url) {
+  const stamp = Date.now();
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-    el.src = url + (url.startsWith('data:') ? '' : '?t=' + Date.now());
+    el.src = url + (url.startsWith('data:') ? '' : '?t=' + stamp);
   });
   if (!url.startsWith('data:')) {
     localStorage.setItem('ghostAvatarUrl', url);
+    localStorage.setItem('ghostAvatarUpdatedAt', stamp); // 朋友圈渲染时会读这个破缓存
     if (typeof touchLocalState === 'function') touchLocalState();
 
     // ✅ 同步写入Supabase数据库，换设备也不丢

@@ -228,18 +228,31 @@ const FEED_ACTORS = {
   price: { key: 'price', displayName: () => 'Price', emoji: '🚬',  avatar: 'images/price-avatar.jpg', nameClass: 'couple-price-name', postWeight: 1,  commentChance: 0.15 },
 };
 
+// 给远程头像 URL 加缓存破除参数（本地文件/base64 不动），避免换头像后浏览器还显示旧图
+function _bustAvatarCache(url) {
+  if (!url || url.startsWith('data:') || url.startsWith('images/')) return url;
+  const stamp = localStorage.getItem('ghostAvatarUpdatedAt') || '';
+  return stamp ? `${url}${url.includes('?') ? '&' : '?'}t=${stamp}` : url;
+}
 // Ghost 头像 HTML（永远读最新 ghostAvatarUrl）
 function _ghostAvatarHTML() {
   const url = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
-  return `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  return `<img src="${_bustAvatarCache(url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
 }
 // 取某作者的头像渲染内容（Ghost=图，NPC=emoji，user=用户头像）
+// IndexedDB 里存的是裸 base64（无 data: 前缀），渲染前补上
+function _toDataUri(b64) {
+  if (!b64) return '';
+  return b64.startsWith('data:') ? b64 : `data:image/jpeg;base64,${b64}`;
+}
+
 function feedActorAvatar(authorKey) {
   if (authorKey === 'ghost') return _ghostAvatarHTML();
   if (authorKey === 'user') {
+    // 和个人资料页同步：有自定义头像用它，否则用默认头像图（不再显示首字母）
     const a = localStorage.getItem('userAvatarBase64');
-    return a ? `<img src="${a}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
-             : (localStorage.getItem('userName') || '我').charAt(0);
+    const src = a ? _toDataUri(a) : 'images/default-avatar.jpg';
+    return `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   }
   const actor = FEED_ACTORS[authorKey];
   if (actor?.avatar) {
@@ -321,6 +334,13 @@ function initCoupleSpace() {
         e.stopPropagation();
         e.preventDefault();
         toggleCoupleLike(btn);
+        return;
+      }
+      const delBtn = e.target.closest('.couple-delete-btn');
+      if (delBtn) {
+        e.stopPropagation();
+        e.preventDefault();
+        deleteCoupleFeedPost(delBtn.dataset.postId);
       }
     }, true); // 用捕获阶段确保优先触发
     feedContainer._likeListenerAdded = true;
@@ -417,11 +437,12 @@ function renderCoupleFeed(posts) {
     // 评论/回复串
     const commentsHTML = (post.comments || []).map(c => {
       const cKey = c.author || 'ghost';
+      const clickable = cKey !== 'user' ? ` onclick="openCharFeed('${cKey}')" style="cursor:pointer"` : '';
       const replyLine = c.replyTo ? `<div class="couple-reply-to">↩ 回复 <span class="${feedActorNameClass(c.replyTo)}">${feedActorName(c.replyTo)}</span></div>` : '';
-      const nameLine = c.replyTo ? '' : `<div class="couple-comment-name ${feedActorNameClass(cKey)}">${feedActorName(cKey)}</div>`;
+      const nameLine = c.replyTo ? '' : `<div class="couple-comment-name ${feedActorNameClass(cKey)}"${clickable}>${feedActorName(cKey)}</div>`;
       return `
         <div class="couple-comment">
-          <div class="couple-avatar couple-avatar-sm">${feedActorAvatar(cKey)}</div>
+          <div class="couple-avatar couple-avatar-sm"${clickable}>${feedActorAvatar(cKey)}</div>
           <div class="couple-comment-body">
             ${replyLine}${nameLine}
             <div class="couple-comment-en">${c.en || ''}</div>
@@ -452,6 +473,7 @@ function renderCoupleFeed(posts) {
         <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}"
           data-post-id="${post.id}" data-count="${likeCount}"
           style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
+        ${authorKey === 'user' ? `<button class="couple-delete-btn" data-post-id="${post.id}" style="cursor:pointer;pointer-events:auto;margin-left:auto;color:#999;font-size:0.85em;">🗑️ 删除</button>` : ''}
       </div>
     `;
     feed.appendChild(div);
@@ -462,7 +484,7 @@ function renderCoupleFeed(posts) {
     try {
       const list = await loadPhotosFromIDB(img.dataset.idb);
       const idx = parseInt(img.dataset.idx || '0');
-      if (list && list[idx]) img.src = list[idx];
+      if (list && list[idx]) img.src = _toDataUri(list[idx]);
     } catch(e) {}
   });
 }
@@ -519,6 +541,19 @@ function toggleCoupleLike(btn, key) {
     btn.classList.add('couple-liked');
     btn.innerHTML = '❤️ <span class="like-num">' + count + '</span>';
   }
+}
+
+// 删除用户自己发的朋友圈（只允许删 author==='user' 的帖子）
+function deleteCoupleFeedPost(postId) {
+  if (!postId) return;
+  const list = getFeedPosts();
+  const post = list.find(p => String(p.id) === String(postId));
+  if (!post || (post.author || 'ghost') !== 'user') return; // 只能删自己的
+  if (!confirm('确定删除这条动态吗？删了就找不回来了。')) return;
+  const next = list.filter(p => String(p.id) !== String(postId));
+  saveFeedPosts(next);
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  renderCoupleFeedFromHistory();
 }
 
 // ===== 阴阳帖系统 =====
@@ -985,17 +1020,17 @@ function _rollFeedCommenters(postAuthorKey) {
 }
 
 const _FEED_PERSONA = {
-  ghost: 'Ghost (Simon Riley): dry, minimal, blunt, lowercase. rarely comments; when he does it lands hard. never sweet.',
-  soap:  'Soap: playful, teasing, energetic. jokes at Ghost. light scottish flavor. informal.',
-  gaz:   'Gaz: calm, observant, slightly amused. notices what others miss. one line, no drama.',
-  price: 'Price: 2-5 words max. weighted, authoritative, no fluff.',
+  ghost: "Ghost (Simon Riley): her husband. dry, minimal, blunt, lowercase. never sweet in front of the lads, but under HER posts he softens a fraction — a short dry line only she'd catch. under teammates' posts he's just blunt.",
+  soap:  "Soap (Johnny MacTavish): Ghost's best mate, treats her like a little sister he gets to wind up. warm, teasing, energetic, light scottish. loves ribbing Ghost about being soft on her. speaks TO her, not about her.",
+  gaz:   "Gaz (Kyle Garrick): calm, observant, dry wit. fond of her, quietly approves of what she does for Ghost. notices the small things. addresses her directly, one grounded line.",
+  price: "Price (John Price): the captain, gruff father-figure to the whole unit including her. short, weighted, gives a nod of approval or a dry warning to Ghost to look after her. 2-6 words.",
 };
 
 const _FEED_FALLBACK = {
-  ghost: [{ en: 'noted.', zh: '知道了。' }, { en: 'enough.', zh: '够了。' }, { en: 'barely.', zh: '勉强。' }],
-  soap:  [{ en: 'there he is.', zh: '瞧瞧这位。' }, { en: "that's grim.", zh: '够呛啊。' }, { en: 'you hate fun.', zh: '你就是扫兴。' }],
-  gaz:   [{ en: 'sounds about right.', zh: '差不多就这样。' }, { en: 'figured.', zh: '猜到了。' }, { en: 'not subtle.', zh: '不太含蓄。' }],
-  price: [{ en: 'good.', zh: '很好。' }, { en: 'solid.', zh: '稳。' }, { en: 'enough.', zh: '够了。' }],
+  ghost: [{ en: 'noted.', zh: '知道了。' }, { en: 'enough.', zh: '够了。' }, { en: 'barely.', zh: '勉强。' }, { en: 'you win.', zh: '你赢了。' }],
+  soap:  [{ en: "look at you two.", zh: '看看你俩。' }, { en: "Ghost's going soft.", zh: 'Ghost越来越软了。' }, { en: 'adorable.', zh: '可爱啊。' }, { en: "careful, LT's watching.", zh: '小心，中尉盯着呢。' }],
+  gaz:   [{ en: 'looks good.', zh: '看着不错。' }, { en: 'well done.', zh: '干得好。' }, { en: 'keep him honest.', zh: '管好他。' }, { en: 'solid choice.', zh: '稳妥的选择。' }],
+  price: [{ en: 'good.', zh: '很好。' }, { en: 'solid.', zh: '稳。' }, { en: 'look after her.', zh: '照顾好她。' }, { en: 'carry on.', zh: '继续。' }],
 };
 
 // 一次调用生成整串评论（含可选 replyTo），失败降级为每人一句兜底
@@ -1004,11 +1039,24 @@ async function generateFeedComments(postAuthorKey, postEn) {
   if (!commenters.length) return [];
 
   const authorName = feedActorName(postAuthorKey);
+  const userName = localStorage.getItem('userName') || '你';
+  const marriageDate = localStorage.getItem('marriageDate');
+  let daysTogether = '';
+  if (marriageDate) {
+    const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate).getTime()) / 86400000) + 1);
+    daysTogether = `, married ${days} days`;
+  }
+
   const personaLines = commenters
     .map((k, i) => `${i + 1}. ${feedActorName(k)} [${k}] — ${_FEED_PERSONA[k]}`)
     .join('\n');
 
-  const systemPrompt = `You generate a short Task Force 141 comment thread under a social post. Each comment has English + Chinese. Comments must react to the post and to each other, in character. No emojis, no hashtags, no pet names (babe/honey/love), no OOC sweetness. Return JSON only.`;
+  const isUserPost = postAuthorKey === 'user';
+  const contextLine = isUserPost
+    ? `This is ${userName}'s post. She is Ghost's wife${daysTogether} and part of the unit's circle. Teammates know her and may address her directly when it fits naturally.`
+    : `This is ${authorName}'s post. Stay focused on the post itself. ${userName} (Ghost's wife) is part of the unit's circle, but do not mention her unless it naturally fits the conversation.`;
+
+  const systemPrompt = `You generate a short Task Force 141 comment thread under a social post. ${contextLine} Each comment has English + Chinese. Comments react to the post and to each other, in character. React to the social intent of the post, not just its literal content. If she is joking, teasing, being sarcastic, or deliberately posting something silly, play along or react naturally in character. Do not explain the joke or treat it like a factual statement. A dry reaction, playful jab, or deadpan response is often better than praise. No emojis, no hashtags, no pet names (babe/honey/love), no OOC sweetness. Return JSON only.`;
   const userPrompt = `Post by ${authorName}: "${postEn}"
 
 These teammates comment, in this order:
@@ -1020,13 +1068,13 @@ Return a JSON array only, same order and keys:
 
   try {
     let raw = '';
-    if (typeof callHaiku === 'function') {
-      raw = await callHaiku(systemPrompt, [{ role: 'user', content: userPrompt }]);
+    if (typeof callSonnet === 'function') {
+      raw = await callSonnet(systemPrompt, [{ role: 'user', content: userPrompt }], 320);
     } else {
       const res = await fetchWithTimeout('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 260, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
-      }, 8000);
+        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 320, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+      }, 25000);
       const d = await res.json();
       raw = d.content?.[0]?.text || '';
     }
@@ -1166,32 +1214,202 @@ ${recentGhostPosts ? `CRITICAL — these are Ghost's recent posts. Your post MUS
 Return JSON only: {"en":"...","zh":"..."}`;
   };
 
-  // ── 队友发帖人设（精简稳定版）────────────────────
+  // ── 队友发帖人设（丰富版：关系背景 + 角度池）────────
 
-  const SOAP_PROMPT = `Soap posting style: He posts casually, like talking out loud. Energetic, slightly chaotic, but not stupid.
-Posts are: playful, teasing, slightly exaggerated, sometimes directed at teammates.
-He often: jokes about Ghost, reacts to something that just happened, makes fun of the situation.
-Tone: informal English, can be one or two short lines, light humor — not forced.
-Do NOT: repeat the same joke structure, use heavy internet slang, sound like a comedian trying too hard, write long stories.
-Good angles: teasing Ghost ("he smiled. i'm concerned.") / reacting to chaos ("that went wrong fast.") / casual brag ("still the best shot here.") / light complaint ("someone needs to make better coffee.")
-Feels like: he hit post without thinking too much.
-Return JSON only: {"en":"...","zh":"..."}`;
+  const SOAP_POST_ANGLES = [
+    'teasing_ghost',        // 调侃 Ghost：发现他变软了、又看手机了、难得笑了
+    'tactical_chaos',       // 战术混乱：训练出岔子、某人搞砸了、意外状况
+    'base_life',            // 基地日常：食堂、健身房、武器库、走廊遇见谁
+    'gear_opinion',         // 装备吐槽：新枪不错、旧装备更好、某个细节很蠢
+    'teammate_observation', // 观察队友：Gaz 又对了、Price 那个眼神、某人做了件事
+    'brag_or_complaint',    // 吹牛/抱怨：自己射得准、咖啡难喝、天气糟糕
+    'spontaneous_energy',   // 突发能量：刚跑完步、睡不着、突然想到某事
+    'about_the_wife',       // 关于她：Ghost 的状态因为她变了、她做了什么、队里都知道
+  ];
 
-  const GAZ_PROMPT = `Gaz posting style: Observant, grounded. Does not post often — when he does, it's intentional.
-Posts are: calm, slightly amused, quietly insightful, sometimes dry humor.
-He often: notices subtle changes, comments on others (especially Ghost), says less but means more.
-Tone: clean natural English, one sentence, no exaggeration, no chaos energy.
-Do NOT: make loud jokes, overshare emotionally, sound like a narrator explaining things, be dramatic.
-Good angles: "he's different lately." / "something changed. not a bad thing." / "never thought i'd see that."
-Feels like: he saw something real and just noted it.
-Return JSON only: {"en":"...","zh":"..."}`;
+  const GAZ_POST_ANGLES = [
+    'ghost_observation',    // 观察 Ghost：他不一样了、某个细节变了、状态比以前好
+    'quiet_insight',        // 安静洞察：注意到某件小事、某个模式、谁在变化
+    'dry_humor',            // 干幽默：冷静吐槽、轻描淡写的讽刺、不动声色的玩笑
+    'tactical_note',        // 战术笔记：训练细节、任务后的观察、装备改进想法
+    'base_atmosphere',      // 基地氛围：今天的气氛、某个时刻、环境的微妙变化
+    'about_teammates',      // 关于队友：Soap 又闹腾、Price 那句话、某人做了件事
+    'about_the_wife',       // 关于她：她对 Ghost 的影响、她做了什么、队里对她的看法
+  ];
 
-  const PRICE_PROMPT = `Price posting style: Rarely posts. When he does, it carries weight.
-Posts are: short (2–6 words preferred), controlled, grounded, authoritative without trying.
-He does NOT: joke around, overshare, comment on trivial things, use slang, write multiple sentences.
-Good angles: "good man." / "that matters." / "keep it that way." / "solid."
-Feels like: he decided it was worth saying. Nothing more.
+  const PRICE_POST_ANGLES = [
+    'approval',             // 认可：某人做得好、某事值得、某个状态是对的
+    'gruff_observation',    // 粗糙观察：注意到某事、某人、某个变化，一句话点出
+    'unit_state',           // 队伍状态：士气、凝聚力、某个时刻的感觉
+    'about_ghost',          // 关于 Ghost：他的状态、他的选择、他的妻子对他的影响
+    'tactical_weight',      // 战术份量：任务后的评价、装备决定、训练标准
+    'fatherly_nod',         // 父亲式点头：给队员（包括她）的简短肯定或警告
+  ];
+
+  const buildSoapDailyPrompt = () => {
+    const recentSoapPosts = getFeedPosts()
+      .filter(p => p.author === 'soap')
+      .slice(0, 6)
+      .map(p => `"${p.en}"`)
+      .join('\n');
+
+    const lastAngle = localStorage.getItem('lastSoapPostAngle') || '';
+    const lastAngle2 = localStorage.getItem('lastSoapPostAngle2') || '';
+    const available = SOAP_POST_ANGLES.filter(a => a !== lastAngle && a !== lastAngle2);
+    const angle = available[Math.floor(Math.random() * available.length)];
+    localStorage.setItem('lastSoapPostAngle2', lastAngle);
+    localStorage.setItem('lastSoapPostAngle', angle);
+
+    const angleHints = {
+      teasing_ghost:        `Tease Ghost about being softer / checking his phone / smiling. Warm, not mean.`,
+      tactical_chaos:       `React to something that just went wrong in training or on base. Light chaos energy.`,
+      base_life:            `Comment on mess hall, gym, armory, or someone you ran into. Casual, offhand.`,
+      gear_opinion:         `Opinion on a weapon, kit, or equipment. Compliment or light complaint.`,
+      teammate_observation: `Notice what Gaz, Price, or Ghost just did. Teasing or genuine.`,
+      brag_or_complaint:    `Brag about your own skills OR complain about coffee/weather/food. Light.`,
+      spontaneous_energy:   `Just finished a run / can't sleep / random thought. Spontaneous.`,
+      about_the_wife:       `Observe how Ghost's wife affects him or the unit. Warm, teasing tone.`,
+    };
+
+    return `Soap (Johnny MacTavish) posting style:
+He posts casually, like talking out loud to the lads. Energetic, teasing, warm. SAS demolitions expert, Ghost's best mate for years.
+
+Context: He's in Task Force 141 with Ghost, Gaz, and Price. Ghost is married now — Soap watched it happen, ribs him about going soft, but he's genuinely glad. The wife is part of their circle; Soap treats her like a little sister he gets to wind up.
+
+Posts are:
+- playful, teasing, sometimes directed at Ghost or other teammates
+- one or two short lines, informal English, light Scottish flavor where natural ("aye" / "daft" / "lad" OK sparingly)
+- spontaneous — feels like he hit post without overthinking
+
+He does NOT:
+- force jokes or repeat the same joke structure
+- overshare emotions or write long stories
+- use heavy internet slang or sound like he's performing
+
+Post angle this time: ${angle}
+Angle hint: ${angleHints[angle]}
+
+Good examples:
+"he smiled. i'm concerned."
+"that went wrong fast."
+"caught him staring at his phone again. shocking."
+"best demo man here and the coffee's still shite."
+"she's got him wrapped. it's brilliant."
+"never thought i'd see Ghost domesticated."
+
+${recentSoapPosts ? `Do NOT reuse wording, structure, or angle from these recent Soap posts:\n${recentSoapPosts}` : ''}
+
 Return JSON only: {"en":"...","zh":"..."}`;
+  };
+
+  const buildGazDailyPrompt = () => {
+    const recentGazPosts = getFeedPosts()
+      .filter(p => p.author === 'gaz')
+      .slice(0, 6)
+      .map(p => `"${p.en}"`)
+      .join('\n');
+
+    const lastAngle = localStorage.getItem('lastGazPostAngle') || '';
+    const lastAngle2 = localStorage.getItem('lastGazPostAngle2') || '';
+    const available = GAZ_POST_ANGLES.filter(a => a !== lastAngle && a !== lastAngle2);
+    const angle = available[Math.floor(Math.random() * available.length)];
+    localStorage.setItem('lastGazPostAngle2', lastAngle);
+    localStorage.setItem('lastGazPostAngle', angle);
+
+    const angleHints = {
+      ghost_observation:  `Notice Ghost is different lately — better, softer, more human. Quiet approval.`,
+      quiet_insight:      `Observe something small about base life, teammates, or a pattern. Understated.`,
+      dry_humor:          `Deadpan observation or light sarcasm. Calm, not loud.`,
+      tactical_note:      `Training detail, post-mission thought, or kit improvement idea. Grounded.`,
+      base_atmosphere:    `The mood today, a specific moment, or environmental shift. Subtle.`,
+      about_teammates:    `Comment on Soap being chaotic, Price saying something, or someone's behavior.`,
+      about_the_wife:     `How she changed Ghost or the unit dynamic. Respectful, understated warmth.`,
+    };
+
+    return `Gaz (Kyle Garrick) posting style:
+Observant, grounded, calm. Former British Army, now TF141. Does not post often — when he does, it's because he noticed something worth noting.
+
+Context: He's in Task Force 141. Ghost is married; Gaz quietly approves — he sees how it steadies Ghost, notices the small ways she affects him. He respects her, speaks about her (or to her) with understated warmth.
+
+Posts are:
+- calm, slightly amused, quietly insightful
+- one clean sentence, natural English, no exaggeration
+- feels intentional — he saw something real and chose to note it
+
+He does NOT:
+- make loud jokes or force humor
+- overshare emotionally or sound like a narrator
+- be dramatic or chaotic
+
+Post angle this time: ${angle}
+Angle hint: ${angleHints[angle]}
+
+Good examples:
+"he's different lately. not a bad thing."
+"never thought i'd see that."
+"she's good for him. whole unit feels it."
+"caught him smiling at his phone. twice."
+"something shifted. can't put my finger on it."
+"Soap's losing the bet. Ghost is gone."
+
+${recentGazPosts ? `Do NOT reuse wording, structure, or angle from these recent Gaz posts:\n${recentGazPosts}` : ''}
+
+Return JSON only: {"en":"...","zh":"..."}`;
+  };
+
+  const buildPriceDailyPrompt = () => {
+    const recentPricePosts = getFeedPosts()
+      .filter(p => p.author === 'price')
+      .slice(0, 6)
+      .map(p => `"${p.en}"`)
+      .join('\n');
+
+    const lastAngle = localStorage.getItem('lastPricePostAngle') || '';
+    const lastAngle2 = localStorage.getItem('lastPricePostAngle2') || '';
+    const available = PRICE_POST_ANGLES.filter(a => a !== lastAngle && a !== lastAngle2);
+    const angle = available[Math.floor(Math.random() * available.length)];
+    localStorage.setItem('lastPricePostAngle2', lastAngle);
+    localStorage.setItem('lastPricePostAngle', angle);
+
+    const angleHints = {
+      approval:          `Approve of Ghost's state or someone's action. Short, weighted.`,
+      gruff_observation: `Notice something about the unit, a teammate, or a change. One line.`,
+      unit_state:        `Comment on morale, cohesion, or how the unit feels right now.`,
+      about_ghost:       `Ghost's state, his choice, or his wife's impact on him. Fatherly approval.`,
+      tactical_weight:   `Post-mission assessment, kit decision, or training standard. Authoritative.`,
+      fatherly_nod:      `Short affirmation or warning to Ghost (or her). Captain's nod.`,
+    };
+
+    return `Price (John Price) posting style:
+Captain of Task Force 141. Gruff, authoritative, father-figure to the unit. Rarely posts — when he does, it carries weight.
+
+Context: Ghost, Soap, Gaz are his men. Ghost is married now; Price watched it happen, gave his quiet approval. He sees the wife as part of the unit family — respects what she does for Ghost, treats her with gruff protectiveness.
+
+Posts are:
+- short (2–6 words preferred), controlled, grounded
+- authoritative without trying, feels like a nod from the captain
+- often directed at someone (Ghost, the wife, the lads) without tagging them
+
+He does NOT:
+- joke around, overshare, or comment on trivial things
+- use slang, write multiple sentences, or explain himself
+
+Post angle this time: ${angle}
+Angle hint: ${angleHints[angle]}
+
+Good examples:
+"good man."
+"that matters."
+"look after her."
+"solid choice."
+"she steadies him."
+"knew it would stick."
+"keep it that way."
+
+${recentPricePosts ? `Do NOT reuse wording, structure, or angle from these recent Price posts:\n${recentPricePosts}` : ''}
+
+Return JSON only: {"en":"...","zh":"..."}`;
+  };
 
   // ── 取最近帖子用于所有角色的反重复 ──────────────
   const _allRecentPosts = getFeedPosts()
@@ -1241,9 +1459,9 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
 
     daily_moment: (() => {
       const actor = evt.actor;
-      if (actor === 'soap')  return SOAP_PROMPT + _antiRepeat;
-      if (actor === 'gaz')   return GAZ_PROMPT + _antiRepeat;
-      if (actor === 'price') return PRICE_PROMPT + _antiRepeat;
+      if (actor === 'soap')  return buildSoapDailyPrompt();
+      if (actor === 'gaz')   return buildGazDailyPrompt();
+      if (actor === 'price') return buildPriceDailyPrompt();
       return buildGhostDailyPrompt();
     })(),
   };
@@ -1256,13 +1474,13 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
       : `You are a roleplay generator for Task Force 141. Return JSON only, no other text.`;
 
     let raw = '';
-    if (typeof callHaiku === 'function') {
-      raw = await callHaiku(systemPrompt, [{ role: 'user', content: prompt }]);
+    if (typeof callSonnet === 'function') {
+      raw = await callSonnet(systemPrompt, [{ role: 'user', content: prompt }], 200);
     } else {
       const res = await fetchWithTimeout('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 150, system: systemPrompt, messages: [{ role: 'user', content: prompt }] })
-      }, 8000);
+        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 200, system: systemPrompt, messages: [{ role: 'user', content: prompt }] })
+      }, 25000);
       const d = await res.json();
       raw = d.content?.[0]?.text || '';
     }
@@ -1521,7 +1739,7 @@ function renderCharFeed(authorKey) {
     .sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
   if (!posts.length && authorKey !== 'ghost') {
-    list.insertAdjacentHTML('beforeend', '<div class="couple-empty">还没有动态</div>');
+    list.insertAdjacentHTML('beforeend', `<div class="couple-empty">${feedActorName(authorKey)} 还没发布任何朋友圈</div>`);
     return;
   }
 
@@ -1532,7 +1750,7 @@ function renderCharFeed(authorKey) {
     try {
       const arr = await loadPhotosFromIDB(img.dataset.idb);
       const idx = parseInt(img.dataset.idx || '0');
-      if (arr && arr[idx]) img.src = arr[idx];
+      if (arr && arr[idx]) img.src = _toDataUri(arr[idx]);
     } catch(e) {}
   });
 }
@@ -1560,11 +1778,12 @@ function _charFeedPostHTML(post, authorKey) {
 
   const commentsHTML = (post.comments || []).map(c => {
     const cKey = c.author || 'ghost';
+    const clickable = cKey !== 'user' ? ` onclick="openCharFeed('${cKey}')" style="cursor:pointer"` : '';
     const replyLine = c.replyTo ? `<div class="couple-reply-to">↩ 回复 <span class="${feedActorNameClass(c.replyTo)}">${feedActorName(c.replyTo)}</span></div>` : '';
-    const nameLine = c.replyTo ? '' : `<div class="couple-comment-name ${feedActorNameClass(cKey)}">${feedActorName(cKey)}</div>`;
+    const nameLine = c.replyTo ? '' : `<div class="couple-comment-name ${feedActorNameClass(cKey)}"${clickable}>${feedActorName(cKey)}</div>`;
     return `
       <div class="couple-comment">
-        <div class="couple-avatar couple-avatar-sm">${feedActorAvatar(cKey)}</div>
+        <div class="couple-avatar couple-avatar-sm"${clickable}>${feedActorAvatar(cKey)}</div>
         <div class="couple-comment-body">
           ${replyLine}${nameLine}
           <div class="couple-comment-en">${c.en || ''}</div>
@@ -1749,7 +1968,7 @@ async function onFeedDeviceFilePicked(input) {
     const ok = await savePhotosToIDB(key, [base64]);
     if (!ok) { if (row) row.innerHTML = '<div class="feed-compose-empty">图片太大，换一张试试</div>'; return; }
     _feedComposePhoto = { idbKey: key, idbIndex: 0 };
-    if (row) row.innerHTML = `<div class="feed-compose-thumb selected"><img src="${base64}" alt=""></div>`;
+    if (row) row.innerHTML = `<div class="feed-compose-thumb selected"><img src="${_toDataUri(base64)}" alt=""></div>`;
   } catch(e) {
     if (row) row.innerHTML = '<div class="feed-compose-empty">读取失败，换一张试试</div>';
   } finally {
@@ -1774,7 +1993,7 @@ async function openFeedAlbumPicker() {
     try {
       const list = await loadPhotosFromIDB(img.dataset.idb);
       const idx = parseInt(img.dataset.idx || '0');
-      if (list && list[idx]) img.src = list[idx];
+      if (list && list[idx]) img.src = _toDataUri(list[idx]);
     } catch(e) {}
   });
   row.querySelectorAll('.feed-compose-thumb').forEach(el => {
@@ -1816,17 +2035,17 @@ async function submitFeedCompose() {
   const en = zh || text;
   const zhLine = zh ? text : '';
 
-  const comments = await generateFeedComments('user', en);
-
+  // 先发帖（无评论），立刻显示——评论稍后异步补上，更像真人陆续来评论
+  const postId = 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   insertFeedPost({
-    id: 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    id: postId,
     author: 'user',
     en, zh: zhLine,
     photo: _feedComposePhoto ? { idbKey: _feedComposePhoto.idbKey, idbIndex: _feedComposePhoto.idbIndex } : null,
     ts: Date.now(),
     likes: 1,
     liked: false,
-    comments
+    comments: []
   });
 
   // 扣额度
@@ -1839,6 +2058,33 @@ async function submitFeedCompose() {
   document.getElementById('feedComposeModal')?.remove();
   if (typeof showToast === 'function') showToast('✨ 已发布到动态');
   renderCoupleFeedFromHistory();
+
+  // 评论延迟送达（8~20秒随机），生成后写回对应帖子再刷新
+  scheduleFeedComments(postId, 'user', en);
+}
+
+// 异步生成评论并陆续写回指定帖子（一条一条冒出来，像真人陆续来评论）
+async function scheduleFeedComments(postId, authorKey, postEn) {
+  try {
+    const comments = await generateFeedComments(authorKey, postEn);
+    if (!comments || !comments.length) return;
+
+    // 每条评论各自延迟：第一条 20~50 秒才来，之后每条再隔 15~60 秒
+    let elapsed = 20000 + Math.floor(Math.random() * 30000);
+    comments.forEach((c) => {
+      setTimeout(() => {
+        const list = getFeedPosts();
+        const post = list.find(p => String(p.id) === String(postId));
+        if (!post) return;
+        post.comments = [...(post.comments || []), c];
+        saveFeedPosts(list);
+        if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+        const cs = document.getElementById('coupleScreen');
+        if (cs && cs.classList.contains('active')) renderCoupleFeedFromHistory();
+      }, elapsed);
+      elapsed += 15000 + Math.floor(Math.random() * 45000);
+    });
+  } catch(e) {}
 }
 
 // ===== 花瓣动画 =====
