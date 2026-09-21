@@ -915,6 +915,33 @@
     background: none; border: none; cursor: pointer;
     font-size: 13px; color: #bbb; padding: 0;
 }
+
+/* 角色个人朋友圈页 */
+#charFeedScreen {
+    background: linear-gradient(160deg, #eef4e8 0%, #dce8d2 100%);
+    overflow-y: auto;
+}
+.charfeed-cover {
+    display: flex; flex-direction: column; align-items: center;
+    padding: calc(96px + env(safe-area-inset-top)) 20px 26px;
+    background: linear-gradient(135deg,
+        rgba(155,210,125,0.55) 0%,
+        rgba(195,228,155,0.48) 70%,
+        rgba(210,235,170,0.45) 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.6);
+}
+.charfeed-avatar {
+    width: 78px; height: 78px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; overflow: hidden;
+    background: rgba(255,255,255,0.5);
+    border: 3px solid rgba(255,255,255,0.9);
+    box-shadow: 0 6px 20px rgba(80,140,55,0.2);
+}
+.charfeed-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.charfeed-name { font-size: 19px; font-weight: 800; margin-top: 12px; }
+.charfeed-sub { font-size: 12px; color: rgba(40,80,30,0.6); margin-top: 4px; }
+.charfeed-list { padding: 14px 16px 80px; }
 .couple-like-btn.couple-liked { color: #5a9a46; }
 
 /* 空状态 */

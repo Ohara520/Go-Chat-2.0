@@ -438,9 +438,9 @@ function renderCoupleFeed(posts) {
     div.className = 'couple-post-card';
     div.innerHTML = `
       <div class="couple-post-header">
-        <div class="couple-avatar">${postAvatarHTML}</div>
+        <div class="couple-avatar"${authorKey !== 'user' ? ` onclick="openCharFeed('${authorKey}')" style="cursor:pointer"` : ''}>${postAvatarHTML}</div>
         <div class="couple-post-meta">
-          <div class="couple-post-name ${nameClass}">${displayName}</div>
+          <div class="couple-post-name ${nameClass}"${authorKey !== 'user' ? ` onclick="openCharFeed('${authorKey}')" style="cursor:pointer"` : ''}>${displayName}</div>
           <div class="couple-post-time">${timeAgo(post.ts)}</div>
         </div>
       </div>
@@ -1478,6 +1478,190 @@ async function publishUserDraft() {
 function renderCoupleFeedFromHistory() {
   const all = getFeedPosts().slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
   renderCoupleFeed(all);
+}
+
+// ===================================================================
+// ===== 角色个人朋友圈页（点头像进入，只看这个人发的动态）=========
+// ===================================================================
+
+// 打开某角色的个人页
+function openCharFeed(authorKey) {
+  if (!FEED_ACTORS[authorKey]) return;
+  if (typeof openScreen === 'function') openScreen('charFeedScreen');
+  renderCharFeed(authorKey);
+}
+
+// 渲染个人页：顶部封面 + （Ghost 专属置顶婚帖）+ 该角色全部动态
+function renderCharFeed(authorKey) {
+  const actor = FEED_ACTORS[authorKey];
+  if (!actor) return;
+  const name = feedActorName(authorKey);
+
+  // 顶部封面
+  const titleEl = document.getElementById('charFeedTitle');
+  if (titleEl) titleEl.textContent = name + ' 的朋友圈';
+  const avaEl = document.getElementById('charFeedAvatar');
+  if (avaEl) avaEl.innerHTML = feedActorAvatar(authorKey);
+  const nameEl = document.getElementById('charFeedName');
+  if (nameEl) { nameEl.textContent = name; nameEl.className = 'charfeed-name ' + (actor.nameClass || ''); }
+  const subEl = document.getElementById('charFeedSub');
+  if (subEl) subEl.textContent = _charFeedSub(authorKey);
+
+  const list = document.getElementById('charFeedList');
+  if (!list) return;
+  list.innerHTML = '';
+
+  // Ghost 专属：置顶婚帖
+  if (authorKey === 'ghost') {
+    list.insertAdjacentHTML('beforeend', _weddingPinnedHTML());
+  }
+
+  const posts = getFeedPosts()
+    .filter(p => (p.author || 'ghost') === authorKey && p.en)
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+  if (!posts.length && authorKey !== 'ghost') {
+    list.insertAdjacentHTML('beforeend', '<div class="couple-empty">还没有动态</div>');
+    return;
+  }
+
+  posts.forEach(post => list.insertAdjacentHTML('beforeend', _charFeedPostHTML(post, authorKey)));
+
+  // 相册图异步填充
+  list.querySelectorAll('img[data-idb]').forEach(async img => {
+    try {
+      const arr = await loadPhotosFromIDB(img.dataset.idb);
+      const idx = parseInt(img.dataset.idx || '0');
+      if (arr && arr[idx]) img.src = arr[idx];
+    } catch(e) {}
+  });
+}
+
+function _charFeedSub(authorKey) {
+  const n = getFeedPosts().filter(p => (p.author || 'ghost') === authorKey && p.en).length;
+  const extra = authorKey === 'ghost' ? n + 1 : n; // Ghost 多一条置顶婚帖
+  return extra > 0 ? `${extra} 条动态` : '还没有动态';
+}
+
+// 单条帖子 HTML（个人页用，结构与 renderCoupleFeed 一致，头像不再可点）
+function _charFeedPostHTML(post, authorKey) {
+  const nameClass = feedActorNameClass(authorKey);
+  const displayName = feedActorName(authorKey);
+  const postAvatarHTML = feedActorAvatar(authorKey);
+
+  let photoHTML = '';
+  if (post.photo) {
+    if (post.photo.src) {
+      photoHTML = `<div class="couple-post-photo"><img src="${post.photo.src}" loading="lazy" alt=""></div>`;
+    } else if (post.photo.idbKey) {
+      photoHTML = `<div class="couple-post-photo"><img data-idb="${post.photo.idbKey}" data-idx="${post.photo.idbIndex || 0}" loading="lazy" alt=""></div>`;
+    }
+  }
+
+  const commentsHTML = (post.comments || []).map(c => {
+    const cKey = c.author || 'ghost';
+    const replyLine = c.replyTo ? `<div class="couple-reply-to">↩ 回复 <span class="${feedActorNameClass(c.replyTo)}">${feedActorName(c.replyTo)}</span></div>` : '';
+    const nameLine = c.replyTo ? '' : `<div class="couple-comment-name ${feedActorNameClass(cKey)}">${feedActorName(cKey)}</div>`;
+    return `
+      <div class="couple-comment">
+        <div class="couple-avatar couple-avatar-sm">${feedActorAvatar(cKey)}</div>
+        <div class="couple-comment-body">
+          ${replyLine}${nameLine}
+          <div class="couple-comment-en">${c.en || ''}</div>
+          ${c.zh ? `<div class="couple-comment-zh">${c.zh}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  const likeCount = post.likes ?? Math.floor(Math.random() * 30 + 3);
+  const isLiked = !!post.liked;
+  const likeEmoji = isLiked ? '❤️' : '🤍';
+
+  return `
+    <div class="couple-post-card">
+      <div class="couple-post-header">
+        <div class="couple-avatar">${postAvatarHTML}</div>
+        <div class="couple-post-meta">
+          <div class="couple-post-name ${nameClass}">${displayName}</div>
+          <div class="couple-post-time">${timeAgo(post.ts)}</div>
+        </div>
+      </div>
+      <div class="couple-post-en">${post.en}</div>
+      ${post.zh ? `<div class="couple-post-zh">${post.zh}</div>` : ''}
+      ${photoHTML}
+      ${commentsHTML ? `<div class="couple-divider"></div><div class="couple-comments">${commentsHTML}</div>` : ''}
+      <div class="couple-post-footer" style="display:flex;align-items:center;gap:10px;">
+        <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}"
+          data-post-id="${post.id}" data-count="${likeCount}"
+          onclick="toggleCoupleLike(this)"
+          style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
+      </div>
+    </div>`;
+}
+
+// Ghost 置顶婚帖（原主页那条，搬到个人页顶部）
+function _weddingPinnedHTML() {
+  const ghostName = localStorage.getItem('botNickname') || 'Simon Riley';
+  const userName = localStorage.getItem('userName') || '你';
+  const wd = localStorage.getItem('marriageDate');
+  let dateStr = '—';
+  if (wd) { const d = new Date(wd); dateStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+  const userAva = localStorage.getItem('userAvatarBase64') || 'images/default-avatar.jpg';
+  const liked = localStorage.getItem('weddingLike') === '1';
+  return `
+    <div class="couple-post-card couple-wedding">
+      <div class="couple-pinned-tag">📌 置顶</div>
+      <div class="couple-post-header">
+        <div class="couple-double-avatar">
+          <div class="couple-av1">${_ghostAvatarHTML()}</div>
+          <div class="couple-av2" style="background-image:url(${userAva});background-size:cover;background-position:center;"></div>
+        </div>
+        <div class="couple-post-meta">
+          <div class="couple-post-name couple-ghost-name">${ghostName}</div>
+          <div class="couple-post-time">${dateStr}</div>
+        </div>
+      </div>
+      <div class="couple-post-en">we're married. that's all. <span class="couple-mention">@${userName}</span></div>
+      <div class="couple-post-zh">我们结婚了，就这样。<span class="couple-mention">@${userName}</span></div>
+      <div class="couple-divider"></div>
+      <div class="couple-comments">
+        <div class="couple-comment">
+          <div class="couple-avatar couple-avatar-sm">${feedActorAvatar('soap')}</div>
+          <div class="couple-comment-body">
+            <div class="couple-comment-name couple-soap-name">Soap</div>
+            <div class="couple-comment-en">FINALLY. took him long enough. congrats you two 🎉</div>
+            <div class="couple-comment-zh">终于！他可真磨叽。恭喜你们两个🎉</div>
+          </div>
+        </div>
+        <div class="couple-comment">
+          <div class="couple-avatar couple-avatar-sm">${feedActorAvatar('gaz')}</div>
+          <div class="couple-comment-body">
+            <div class="couple-comment-name couple-gaz-name">Gaz</div>
+            <div class="couple-comment-en">happy for you both. she's good for you, Ghost.</div>
+            <div class="couple-comment-zh">替你们高兴。她对你好，Ghost。</div>
+          </div>
+        </div>
+        <div class="couple-comment">
+          <div class="couple-avatar couple-avatar-sm">${feedActorAvatar('price')}</div>
+          <div class="couple-comment-body">
+            <div class="couple-comment-name couple-price-name">Price</div>
+            <div class="couple-comment-en">take care of her.</div>
+            <div class="couple-comment-zh">好好照顾她。</div>
+          </div>
+        </div>
+        <div class="couple-comment">
+          <div class="couple-avatar couple-avatar-sm">${_ghostAvatarHTML()}</div>
+          <div class="couple-comment-body">
+            <div class="couple-reply-to">↩ 回复 <span class="couple-price-name">Price</span></div>
+            <div class="couple-comment-en">always.</div>
+            <div class="couple-comment-zh">一直会。</div>
+          </div>
+        </div>
+      </div>
+      <div class="couple-post-footer">
+        <button class="couple-like-btn ${liked ? 'couple-liked' : ''}" data-count="12" onclick="toggleCoupleLike(this, 'weddingLike')">${liked ? '❤️' : '🤍'} <span class="like-num">12</span></button>
+      </div>
+    </div>`;
 }
 
 // ===================================================================
