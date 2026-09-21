@@ -383,6 +383,7 @@ async function loadFromCloud() {
         }
         if (s.attachmentPull != null) localStorage.setItem('attachmentPull', s.attachmentPull);
         if (s.jealousyLevel != null) localStorage.setItem('jealousyLevel', s.jealousyLevel);
+        if (s.banterSweet != null) localStorage.setItem('banterSweet', s.banterSweet);
         if (s.globalTurnCount != null) { _globalTurnCount = s.globalTurnCount; localStorage.setItem('globalTurnCount', s.globalTurnCount); }
         if (Array.isArray(s.pendingReversePackages)) savePendingReversePackages(s.pendingReversePackages, { markChanged: false });
         if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
@@ -957,6 +958,7 @@ async function saveToCloud() {
       trustHeat: getTrustHeat(),
       attachmentPull: getAttachmentPull(),
       jealousyLevel: getJealousyLevel(),
+      banterSweet: getBanterSweet(),
       globalTurnCount: _globalTurnCount,
       pendingReversePackages: getPendingReversePackages(),
       emotionalHurt: parseInt(localStorage.getItem('emotionalHurt') || '0'),

@@ -519,6 +519,79 @@ function checkJealousyTimeDecay() {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 表达风格轴 banterSweet
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// "绕着表达 ←→ 直接表达"，不是"冷 ←→ 爱"。爱的深度由 trust/affection/mood 管，
+// 这条轴只管表层怎么说出来。长期互动慢慢长成，每个用户聊出独一无二的 Ghost。
+// 范围 -100~+100，默认 -20（契合 restrained/dry 底子，注入时只译成"略偏含蓄"）。
+
+function getBanterSweet() {
+  const v = localStorage.getItem('banterSweet');
+  return v === null ? -20 : parseFloat(v);
+}
+
+// 单次漂移步长：low 忽略，medium ±1，high ±2；越极端越难再推（阻尼）
+function _banterStep(signal, confidence) {
+  if (confidence === 'low' || !signal) return 0;
+  const base = confidence === 'high' ? 2 : 1;
+  const cur = Math.abs(getBanterSweet());
+  const damp = cur < 50 ? 1 : cur < 80 ? 0.5 : 0.25;
+  return signal * base * damp;
+}
+
+function applyBanterSignal(signal, confidence, reason) {
+  const before = getBanterSweet();
+  const delta = _banterStep(signal, confidence);
+  if (delta === 0) { _recordBanterHistory(before, before, signal, confidence, reason, true); return before; }
+  const after = Math.max(-100, Math.min(100, before + delta));
+  localStorage.setItem('banterSweet', after);
+  _touch();
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  _recordBanterHistory(before, after, signal, confidence, reason, false);
+  return after;
+}
+
+// 开发者调试用：最近 10 次漂移历史（纯本地，不同步云端）
+function _recordBanterHistory(before, after, signal, confidence, reason, ignored) {
+  let h = []; try { h = JSON.parse(localStorage.getItem('banterHistory') || '[]'); } catch(e) {}
+  h.unshift({ t: Date.now(), before: +before.toFixed(1), after: +after.toFixed(1),
+              signal, confidence, reason: reason || '', ignored });
+  localStorage.setItem('banterHistory', JSON.stringify(h.slice(0, 10)));
+}
+
+// 用 DeepSeek 判断最近 4 条用户消息的整体互动倾向 → 结构化 JSON 漂移
+// 关键：判断"她对 Ghost 的互动方式"，不是情绪正负；看整体基调，不看单句
+async function evaluateBanterSignal() {
+  if (typeof chatHistory === 'undefined' || !Array.isArray(chatHistory)) return;
+  const userMsgs = chatHistory.filter(m => m.role === 'user' && !m._system)
+    .slice(-4).map(m => m.content).filter(Boolean);
+  if (userMsgs.length < 4) return;
+
+  const sys = `You judge HOW a wife interacts with her husband over text — her expression style, NOT her mood or whether she is positive/negative.
+
+Axis: BANTER (playful teasing, mock-annoyance, poking, roughhousing, "你好烦" as flirtation) vs SWEET (direct affection, missing him, softness, open warmth).
+
+Rules:
+- Judge the OVERALL pattern across ALL messages, never a single word.
+- "讨厌死了 😭" chasing him = sweet/playful. "讨厌死了，别烦我" pushing away = neither, likely genuine.
+- If she is genuinely hurt, serious, or setting a boundary → signal 0 (do NOT let it move her long-term style).
+- Sarcasm/reverse-talk is common; weigh context.
+- confidence: high only when the pattern is clear and consistent; low when ambiguous or mixed.
+
+Return ONLY compact JSON: {"signal":-1|0|1,"confidence":"low"|"medium"|"high","reason":"<=8 words"}
+signal -1 = banter-leaning, +1 = sweet-leaning, 0 = neutral/serious.`;
+
+  const user = userMsgs.map((m, i) => `${i + 1}. ${m}`).join('\n');
+  if (typeof callDeepSeekWithSystem !== 'function') return;
+  const raw = await callDeepSeekWithSystem(sys, user, 60);
+  if (!raw) return;
+  let parsed; try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); } catch(e) { return; }
+  if (!parsed || typeof parsed.signal !== 'number') return;
+  applyBanterSignal(parsed.signal, parsed.confidence || 'low', parsed.reason);
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 好感度（快变量）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1266,3 +1339,20 @@ async function ghostSendMakeupMoney() {
     if (typeof hideTyping === 'function') hideTyping();
   }
 }
+
+
+// ── 开发者调试：表达风格轴读数 ──
+// banterSweet 是每设备本地值，admin 页走服务端 DB 不匹配，故用 console 命令。
+// 用法：DevTools 里敲 __banterDebug()
+window.__banterDebug = function() {
+  const v = getBanterSweet();
+  let h = []; try { h = JSON.parse(localStorage.getItem('banterHistory') || '[]'); } catch(e) {}
+  console.log(`[banterSweet] 当前: ${v.toFixed(1)}  (${v <= -50 ? '含蓄块' : v >= 50 ? '直接块' : '中性-无注入'})`);
+  console.table(h.map(r => ({
+    时间: new Date(r.t).toLocaleString('zh-CN'),
+    变化: `${r.before} → ${r.after}`,
+    信号: r.signal, 置信: r.confidence,
+    忽略: r.ignored ? '是' : '', 原因: r.reason
+  })));
+  return v;
+};

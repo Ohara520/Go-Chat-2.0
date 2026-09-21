@@ -486,6 +486,30 @@ async function callDeepSeek(prompt, maxTokens = 200) {
   }
 }
 
+/**
+ * 调用 DeepSeek 并传入独立 system（用于结构化打分，如表达风格轴 banterSweet）
+ * 后端 /api/deepseek 已支持 system 字段，此处薄封装不动原 callDeepSeek，避免影响其它调用方
+ * @param {string} system   系统提示（打分规则）
+ * @param {string} user     用户内容（待判断的消息）
+ * @param {number} maxTokens 默认200
+ * @returns {string} 回复文本，失败返回空字符串
+ */
+async function callDeepSeekWithSystem(system, user, maxTokens = 200) {
+  try {
+    const res = await fetchWithTimeout('/api/deepseek', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system, user, max_tokens: maxTokens }),
+    }, 12000);
+    if (!res.ok) return '';
+    const data = await res.json();
+    if (_isApiErrorBody(data)) return '';
+    return data.text?.trim() || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 // ===== Sonnet 主调用（支持prompt cache）=====
 
 /**

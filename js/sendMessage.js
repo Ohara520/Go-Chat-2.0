@@ -179,6 +179,13 @@ async function handlePostReplyActions(text, reply, intent, pendingEvent) {
     if (typeof handlePostReplyEvents === 'function' && pendingEvent) {
       handlePostReplyEvents(text, reply, pendingEvent).catch(e => console.warn('事件处理出错:', e));
     }
+    // 表达风格轴：每 4 轮用 DeepSeek 评一次最近互动倾向，不阻塞主回复
+    try {
+      const _turn = (typeof getGlobalTurnCount === 'function') ? getGlobalTurnCount() : 0;
+      if (_turn > 0 && _turn % 4 === 0 && typeof evaluateBanterSignal === 'function') {
+        setTimeout(() => { evaluateBanterSignal().catch(() => {}); }, 3000);
+      }
+    } catch(e) {}
   } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
 }
 
