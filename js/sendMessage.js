@@ -817,17 +817,24 @@ async function _processMergedMessage(text) {
       } catch(e) { console.warn('[explicit-gift] pick item fail:', e); }
 
       if (pickedItem) {
-        // 关键：先下单！再让 Sonnet 回复
+        // 关键：先下单，且只有真下单成功才播报"已寄出"。
+        // 杜绝画饼：addGhostReverseDelivery 返回 false（被拦）时不能扣配额、不能说"在路上"。
+        let _shipped = false;
         try {
           if (typeof addGhostReverseDelivery === 'function') {
-            addGhostReverseDelivery(pickedItem, 'explicit_request');
-            localStorage.setItem(_explicitGiftWeekKey, String(_explicitGiftThisWeek + 1));
-            console.log('[explicit-gift] shipped:', pickedItem.name, 'count this week:', _explicitGiftThisWeek + 1);
+            _shipped = addGhostReverseDelivery(pickedItem, 'explicit_request') === true;
           }
         } catch(e) { console.warn('[explicit-gift] ship fail:', e); }
 
-        // 注入精确的 system 消息（_delivery 标记让 Sonnet 看见）
-        _specialtyHint = `[She just asked for something. You ARE shipping 「${pickedItem.name}」 to her right now — this is REAL, in the system, on its way to her door.\nTell her directly. Acknowledge what's coming. Don't be flowery, don't make a thing of it.\nCould be: "shipped you 「${pickedItem.name}」." / "the 「${pickedItem.name}」. on its way." / "got it sent. don't say i never did anything."\nThis is NOT pretending. The package will actually arrive in her delivery list.]`;
+        if (_shipped) {
+          localStorage.setItem(_explicitGiftWeekKey, String(_explicitGiftThisWeek + 1));
+          console.log('[explicit-gift] shipped:', pickedItem.name, 'count this week:', _explicitGiftThisWeek + 1);
+          // 注入精确的 system 消息（_delivery 标记让 Sonnet 看见）
+          _specialtyHint = `[She just asked for something. You ARE shipping 「${pickedItem.name}」 to her right now — this is REAL, in the system, on its way to her door.\nTell her directly. Acknowledge what's coming. Don't be flowery, don't make a thing of it.\nCould be: "shipped you 「${pickedItem.name}」." / "the 「${pickedItem.name}」. on its way." / "got it sent. don't say i never did anything."\nThis is NOT pretending. The package will actually arrive in her delivery list.]`;
+        } else {
+          // 下单被拦（极少见，explicit 已绕过冷却，仅剩系统异常）→ 诚实，不画饼
+          _specialtyHint = '[She is asking for something. You can softly acknowledge — but do NOT promise a shipment or say anything is on its way. Stay natural and non-committal.]';
+        }
       } else {
         // 礼物池没有 → 退化到不触发
         _specialtyHint = '[She is asking for something. You can softly acknowledge — but stay natural. Do not over-promise specifics.]';
@@ -1571,7 +1578,8 @@ async function _processMergedMessage(text) {
       checkLocationSpecialTrigger(text).catch(() => {});
     }
     // 情绪/商城触发：提高到45%（原25%太低）
-    if (Math.random() < 0.85) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
+    // 每轮 30% 概率跑反寄/情绪判断（原为 0.85，与"惊喜才珍贵"的设计冲突，且注释谎称 25%）
+    if (Math.random() < 0.30) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (chatHistory.slice(-6).some(m => m._intimate)) {
       setTimeout(() => { try { checkIntimateHighlight(text, reply); } catch(e) {} }, 1500);
     }

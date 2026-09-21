@@ -647,7 +647,7 @@ async function loadFromCloud() {
           localStorage.setItem('giftRecords', JSON.stringify(merged.slice(0, 100)));
         }
       }
-      mergeArrays('coupleFeedHistory', s.coupleFeedHistory, 50);
+      mergeArrays('feedPosts', s.feedPosts, 40);
       mergeArrays('deliveryHistory', s.deliveryHistory, 50);
       mergeArrays('takeoutHistory', s.takeoutHistory, 50);
 
@@ -981,8 +981,7 @@ async function saveToCloud() {
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 400),
       dateMemories: JSON.parse(localStorage.getItem('dateMemories') || '[]').slice(0, 50),
       giftRecords: JSON.parse(localStorage.getItem('giftRecords') || '[]').slice(0, 100),
-      coupleFeedHistory: JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]').slice(0, 25),
-      coupleFeedDate: localStorage.getItem('coupleFeedDate') || '',
+      feedPosts: JSON.parse(localStorage.getItem('feedPosts') || '[]').slice(0, 40),
       organicFeedCount: localStorage.getItem('organicFeedCount_' + getTodayDateStr()) || '0',
       organicFeedCountKey: 'organicFeedCount_' + getTodayDateStr(),
       feedEventPool: (typeof getFeedEventPool === 'function' ? getFeedEventPool() : []).filter(e => !e.consumed).slice(0, 20),

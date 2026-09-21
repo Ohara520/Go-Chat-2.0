@@ -937,6 +937,71 @@
     50% { transform: scale(1.15); opacity: 1; }
 }
 
+/* ===== 朋友圈重做：帖子配图 + 发圈入口/弹窗 ===== */
+.couple-post-photo { margin: 8px 0 4px; }
+.couple-post-photo img {
+    width: 100%; max-height: 320px; object-fit: cover;
+    border-radius: 12px; display: block; background: rgba(0,0,0,0.04);
+}
+
+/* 发朋友圈入口按钮 */
+.feed-compose-btn {
+    display: block; width: 100%; margin: 0 0 12px;
+    padding: 11px; border: 1.5px dashed rgba(90,154,70,0.35);
+    background: rgba(90,154,70,0.06); color: #4a7a2a;
+    font-size: 14px; font-weight: 600; border-radius: 14px; cursor: pointer;
+    transition: background .2s;
+}
+.feed-compose-btn:hover { background: rgba(90,154,70,0.12); }
+
+/* 撰写弹窗 */
+.feed-compose-modal {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.35); display: flex; align-items: flex-end;
+    justify-content: center;
+}
+.feed-compose-sheet {
+    width: 100%; max-width: 480px; background: #fff;
+    border-radius: 20px 20px 0 0; padding: 18px 16px 22px;
+    box-shadow: 0 -6px 30px rgba(0,0,0,0.15);
+}
+.feed-compose-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    font-size: 15px; font-weight: 700; color: #333; margin-bottom: 12px;
+}
+.feed-compose-quota { font-size: 12px; font-weight: 500; color: #a0a090; }
+.feed-compose-text {
+    width: 100%; min-height: 80px; border: none; resize: none; outline: none;
+    font-size: 15px; line-height: 1.5; color: #333; font-family: inherit;
+}
+.feed-compose-photo-row {
+    display: flex; gap: 8px; overflow-x: auto; margin: 8px 0;
+    -webkit-overflow-scrolling: touch;
+}
+.feed-compose-thumb {
+    flex: 0 0 auto; width: 64px; height: 64px; border-radius: 10px;
+    overflow: hidden; border: 2px solid transparent; cursor: pointer;
+}
+.feed-compose-thumb.selected { border-color: #5a9a46; }
+.feed-compose-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.feed-compose-empty { font-size: 12px; color: #b0b0a0; padding: 10px 2px; }
+.feed-compose-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.feed-compose-pick {
+    padding: 8px 14px; border: 1px solid rgba(90,154,70,0.3);
+    background: transparent; color: #4a7a2a; font-size: 13px;
+    border-radius: 10px; cursor: pointer;
+}
+.feed-compose-cancel {
+    padding: 8px 16px; border: none; background: #f0f0ec; color: #888;
+    font-size: 14px; border-radius: 10px; cursor: pointer;
+}
+.feed-compose-send {
+    padding: 8px 20px; border: none;
+    background: linear-gradient(135deg, #6aab52, #4a7a2a); color: #fff;
+    font-size: 14px; font-weight: 600; border-radius: 10px; cursor: pointer;
+}
+.feed-compose-send:disabled { opacity: .6; cursor: default; }
+
 /* ===== 阴阳帖 ===== */
 .couple-sassy {
     border-color: rgba(80,150,55,0.22);

@@ -196,22 +196,30 @@ function showPurchaseReceipt(delivery) {
 // Ghost 反寄
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// 返回 true=已下单，false=被拦截未下单。调用方（尤其是用户明确索要的路径）
+// 必须依据返回值决定是否播报"已寄出"，否则会出现"嘴上说寄了、系统没寄"的画饼。
 function addGhostReverseDelivery(item, emotionType) {
-  // 统一冷却：3天内只寄一次（不管哪种反寄系统）
-  const lastAnyReverse = parseInt(localStorage.getItem('lastAnyReverseAt') || '0');
-  if (Date.now() - lastAnyReverse < 3 * 24 * 3600 * 1000) return;
+  // 用户明确索要（explicit_request）不受惊喜冷却限制——上游已用每周配额节流。
+  // 惊喜类（情绪/特产）才共用 7 天全局冷却，保证稀有。
+  const isExplicitRequest = emotionType === 'explicit_request';
+
+  if (!isExplicitRequest) {
+    // 统一惊喜冷却：7天内只主动寄一次（情绪 + 特产共用）
+    const lastAnyReverse = parseInt(localStorage.getItem('lastAnyReverseAt') || '0');
+    if (Date.now() - lastAnyReverse < 7 * 24 * 3600 * 1000) return false;
+  }
 
   // 读统一状态
   const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
 
-  // initiative 0 + availability closed → 不主动寄
-  if (gs && gs.initiative === 0 && gs.availability === 'closed') return;
+  // initiative 0 + availability closed → 不主动寄（索要类不受此限，她开口要就给）
+  if (!isExplicitRequest && gs && gs.initiative === 0 && gs.availability === 'closed') return false;
 
   // warmth 0 + 非 longing/sick 类型 → 不寄软性礼物
   const softTypes = ['longing', 'sad', 'heartbroken', 'worry'];
-  if (gs && gs.warmth === 0 && softTypes.includes(emotionType)) return;
+  if (!isExplicitRequest && gs && gs.warmth === 0 && softTypes.includes(emotionType)) return false;
 
-  if (typeof canTriggerReverseDelivery  === 'function' && !canTriggerReverseDelivery()) return;
+  if (!isExplicitRequest && typeof canTriggerReverseDelivery === 'function' && !canTriggerReverseDelivery()) return false;
   if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
 
   // 记录统一冷却时间
@@ -292,6 +300,8 @@ One line. English only. Lowercase.${_tipHint}]`,
       }
     } catch(e) {}
   }, directDelay);
+
+  return true;
 }
 
 
@@ -406,16 +416,22 @@ async function onGhostReceived(delivery) {
   // 去重：同一个快递只触发一次签收反应
   const _dedupKey = 'ghostReceived_' + delivery.id;
   if (localStorage.getItem(_dedupKey)) return;
-  localStorage.setItem(_dedupKey, Date.now().toString());
 
   const container = document.getElementById('messagesContainer');
   if (!container) {
     // 不在聊天页面，存起来下次触发
+    // 注意：这里【不】设去重标记——否则回放时 onGhostReceived 会被自己刚设的标记挡在门外，
+    // 离线到达的快递永远不会有反应（这正是"收到快递不说话"的主因）
     const pending = JSON.parse(localStorage.getItem('pendingDeliveryReactions') || '[]');
-    pending.push({ delivery, savedAt: Date.now() });
-    localStorage.setItem('pendingDeliveryReactions', JSON.stringify(pending));
+    if (!pending.some(p => p.delivery && p.delivery.id === delivery.id)) {
+      pending.push({ delivery, savedAt: Date.now() });
+      localStorage.setItem('pendingDeliveryReactions', JSON.stringify(pending));
+    }
     return;
   }
+
+  // 到这里说明在聊天页、确定要生成反应了，此刻才设去重标记
+  localStorage.setItem(_dedupKey, Date.now().toString());
 
   const pd = delivery.productData;
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
@@ -534,6 +550,14 @@ One or two lines. Lowercase. English only.]`;
 
     setTimeout(async () => {
       try {
+        // 防复读池：记最近5句签收台词，喂给模型让它别重复（对标外卖 takeoutReplyPool）
+        const _getRecvPool  = () => JSON.parse(localStorage.getItem('deliveryReplyPool') || '[]');
+        const _saveRecvPool = (pool) => localStorage.setItem('deliveryReplyPool', JSON.stringify(pool.slice(-5)));
+        const _recentRecv   = _getRecvPool().map(l => `"${l}"`).join(', ');
+        const _noRepeatHint = _recentRecv
+          ? `\nDo not reuse or echo these recent lines: ${_recentRecv}. Vary phrasing and angle completely.`
+          : '';
+
         const _itemDesc = pd.desc || pd.tip || delivery.name;
         const _priceHint = pd.price > 500 ? ' She spent real money on this.' : '';
         const _deliveryUserContent = `[She sent something. It just arrived — 「${delivery.name}」.
@@ -552,7 +576,7 @@ What makes it land:
 - The restraint makes the reaction heavier, not emptier. "got it. thanks." is empty. "you sent Earl Grey. bold choice." has weight.
 - He can be amused, surprised, unimpressed, curious, or quietly affected. Not always the same.
 
-One or two lines. English only. Lowercase. No sweet talk. But not hollow either.]`;
+One or two lines. English only. Lowercase. No sweet talk. But not hollow either.${_noRepeatHint}]`;
 
         let reply = '';
         if (pd.isLuxury) {
@@ -572,11 +596,27 @@ One or two lines. English only. Lowercase. No sweet talk. But not hollow either.
           // 普通签收 → D
           reply = await callDeepSeek(buildDeliverySystem() + '\n\n' + _deliveryUserContent, 120);
         }
+
+        // 主模型空/破防 → 降级 Haiku 再试一次（对标外卖双模型链，救回大部分"不说话"）
+        if (!reply || _isDeliveryBreakout(reply)) {
+          try {
+            const _line = await callHaiku(
+              buildDeliverySystem(),
+              [...chatHistory.filter(m => !m._system).slice(-8), { role: 'user', content: _deliveryUserContent }]
+            );
+            if (_line && !_isDeliveryBreakout(_line)) reply = _line.trim();
+          } catch(e) {}
+        }
+
         if (reply && !_isDeliveryBreakout(reply)) {
           appendMessage('bot', reply);
           chatHistory.push({ role: 'assistant', content: reply });
           _safeDeliverySaveHistory();
+          // 存进防复读池
+          const _pool = _getRecvPool(); _pool.push(reply); _saveRecvPool(_pool);
         }
+        // 双模型都失败 → 不硬发兜底台词（B方案）。
+        // 系统记忆已在调模型前注入（上方 _delivery 系统消息），Ghost 下轮自然对话里会认。
       } catch(e) {}
     }, replyDelay);
 

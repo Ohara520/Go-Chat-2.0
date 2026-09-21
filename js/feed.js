@@ -18,7 +18,7 @@ function switchCoupleTab(tab) {
 function buildSharedMemories() {
   const stories = JSON.parse(localStorage.getItem('storyBook') || '[]');
   const deliveries = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
-  const feeds = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+  const feeds = (typeof getFeedPosts === 'function' ? getFeedPosts() : []);
 
   const memories = [];
 
@@ -49,15 +49,15 @@ function buildSharedMemories() {
   });
 
   // 有分量的朋友圈 → light（只取冷战/和好/大事件类型）
-  feeds.filter(h => h.post?.sourceEvent && ['cold_war_started','made_up','gift_received','bought_big_item'].includes(h.post.sourceEvent))
-    .slice(0, 8).forEach(h => {
+  feeds.filter(p => p.sourceEvent && ['cold_war_started','made_up','gift_received','bought_big_item'].includes(p.sourceEvent))
+    .slice(0, 8).forEach(p => {
     memories.push({
-      id: 'feed_' + h.date + '_' + (h.post?.en || '').slice(0, 10),
+      id: 'feed_' + (p.id || p.ts) + '_' + (p.en || '').slice(0, 10),
       type: 'feed', tier: 'light',
-      title: h.post?.en || '',
-      sub: h.post?.zh || '',
-      timestamp: h.post?.sourceEvent ? Date.parse(h.date) : 0,
-      date: h.date,
+      title: p.en || '',
+      sub: p.zh || '',
+      timestamp: p.ts || 0,
+      date: p.ts ? new Date(p.ts).toISOString().slice(0, 10) : '',
       badge: '情绪 · 那一刻'
     });
   });
@@ -183,17 +183,17 @@ function checkFeedBadge() {
 
   // 有 flag，但检查是否真的有新内容（最近帖子时间 > 上次查看时间）
   const lastViewed = parseInt(localStorage.getItem('feedLastViewedAt') || '0');
-  const history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+  const posts = (typeof getFeedPosts === 'function' ? getFeedPosts() : []);
 
   if (lastViewed === 0) {
-    // 从没看过 → 只有 feedHasNew 是本次会话内由 Ghost 发帖触发的才显示
+    // 从没看过 → 只有 feedHasNew 是本次会话内由发帖触发的才显示
     // 否则历史帖子不应触发红点（防止换设备/清缓存后假红点）
     localStorage.removeItem('feedHasNew');
     badge.style.display = 'none';
     return;
   }
   // 修复：加1秒容错，防止用户刚看完时间戳跟帖子时间完全相同导致假红点
-  const hasNewerPost = history.some(h => (h.post?.time || 0) > lastViewed + 1000);
+  const hasNewerPost = posts.some(p => (p.ts || 0) > lastViewed + 1000);
   if (hasNewerPost) {
     badge.style.display = 'block';
   } else {
@@ -216,35 +216,92 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ===== 情侣空间 =====
-const COUPLE_POSTS = [
-  // Soap的评论（60%概率）
-  { author: 'Soap', emoji: '🪖', nameClass: 'soap', weight: 60, posts: [
-    { en: "Ghost actually smiles now. Terrifying.", zh: "Ghost现在真的会笑了，很吓人。" },
-    { en: "Never thought I'd see him this soft. Respect.", zh: "没想到能看到他这么温柔。敬佩。" },
-    { en: "He checks his phone more than his rifle now.", zh: "他看手机比看步枪还勤了。" },
-    { en: "Whatever she said, it worked. He's almost bearable.", zh: "不管她说了什么，都起效了，他现在几乎能忍了。" },
-    { en: "Caught him humming. Won't say what song.", zh: "听到他在哼歌，不说是什么歌。" },
-  ]},
-  // Ghost自己发（40%）
-  { author: 'Ghost', emoji: '👻', nameClass: 'ghost', weight: 40, posts: [
-    { en: "Still here.", zh: "还在。" },
-    { en: "Long day. Worth it.", zh: "漫长的一天，值得。" },
-    { en: "Quieter when she's not online.", zh: "她不在线的时候安静多了。" },
-    { en: "Time zones are the enemy.", zh: "时区才是敌人。" },
-    { en: "Hereford at dawn. Not bad.", zh: "赫里福德的黎明，还不错。" },
-  ]},
-  // Gaz（30%）
-  { author: 'Gaz', emoji: '🎖️', nameClass: 'gaz', weight: 30, posts: [
-    { en: "He's less terrifying when he's got someone.", zh: "有了人之后，他没那么可怕了。" },
-    { en: "She must be something else to put up with him.", zh: "能受得了他，她肯定不一般。" },
-    { en: "Ghost said 'please' today. First time in years.", zh: "Ghost今天说了'请'，这几年头一次。" },
-  ]},
-  // Price（5%）
-  { author: 'Price', emoji: '🚬', nameClass: 'price', weight: 5, posts: [
-    { en: "Good man.", zh: "好小子。" },
-    { en: "She keeps him grounded. That matters.", zh: "她让他踏实了，这很重要。" },
-  ]},
-];
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 朋友圈重做：多角色社交 + 照片池（数据 key = feedPosts）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// NPC 名册。发帖权重（ambient 抽谁发）+ 评论概率（每条帖对每人独立掷骰）。
+// Ghost 头像走 ghostAvatarUrl（跟聊天同步）；其他人静态 emoji/文件占位，用户可替换。
+const FEED_ACTORS = {
+  ghost: { key: 'ghost', displayName: () => localStorage.getItem('botNickname') || 'Simon Riley', emoji: '👻', nameClass: 'couple-ghost-name', postWeight: 5,  commentChance: 0.6  },
+  soap:  { key: 'soap',  displayName: () => 'Soap',  emoji: '🧼',  avatar: 'images/soap-avatar.jpg',  nameClass: 'couple-soap-name',  postWeight: 3,  commentChance: 0.45 },
+  gaz:   { key: 'gaz',   displayName: () => 'Gaz',   emoji: '🎖️', avatar: 'images/gaz-avatar.jpg',   nameClass: 'couple-gaz-name',   postWeight: 2,  commentChance: 0.35 },
+  price: { key: 'price', displayName: () => 'Price', emoji: '🚬',  avatar: 'images/price-avatar.jpg', nameClass: 'couple-price-name', postWeight: 1,  commentChance: 0.15 },
+};
+
+// Ghost 头像 HTML（永远读最新 ghostAvatarUrl）
+function _ghostAvatarHTML() {
+  const url = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
+  return `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+}
+// 取某作者的头像渲染内容（Ghost=图，NPC=emoji，user=用户头像）
+function feedActorAvatar(authorKey) {
+  if (authorKey === 'ghost') return _ghostAvatarHTML();
+  if (authorKey === 'user') {
+    const a = localStorage.getItem('userAvatarBase64');
+    return a ? `<img src="${a}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+             : (localStorage.getItem('userName') || '我').charAt(0);
+  }
+  const actor = FEED_ACTORS[authorKey];
+  if (actor?.avatar) {
+    // 有头像文件就用图；文件缺失时 onerror 回退到 emoji，不留裂图
+    const fallback = (actor.emoji || '👤').replace(/'/g, "\\'");
+    return `<img src="${actor.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='${fallback}'">`;
+  }
+  return actor?.emoji || '👤';
+}
+function feedActorName(authorKey) {
+  if (authorKey === 'user') return localStorage.getItem('userName') || '你';
+  return FEED_ACTORS[authorKey]?.displayName() || authorKey;
+}
+function feedActorNameClass(authorKey) {
+  return FEED_ACTORS[authorKey]?.nameClass || '';
+}
+
+// ----- 数据层：feedPosts（数组，新的在前）-----
+function getFeedPosts() {
+  try { return JSON.parse(localStorage.getItem('feedPosts') || '[]'); }
+  catch(e) { return []; }
+}
+function saveFeedPosts(list) {
+  localStorage.setItem('feedPosts', JSON.stringify(list.slice(0, 60)));
+  // persona.js 读 coupleFeedSummary 进 Ghost 聊天 prompt——保住
+  const summary = list.slice(0, 3)
+    .map(p => `[${new Date(p.ts).toISOString().slice(0,10)}] ${feedActorName(p.author)}: ${p.en}`)
+    .join('\n');
+  localStorage.setItem('coupleFeedSummary', summary);
+}
+
+// ----- 照片池：从 FEED_PHOTO_POOL 里按作者取图（带 recent 去重）-----
+function pickPhotoForAuthor(authorKey) {
+  const pool = (typeof FEED_PHOTO_POOL !== 'undefined' ? FEED_PHOTO_POOL : (window.FEED_PHOTO_POOL || []));
+  if (!pool.length) return null;
+  const eligible = pool.filter(p => p.owner === authorKey || p.owner === 'any');
+  if (!eligible.length) return null;
+  const recent = JSON.parse(localStorage.getItem('feedPhotoRecent') || '[]');
+  let candidates = eligible.filter(p => !recent.includes(p.file));
+  if (!candidates.length) candidates = eligible; // 都用过了就放开
+  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+  const newRecent = [chosen.file, ...recent].slice(0, 12);
+  localStorage.setItem('feedPhotoRecent', JSON.stringify(newRecent));
+  return { src: chosen.file, caption: chosen.caption };
+}
+
+// ----- 相册：聊天里传过的真照片（存在 IndexedDB，chatHistory 里带 _photoIdbKey）-----
+// 返回 [{ idbKey, idbIndex, thumb }]，thumb 仅用于选图预览（本次会话内存里的 base64）
+function getAlbumPhotos() {
+  const out = [];
+  const hist = (typeof chatHistory !== 'undefined' ? chatHistory : []);
+  for (const m of hist) {
+    if (m.role !== 'user') continue;
+    if (!m._photoIdbKey) continue;
+    const inMem = Array.isArray(m._photoBase64) ? m._photoBase64 : null;
+    const count = inMem ? inMem.length : 1;
+    for (let i = 0; i < count; i++) {
+      out.push({ idbKey: m._photoIdbKey, idbIndex: i, thumb: inMem ? inMem[i] : null });
+    }
+  }
+  return out.reverse(); // 最近发的排前面
+}
 
 function initCoupleSpace() {
   // ── 清除"有动态"红点 + 记录查看时间 ──
@@ -318,6 +375,9 @@ function initCoupleSpace() {
   const mentionZhEl = document.getElementById('coupleUserMentionZh');
   if (mentionZhEl) mentionZhEl.textContent = `@${userName}`;
 
+  // 发圈入口（用户自定义发朋友圈）
+  ensureFeedComposeButton();
+
   // 花瓣动画
   spawnCouplePetals();
 
@@ -326,179 +386,52 @@ function initCoupleSpace() {
   setTimeout(() => maybeTriggerFeedPost('open_couple_space'), 800);
 }
 
-async function generateCoupleFeed() {
-  const feed = document.getElementById('couplePostsFeed');
-  if (!feed) return;
-
-  // 修复：补充缺失的变量声明（原来只在 generateFeedPostFromEvent 里定义）
-  const location = localStorage.getItem('currentLocation') || 'Hereford Base';
-  const weather  = localStorage.getItem('lastWeatherDisplay') || '';
-  const mood     = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
-
-  // 今天已生成过就直接渲染
-  const today = new Date().toISOString().slice(0, 10); // ISO 格式，和 insertFeedPost 一致
-  const cachedDate = localStorage.getItem('coupleFeedDate');
-  if (cachedDate === today) {
-    const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    const todayPosts = all.filter(p => p.date === today);
-    renderCoupleFeed(todayPosts.map(p => p.post));
-    return;
-  }
-
-  // 冷战状态传入氛围
-  const isColdWar = localStorage.getItem('coldWarMode') === 'true';
-  const toneHint = isColdWar ? '当前Ghost和老婆处于冷战状态，Ghost朋友圈可以带点情绪，但不要太明显。' : '';
-  const count = Math.floor(Math.random() * 3) + 2; // 每天随机2-4条
-
-  feed.innerHTML = '<div class="couple-loading">加载中...</div>';
-
-  try {
-    const prompt = `你是一个角色扮演生成器。生成今天141特遣队成员的朋友圈动态，共${count}条。
-
-背景信息：
-- Ghost当前位置：${location}
-- 天气：${weather}
-- Ghost心情：${mood}
-${toneHint ? `- ${toneHint}` : ''}
-
-角色人设：
-- Ghost（西蒙·莱利）：话不多但不是完全沉默，朋友圈偶尔轻松，可以有点班味（抱怨训练/任务/队友烦人），偶尔吐槽，偶尔意外撒娇一句，全小写英文，语气干燥但不冷漠
-- Soap（约翰·麦克塔维什）：活泼，爱调侃Ghost，偶尔苏格兰口音，英文
-- Gaz（凯尔·加里克）：稳重幽默，不瞎起哄，英文
-- Price（约翰·普莱斯）：话最少，说了就是重要的，英文
-
-要求：
-1. 每条帖子由Ghost或队友发布（Ghost概率40%，Soap 30%，Gaz 20%，Price 10%）
-2. 每条帖子必须有1-3条评论，评论者随机从其他队友中选（发帖人不能评论自己），Ghost评论概率30%
-3. 内容自然，结合位置和天气，符合军人日常
-4. 不要OOC，不要提任务细节
-
-只返回JSON，不要任何其他文字：
-[
-  {
-    "author": "Ghost",
-    "emoji": "👻",
-    "nameClass": "ghost",
-    "time": "2小时前",
-    "en": "英文内容",
-    "zh": "中文翻译",
-    "likes": 23,
-    "comments": [
-      { "author": "Soap", "nameClass": "soap", "text": "评论内容" }
-    ]
-  }
-]`;
-
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await res.json();
-    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
-    const posts = JSON.parse(raw);
-
-    // 存进30天历史记录
-    let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    posts.forEach(p => history.push({ date: today, post: { ...p, time: Date.now() } }));
-    // 只保留最近30天（用时间戳比较）
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 3600 * 1000;
-    history = history.filter(p => {
-      const t = Date.parse(p.date) || (p.post?.time || 0);
-      return t > thirtyDaysAgo || isNaN(t);
-    });
-    localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
-
-    // 同步一份简洁摘要进prompt用（只保留最近3条，省token）
-    const summary = history.slice(-3).map(p => `[${p.date}] ${p.post.author}: ${p.post.en}`).join('\n');
-    localStorage.setItem('coupleFeedSummary', summary);
-    localStorage.setItem('coupleFeedDate', today); // 今天已生成，防重复
-  } catch(e) {
-    feed.innerHTML = '<div class="couple-empty">暂无动态</div>';
-  }
-}
-
+// ----- 渲染 feed（新 flat 结构，支持配图 + 一串评论/回复）-----
 function renderCoupleFeed(posts) {
   const feed = document.getElementById('couplePostsFeed');
   if (!feed) return;
   feed.innerHTML = '';
   if (!posts || posts.length === 0) {
-    feed.innerHTML = '<div class="couple-empty">今天还没有动态</div>';
+    feed.innerHTML = '<div class="couple-empty">还没有动态</div>';
     return;
   }
 
-  const _ghostAv = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
-  const GHOST_AVATAR_HTML = `<img src="${_ghostAv}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-  const emojiMap = { Ghost: GHOST_AVATAR_HTML, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
-  const nameClassMap = { Ghost: 'couple-ghost-name', Soap: 'couple-soap-name', Gaz: 'couple-gaz-name', Price: 'couple-price-name' };
-  const _ghostNickname = localStorage.getItem('botNickname') || '';
+  posts.forEach(post => {
+    if (!post || !post.en) return;
+    const authorKey = post.author || 'ghost';
+    const postAvatarHTML = feedActorAvatar(authorKey);
+    const nameClass = feedActorNameClass(authorKey);
+    const displayName = feedActorName(authorKey);
 
-  posts.forEach((item, idx) => {
-    // Ghost 帖子：永远用当前头像（不用存的旧头像）
-    const _isGhostPost = item.author === 'Ghost'
-      || item.nameClass === 'ghost'
-      || item.nameClass === 'couple-ghost-name'
-      || (_ghostNickname && item.author === _ghostNickname);
-
-    const savedAvatar = localStorage.getItem('userAvatarBase64');
-    const getAvatarHTML = (a) => {
-      if (_isGhostPost) return GHOST_AVATAR_HTML; // Ghost 永远用最新头像
-      if (!a || a === '👤') return emojiMap[item.author] || '👤';
-      if (a === 'IMG') return savedAvatar
-        ? `<img src="${savedAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
-        : (localStorage.getItem('userName') || '我').charAt(0);
-      if (a.startsWith('<img')) return a;
-      return a; // emoji
-    };
-    const postAvatarHTML = _isGhostPost ? GHOST_AVATAR_HTML : (item.avatar ? getAvatarHTML(item.avatar) : (emojiMap[item.author] || '👤'));
-    const commentsHTML = (item.comments || []).map((c, ci) => {
-      const commentId = `comment_${idx}_${ci}`;
-      const zhText = c.zh || '';
-      // 有存储的中文就直接用，没有就用 Gemini 异步翻译并存回历史
-      if (!zhText && c.text) {
-        setTimeout(async () => {
-          const el = document.getElementById(commentId);
-          if (!el || el.dataset.translated === '1') return; // 已翻译过，跳过
-          try {
-            const translated = await fetchDeepSeek('只返回中文翻译，不要其他内容。', c.text, 40);
-            if (translated?.trim()) {
-              el.textContent = translated.trim();
-              el.dataset.translated = '1';
-              // 存回历史数据，下次不再请求
-              c.zh = translated.trim();
-              try {
-                const _hist = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-                localStorage.setItem('coupleFeedHistory', JSON.stringify(_hist));
-              } catch(e) {}
-            }
-          } catch(e) {}
-        }, 200 + ci * 100);
+    // 配图占位：池图直接 src；相册图先占位，稍后按 idbKey 异步填充
+    let photoHTML = '';
+    if (post.photo) {
+      if (post.photo.src) {
+        photoHTML = `<div class="couple-post-photo"><img src="${post.photo.src}" loading="lazy" alt=""></div>`;
+      } else if (post.photo.idbKey) {
+        const phId = `feedimg_${post.id}`;
+        photoHTML = `<div class="couple-post-photo"><img id="${phId}" data-idb="${post.photo.idbKey}" data-idx="${post.photo.idbIndex || 0}" loading="lazy" alt=""></div>`;
       }
+    }
+
+    // 评论/回复串
+    const commentsHTML = (post.comments || []).map(c => {
+      const cKey = c.author || 'ghost';
+      const replyLine = c.replyTo ? `<div class="couple-reply-to">↩ 回复 <span class="${feedActorNameClass(c.replyTo)}">${feedActorName(c.replyTo)}</span></div>` : '';
+      const nameLine = c.replyTo ? '' : `<div class="couple-comment-name ${feedActorNameClass(cKey)}">${feedActorName(cKey)}</div>`;
       return `
         <div class="couple-comment">
-          <div class="couple-avatar couple-avatar-sm">${emojiMap[c.author] || '👤'}</div>
+          <div class="couple-avatar couple-avatar-sm">${feedActorAvatar(cKey)}</div>
           <div class="couple-comment-body">
-            <div class="couple-comment-name ${nameClassMap[c.author] || ''}">${c.author}</div>
-            <div class="couple-comment-en">${c.text}</div>
-            <div class="couple-comment-zh" id="${commentId}" style="font-size:11px;color:#b09cc8;margin-top:2px;">${zhText}</div>
+            ${replyLine}${nameLine}
+            <div class="couple-comment-en">${c.en || ''}</div>
+            ${c.zh ? `<div class="couple-comment-zh">${c.zh}</div>` : ''}
           </div>
-        </div>
-      `;
+        </div>`;
     }).join('');
 
-    // 稳定 key：基于作者+内容+时间，不随数组位置变化
-    const _likeId = (item.author || '') + '_' + (item.en || '').slice(0, 20).replace(/[^a-zA-Z0-9]/g, '') + '_' + (item.time || idx);
-    const postKey = 'like_' + _likeId;
-    const isLiked = localStorage.getItem(postKey) === '1';
-    const likeCountKey = 'likeC_' + _likeId;
-    if (!localStorage.getItem(likeCountKey)) {
-      localStorage.setItem(likeCountKey, String(item.likes || Math.floor(Math.random()*60+5)));
-    }
-    const likeCount = parseInt(localStorage.getItem(likeCountKey));
+    const likeCount = post.likes ?? Math.floor(Math.random() * 30 + 3);
+    const isLiked = !!post.liked;
     const likeEmoji = isLiked ? '❤️' : '🤍';
 
     const div = document.createElement('div');
@@ -507,21 +440,30 @@ function renderCoupleFeed(posts) {
       <div class="couple-post-header">
         <div class="couple-avatar">${postAvatarHTML}</div>
         <div class="couple-post-meta">
-          <div class="couple-post-name ${nameClassMap[item.author] || ''}">${item.author}</div>
-          <div class="couple-post-time">${timeAgo(item.time)}</div>
+          <div class="couple-post-name ${nameClass}">${displayName}</div>
+          <div class="couple-post-time">${timeAgo(post.ts)}</div>
         </div>
       </div>
-      <div class="couple-post-en">${item.en}</div>
-      <div class="couple-post-zh">${item.zh}</div>
+      <div class="couple-post-en">${post.en}</div>
+      ${post.zh ? `<div class="couple-post-zh">${post.zh}</div>` : ''}
+      ${photoHTML}
       ${commentsHTML ? `<div class="couple-divider"></div><div class="couple-comments">${commentsHTML}</div>` : ''}
       <div class="couple-post-footer" style="display:flex;align-items:center;gap:10px;">
-        <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}" 
-          data-key="${postKey}" data-count="${likeCount}"
+        <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}"
+          data-post-id="${post.id}" data-count="${likeCount}"
           style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
-
       </div>
     `;
     feed.appendChild(div);
+  });
+
+  // 相册图异步填充（按 idbKey 从 IndexedDB 懒加载，不存 base64 进 feedPosts）
+  feed.querySelectorAll('img[data-idb]').forEach(async img => {
+    try {
+      const list = await loadPhotosFromIDB(img.dataset.idb);
+      const idx = parseInt(img.dataset.idx || '0');
+      if (list && list[idx]) img.src = list[idx];
+    } catch(e) {}
   });
 }
 
@@ -544,8 +486,24 @@ function timeAgo(ts) {
 }
 
 function toggleCoupleLike(btn, key) {
+  // 新帖子：data-post-id → 直接改 feedPosts 里的 liked/likes
+  const postId = btn.dataset.postId;
+  if (postId) {
+    const list = getFeedPosts();
+    const post = list.find(p => String(p.id) === String(postId));
+    if (!post) return;
+    post.liked = !post.liked;
+    post.likes = Math.max(0, (post.likes || 0) + (post.liked ? 1 : -1));
+    saveFeedPosts(list);
+    btn.dataset.count = post.likes;
+    btn.classList.toggle('couple-liked', post.liked);
+    btn.innerHTML = (post.liked ? '❤️' : '🤍') + ' <span class="like-num">' + post.likes + '</span>';
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    return;
+  }
+  // 旧路径：置顶婚礼帖等用固定 storage key
   const storageKey = key || btn.dataset.key;
-  if (!storageKey) return; // 没有key直接退出，防止存undefined
+  if (!storageKey) return;
   const isLiked = localStorage.getItem(storageKey) === '1';
   let count = parseInt(btn.dataset.count || '0');
   if (isLiked) {
@@ -768,8 +726,9 @@ async function handleUserFeedRequest() {
   const GHOST_AV = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
 
   // 取历史帖子做反重复
-  const _recentPosts = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]')
-    .slice(-6).map(p => `"${p.post?.en}"`).join('\n');
+  const _recentPosts = getFeedPosts()
+    .filter(p => p.author === 'ghost')
+    .slice(0, 6).map(p => `"${p.en}"`).join('\n');
 
   try {
     const systemPrompt = `You are Simon "Ghost" Riley. She asked you to post something. You wouldn't normally, but you do it — your way. Dry, minimal, lowercase English. Return JSON only.`;
@@ -800,30 +759,20 @@ Return JSON only: {"en":"...","zh":"..."}`;
     const post = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
     if (!post?.en) return { ok: false, reply: "couldn't think of anything." };
 
-    // 生成评论
-    const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
-    let comments = [];
-    if (Math.random() < 0.7) {
-      comments = await generateFeedCommentChain(
-        { author: localStorage.getItem('botNickname') || 'Simon Riley', en: post.en },
-        { type: 'user_requested', actor: 'ghost' },
-        avatarMap
-      );
-    }
+    // 一次调用生成整串评论（Ghost 是发帖人，不评自己）
+    const comments = await generateFeedComments('ghost', post.en);
 
-      const entry = {
-      date: new Date().toISOString().slice(0, 10),
-      post: {
-        en: post.en, zh: post.zh,
-        avatar: GHOST_AV,
-        author: localStorage.getItem('botNickname') || 'Simon Riley',
-        name: localStorage.getItem('botNickname') || 'Simon Riley',
-        comments, time: Date.now() + 1000, // +1秒确保比 lastViewedAt 新
-        likes: Math.floor(Math.random() * 30 + 3),
-        sourceEvent: 'user_requested'
-      }
-    };
-    insertFeedPost(entry);
+    insertFeedPost({
+      id: 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      author: 'ghost',
+      en: post.en, zh: post.zh || '',
+      photo: null,
+      ts: Date.now() + 1000,
+      likes: Math.floor(Math.random() * 30 + 3),
+      liked: false,
+      comments,
+      sourceEvent: 'user_requested'
+    });
     localStorage.setItem(todayKey, '1');
     localStorage.setItem('lastFeedPostAt', String(Date.now()));
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
@@ -973,7 +922,18 @@ function shouldEventBecomePost(evt) {
   return Math.random() < 0.4;
 }
 
-// ----- 兜底日常路过 -----
+// ----- 兜底日常路过（按 postWeight 加权选发帖人）-----
+function _pickWeightedActor() {
+  const entries = Object.values(FEED_ACTORS);
+  const total = entries.reduce((s, a) => s + (a.postWeight || 0), 0);
+  let r = Math.random() * total;
+  for (const a of entries) {
+    r -= (a.postWeight || 0);
+    if (r <= 0) return a.key;
+  }
+  return 'ghost';
+}
+
 async function maybeGenerateAmbientPost(triggerSource) {
   const todayKey = 'ambientFeedCount_' + getTodayDateStr();
   const count = parseInt(localStorage.getItem(todayKey) || '0');
@@ -981,15 +941,26 @@ async function maybeGenerateAmbientPost(triggerSource) {
   const chance = triggerSource === 'open_couple_space' ? 0.2 : 0.08;
   if (Math.random() > chance) return null;
 
-  feedEvent_dailyMoment();
-  const pool = getFeedEventPool().filter(e => !e.consumed && e.dueAt <= Date.now());
-  const evt = pool.find(e => e.type === 'daily_moment');
-  if (!evt) return null;
+  // 加权选发帖人（ghost 最高、price 最低），直接造一个 daily_moment 事件
+  const actor = _pickWeightedActor();
+  const evt = {
+    id: 'amb_' + Date.now(),
+    type: 'daily_moment',
+    actor,
+    intensity: 2,
+    meta: {}
+  };
   const result = await generateFeedPostFromEvent(evt);
   if (!result) return null;
   insertFeedPost(result);
-  consumeFeedEvent(evt.id);
   localStorage.setItem(todayKey, String(count + 1));
+  localStorage.setItem('lastFeedPostAt', String(Date.now()));
+  scheduleCloudSave();
+  localStorage.setItem('feedHasNew', '1');
+  const badge = document.getElementById('feedNewBadge');
+  if (badge) badge.style.display = 'block';
+  const coupleScreen = document.getElementById('coupleScreen');
+  if (coupleScreen?.classList.contains('active')) renderCoupleFeedFromHistory();
   return result;
 }
 
@@ -998,162 +969,89 @@ async function maybeGenerateAmbientPost(triggerSource) {
 // 朋友圈评论链系统
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// 按发帖人选评论结构
-function pickCommentPattern(postAuthor) {
-  if (postAuthor === 'Ghost' || postAuthor === localStorage.getItem('botNickname')) {
-    const pool = ['soap_ghost_gaz', 'gaz_only', 'soap_only', 'price_end'];
-    return pool[Math.floor(Math.random() * pool.length)];
+// 按概率掷出本帖的评论者（发帖人自己不评自己，最多3人，可能0人）
+function _rollFeedCommenters(postAuthorKey) {
+  const picked = [];
+  for (const k of ['ghost', 'soap', 'gaz', 'price']) {
+    if (k === postAuthorKey) continue;
+    if (Math.random() < (FEED_ACTORS[k]?.commentChance || 0)) picked.push(k);
   }
-  if (postAuthor === 'Soap') {
-    const pool = ['ghost_only', 'ghost_gaz', 'price_end', 'gaz_only'];
-    return pool[Math.floor(Math.random() * pool.length)];
+  // 洗牌，避免 ghost 永远排第一
+  for (let i = picked.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [picked[i], picked[j]] = [picked[j], picked[i]];
   }
-  if (postAuthor === 'Gaz') {
-    const pool = ['soap_only', 'ghost_only', 'price_end'];
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-  // Price 发帖——其他人偶尔回
-  return Math.random() < 0.5 ? 'soap_only' : 'gaz_only';
+  return picked.slice(0, 3);
 }
 
-// 结构 → 评论者顺序
-const COMMENT_PATTERN_STEPS = {
-  soap_ghost_gaz: ['Soap', 'Ghost', 'Gaz'],
-  soap_ghost:     ['Soap', 'Ghost'],
-  soap_only:      ['Soap'],
-  ghost_only:     ['Ghost'],
-  ghost_gaz:      ['Ghost', 'Gaz'],
-  gaz_only:       ['Gaz'],
-  price_end:      ['Price'],
+const _FEED_PERSONA = {
+  ghost: 'Ghost (Simon Riley): dry, minimal, blunt, lowercase. rarely comments; when he does it lands hard. never sweet.',
+  soap:  'Soap: playful, teasing, energetic. jokes at Ghost. light scottish flavor. informal.',
+  gaz:   'Gaz: calm, observant, slightly amused. notices what others miss. one line, no drama.',
+  price: 'Price: 2-5 words max. weighted, authoritative, no fluff.',
 };
 
-// 各角色评论人设
-function buildFeedCommentPrompt(author) {
-  const common = `Write one short in-character comment in a military teammate thread.
-Rules:
-- English only
-- One line only
-- Natural, not polished
-- No emojis, no hashtags
-- React to the post or previous comment — do not repeat the post wording
-- No generic reactions like "lol" / "nice" / "wow"
-- No babe/honey/love or out-of-character sweetness`;
+const _FEED_FALLBACK = {
+  ghost: [{ en: 'noted.', zh: '知道了。' }, { en: 'enough.', zh: '够了。' }, { en: 'barely.', zh: '勉强。' }],
+  soap:  [{ en: 'there he is.', zh: '瞧瞧这位。' }, { en: "that's grim.", zh: '够呛啊。' }, { en: 'you hate fun.', zh: '你就是扫兴。' }],
+  gaz:   [{ en: 'sounds about right.', zh: '差不多就这样。' }, { en: 'figured.', zh: '猜到了。' }, { en: 'not subtle.', zh: '不太含蓄。' }],
+  price: [{ en: 'good.', zh: '很好。' }, { en: 'solid.', zh: '稳。' }, { en: 'enough.', zh: '够了。' }],
+};
 
-  const byAuthor = {
-    Ghost: `${common}
+// 一次调用生成整串评论（含可选 replyTo），失败降级为每人一句兜底
+async function generateFeedComments(postAuthorKey, postEn) {
+  const commenters = _rollFeedCommenters(postAuthorKey);
+  if (!commenters.length) return [];
 
-Ghost comment style:
-- dry, minimal, blunt
-- only replies when necessary
-- never explains himself
-- can shut down a joke with one line
-- Ghost comments are LOW FREQUENCY — if this is Ghost commenting, it should feel like a rare, deliberate move
-- Do NOT have Ghost comment unless it adds something real`,
+  const authorName = feedActorName(postAuthorKey);
+  const personaLines = commenters
+    .map((k, i) => `${i + 1}. ${feedActorName(k)} [${k}] — ${_FEED_PERSONA[k]}`)
+    .join('\n');
 
-    Soap: `${common}
+  const systemPrompt = `You generate a short Task Force 141 comment thread under a social post. Each comment has English + Chinese. Comments must react to the post and to each other, in character. No emojis, no hashtags, no pet names (babe/honey/love), no OOC sweetness. Return JSON only.`;
+  const userPrompt = `Post by ${authorName}: "${postEn}"
 
-Soap comment style:
-- playful, teasing, energetic
-- reacts fast, jokes at Ghost's expense when possible
-- genuine lad energy, not a meme bot
-- can use light Scottish flavor`,
+These teammates comment, in this order:
+${personaLines}
 
-    Gaz: `${common}
+Write one short line each. A later commenter MAY reply to an earlier one — if so, set "replyTo" to that earlier teammate's [key]; otherwise null.
+Return a JSON array only, same order and keys:
+[{"key":"${commenters[0]}","en":"...","zh":"...","replyTo":null}]`;
 
-Gaz comment style:
-- calm, observant, slightly amused
-- notices what others miss
-- not loud, drops one line then goes quiet`,
-
-    Price: `${common}
-
-Price comment style:
-- 2–5 words max
-- weighted, no fluff
-- rare, but when he speaks it means something`,
-  };
-
-  return byAuthor[author] || common;
-}
-
-// 兜底评论
-function getFallbackComment(author) {
-  const map = {
-    Ghost: ['barely.', 'noted.', 'enough.'],
-    Soap:  ["that's grim.", 'there he is.', 'you hate fun.'],
-    Gaz:   ['sounds about right.', 'not subtle.', 'figured.'],
-    Price: ['good.', 'enough.', 'solid.'],
-  };
-  const opts = map[author] || ['right.'];
-  return opts[Math.floor(Math.random() * opts.length)];
-}
-
-// 链式生成评论（每条评论能看到前面的评论）
-async function generateFeedCommentChain(post, evt, avatarMap) {
-  // Ghost 评论严格限频——30% 才让 Ghost 参与评论
-  const postAuthor = (post.author || '').toLowerCase();
-  let pattern = pickCommentPattern(post.author);
-
-  // Ghost 是发帖人时，Ghost 不能同时是评论者
-  // Ghost 作为评论者：只有 30% 概率真的让他出现
-  const stepsRaw = COMMENT_PATTERN_STEPS[pattern] || ['Gaz'];
-  const steps = stepsRaw.filter(author => {
-    if (author === 'Ghost' && postAuthor === 'ghost') return false;
-    if (author === 'Ghost' && Math.random() > 0.3) return false; // Ghost 评论低频
-    return true;
-  });
-
-  if (steps.length === 0) return [];
-
-  const comments = [];
-
-  for (const author of steps) {
-    // 最多3条
-    if (comments.length >= 3) break;
-
-    const previousStr = comments.map(c => `${c.author}: ${c.text}`).join('\n');
-    const systemPrompt = buildFeedCommentPrompt(author);
-    const userPrompt = `Post by ${post.author}: "${post.en}"
-${previousStr ? `\nPrevious comments:\n${previousStr}` : ''}
-
-Write ${author}'s comment. Return JSON only: {"text":"...","zh":"..."}`;
-
-    try {
-      let raw = '';
-      if (typeof callHaiku === 'function') {
-        raw = await callHaiku(systemPrompt, [{ role: 'user', content: userPrompt }]);
-      } else {
-        const res = await fetchWithTimeout('/api/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 80, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
-        }, 6000);
-        const d = await res.json();
-        raw = d.content?.[0]?.text || '';
-      }
-      const parsed = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
-      if (parsed.text) {
-        comments.push({
-          avatar:    avatarMap[author] || '👤',
-          author,
-          name:      author,
-          text:      parsed.text,
-          en:        parsed.text,
-          zh:        parsed.zh || parsed.text,
-          nameClass: author.toLowerCase(),
-        });
-      }
-    } catch(e) {
-      const fb = getFallbackComment(author);
-      comments.push({
-        avatar: avatarMap[author] || '👤',
-        author, name: author,
-        text: fb, en: fb, zh: fb,
-        nameClass: author.toLowerCase(),
-      });
+  try {
+    let raw = '';
+    if (typeof callHaiku === 'function') {
+      raw = await callHaiku(systemPrompt, [{ role: 'user', content: userPrompt }]);
+    } else {
+      const res = await fetchWithTimeout('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 260, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+      }, 8000);
+      const d = await res.json();
+      raw = d.content?.[0]?.text || '';
     }
+    const arr = JSON.parse((raw || '').replace(/```json|```/g, '').trim());
+    if (!Array.isArray(arr)) throw new Error('not array');
+    const valid = new Set(commenters);
+    const out = arr
+      .filter(c => c && c.en && valid.has(c.key))
+      .slice(0, 3)
+      .map(c => ({
+        author: c.key,
+        en: c.en,
+        zh: c.zh || '',
+        replyTo: (c.replyTo && valid.has(c.replyTo) && c.replyTo !== c.key) ? c.replyTo : undefined
+      }));
+    return out.length ? out : commenters.map(k => {
+      const o = _FEED_FALLBACK[k]; const p = o[Math.floor(Math.random() * o.length)];
+      return { author: k, en: p.en, zh: p.zh };
+    });
+  } catch(e) {
+    return commenters.map(k => {
+      const o = _FEED_FALLBACK[k]; const p = o[Math.floor(Math.random() * o.length)];
+      return { author: k, en: p.en, zh: p.zh };
+    });
   }
-
-  return comments;
 }
 
 
@@ -1222,11 +1120,10 @@ He feels like: someone who rarely posts, but when he does, it comes from a real 
   // ── 按事件类型拼 prompt ─────────────────────────────
   const buildGhostDailyPrompt = () => {
     // 去重：取最近6条 Ghost 帖子
-    const feedHistory = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-    const recentGhostPosts = feedHistory
-      .filter(p => p.post?.author === 'Ghost' || p.post?.author === posterMap.ghost.name)
-      .slice(-6)
-      .map(p => `"${p.post.en}"`)
+    const recentGhostPosts = getFeedPosts()
+      .filter(p => p.author === 'ghost')
+      .slice(0, 6)
+      .map(p => `"${p.en}"`)
       .join('\n');
 
     // 随机选一个角度，避免连续同角度（排除最近2个）
@@ -1297,10 +1194,19 @@ Feels like: he decided it was worth saying. Nothing more.
 Return JSON only: {"en":"...","zh":"..."}`;
 
   // ── 取最近帖子用于所有角色的反重复 ──────────────
-  const _allRecentPosts = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]')
-    .slice(-8).map(p => `${p.post?.author}: "${p.post?.en}"`).join('\n');
+  const _allRecentPosts = getFeedPosts()
+    .slice(0, 8).map(p => `${feedActorName(p.author)}: "${p.en}"`).join('\n');
   const _antiRepeat = _allRecentPosts
     ? `\n\nDo NOT reuse wording, structure, or angle from these recent posts:\n${_allRecentPosts}`
+    : '';
+
+  // ── 配图：约 35% 概率给这条帖子配一张池图，让文案贴着图写 ──
+  let _attachedPhoto = null;
+  if (evt.type === 'daily_moment' && Math.random() < 0.35) {
+    _attachedPhoto = pickPhotoForAuthor(evt.actor || 'ghost');
+  }
+  const _photoHint = _attachedPhoto
+    ? `\n\nYou are posting THIS photo: "${_attachedPhoto.caption}". Write the post AS THE CAPTION for that exact image — it must match what's in the picture, offhand, not a description.`
     : '';
 
   const promptMap = {
@@ -1342,7 +1248,7 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
     })(),
   };
 
-  const prompt = promptMap[evt.type] || promptMap['daily_moment'];
+  const prompt = (promptMap[evt.type] || promptMap['daily_moment']) + _photoHint;
 
   try {
     const systemPrompt = evt.actor === 'ghost' || !evt.actor
@@ -1365,10 +1271,10 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
     if (!post?.en) return null;
 
     // ── 生成后去重：和最近帖子比较，太像就丢弃 ──────────
-    const _recentHistory = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+    const _recentHistory = getFeedPosts();
     const _newWords = new Set(post.en.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 3));
-    const isTooSimilar = _recentHistory.slice(-10).some(h => {
-      const oldWords = new Set((h.post?.en || '').toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 3));
+    const isTooSimilar = _recentHistory.slice(0, 10).some(h => {
+      const oldWords = new Set((h.en || '').toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 3));
       if (oldWords.size === 0 || _newWords.size === 0) return false;
       const overlap = [..._newWords].filter(w => oldWords.has(w)).length;
       const similarity = overlap / Math.min(_newWords.size, oldWords.size);
@@ -1386,76 +1292,50 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
       return null;
     }
 
-    // ── 链式评论生成 ──────────────────────────────
-    // 评论最多3条，Ghost 评论低频（30%），后面的评论能看到前面的
-    const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
-    let comments = [];
-    if (Math.random() < 0.72) {
-      comments = await generateFeedCommentChain(
-        { author: posterInfo.name, en: post.en },
-        evt,
-        avatarMap
-      );
-    }
+    // ── 一次调用生成整串评论（按概率掷参与者，发帖人不评自己）──
+    const comments = await generateFeedComments(evt.actor || 'ghost', post.en);
 
     // 记录类型冷却（检查已在上面做过了）
     localStorage.setItem(_postTypeKey, JSON.stringify({ type: evt.type, at: Date.now() }));
 
     return {
-      date: new Date().toISOString().slice(0, 10),
-      post: {
-        en: post.en, zh: post.zh,
-        avatar: posterInfo.avatar, author: posterInfo.name, name: posterInfo.name,
-        comments, time: Date.now(),
-        likes: Math.floor(Math.random() * 30 + 3),
-        sourceEvent: evt.type
-      }
+      id: 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      author: evt.actor || 'ghost',
+      en: post.en, zh: post.zh || '',
+      photo: _attachedPhoto ? { src: _attachedPhoto.src, caption: _attachedPhoto.caption } : null,
+      ts: Date.now(),
+      likes: Math.floor(Math.random() * 30 + 3),
+      liked: false,
+      comments,
+      sourceEvent: evt.type
     };
   } catch(e) { return null; }
 }
 
-// ----- 插入帖子到历史 -----
-function insertFeedPost(entry) {
-  let history = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
+// ----- 插入帖子（新 flat 结构，feedPosts key）-----
+function insertFeedPost(post) {
+  if (!post || !post.en) return;
+  if (!post.id) post.id = 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  if (!post.ts) post.ts = Date.now();
 
-  // 确保 post.time 存在且比 lastViewedAt 新（修复红点虚报）
-  if (entry.post && !entry.post.time) {
-    entry.post.time = Date.now() + 1000;
-  } else if (entry.post) {
-    const lastViewed = parseInt(localStorage.getItem('feedLastViewedAt') || '0');
-    if (entry.post.time <= lastViewed) {
-      entry.post.time = lastViewed + 1000;
-    }
-  }
+  const list = getFeedPosts();
 
-  // 去重：用户自己发的帖子跳过去重（防止被误判成重复帖子丢失）
-  // 其他帖子：同一天 + 同作者 + 内容前30字符相同 → 跳过
-  const _isUserPost = !!(entry.post?.isUserPost);
-  if (!_isUserPost) {
-    const newEn = (entry.post?.en || '').slice(0, 30);
-    const newAuthor = entry.post?.author || '';
-    const isDupe = history.some(h =>
-      h.date === entry.date &&
-      (h.post?.author || '') === newAuthor &&
-      (h.post?.en || '').slice(0, 30) === newEn
+  // 去重：同作者 + 内容前30字符相同 且在 6 小时内 → 跳过（用户帖不去重）
+  if (post.author !== 'user') {
+    const newEn = (post.en || '').slice(0, 30);
+    const isDupe = list.some(p =>
+      p.author === post.author &&
+      (p.en || '').slice(0, 30) === newEn &&
+      Date.now() - (p.ts || 0) < 6 * 3600 * 1000
     );
     if (isDupe) {
-      console.log('[feed] 跳过重复帖子:', newAuthor, newEn.slice(0, 20));
+      console.log('[feed] 跳过重复帖子:', post.author, newEn.slice(0, 20));
       return;
     }
   }
 
-  history.unshift(entry);
-  // 清理：只保留最近7天，但用户自己发的帖子永远不淘汰
-  const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
-  history = history.filter(h => {
-    if (h.post?.isUserPost) return true; // 用户帖子永不淘汰
-    const t = Date.parse(h.date) || (h.post?.time || 0);
-    return t > sevenDaysAgo || isNaN(t);
-  }).slice(0, 50); // 扩大到50条，给用户帖子留空间
-  localStorage.setItem('coupleFeedHistory', JSON.stringify(history));
-  const summary = history.slice(0, 3).map(h => `[${h.date}] ${h.post?.name || 'Ghost'}发：${h.post?.en || ''}`).join('\n');
-  localStorage.setItem('coupleFeedSummary', summary);
+  list.unshift(post);
+  saveFeedPosts(list); // saveFeedPosts 内部截断 + 写 coupleFeedSummary
 }
 
 // ----- 用户草稿弹窗 -----
@@ -1570,30 +1450,19 @@ async function publishUserDraft() {
     if (translated?.trim()) zh = translated.trim();
   } catch(e) {}
 
-  // 生成评论
-  let comments = [];
-  try {
-    const avatarMap = { Ghost: GHOST_AV, Soap: '🧼', Gaz: '🎖️', Price: '🚬' };
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 200,
-        messages: [{ role: 'user', content: `${userName}发了朋友圈："${text}"。生成2条队友评论，角色从Soap、Gaz、Ghost中选。\n\n角色人设（严格遵守）：\n- Soap：话多、爱起哄、爱调侃Ghost、兄弟情\n- Gaz：稳重、幽默但不过分、不煽情\n- Ghost：极度克制、简短冷淡\n\n绝对禁止：叫对方babe/honey/love等亲密称谓、甜腻话。\n\n格式：角色名|英文|中文。只返回评论。` }]
-      })
-    });
-    const d = await res.json();
-    comments = (d.content?.[0]?.text?.trim() || '').split('\n')
-      .filter(l => l.includes('|'))
-      .map(l => { const [name, en, zh] = l.split('|'); return { name: name?.trim(), en: en?.trim(), zh: zh?.trim() }; })
-      .filter(c => c.name && c.en)
-      .map(c => ({ avatar: avatarMap[c.name] || '👤', author: c.name, name: c.name, en: c.en, zh: c.zh, text: c.en }));
-  } catch(e) {}
+  // 一次调用生成整串评论（用户发帖，角色按概率来评）
+  const comments = await generateFeedComments('user', text);
 
-  const entry = {
-    date: new Date().toISOString().slice(0, 10),
-    post: { en: text, zh, avatar: userAvatar, author: userName, name: userName, comments, time: Date.now(), likes: 1, isUserPost: true }
-  };
-  insertFeedPost(entry);
+  insertFeedPost({
+    id: 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    author: 'user',
+    en: text, zh,
+    photo: null,
+    ts: Date.now(),
+    likes: 1,
+    liked: false,
+    comments
+  });
   // 修复：用户自己发帖不触发红点，同时更新lastViewedAt避免假红点
   // 用户刚发完帖子还在朋友圈页面，不需要提示"有新动态"
   localStorage.setItem('feedLastViewedAt', String(Date.now()));
@@ -1607,16 +1476,153 @@ async function publishUserDraft() {
 
 // ----- 只渲染历史（不重新生成） -----
 function renderCoupleFeedFromHistory() {
-  const all = JSON.parse(localStorage.getItem('coupleFeedHistory') || '[]');
-  // 用户自己的帖子永远排在最前面，其他按时间倒序
-  const sorted = [
-    ...all.filter(h => h.post?.isUserPost),
-    ...all.filter(h => !h.post?.isUserPost)
-  ];
-  renderCoupleFeed(sorted.map(h => h.post));
+  const all = getFeedPosts().slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  renderCoupleFeed(all);
 }
 
-// ===== 阴阳帖系统 =====
+// ===================================================================
+// ===== 用户发圈：入口按钮 + 撰写弹窗（相册选图 / 纯文字，每日3条）=====
+// ===================================================================
+
+function _feedUserQuotaKey() {
+  const day = (typeof getTodayDateStr === 'function' ? getTodayDateStr() : new Date().toISOString().slice(0, 10));
+  return 'organicFeedCount_' + day;
+}
+function _feedUserQuotaLeft() {
+  return 3 - parseInt(localStorage.getItem(_feedUserQuotaKey()) || '0');
+}
+
+// 在动态区顶部注入"发朋友圈"按钮（只注入一次）
+function ensureFeedComposeButton() {
+  const feed = document.getElementById('couplePostsFeed');
+  if (!feed || document.getElementById('feedComposeBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'feedComposeBtn';
+  btn.className = 'feed-compose-btn';
+  btn.textContent = '＋ 发朋友圈';
+  btn.onclick = openFeedCompose;
+  feed.parentNode.insertBefore(btn, feed);
+}
+
+let _feedComposePhoto = null; // { idbKey, idbIndex, thumb }
+
+async function openFeedCompose() {
+  if (_feedUserQuotaLeft() <= 0) {
+    if (typeof showToast === 'function') showToast('今天发得够多啦，明天再来');
+    return;
+  }
+  document.getElementById('feedComposeModal')?.remove();
+  _feedComposePhoto = null;
+
+  const modal = document.createElement('div');
+  modal.id = 'feedComposeModal';
+  modal.className = 'feed-compose-modal';
+  modal.innerHTML = `
+    <div class="feed-compose-sheet">
+      <div class="feed-compose-head">
+        <span>发朋友圈</span>
+        <span class="feed-compose-quota">今天还能发 ${_feedUserQuotaLeft()} 条</span>
+      </div>
+      <textarea id="feedComposeText" class="feed-compose-text" placeholder="这一刻的想法…" maxlength="200"></textarea>
+      <div id="feedComposePhotoRow" class="feed-compose-photo-row"></div>
+      <div class="feed-compose-actions">
+        <button id="feedComposePickBtn" class="feed-compose-pick">从相册选图</button>
+        <div style="flex:1"></div>
+        <button id="feedComposeCancel" class="feed-compose-cancel">取消</button>
+        <button id="feedComposeSend" class="feed-compose-send">发布</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.getElementById('feedComposeCancel').onclick = () => modal.remove();
+  document.getElementById('feedComposePickBtn').onclick = openFeedAlbumPicker;
+  document.getElementById('feedComposeSend').onclick = submitFeedCompose;
+}
+
+async function openFeedAlbumPicker() {
+  const photos = (typeof getAlbumPhotos === 'function') ? getAlbumPhotos() : [];
+  const row = document.getElementById('feedComposePhotoRow');
+  if (!row) return;
+  if (!photos.length) {
+    row.innerHTML = '<div class="feed-compose-empty">相册还没有照片（聊天里发过的照片会出现在这里）</div>';
+    return;
+  }
+  row.innerHTML = photos.slice(0, 24).map((p, i) =>
+    `<div class="feed-compose-thumb" data-i="${i}"><img data-idb="${p.idbKey}" data-idx="${p.idbIndex}" loading="lazy" alt=""></div>`
+  ).join('');
+
+  // 懒加载缩略图 + 点击选择
+  row.querySelectorAll('img[data-idb]').forEach(async img => {
+    try {
+      const list = await loadPhotosFromIDB(img.dataset.idb);
+      const idx = parseInt(img.dataset.idx || '0');
+      if (list && list[idx]) img.src = list[idx];
+    } catch(e) {}
+  });
+  row.querySelectorAll('.feed-compose-thumb').forEach(el => {
+    el.onclick = () => {
+      const i = parseInt(el.dataset.i);
+      const p = photos[i];
+      _feedComposePhoto = { idbKey: p.idbKey, idbIndex: p.idbIndex };
+      row.querySelectorAll('.feed-compose-thumb').forEach(t => t.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+  });
+}
+
+async function submitFeedCompose() {
+  const ta = document.getElementById('feedComposeText');
+  const text = (ta?.value || '').trim();
+  if (!text && !_feedComposePhoto) {
+    if (typeof showToast === 'function') showToast('写点什么，或选张图');
+    return;
+  }
+  if (_feedUserQuotaLeft() <= 0) {
+    if (typeof showToast === 'function') showToast('今天的额度用完啦');
+    document.getElementById('feedComposeModal')?.remove();
+    return;
+  }
+
+  const sendBtn = document.getElementById('feedComposeSend');
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '发布中…'; }
+
+  // 翻译（有中文正文才翻）
+  let zh = '';
+  if (text) {
+    try {
+      const t = await fetchDeepSeek('Translate to natural English, return only the translation.', text, 80);
+      if (t?.trim()) zh = t.trim();
+    } catch(e) {}
+  }
+  // 用户发的是中文，把中文放 zh，英文放 en（渲染时 en 在上、zh 在下——保持双语版式）
+  const en = zh || text;
+  const zhLine = zh ? text : '';
+
+  const comments = await generateFeedComments('user', en);
+
+  insertFeedPost({
+    id: 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    author: 'user',
+    en, zh: zhLine,
+    photo: _feedComposePhoto ? { idbKey: _feedComposePhoto.idbKey, idbIndex: _feedComposePhoto.idbIndex } : null,
+    ts: Date.now(),
+    likes: 1,
+    liked: false,
+    comments
+  });
+
+  // 扣额度
+  const k = _feedUserQuotaKey();
+  localStorage.setItem(k, String(parseInt(localStorage.getItem(k) || '0') + 1));
+  localStorage.setItem('feedLastViewedAt', String(Date.now()));
+  localStorage.removeItem('feedHasNew');
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+
+  document.getElementById('feedComposeModal')?.remove();
+  if (typeof showToast === 'function') showToast('✨ 已发布到动态');
+  renderCoupleFeedFromHistory();
+}
 
 // ===== 花瓣动画 =====
 function spawnCouplePetals() {

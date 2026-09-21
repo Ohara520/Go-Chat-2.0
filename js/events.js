@@ -743,6 +743,11 @@ async function checkLocationSpecialTrigger(userText) {
     const specials = LOCATION_SPECIALS?.[locationKey];
     if (!specials || specials.length === 0) return;
 
+    // ── 统一惊喜冷却：7天内已主动寄过任何东西（情绪/特产）→ 跳过 ────
+    // 修复：原版只在寄出后"写"lastAnyReverseAt，却从不"读"，导致特产反寄绕过全局冷却、太频繁。
+    const lastAnyReverse = parseInt(localStorage.getItem('lastAnyReverseAt') || '0');
+    if (Date.now() - lastAnyReverse < 7 * 24 * 3600 * 1000) return;
+
     // ── 2天冷却（同地点每2天最多触发一次）────
     const sentKey  = 'locationSpecialSent_' + locationKey;
     const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
@@ -876,6 +881,11 @@ function checkLocationSpecialAutoTrigger() {
 
     const specials = LOCATION_SPECIALS?.[locationKey];
     if (!specials || specials.length === 0) return;
+
+    // 统一惊喜冷却：7天内已主动寄过任何东西（情绪/特产）→ 跳过
+    // 修复：同 checkLocationSpecialTrigger，原版只写不读 lastAnyReverseAt，绕过了全局冷却。
+    const lastAnyReverse = parseInt(localStorage.getItem('lastAnyReverseAt') || '0');
+    if (Date.now() - lastAnyReverse < 7 * 24 * 3600 * 1000) return;
 
     // 同地点2天冷却
     const sentKey  = 'locationSpecialSent_' + locationKey;

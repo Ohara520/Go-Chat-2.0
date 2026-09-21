@@ -252,6 +252,37 @@ function getSeasonalFromHome() {
   });
 }
 
+// 入冬限定：入冬自动上架，开春自动下架（窗口 9/20–次年 3/1）。
+// cat 标明并入哪个商城分类；winterTag 触发商城「入冬限定」角标。
+const WINTER_SEASONAL = [
+  // ── 穿他身上 clothing ──
+  { cat: 'clothing', emoji: '🧶', name: '卷檐针织帽',        desc: '压到眉骨，值夜岗不冻耳朵',                 price: 52,  shipping: 25, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
+  { cat: 'clothing', emoji: '🧣', name: '抓绒战术脖套',      desc: '拉上去连脸一起挡风，他会用',               price: 42,  shipping: 25, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
+  { cat: 'clothing', emoji: '🩲', name: '美利奴保暖打底套装', desc: '贴身穿在作训服里，零下也扛得住',           price: 120, shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
+  { cat: 'clothing', emoji: '👖', name: '法兰绒家居长裤',    desc: '回营地脱下作训服，松松垮垮那条',           price: 78,  shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.warm },
+  // ── 吃喝 food（应季热饮）──
+  { cat: 'food', emoji: '🍷', name: '热红酒香料包', desc: '丁香肉桂橙皮一包，冬夜煮一锅',                     price: 58, shipping: 20, isGhostGift: true, winterTag: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
+  { cat: 'food', emoji: '🍫', name: '比利时热可可罐', desc: '浓到挂勺，值夜班冻手时冲一杯',                   price: 68, shipping: 20, isGhostGift: true, winterTag: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
+  // ── 礼物 gift ──
+  { cat: 'gift', emoji: '🫙', name: '焖烧保温饭盒',   desc: '早上装热的中午还烫嘴，别老啃冷口粮',       price: 95,  shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
+  { cat: 'gift', emoji: '🔊', name: '防摔蓝牙音箱',   desc: '营地放点动静，不至于太安静',               price: 158, shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
+  { cat: 'gift', emoji: '📸', name: '拍立得相机',     desc: '当场出照片，逼他拍一张贴储物柜',           price: 220, shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.warm },
+  // ── 家乡味 fromhome（秋冬限定）──
+  { cat: 'fromhome', emoji: '🌰', name: '糖炒栗子礼盒', desc: '现炒真空封，教他剥壳，冬天街边的味道',     price: 58, shipping: 20, isFromHome: true, winterTag: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
+];
+
+// 入冬窗口：9/20 – 次年 3/1（跨年，用 月*100+日 比较）
+function isWinterWindow() {
+  const today = new Date();
+  const md = (today.getMonth() + 1) * 100 + today.getDate();
+  return md >= 920 || md <= 301;
+}
+
+function getWinterSeasonal(categoryId) {
+  if (!isWinterWindow()) return [];
+  return categoryId ? WINTER_SEASONAL.filter(p => p.cat === categoryId) : WINTER_SEASONAL;
+}
+
 
 const LOCATION_SPECIALS = {
   'Germany': [
@@ -660,6 +691,8 @@ function renderMarket(categoryId) {
   if (isFromHome) {
     try { const seasonal = getSeasonalFromHome(); products = [...products, ...seasonal]; } catch(e) {}
   }
+  // 入冬限定：并入对应分类（顺序须与 openBuyModal 一致）
+  try { const winter = getWinterSeasonal(categoryId); if (winter.length) products = [...products, ...winter]; } catch(e) {}
   const gridEl = document.getElementById('productsGrid');
   if (!gridEl) return;
 
@@ -766,6 +799,7 @@ function renderMarket(categoryId) {
            onclick="${owned||isLocked?'':'(function(el){openBuyModal_byName(el.dataset.pname.replace(/__DQUOTE__/g,String.fromCharCode(34)),el.dataset.pcat)})(this)'}">
         ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
         ${p.festival&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(255,200,100,0.15);border-color:rgba(255,180,50,0.4);color:#b45309;">🎋 ${p.festival}限定</div>` : ''}
+        ${p.winterTag&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(140,190,230,0.16);border-color:rgba(90,150,210,0.42);color:#2563a8;">❄️ 入冬限定</div>` : ''}
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">💡 ${triggerReason}</div>` : ''}
         ${isLocked ? '<div class="ghost-mentioned-tag" style="background:#9ca3af">🔒 需先买机票</div>' : ''}
         <div class="product-emoji">${p.emoji}</div>
@@ -801,6 +835,7 @@ function openBuyModal_byName(name, categoryId) {
   const _cat = categoryId || currentCategory;
   let _list = MARKET_PRODUCTS[_cat] || [];
   if (_cat === 'fromhome') _list = [..._list, ...getSeasonalFromHome()];
+  try { const w = getWinterSeasonal(_cat); if (w.length) _list = [..._list, ...w]; } catch(e) {}
   const _idx = _list.findIndex(p => p.name === name);
   if (_idx === -1) return;
   currentCategory = _cat;
@@ -812,6 +847,7 @@ function openBuyModal(idx) {
   if (currentCategory === 'fromhome') {
     productList = [...productList, ...getSeasonalFromHome()];
   }
+  try { const w = getWinterSeasonal(currentCategory); if (w.length) productList = [...productList, ...w]; } catch(e) {}
   const p = productList[idx];
   if (!p) return;
   pendingProduct = p;

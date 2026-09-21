@@ -101,79 +101,71 @@ function recallWorldBook(userMessage, limit = 4) {
 }
 
 // ===================================================
-// UI —— 记忆世界书面板（沿用 index.html 玻璃拟态绿色风格）
+// UI：世界书管理面板
 // ===================================================
 
-function _wbEsc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 function renderWorldBook() {
-  const box = document.getElementById('worldBookList');
-  if (!box) return;
-  const arr = getWorldBookEntries();
-
-  if (arr.length === 0) {
-    box.innerHTML = `<div style="text-align:center;color:#9cc38f;font-size:13px;padding:40px 16px;line-height:1.9;">
-      还没有记忆条目<br>点上面「＋ 添加记忆」写第一条吧</div>`;
+  const list = document.getElementById('worldBookList');
+  if (!list) return;
+  const entries = getWorldBookEntries();
+  if (entries.length === 0) {
+    list.innerHTML = `<div style="text-align:center;color:#a8c8a0;font-size:13px;padding:40px 0;">还没有记忆条目<br>点上面「添加记忆」，或聊着聊着他会自己记住</div>`;
     return;
   }
-
-  // 手动的排前面，其次按创建时间倒序
-  const sorted = arr.slice().sort((a, b) =>
-    (a.source === b.source ? (b.created || 0) - (a.created || 0) : (a.source === 'manual' ? -1 : 1)));
-
-  box.innerHTML = sorted.map(e => {
-    const kw = (e.keywords || []).map(k =>
-      `<span style="display:inline-block;background:rgba(90,154,70,0.14);color:#2d6028;font-size:11px;
-        padding:2px 9px;border-radius:10px;margin:0 5px 5px 0;">${_wbEsc(k)}</span>`).join('');
+  // 手动的排前面，其次按最近命中
+  entries.sort((a, b) => {
+    if ((a.source === 'manual') !== (b.source === 'manual')) return a.source === 'manual' ? -1 : 1;
+    return (b.lastHit || 0) - (a.lastHit || 0);
+  });
+  list.innerHTML = entries.map(e => {
+    const tags = (e.keywords || []).map(k =>
+      `<span style="display:inline-block;background:rgba(90,160,70,0.12);color:#3d7a2d;font-size:11px;padding:2px 8px;border-radius:8px;margin:0 4px 4px 0;">${_wbEsc(k)}</span>`
+    ).join('');
     const badge = e.source === 'auto'
-      ? `<span style="font-size:10px;color:#a0a0a0;background:rgba(0,0,0,0.05);padding:1px 7px;border-radius:8px;">自动</span>`
-      : `<span style="font-size:10px;color:#5a9a46;background:rgba(90,154,70,0.12);padding:1px 7px;border-radius:8px;">手动</span>`;
+      ? `<span style="font-size:10px;color:#a8a8a8;">自动</span>`
+      : `<span style="font-size:10px;color:#7dba5a;">手动</span>`;
     const off = e.enabled === false;
-    return `<div style="background:rgba(255,255,255,${off ? 0.35 : 0.6});backdrop-filter:blur(14px);
-      border-radius:16px;padding:13px 15px;border:1px solid rgba(255,255,255,0.85);margin-bottom:11px;
-      opacity:${off ? 0.6 : 1};">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        ${badge}
-        <div style="flex:1;"></div>
-        <button onclick="setWorldBookEnabled('${e.id}', ${off}); renderWorldBook();"
-          style="border:none;background:none;cursor:pointer;font-size:12px;color:${off ? '#9cc38f' : '#5a9a46'};font-weight:600;">
-          ${off ? '已关闭' : '开启中'}</button>
-        <button onclick="openWorldBookEditor('${e.id}')"
-          style="border:none;background:none;cursor:pointer;font-size:12px;color:#5a8a4a;">编辑</button>
-        <button onclick="if(confirm('删除这条记忆？')){removeWorldBookEntry('${e.id}');renderWorldBook();}"
-          style="border:none;background:none;cursor:pointer;font-size:12px;color:#c76a6a;">删除</button>
+    return `<div style="background:rgba(255,255,255,0.6);backdrop-filter:blur(14px);border-radius:14px;
+      padding:12px 14px;border:1px solid rgba(255,255,255,0.85);margin-bottom:10px;${off ? 'opacity:0.5;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>${badge}</div>
+        <div style="display:flex;gap:12px;">
+          <span onclick="toggleWorldBookEntry('${e.id}')" style="font-size:12px;color:#7aaa7a;cursor:pointer;">${off ? '启用' : '停用'}</span>
+          <span onclick="openWorldBookEditor('${e.id}')" style="font-size:12px;color:#5a9a46;cursor:pointer;">编辑</span>
+          <span onclick="deleteWorldBookEntry('${e.id}')" style="font-size:12px;color:#e57373;cursor:pointer;">删除</span>
+        </div>
       </div>
-      <div style="font-size:13.5px;color:#1e3d20;line-height:1.6;margin-bottom:9px;">${_wbEsc(e.content)}</div>
-      <div>${kw}</div>
+      <div style="margin-bottom:6px;">${tags}</div>
+      <div style="font-size:13px;color:#1e3d20;line-height:1.6;">${_wbEsc(e.content)}</div>
     </div>`;
   }).join('');
 }
 
-function openWorldBookEditor(id = null) {
+function _wbEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function openWorldBookEditor(id) {
   const modal = document.getElementById('worldBookEditor');
+  if (!modal) return;
   const titleEl = document.getElementById('wbEditorTitle');
   const idEl = document.getElementById('wbEditId');
   const kwEl = document.getElementById('wbEditKeywords');
-  const contentEl = document.getElementById('wbEditContent');
-  if (!modal) return;
-
+  const cEl = document.getElementById('wbEditContent');
   if (id) {
     const e = getWorldBookEntries().find(x => x.id === id);
     if (e) {
       titleEl.textContent = '编辑记忆';
       idEl.value = e.id;
       kwEl.value = (e.keywords || []).join(', ');
-      contentEl.value = e.content || '';
+      cEl.value = e.content || '';
     }
   } else {
     titleEl.textContent = '添加记忆';
     idEl.value = '';
     kwEl.value = '';
-    contentEl.value = '';
+    cEl.value = '';
   }
   modal.style.display = 'flex';
 }
@@ -187,13 +179,25 @@ function saveWorldBookFromEditor() {
   const id = document.getElementById('wbEditId').value || null;
   const keywords = document.getElementById('wbEditKeywords').value;
   const content = document.getElementById('wbEditContent').value;
-
-  if (!content.trim()) { alert('写点记忆内容吧'); return; }
-  if (!keywords.trim()) { alert('至少写一个触发关键词'); return; }
-
+  if (!content.trim()) { if (typeof showToast === 'function') showToast('写点内容吧'); return; }
+  if (!keywords.trim()) { if (typeof showToast === 'function') showToast('至少写一个关键词'); return; }
   const saved = addWorldBookEntry({ keywords, content, source: 'manual', id });
-  if (!saved && !id) { alert('这条记忆已经存在啦'); return; }
-
+  if (!saved && !id) { if (typeof showToast === 'function') showToast('这条已经存在了'); return; }
   closeWorldBookEditor();
+  renderWorldBook();
+  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+  if (typeof showToast === 'function') showToast('已保存 📖');
+}
+
+function deleteWorldBookEntry(id) {
+  if (!confirm('删除这条记忆？')) return;
+  removeWorldBookEntry(id);
+  renderWorldBook();
+  if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
+}
+
+function toggleWorldBookEntry(id) {
+  const e = getWorldBookEntries().find(x => x.id === id);
+  if (e) setWorldBookEnabled(id, e.enabled === false);
   renderWorldBook();
 }
