@@ -381,10 +381,6 @@ function appendGhostSticker(id) {
   }
 }
 
-// ===== 转账卡片 =====
-// showUserTransferCard / updateUserTransferCard / showGhostTransferCard
-// 定义在 money.js，不在这里重复定义
-
 // ===== 历史记录重建渲染 =====
 // initChat 调用，把 localStorage 里的 chatHistory 全部重建到 DOM
 
@@ -397,12 +393,9 @@ function renderChatHistory(chatHistory) {
   chatHistory.forEach((msg, idx) => {
     // ── 用户消息 ────────────────────────────────────────────
     if (msg.role === 'user') {
-      // 系统注入消息不渲染，但转账卡片要重建
+      // 系统注入消息不渲染
       if (msg._system || msg.content.startsWith('[系统') || msg.content.startsWith('[System') ||
           /\b(REFUND|\bKEEP\b)\b/.test(msg.content)) {
-        if (msg._userTransfer) {
-          showUserTransferCard(container, msg._userTransfer.amount);
-        }
         return;
       }
 

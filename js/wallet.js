@@ -207,8 +207,6 @@ function setBalance(val) {
   // 不再直接存wallet，余额由transactions决定
   // 只更新UI显示
   const safeVal = Math.max(0, val);
-  const balEl = document.getElementById('transferBalance');
-  if (balEl) balEl.textContent = '£' + Math.floor(safeVal);
   const walletBalEl = document.getElementById('walletBalance');
   if (walletBalEl) walletBalEl.textContent = '£' + safeVal.toFixed(2);
   if (typeof touchLocalState === 'function') touchLocalState();

@@ -435,35 +435,6 @@ async function _processMergedMessage(text) {
 
   resetSilenceTimer();
 
-  // ── pendingTransfer检测：用户回答了理由，继续处理转账 ──
-  const _pendingTransferRaw = sessionStorage.getItem('pendingTransfer') || localStorage.getItem('pendingTransfer');
-  if (_pendingTransferRaw) {
-    try {
-      const _pt = JSON.parse(_pendingTransferRaw);
-      if (_pt && _pt.amount && _pt.deducted) {
-        // 超过24小时的挂起转账自动退款
-        if (_pt.at && Date.now() - _pt.at > 24 * 3600 * 1000) {
-          sessionStorage.removeItem('pendingTransfer');
-          localStorage.removeItem('pendingTransfer');
-          if (typeof addTransaction === 'function') addTransaction({ icon: '↩️', name: '退款（超时未确认）', amount: _pt.amount });
-          if (typeof renderWallet === 'function') renderWallet();
-          if (typeof showToast === 'function') showToast(`£${_pt.amount} 转账超时已退回`);
-        } else {
-          sessionStorage.removeItem('pendingTransfer');
-          localStorage.removeItem('pendingTransfer');
-          // 用户这条消息作为理由，重新走判断收/退
-          if (typeof handlePendingTransfer === 'function') {
-            await handlePendingTransfer(_pt.amount, text);
-            return;
-          }
-        }
-      }
-    } catch(e) {
-      sessionStorage.removeItem('pendingTransfer');
-      localStorage.removeItem('pendingTransfer');
-    }
-  }
-
   // ── 用户回来检测（离开超过2小时）────────────────────────
   const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
   const _comebackMins = Math.floor(_comebackGap / 60000);
