@@ -210,14 +210,6 @@ function markEventTriggered(eventType) {
   localStorage.setItem(`lastEventAt_${eventType}`, Date.now());
 }
 
-// ── 转账语气兜底文案（money case 和 catch 共用）──
-const MONEY_MOTIVE_DEFAULTS = {
-  practical:    "sort it.",
-  care:         "eat something.",
-  celebration:  "don't waste it.",
-  compensation: "take it.",
-};
-
 
 // ── emitGhostEvent 主入口 ────────────────────────
 
@@ -240,7 +232,6 @@ async function emitGhostEvent(eventType, payload = {}) {
   let line = '';
   let systemTag    = null;
   let sideEffect   = null;
-  let transferAmount = null; // 最终转账金额，用于 _transfer 记录，避免和 payload.amount 脱节
 
   switch (eventType) {
 
@@ -451,128 +442,6 @@ English only.`,
       break;
     }
 
-    case 'money': {
-      const userText       = payload.userText || '';
-      const justHadTension = !!payload.justHadTension;
-      const jealousyGift   = !!payload.isJealousyGift;
-
-      // 退款冷却期内：只说话，不转
-      // 注意：这和 isMoneyRefuseActive() 不同
-      // isMoneyRefuseActive() = 用户刷钱/拒绝态还在
-      // isPostRefundVerbalOnly = 她刚把钱退回来，Ghost 暂时只说话不再转
-      const lastRefundAt = parseInt(localStorage.getItem('lastRefundAt') || '0');
-      const isPostRefundVerbalOnly = (Date.now() - lastRefundAt) < 2 * 3600 * 1000;
-
-      if (isPostRefundVerbalOnly) {
-        try {
-          const fbLine = await callGrok(
-            buildGhostStyleCore() + `
-You were going to send money, but you do not.
-Say one short line instead.
-
-Dry. Stubborn if needed.
-Do not mention the system.
-Lowercase where natural.
-English only.
-One line only.`,
-            userText
-              ? `She said: "${userText}"\nWrite his line.`
-              : `Write his line.`,
-            80
-          );
-          if (fbLine && fbLine.trim()) {
-            line = fbLine.trim().split('\n')[0];
-            systemTag = '';
-            break;
-          }
-        } catch(e) {}
-        line = "drop it."; systemTag = ''; break;
-      }
-
-      // 吃醋转账：单独走规则
-      let motive = null;
-      if (jealousyGift) {
-        if (!canJealousyTriggerMoney()) return false;
-        motive = 'care';
-      } else {
-        const result = shouldGiveMoney(userText, {
-          justHadTension,
-          mood:  getMoodLevel(),
-          trust: getTrustHeat()
-        });
-        if (!result?.ok) {
-          if (isMoneyAsk(userText)) {
-            const pattern = getMoneyAskPattern();
-            line = await generateMoneyRefuseLine(pattern === 'none' ? 'light' : pattern);
-            systemTag = '';
-            break;
-          }
-          return false;
-        }
-        motive = result.motive;
-      }
-
-      const amount = decideMoneyAmountFromState(motive);
-      if (!amount || amount <= 0) return false;
-
-      transferAmount = amount; // 记录最终金额，统一输出时用
-      systemTag = `GIVE_MONEY:${amount}:`;
-
-      try {
-        const toneHint = jealousyGift
-          ? 'jealousy-driven — possessive, guarded, but clearly cares'
-          : {
-              practical:    'practical — brief, like he is just handling it',
-              care:         'care — understated, no softness added',
-              celebration:  'special day — restrained, not sentimental',
-              compensation: 'quiet compensation — no apology speech, no drama'
-            }[motive] || 'brief and dry';
-
-        const recentCtx = payload.context || getRecentCtx(4, 80);
-        const userContent = [
-          userText ? `She said: "${userText}"` : '',
-          recentCtx ? `Recent chat:\n${recentCtx}` : '',
-          'Write his one line.'
-        ].filter(Boolean).join('\n');
-
-        const generated = await callGrok(
-          buildGhostStyleCore() + `
-Ghost has sent her money.
-
-Amount: £${amount}
-Tone: ${toneHint}
-
-Say one short line.
-Do not explain too much.
-Do not be sweet.
-Do not be romantic.
-Do not turn it into a speech.
-Lowercase where natural.
-English only.
-One line only.`,
-          userContent,
-          80
-        );
-
-        line = (generated || '').trim().split('\n')[0] || MONEY_MOTIVE_DEFAULTS[motive] || "check it.";
-      } catch(e) {
-        line = MONEY_MOTIVE_DEFAULTS[motive] || "check it.";
-      }
-
-      sideEffect = () => {
-        applyMoneyEffect(amount, {
-          motive,                                                          // 【已接新 motive 体系】
-          label:              payload.label || (jealousyGift ? 'Ghost 吃醋转账' : 'Ghost 零花钱'),
-          note:               payload.note || '',
-          bypassWeeklyLimit:  false,
-          bypassCooldown:     jealousyGift,
-          bypassSessionLimit: jealousyGift,
-          userRequested:      payload.userRequested || false,
-        });
-      };
-      break;
-    }
-
     case 'confront': {
       try {
         const t = await callGrokWithCtx(
@@ -620,10 +489,7 @@ No explanation. English only.`,
         chatHistory.push({
           role: 'assistant',
           content: line,
-          ...(systemTag ? { _eventTag: systemTag } : {}),
-          ...(systemTag && systemTag.startsWith('GIVE_MONEY:') ? {
-            _transfer: { amount: transferAmount || 0, isRefund: false }
-          } : {})
+          ...(systemTag ? { _eventTag: systemTag } : {})
         });
         if (typeof saveHistory === 'function') saveHistory();
       }
@@ -674,17 +540,6 @@ async function handlePostReplyEvents(userText, reply, intent) {
     case 'confront':
       if (Math.random() < 0.35) await emitGhostEvent('confront');
       break;
-
-    case 'money_candidate': {
-      // 不在外层算 amount——emitGhostEvent('money') 内部会自己走
-      // shouldGiveMoney() → decideMoneyAmountFromState(motive) 的完整链路
-      await emitGhostEvent('money', {
-        userText: userText.slice(0, 80),
-        context:  getRecentCtx(4, 80),
-        note:     ''
-      });
-      break;
-    }
 
     case 'reverse_package': {
       const _pool2 = (typeof GHOST_REVERSE_POOL !== 'undefined')
