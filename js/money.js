@@ -260,64 +260,79 @@ function spendGhostCard(amount, itemName, category) {
 }
 
 function _classifySpend(amount, category, card) {
-  const state    = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
-  const jealousy = typeof getJealousyLevelCapped === 'function' ? getJealousyLevelCapped() : 'none';
-  const { moneyEase = 1, sharpness = 0, warmth = 0, availability = 'normal' } = state;
+  const state = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
+  const { moneyEase = 1 } = state;
 
   const history = JSON.parse(localStorage.getItem('ghostCardRecentSpend') || '[]');
   history.push({ amount, category, at: Date.now() });
   const last10min = history.filter(s => Date.now() - s.at < 10 * 60 * 1000);
   localStorage.setItem('ghostCardRecentSpend', JSON.stringify(history.slice(-20)));
 
-  if (last10min.length >= 3) return { reactionType: 'intervene', lineTone: 'sharp', needExplanation: true };
-
   const limit = card.monthlyLimit || getGhostCardMonthlyLimit() || 2000;
   const ratio = amount / limit;
-  const baseSensitivity = { daily: 0, self: 0.5, for_him: 0, gift: 1.5, unknown: 1 }[category] || 1;
-  let sensitivityMod = 0;
-  if (jealousy === 'medium') sensitivityMod += 1;
-  if (jealousy === 'severe') sensitivityMod += 2;
-  if (availability === 'closed') sensitivityMod += 1;
-  if (moneyEase >= 2) sensitivityMod -= 0.5;
 
-  let amountWeight = 0;
-  if (ratio > 0.3 || amount > 400) amountWeight = 3;
-  else if (ratio > 0.15 || amount > 200) amountWeight = 2;
-  else if (ratio > 0.05 || amount > 80) amountWeight = 1;
-
+  // C: 门槛上移，敏感度只由金额驱动，日常/中小额默认沉默
+  let score = 0;
+  const isLarge = ratio > 0.3 || amount > 400;       // 异常大额
+  if (isLarge) score = 3;                            // 大额
+  else if (ratio > 0.15 || amount > 200) score = 2;  // 中额
+  else if (ratio > 0.08 || amount > 100) score = 1;  // 中小额
+  if (moneyEase >= 2 && !isLarge) score -= 0.5;      // 手头宽松更沉默，但异常大额不打折
   const todayReacted = localStorage.getItem(`ghostCardReacted_${category}_${new Date().toDateString()}`);
-  const finalScore = baseSensitivity + sensitivityMod + amountWeight + (todayReacted ? -1 : 0);
+  if (todayReacted && !isLarge) score -= 1;          // 同品类当天已反应过降一档，但异常大额不打折
 
-  let reactionType, lineTone, needExplanation = false;
-  if (finalScore <= 0)   { reactionType = 'ignore';    lineTone = 'casual'; }
-  else if (finalScore <= 1)   { reactionType = 'note';      lineTone = warmth >= 2 ? 'casual' : 'dry'; }
-  else if (finalScore <= 2.5) { reactionType = 'ask';       lineTone = sharpness >= 2 ? 'guarded' : 'dry'; needExplanation = amount > 150; }
-  else if (finalScore <= 4)   { reactionType = 'probe';     lineTone = 'sharp'; needExplanation = true; }
-  else                        { reactionType = 'intervene'; lineTone = 'sharp'; needExplanation = true; }
+  // 短时高频（10 分钟内 3 笔）直接担心
+  if (last10min.length >= 3) return { reactionType: 'worry' };
 
-  if (category === 'gift' && (jealousy === 'medium' || jealousy === 'severe')) {
-    if (reactionType === 'ask')  reactionType = 'probe';
-    if (reactionType === 'note') reactionType = 'ask';
-    lineTone = 'sharp'; needExplanation = true;
-  }
-  return { reactionType, lineTone, needExplanation };
+  // E: 只有三档 —— 沉默 / 暖一句 / 担心一句
+  let reactionType;
+  if (score < 2)      reactionType = 'ignore';   // 大多数情况：沉默
+  else if (score < 3) reactionType = 'warm';     // 偶尔一次：暖一句
+  else                reactionType = 'worry';    // 罕见大额：担心一句
+
+  // D: 判定顺序 —— 先单笔反应，若单笔沉默，再看累积；不叠加
+  if (reactionType === 'ignore') _maybeSetCumulativePending(history, limit);
+
+  return { reactionType };
 }
 
+// D: 本周累计 ≥ 月额度 60% 时挂起 pending（不立即注入），每周最多一次
+function _maybeSetCumulativePending(history, limit) {
+  const weekAgo = Date.now() - 7 * 86400000;
+  const weekSum = history.filter(s => s.at >= weekAgo).reduce((sum, s) => sum + (s.amount || 0), 0);
+  if (weekSum < limit * 0.6) return;
+  const wk = _isoWeekKey();
+  if (localStorage.getItem('ghostCardCumulativeWeek') === wk) return; // 本周已触发过
+  if (localStorage.getItem('ghostCardPending')) return;               // 上一个 pending 还没说出口
+  localStorage.setItem('ghostCardPending', JSON.stringify({ weekSum: Math.round(weekSum), triggeredAt: Date.now() }));
+  localStorage.setItem('ghostCardCumulativeWeek', wk);
+}
+
+function _isoWeekKey(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${weekNo}`;
+}
+
+// A: 注入只留金额，绝不泄露品类/物品。itemName 保留签名但不再用于拼注入。
 function _buildGhostCardPrompt(amount, itemName, category, decision) {
-  const { reactionType, lineTone, needExplanation } = decision;
-  const state    = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
-  const jealousy = typeof getJealousyLevelCapped === 'function' ? getJealousyLevelCapped() : 'none';
-  const categoryHint = { daily: 'everyday spending — food, drinks, transport', self: 'something for herself', for_him: 'a gift for you', gift: 'something for someone else', unknown: 'purpose unknown' }[category] || 'unknown purpose';
-  const toneHint = { casual: 'casual, offhand', dry: 'dry, controlled, brief', guarded: 'guarded, slightly sharp', sharp: 'sharp, direct, wants an answer' }[lineTone] || 'dry';
+  const { reactionType, cumulative } = decision;
+  const state = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
   const reactionHint = {
-    ignore:    null,
-    note:      `You saw it. One line — notice it without making it a thing. ${toneHint}.`,
-    ask:       `You saw the charge. Ask what it was for — one line, ${toneHint}. ${needExplanation ? 'You want an actual answer.' : 'Not demanding, just asking.'}`,
-    probe:     `You saw the charge and it caught your attention. Push a little — ${toneHint}. One line, wants an explanation.${jealousy !== 'none' ? ' There is an edge to it.' : ''}`,
-    intervene: `Multiple charges or something significant. Putting a stop to it for now. One line — direct, not angry, but clear.`,
+    ignore: null,
+    warm:   `Nothing alarming. If anything, a light, easy line — glad she treated herself. Don't ask what it was. Something like "spend it however makes you happy."`,
+    worry:  cumulative
+      ? `She's spent more than usual this week — you can feel it adding up. One gentle, caring line, a little worried but not accusing. Something like "you've been spending a bit more lately — everything okay?"`
+      : `That's a larger amount than usual. One line — a touch worried, checking she's alright, not interrogating. Something like "that's a lot at once — everything alright?"`,
   }[reactionType];
   if (!reactionHint) return null;
-  return `[Ghost Card notification: she spent £${amount} on: ${categoryHint}. He does not know exactly what she bought.\nYour reaction: ${reactionHint}\nState — warmth: ${state.warmth ?? 1}/3, sharpness: ${state.sharpness ?? 0}/3, money ease: ${state.moneyEase ?? 1}/3.\nOne line only. English. Lowercase. Do not mention "card" or "notification".]`;
+  return `[Bank alert: £${amount} was charged to the card you gave her. That's all you see — an amount, not what she bought.
+Your reaction: ${reactionHint}
+State — warmth: ${state.warmth ?? 1}/3, sharpness: ${state.sharpness ?? 0}/3, money ease: ${state.moneyEase ?? 1}/3.
+One line only. English. Lowercase. Do not mention "card", "bank", or "alert". Never guess or name what she bought.]`;
 }
 
 async function _ghostCardReaction(amount, itemName, category, card) {
@@ -325,26 +340,50 @@ async function _ghostCardReaction(amount, itemName, category, card) {
     const _isFlirting = (chatHistory || []).slice(-4).some(m => m._intimate);
     if (_isFlirting) return;
     const decision = _classifySpend(amount, category, card);
-    if (decision.reactionType === 'ignore') return;
+    if (decision.reactionType === 'ignore') return; // 沉默；累积 pending 已在 _classifySpend 里挂起
     const prompt = _buildGhostCardPrompt(amount, itemName, category, decision);
     if (!prompt) return;
     localStorage.setItem(`ghostCardReacted_${category}_${new Date().toDateString()}`, '1');
     await new Promise(r => setTimeout(r, 3000));
-    // 修复：移除 intervene 时偷扣 Ghost Card 余额的逻辑
-    // 该函数由 spendGhostCard 调用，intervene 额外扣余额会导致双倍扣钱
-    const _sys = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
-    const _res = await fetchWithTimeout('/api/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6', max_tokens: 60, system: _sys, messages: [...(chatHistory||[]).filter(m=>!m._system).slice(-4), { role:'user', content: prompt }] })
-    }, 10000);
-    const _data = await _res.json();
-    const _reply = (_data.content?.[0]?.text || '').trim();
-    const _bad = ["i'm claude","i am claude","as an ai","can't roleplay","ghost card","notification"];
-    if (_reply && !_bad.some(p => _reply.toLowerCase().includes(p))) {
-      if (typeof appendMessage === 'function') appendMessage('bot', _reply);
-      if (typeof chatHistory !== 'undefined') { chatHistory.push({ role:'assistant', content: _reply }); if (typeof saveHistory === 'function') saveHistory(); }
-    }
+    await _sendGhostCardLine(prompt);
   } catch(e) { console.warn('[GhostCard] 反应失败:', e); }
+}
+
+// D 的下半场：下一轮对话时检查 pending，等她聊到钱/消费/近况才注入
+async function checkGhostCardPending(text) {
+  try {
+    const raw = localStorage.getItem('ghostCardPending');
+    if (!raw) return;
+    const pending = JSON.parse(raw);
+    if (Date.now() - (pending.triggeredAt || 0) > 48 * 3600000) { // 48h 过期
+      localStorage.removeItem('ghostCardPending');
+      return;
+    }
+    const kw = /钱|买|花|消费|预算|账单|工资|最近|状态|spend|spent|bought|buy|money|budget|afford|broke|cost/i;
+    if (!kw.test(text || '')) return; // 没聊到，继续等
+    const _isFlirting = (chatHistory || []).slice(-4).some(m => m._intimate);
+    if (_isFlirting) return; // 亲密时刻不打断，pending 保留
+    localStorage.removeItem('ghostCardPending');
+    const prompt = _buildGhostCardPrompt(pending.weekSum, '', 'unknown', { reactionType: 'worry', cumulative: true });
+    if (!prompt) return;
+    await new Promise(r => setTimeout(r, 2000));
+    await _sendGhostCardLine(prompt);
+  } catch(e) { console.warn('[GhostCard] pending 检查失败:', e); }
+}
+
+async function _sendGhostCardLine(prompt) {
+  const _sys = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
+  const _res = await fetchWithTimeout('/api/chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6', max_tokens: 60, system: _sys, messages: [...(chatHistory||[]).filter(m=>!m._system).slice(-4), { role:'user', content: prompt }] })
+  }, 10000);
+  const _data = await _res.json();
+  const _reply = (_data.content?.[0]?.text || '').trim();
+  const _bad = ["i'm claude","i am claude","as an ai","can't roleplay","ghost card","notification","bank alert"];
+  if (_reply && !_bad.some(p => _reply.toLowerCase().includes(p))) {
+    if (typeof appendMessage === 'function') appendMessage('bot', _reply);
+    if (typeof chatHistory !== 'undefined') { chatHistory.push({ role:'assistant', content: _reply }); if (typeof saveHistory === 'function') saveHistory(); }
+  }
 }
 
 function showGhostCardReceipt(amount, itemName, isUserCard) { /* 已停用：账单不在聊天框显示 */ }

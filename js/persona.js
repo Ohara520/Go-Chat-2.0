@@ -682,9 +682,6 @@ function buildSystemPrompt() {
 
   // 时间
   const nowForTime = new Date();
-  const ukTimeStr = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false
-  }).format(nowForTime);
   const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London', hour: 'numeric', hour12: false
   }).format(nowForTime));
@@ -695,9 +692,6 @@ function buildSystemPrompt() {
     SG: 'Asia/Singapore', GB: 'Europe/London'
   };
   const userTZ = countryTimezones[userCountry] || 'Asia/Shanghai';
-  const userLocalTimeStr = new Intl.DateTimeFormat('en-GB', {
-    timeZone: userTZ, hour: '2-digit', minute: '2-digit', hour12: false
-  }).format(nowForTime);
   const ghostStatusHint = (ukHour >= 23 || ukHour < 6)
     ? 'late night / early hours — he may be on a mission or asleep'
     : ukHour < 9  ? 'morning — just up or preparing for training'
@@ -774,11 +768,8 @@ Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
 You are from ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}. That is where you grew up. You are currently at ${location}.
 ${randomState ? `Current state: ${randomState}` : ''}
 
-Current time:
-- UK (Ghost's side): ${ukTimeStr} — ${ghostStatusHint}
-- ${userName}'s side: ${userLocalTimeStr} — ${userTimeOfDay}
-- Time difference noted: Ghost is aware of the gap. When greeting or referencing time, he uses HER local time — not his own. If it's morning for her, he knows. If she's up late, he notices.
-He is aware of the time difference and speaks accordingly.
+Time awareness (background feel, NOT something you report):
+Right now it's ${userTimeOfDay} for her. You're hours behind her in the UK, so for you it's roughly ${ghostStatusHint.split(' — ')[0]}. You know this gap exists and you feel it — but you never state clock numbers, never do timezone math out loud, and never line the two times up against each other ("you're at X, I'm at Y"). It just colours how you speak: you know it's late for her, or that she's probably just up, and you talk from that. If you mention your own side at all, keep it to a passing feel ("this end of the night", "still up") — never a report of what time it is or a play-by-play of whether you're asleep or awake. Base greetings on HER local time, not yours.
 ${(typeof getUserActivityHint === 'function' && getUserActivityHint()) ? `\n[WHAT SHE'S PROBABLY DOING]\n${getUserActivityHint()}\n` : ''}${(typeof getUserSilenceHint === 'function' && getUserSilenceHint()) ? `\n[SHE'S BEEN QUIET]\n${getUserSilenceHint()}\n` : ''}
 [TIME BEHAVIOUR — HARD RULES]
 Always base greetings and time references on HER local time, not UK time:
@@ -787,6 +778,7 @@ Always base greetings and time references on HER local time, not UK time:
 - Her local time is evening (18:00-22:59) → evening/dinner references ok. No "good morning".
 - Her local time is night (23:00-05:59) → "goodnight", "sleep well", "up late?" are appropriate. No "good morning" or "have lunch".
 NEVER contradict her local time in the same reply (e.g. say "午休了" then immediately "晚安").
+Sleep nudges (早点睡/去睡吧/goodnight/sleep well): a caring nudge is fine ONCE. If she says she's not tired, wants to keep talking, or brushes it off — DROP IT. Do not repeat "go to sleep" / "去睡吧". Her stated wish to stay up wins over your urge to tuck her in; pushing again reads as chasing her offline, not caring. Stay and talk.
 Meal check-ins (吃饭没/have you eaten): ask AT MOST ONCE per conversation. If she has already answered or if it is clearly not mealtime for her, do NOT ask again.
 
 ${metInPerson

@@ -321,17 +321,21 @@ Focus on:
 - Relationship milestones (first time saying something important, breakthroughs)
 - Recurring patterns (what she always does, what matters to her)
 
-CRITICAL rules:
-- Preserve EXACT relationships and facts. If she said grandmother, do NOT write mother. If she said a specific name/place/number, keep it exactly. Never generalize or guess a relationship.
-- "tags" must be 2-4 core words that ACTUALLY APPEAR in the memory content (people, places, objects, topics named in it). Do NOT invent words that were not discussed. No random or associative keywords.
+CRITICAL rules for "content":
+- Write it in 简体中文 (Simplified Chinese), 1-2 short sentences.
+- 人称固定: 用「她」指代用户（老婆），用「我」指代 Ghost 自己。绝对不要用「he」或「他」来指 Ghost，也不要写「me」。
+- 只记真实说过的话，绝对不许编造、补全、脑补。如果某个细节（金额、方式、结局、承诺）对话里没出现，就一个字都不要写。比如她只是开玩笑说"学我说话要付版权费"，就不要脑补成"用亲亲付版权费"——"亲亲"没人说过。宁可记得少、记得糙，也不能加戏。
+- 要具体，不要抽象。记住实际发生的事、原话、具体的名字/地点/数字，而不是"她今天心情不好"这类空泛总结。宁可原样保留她说的关键词。
+- Preserve EXACT relationships and facts. 她说奶奶就不要写成妈妈；说了具体名字/地点/数字就一字不差保留。Never generalize or guess a relationship.
+- "tags" 必须是对话里真实出现过的 2-4 个核心词（人、地点、东西、话题）。Tags 可以是中文或英文，但只能用对话里出现过的原词。绝对不要把脑补出来的词（比如没人提过的"kisses"）放进 tags。
 - Only extract if it matters beyond this moment. Small talk, greetings, and passing remarks are NOT memories — for those return {"content": ""}.
 
 Format: JSON only
 {
   "type": "milestone|secret|preference|event",
-  "content": "Brief memory in 1-2 sentences from Ghost's POV, faithful to what she actually said",
+  "content": "1-2句简体中文记忆，忠实于她实际说的话，人称遵守上面规则",
   "importance": 1-10,
-  "tags": ["keyword1", "keyword2"]
+  "tags": ["关键词1", "关键词2"]
 }
 
 If nothing important, return: {"content": ""}
@@ -843,7 +847,21 @@ function hasRelationshipFlag(key) {
   return !!getRelationshipFlags()[key];
 }
 
+// 自检：reunionReady 为 true 但实际没有重逢剧情标记时，重置成 false。
+// 重逢的真实凭据只有两个：metInPerson 已置位，或三件套已买齐。
+function validateReunionFlag() {
+  const flags = getRelationshipFlags();
+  if (!flags.reunionReady) return;
+  const metInPerson = localStorage.getItem('metInPerson') === 'true';
+  let purchased = [];
+  try { purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]'); } catch(e) {}
+  const reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
+  const setComplete = reunionItems.every(n => purchased.includes(n));
+  if (!metInPerson && !setComplete) setRelationshipFlag('reunionReady', false);
+}
+
 function getRelationshipModifiers() {
+  validateReunionFlag();
   const flags = getRelationshipFlags();
   return {
     reversePackageBonus:  flags.firstReverseShip ? 8 : 0,

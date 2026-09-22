@@ -39,7 +39,8 @@ function _ensureGhostProfileDefaults() {
     localStorage.setItem('ghostHometown', 'Manchester, UK');
   }
   if (!localStorage.getItem('metInPerson')) {
-    localStorage.setItem('metInPerson', 'true');
+    // 核心设定：异国、从未见面。默认应为 false，靠重逢剧情（三件套/机票）才翻 true。
+    localStorage.setItem('metInPerson', 'false');
   }
 }
 

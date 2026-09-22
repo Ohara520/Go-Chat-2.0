@@ -811,8 +811,8 @@ async function onGhostReceivedTakeout(order, force = false) {
     chatHistory.push({
       role: 'user',
       content: told
-        ? `[Her takeout just arrived — 「${order.nameEn || order.name}」. You have it. If she asks, confirm you received it.]`
-        : `[A takeout delivery just showed up — 「${order.nameEn || order.name}」. You didn't know she was ordering. You have it now. If she asks, confirm you received it.]`,
+        ? `[She ordered takeout and had it delivered to YOU — 「${order.nameEn || order.name}」. It just arrived at your place. YOU are the one who received it and eats it, not her. If she asks, confirm you got it.]`
+        : `[A takeout delivery she sent just showed up at YOUR place — 「${order.nameEn || order.name}」. You didn't know she was ordering it for you. YOU received it and eat it, not her. If she asks, confirm you got it.]`,
       _system: true,
     });
     const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
@@ -875,19 +875,19 @@ async function onGhostReceivedTakeout(order, force = false) {
         try {
           const _descHint = order.desc ? `\nWhat it is: ${order.desc}` : '';
           const _prompt = told
-            ? `[Her takeout just arrived — 「${order.nameEn || order.name}」. You have it now.${_descHint}
+            ? `[She ordered takeout FOR YOU and had it delivered to your place — 「${order.nameEn || order.name}」. It just arrived and YOU are the one holding it, about to eat it.${_descHint}
 
 She ordered this for you. That matters — regardless of what the food is.
-React to it honestly: what you notice about it, how it smells, what you think.
+React to it honestly: what YOU notice about it in your hands, how it smells, what you think as you're about to eat it.
 You may be dry about it. You may underplay it. But underneath — you received it, and you received what she meant by it.
-Do not dismiss it. Do not make her feel the gesture was wasted.
+Do NOT tell her to eat or sit down — SHE didn't get food, YOU did. Do not dismiss it. Do not make her feel the gesture was wasted.
 Lowercase. English only. Two to three lines.${_noRepeatHint}]`
-            : `[A delivery just showed up — 「${order.nameEn || order.name}」. You didn't know she was ordering.${_descHint}
+            : `[A takeout delivery SHE sent just showed up at YOUR place — 「${order.nameEn || order.name}」. You didn't know she was ordering it for you. YOU are the one holding it, about to eat it.${_descHint}
 
 She did this without telling you. She was thinking of you.
-React to the food and to what just happened — dry, real, a little caught off guard.
+React to the food in YOUR hands and to what just happened — dry, real, a little caught off guard.
 You don't perform gratitude. But you don't act like it means nothing.
-The fact she did this — that stays with you.
+Do NOT tell her to eat or sit down — SHE didn't get food, YOU did. The fact she did this — that stays with you.
 Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
           // 优先 Sonnet（质量好），超时降级 Haiku（快），都失败走兜底
           let _reply = '';

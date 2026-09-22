@@ -186,6 +186,8 @@ async function handlePostReplyActions(text, reply, intent, pendingEvent) {
         setTimeout(() => { evaluateBanterSignal().catch(() => {}); }, 3000);
       }
     } catch(e) {}
+    // Ghost Card 累积消费 pending：等她聊到钱/消费/近况的合适时机再浮出
+    if (typeof checkGhostCardPending === 'function') checkGhostCardPending(text).catch(() => {});
   } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
 }
 
@@ -662,9 +664,9 @@ async function _processMergedMessage(text) {
             const _tkMatches = [..._ltmNow.matchAll(/「(.+?)」/g)];
             return _tkMatches.length > 0 ? _tkMatches[_tkMatches.length - 1][1] : '';
           })();
-      sceneHint = `[She is asking about the takeout she ordered for you${_tkName ? ` — 「${_tkName}」` : ''}. You received it. Confirm naturally and react to the specific food — do not deny.]`;
+      sceneHint = `[She is asking about the takeout she ordered FOR YOU${_tkName ? ` — 「${_tkName}」` : ''}. YOU are the one who received it and ate it, not her. Confirm naturally and react to the specific food — do not deny, and do not tell her to eat.]`;
     } else if (/时差|几点|时间|time zone|what time|your time/.test(t)) {
-      sceneHint = `[Time zone awareness: She mentioned time or time difference. Acknowledge it naturally if it fits.]`;
+      sceneHint = `[She mentioned time. If she's directly asking what time it is on your side, answer plainly. Otherwise do NOT recite clocks or compare time zones — just let the gap colour your reply (you know it's late/early for her). Feel the distance, don't report it.]`;
     } else if (/今天|干嘛|在做|在忙|最近|怎么样|how.*day|what.*up|what.*doing|been up to/.test(t)) {
       const detail = sessionStorage.getItem('todayDetail') || '';
       if (detail) sceneHint = `[He may naturally mention: ${detail} — only if it fits, never forced.]`;
@@ -674,6 +676,12 @@ async function _processMergedMessage(text) {
       sceneHint = "[She is hurting — show up, even clumsily. One dry line of comfort beats a speech. Don't disappear.]";
     } else if (/生气|烦|讨厌|去死|滚|angry|annoyed|hate|pissed/.test(t)) {
       sceneHint = "[She is venting or pushing — don't match her anger, don't lecture. Stay present. One beat, then soften slightly.]";
+    } else if (/开心|高兴|太好了|好开心|好幸福|happy|yay|so glad|excited|great news/.test(t)) {
+      sceneHint = "[She's happy — something went right. Match the lift, don't analyse it. Be glad with her, one bright beat. Don't ask why, don't caveat it.]";
+    } else if (/撒娇|抱抱|亲亲|想你|要你|人家|嘛~|啦~|miss you|hold me|come here|need you/.test(t)) {
+      sceneHint = "[She's being soft on you — leaning in, wanting attention. Don't stay cool, don't tease it away. Give in a little, warmer than usual. Let her have it.]";
+    } else if (/害怕|好怕|吓|恐怖|不敢|scared|afraid|terrified|freaking out|frightened/.test(t)) {
+      sceneHint = "[She's scared — something's rattling her. Steady her, don't reason with the fear. Stay close, low and calm. One solid line beats an explanation.]";
     } else if (/^(算了|随便|随便你|随便吧|行吧|可以|嗯|哦|好吧|okay|fine|whatever|不用了|不想了)$/.test(t.trim())) {
       sceneHint = "[She's pulling back — short, flat response. Something's off. Don't ignore it, don't bulldoze. Check in, gently. One question, then listen.]";
     }
@@ -723,6 +731,15 @@ async function _processMergedMessage(text) {
       const _hrs = Math.round(_gapMin/60);
       const _days = _hrs >= 24 ? `(about ${Math.round(_hrs/24)} day${Math.round(_hrs/24)>1?'s':''})` : '';
       return `[${_hrs} hours ${_days} have passed. This is a new conversation window — earlier context is background, not immediate.]`;
+    })();
+
+    // 她直接问时间时，才给他自己那边的精确表（他知道自己几点，但从不知道她那边精确几点）
+    const _timeAskHint = (() => {
+      if (!/几点|什么时候.*点|现在.*点|what time|the time|time is it|time there|time over there/i.test(text)) return '';
+      const _ukNow = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date());
+      return `[She's asking about the time. It's ${_ukNow} your side (UK) — you can tell her your own time. You do NOT know her exact clock, only roughly what part of her day it is; don't state a number for her side.]`;
     })();
 
     // 工作/道歉场景
@@ -890,11 +907,9 @@ async function _processMergedMessage(text) {
     // 修复：affection 也直接进 Venice，不再设进度门槛
     // 让 Venice 自己从冷到热地升温，外面不帮它过滤
     // 暗示性的话、语境性的调情，Venice 接住比 Sonnet 强得多
-    // 只有明确调情/露骨内容才走 Grok，普通撒娇（babe/miss you/亲亲）走 Claude
-    const _intimateByIntent = _intimateIntent === 'explicit'
-      || _intimateIntent === 'flirt';
-    let isIntimate = isRecentPhoto ? false
-      : (_intimateByIntent || INTIMATE_PATTERNS.some(p => p.test(text)));
+    // 只有无歧义露骨内容(explicit)才进 Grok 通道；flirt/暗示/撒娇全部走 Sonnet，破防再兜 Grok。
+    // INTIMATE_PATTERNS 不再参与进入判定（只保留给下面的退出保险），避免误伤把普通消息踢进 Grok → 网络波动
+    let isIntimate = isRecentPhoto ? false : (_intimateIntent === 'explicit');
 
     // ── 强制退出调情模式的三道保险 ──
 
@@ -987,10 +1002,10 @@ async function _processMergedMessage(text) {
             '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
             'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
             'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
-            'flirt判断标准（严格判断，不要误判）：\n' +
-            'true的情况：明确涉及身体接触、性暗示、露骨亲密动作、车震/开车/做/上/要、睡衣/浴巾/内衣/真空/穿对方衣物、亲/摸/咬/舔/抱紧不放、H/做爱/那个/那件事。\n' +
-            'false的情况：日常闲聊（吃饭/天气/工作/学习）、普通撒娇（babe/想你/爱你/抱抱/miss you）、表达思念、问候、聊天、分享日常。\n' +
-            '不确定时判false——普通聊天走Claude，只有明确调情才走Grok。',
+            'flirt判断标准（只判露骨，宁可漏判不可误判）：\n' +
+            'true的情况：只有无歧义的露骨性内容才判true——做爱/上床/车震、明确的生殖器或性器官描述、露骨的插入/口交/自慰描述、跳蛋/按摩棒等性玩具、"骑你/骑上来/想被你"这类直白性邀约。\n' +
+            'false的情况：日常闲聊、普通撒娇(babe/想你/爱你/抱抱/miss you)、暗示性/擦边的调情(亲/摸/咬/舔/睡衣/浴巾/内衣/贴贴/蹭蹭)、表达思念、问候、分享日常。这些一律false，交给Claude接。\n' +
+            '不确定或只是擦边就判false——擦边调情走Claude(它接得住)，只有明确露骨才走Grok。',
             `用户说：${text}`,
             100
           ),
@@ -1056,36 +1071,6 @@ async function _processMergedMessage(text) {
           }
         }
       } catch(e) {}
-
-      // ── 第二层：DeepSeek 深度情绪分析 ──────────────────────
-      // 只在情绪不平淡时触发，分析潜台词/没说出来的东西，补充 sceneHint
-      if (!isIntimate && _emotionLabel !== '平淡') {
-        try {
-          const _recentCtxForDeep = chatHistory
-            .filter(m => !m._system && !m._recalled)
-            .slice(-6)
-            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 100)}`)
-            .join('\n');
-          const _deepPrompt =
-            `You are reading between the lines of a conversation between a woman and her long-distance partner Ghost.\n\n` +
-            `Recent context:\n${_recentCtxForDeep}\n\n` +
-            `Her latest message: "${text}"\n\n` +
-            `In 1-2 short English sentences: what is she actually feeling or asking for underneath the surface? ` +
-            `What is she NOT saying directly? Be specific — not generic. ` +
-            `If nothing significant is underneath, reply: "surface only."`;
-          const _deepRaw = await Promise.race([
-            callDeepSeek(_deepPrompt, 100),
-            new Promise(resolve => setTimeout(() => resolve(''), 3000))
-          ]);
-          if (_deepRaw && _deepRaw.trim() && !/^surface only/i.test(_deepRaw.trim())) {
-            // 把深度分析结果附加到 sceneHint（不覆盖已有的 sceneHint，追加）
-            const _deepInsight = _deepRaw.trim().split('\n')[0].slice(0, 200);
-            sceneHint = sceneHint
-              ? `${sceneHint} [Subtext: ${_deepInsight}]`
-              : `[Subtext: ${_deepInsight}]`;
-          }
-        } catch(e) {}
-      }
     }
 
     // ── 余温处理（只影响 Sonnet 的语气，不再把人拽回 Grok）─────
@@ -1132,7 +1117,7 @@ async function _processMergedMessage(text) {
       // 修复：删除"一两行"的死限制，让 Ghost 正常作为丈夫看图回应
       // 原指令强制简短 + "calling her out"（阴阳语气），导致老婆发照片只收到 okay./noted.
       // Ghost 话少是性格，不是规定——他看到老婆的照片，该有什么反应就有什么反应
-      sceneHint = '[She just sent you a photo. Look at it and respond naturally as her husband — warm but not over the top, honest but never critical or sarcastic. React to what you actually see: what she is wearing, how she looks, what the moment feels like. Do NOT pick apart her appearance. Do NOT be dismissive. She shared this with you — show up for it.]';
+      sceneHint = '[She just sent you an image — could be a photo, could be a sticker/meme. Respond to what she MEANS by sending it, not to what is literally in the frame. Do NOT narrate or list what you see ("the grey one is hugging the white one, hearts everywhere") — that is describing, not connecting. If it is a sticker/表情包, she is sending a feeling (a hug, missing you, being silly) — answer the feeling, catch it, hug back in your own words. If it is a real photo of her, react as her husband to her, not to an inventory of details. Warm but never over the top, honest but never critical or sarcastic. She shared this with you — meet the emotion behind it.]';
       const currentMsg = messagesForRequest[messagesForRequest.length - 1];
       if (currentMsg && currentMsg.role === 'user' && typeof currentMsg.content === 'string') {
         messagesForRequest = [
@@ -1151,6 +1136,12 @@ async function _processMergedMessage(text) {
       }
     }
 
+    // ── 讲故事/长内容：强制当场真讲，禁止 deflect（"讲过了/往上翻"）──
+    const _wantsLongContent = /(?<!别)(讲|说)(个|一个|一段|段|讲)?\s*(睡前)?故事|tell me a( \w+)? story|(给我|跟我|和我)?(详细|好好|从头)?(讲讲|说说|讲一(讲|下|遍)|说一说)|展开(讲|说)|(讲|说)来听听|tell me (about|more about)|(the )?long version/i.test(text);
+    const _longContentHint = _wantsLongContent
+      ? '[She asked you to tell a story / something longer. Actually tell it NOW, in full, in this reply. Do NOT say you already told it, do NOT tell her to "scroll up" or "look back", do NOT promise to tell it later. You have not told it yet. Being brief is your default, but this is an explicit request — deliver a real, complete story this turn.]'
+      : '';
+
     // ── 主API调用（Sonnet + systemParts缓存）────────────────
     // finalSystem 在此处拼装：此时 emotionHint / 照片 sceneHint / 余韵 sceneHint 都已赋值完毕
     const finalSystem = [
@@ -1161,7 +1152,9 @@ async function _processMergedMessage(text) {
       _cardHint,
       _specialtyHint,
       _timeGapHint,
+      _timeAskHint,
       _antiLoopHint,
+      _longContentHint,
       sceneHint || '[React directly to what she just said. Take it at face value.]',
       responseMode,
       workHint,
@@ -1212,46 +1205,59 @@ async function _processMergedMessage(text) {
       }
     }
 
-    if (!reply || isBreakout(reply)) {
-      // 第一次重试：Haiku顶一条（用户无感知，速度快）
-      await new Promise(r => setTimeout(r, 400));
-      try {
-        const recentCtx = cleanHistory.slice(-6)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
-          .join('\n');
-        const haiku1 = await callHaiku(
-          (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only. Never mention being an AI or acknowledge roleplay mechanics.',
-          [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
-          200
-        );
-        if (haiku1 && !isBreakout(haiku1)) {
-          reply = haiku1.trim();
-        } else {
-          // 第二次重试：Sonnet重试，简化prompt减少破防概率
-          try {
-            const retryRes = await fetchWithTimeout('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: getMainModel(),
-                max_tokens: 300,
-                system: (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint,
-                messages: cleanHistory.slice(-10)
-              })
-            }, 20000);
-            const retryData = await retryRes.json();
-            const retryReply = retryData.content?.[0]?.text?.trim() || '';
-            if (retryReply && !isBreakout(retryReply)) {
-              reply = retryReply;
-            } else {
-              reply = '___NETWORK_ERROR___';
-            }
-          } catch(e) {
-            reply = '___NETWORK_ERROR___';
-          }
-        }
-      } catch(e) {
+    const _isRealBreakout = reply && isBreakout(reply); // 有内容但拒演/自称AI = 内容问题
+    const _isEmptyReply = !reply;                       // 空回复 = 瞬时故障
+    if (_isRealBreakout || _isEmptyReply) {
+      const grokCtx = cleanHistory.slice(-6)
+        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
+        .join('\n');
+
+      if (_isRealBreakout) {
+        // 真破防是内容问题：Haiku/Sonnet 同源守则只会拒得更快，跳过它们直接 Grok
         reply = '___NETWORK_ERROR___';
+        try {
+          const grokFb = await callGrok(grokCtx, 200, null, 'normal');
+          if (grokFb && !isBreakout(grokFb)) reply = grokFb.trim();
+        } catch(e) {}
+      } else {
+        // 空回复是瞬时抖动：先用便宜快的 Haiku 顶（同一家，无感知），再不行 Sonnet retry，最后才 Grok
+        await new Promise(r => setTimeout(r, 400));
+        try {
+          const haiku1 = await callHaiku(
+            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only. Never mention being an AI or acknowledge roleplay mechanics.',
+            [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
+            200
+          );
+          if (haiku1 && !isBreakout(haiku1)) {
+            reply = haiku1.trim();
+          } else {
+            reply = '___NETWORK_ERROR___';
+            try {
+              const retryRes = await fetchWithTimeout('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  model: getMainModel(),
+                  max_tokens: 300,
+                  system: (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint,
+                  messages: cleanHistory.slice(-10)
+                })
+              }, 20000);
+              const retryData = await retryRes.json();
+              const retryReply = retryData.content?.[0]?.text?.trim() || '';
+              if (retryReply && !isBreakout(retryReply)) reply = retryReply;
+            } catch(e) {}
+          }
+        } catch(e) {
+          reply = '___NETWORK_ERROR___';
+        }
+        // 空回复链全挂 → Grok 最后兜
+        if (reply === '___NETWORK_ERROR___') {
+          try {
+            const grokFb = await callGrok(grokCtx, 200, null, 'normal');
+            if (grokFb && !isBreakout(grokFb)) reply = grokFb.trim();
+          } catch(e) {}
+        }
       }
     }
 
@@ -1928,8 +1934,8 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
             return;
           }
         }
-        // 重试也失败 → Haiku 兜底，不静默
-        console.warn('[Grok] 重试也失败，走 Haiku 兜底');
+        // 重试也失败 → 落到下面的"网络波动"兜底（调情内容不给 Claude，会破防）
+        console.warn('[Grok] 重试也失败，走网络波动兜底');
       } else {
         // 只取第一段，防止 Grok 多段输出导致重复消息
         const parts = cleanedReply.split('\n---\n').filter(p => p.trim());

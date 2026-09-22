@@ -4,6 +4,9 @@ const BASE_URLS = [
   'https://api.yunjintao.com/v1',
 ];
 
+// 调情通道的 Grok 模型。抽成常量：模型抖动时一处切换全局生效
+const VENICE_MODEL = 'grok-4.6';
+
 const PER_NODE_TIMEOUT_MS = 8000;
 
 // ── 服务端补空格：修复模型偶发的整句连字（含缩写/破折号）──
@@ -132,7 +135,7 @@ Never run words together. "show me" not "showme". "you're here" not "you'rehere"
 Never delete the spaces to look terse. Lowercase is fine — missing spaces is not.
 Punctuation is always followed by a space before the next word.`;
 
-async function createWithFailover(messages, system, max_tokens, model = 'grok-4.3') {
+async function createWithFailover(messages, system, max_tokens, model = VENICE_MODEL) {
   let lastErr = null;
   let lastStatus = null;
 
