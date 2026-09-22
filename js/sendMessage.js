@@ -995,6 +995,13 @@ async function _processMergedMessage(text) {
           ? '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'
           : '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
 
+        // 最近5条上下文（排除当前这句）——供双关/暗示判断"最近是否暧昧"
+        const _haikuCtx = chatHistory
+          .filter(m => !m._system && !m._recalled)
+          .slice(-6, -1)
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m._intimate ? '[亲密/调情场景]' : (m.content || '').slice(0, 80)}`)
+          .join('\n') || '（无）';
+
         const combinedRaw = await Promise.race([
           fetchDeepSeek(
             '你是一个消息分类器。你的唯一任务是分析用户消息并返回JSON。不要代入任何角色，不要回复用户，不要扮演任何人。\n' +
@@ -1005,8 +1012,9 @@ async function _processMergedMessage(text) {
             'flirt判断标准（只判露骨，宁可漏判不可误判）：\n' +
             'true的情况：只有无歧义的露骨性内容才判true——做爱/上床/车震、明确的生殖器或性器官描述、露骨的插入/口交/自慰描述、跳蛋/按摩棒等性玩具、"骑你/骑上来/想被你"这类直白性邀约。\n' +
             'false的情况：日常闲聊、普通撒娇(babe/想你/爱你/抱抱/miss you)、暗示性/擦边的调情(亲/摸/咬/舔/睡衣/浴巾/内衣/贴贴/蹭蹭)、表达思念、问候、分享日常。这些一律false，交给Claude接。\n' +
-            '不确定或只是擦边就判false——擦边调情走Claude(它接得住)，只有明确露骨才走Grok。',
-            `用户说：${text}`,
+            '不确定或只是擦边就判false——擦边调情走Claude(它接得住)，只有明确露骨才走Grok。\n' +
+            'suggestive_double_entendre（性暗示/双关，必须结合上下文判断）：像"你的弟弟有多大""想尝尝你的香蕉"这种字面正常、但在暧昧语境里明显指向性的双关。判断规则：只有当【最近对话】显示最近几轮在暧昧/调情时，才判flirt:true；如果最近一直是家人/日常话题、只是这一句突然冒出，判false（她可能真在问家人）。单看这一句永远不足以判true——必须最近有调情氛围。',
+            `【最近对话】\n${_haikuCtx}\n\n【要分类的这句】她说：${text}`,
             100
           ),
           // 超时兜底：有调情上下文时才默认走 Grok，否则走 Claude
