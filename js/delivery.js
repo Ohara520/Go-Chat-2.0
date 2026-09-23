@@ -800,14 +800,7 @@ English only. Lowercase. One line.]`
 
   showToast('📦 有来自 Ghost 的包裹！去商城查看');
 
-  // 补寄/置换快递：弹草稿
-  if (delivery.productData?.lostReplace || delivery.noLost) {
-    setTimeout(() => {
-      if (typeof showUserDraftCard === 'function') {
-        showUserDraftCard({ type: 'gift_received', actor: 'user', meta: { itemName: delivery.name, isReplace: true } });
-      }
-    }, 4000);
-  }
+  // 旧版"补寄/置换快递后弹草稿让用户选文案发布"机制已退役，不再主动弹窗。
 }
 
 

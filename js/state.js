@@ -1231,10 +1231,7 @@ function endColdWar(userApologized = false) {
   localStorage.setItem('pendingColdWarEndStory', 'true');
   setTimeout(() => { if (typeof checkStoryOnColdWarEnd === 'function') checkStoryOnColdWarEnd(); }, 8000);
   if (typeof feedEvent_madeUp === 'function') feedEvent_madeUp();
-  const _randMs = (a, b) => (Math.floor(Math.random() * (b - a + 1)) + a) * 60 * 1000;
-  setTimeout(() => {
-    if (typeof showUserDraftCard === 'function') showUserDraftCard({ type: 'made_up', actor: 'user', meta: {} });
-  }, _randMs(20, 90));
+  // 旧版"和好后弹草稿让用户选文案发布"机制已退役，不再主动弹窗。
 }
 
 function checkColdWarApologyCondition() {

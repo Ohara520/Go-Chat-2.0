@@ -899,10 +899,10 @@ async function _maybeTriggerFeedPostInner(triggerSource) {
     return null;
   }
 
-  // 用户侧事件 → 生成草稿，不直接发
+  // 用户侧事件：旧版"系统主动弹窗让用户选文案发布"机制已退役。
+  // 新版 Feed 已有完整的用户自主发帖入口，这里只消费掉事件、不再弹窗。
   if (chosen.actor === 'user') {
     consumeFeedEvent(chosen.id);
-    showUserDraftCard(chosen);
     return null;
   }
 
@@ -1684,141 +1684,11 @@ function insertFeedPost(post) {
   try { sessionStorage.setItem('feedPostedThisSession', '1'); } catch(e) {}
 }
 
-// ----- 用户草稿弹窗 -----
-async function showUserDraftCard(evt) {
-  // 生成3个风格版本
-  const item = evt.meta?.itemName || '这件事';
-  const amount = evt.meta?.amount || 0;
-  const days = evt.meta?.days || 0;
-  const isAnniversary = evt.meta?.isAnniversary || false;
-  const isReplace = evt.meta?.isReplace || false;
-
-  const contextDescMap = {
-    bought_big_item: `刚${item.includes('车') ? '买了一辆车' : item.includes('房') ? '买了一套房' : item.includes('地') ? '买了一块地' : `买了${item}`}`,
-    gift_received: isReplace
-      ? `快递丢失后，西蒙悄悄补寄了「${item}」，刚收到`
-      : `刚收到了西蒙寄来的「${item}」`,
-    made_up: '和西蒙冷战后刚和好了',
-    anniversary: isAnniversary
-      ? `今天是结婚一周年纪念日`
-      : `今天是在一起第${days}天`,
-  };
-  const contextDesc = contextDescMap[evt.type] || '刚发生了一件开心的事';
-
-  let options = ['今天有点开心。', '有些事，不说，但记着。', '谁也没告诉，但就是挺满足的。'];
-  try {
-    const raw = await fetchDeepSeek(
-      '你是一个朋友圈文案生成器。只返回JSON，不要其他文字。',
-      `用户${contextDesc}，帮她生成3条朋友圈候选文案（一句话，口语化，不要太甜腻，不要提西蒙名字）。分别是：低调版、情绪版、嘴硬版。只返回JSON：{"quiet":"...","emotional":"...","tsundere":"..."}`,
-      200
-    );
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    options = [parsed.quiet, parsed.emotional, parsed.tsundere].filter(Boolean);
-    if (options.length < 3) options = ['今天有点开心。', '有些事，不说，但记着。', '谁也没告诉，但就是挺满足的。'];
-  } catch(e) {}
-
-  // 移除旧弹窗
-  document.getElementById('userDraftCard')?.remove();
-
-  const titleMap = {
-    bought_big_item: '要不要把这一刻留在动态里？',
-    gift_received: isReplace ? '他补寄了——要留个记录吗？' : '收到他的东西，发一条？',
-    made_up: '和好了，要说点什么吗？',
-    anniversary: isAnniversary ? '一周年纪念日，留一条？' : `第${days}天，发一条？`,
-  };
-  const cardTitle = titleMap[evt.type] || '要不要把这一刻留在动态里？';
-
-  const labels = ['低调', '情绪', '嘴硬'];
-  const card = document.createElement('div');
-  card.id = 'userDraftCard';
-  card.style.cssText = `position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;background:linear-gradient(to top,rgba(248,231,255,0.98),rgba(255,245,255,0.95));border-radius:24px 24px 0 0;box-shadow:0 -4px 30px rgba(168,85,247,0.15);backdrop-filter:blur(20px);`;
-  card.innerHTML = `
-    <div style="text-align:center;margin-bottom:12px;">
-      <div style="width:36px;height:4px;background:rgba(168,85,247,0.3);border-radius:2px;margin:0 auto 12px;"></div>
-      <div style="font-size:13px;color:#9333ea;font-weight:600;">${cardTitle}</div>
-    </div>
-    <div id="draftOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
-      ${options.map((opt, i) => `
-        <div class="draft-option" data-idx="${i}" onclick="selectDraftOption(this)" style="padding:12px 16px;border-radius:14px;border:1.5px solid rgba(168,85,247,0.2);background:white;cursor:pointer;transition:all 0.2s;">
-          <span style="font-size:11px;color:#c084fc;font-weight:600;margin-right:8px;">${labels[i]}</span>
-          <span style="font-size:14px;color:#4a1a70;">${opt}</span>
-        </div>
-      `).join('')}
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="dismissUserDraft()" style="flex:1;padding:12px;border-radius:14px;border:1.5px solid rgba(168,85,247,0.2);background:transparent;color:#9333ea;font-size:14px;cursor:pointer;">不了</button>
-      <button id="draftPublishBtn" onclick="publishUserDraft('${evt.id}')" style="flex:2;padding:12px;border-radius:14px;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:14px;font-weight:600;border:none;cursor:pointer;opacity:0.5;pointer-events:none;">发布</button>
-    </div>
-  `;
-  document.body.appendChild(card);
-
-  // 存草稿内容供发布用
-  window._currentDraftOptions = options;
-  window._currentDraftEvtId = evt.id;
-  window._currentDraftMeta = evt.meta || {};
-}
-
-let _selectedDraftIdx = -1;
-function selectDraftOption(el) {
-  document.querySelectorAll('.draft-option').forEach(d => {
-    d.style.background = 'white';
-    d.style.borderColor = 'rgba(168,85,247,0.2)';
-  });
-  el.style.background = 'rgba(168,85,247,0.08)';
-  el.style.borderColor = '#a855f7';
-  _selectedDraftIdx = parseInt(el.dataset.idx);
-  const btn = document.getElementById('draftPublishBtn');
-  if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }
-}
-
-function dismissUserDraft() {
-  document.getElementById('userDraftCard')?.remove();
-  _selectedDraftIdx = -1;
-}
-
-async function publishUserDraft() {
-  if (_selectedDraftIdx < 0 || !window._currentDraftOptions) return;
-  const text = window._currentDraftOptions[_selectedDraftIdx];
-  if (!text) return;
-
-  dismissUserDraft();
-
-  const userName = localStorage.getItem('userName') || '你';
-  const savedAvatar = localStorage.getItem('userAvatarBase64');
-  const userAvatar = savedAvatar ? 'IMG' : userName.charAt(0);
-  const _ghostAvUrl = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
-  const GHOST_AV = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-
-  // 翻译
-  let zh = text;
-  try {
-    const translated = await fetchDeepSeek('只返回中文翻译，不要其他内容。', text, 60);
-    if (translated?.trim()) zh = translated.trim();
-  } catch(e) {}
-
-  // 一次调用生成整串评论（用户发帖，角色按概率来评）
-  const comments = await generateFeedComments('user', text);
-
-  insertFeedPost({
-    id: 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-    author: 'user',
-    en: text, zh,
-    photo: null,
-    ts: Date.now(),
-    likes: 1,
-    liked: false,
-    comments
-  });
-  // 修复：用户自己发帖不触发红点，同时更新lastViewedAt避免假红点
-  // 用户刚发完帖子还在朋友圈页面，不需要提示"有新动态"
-  localStorage.setItem('feedLastViewedAt', String(Date.now()));
-  localStorage.removeItem('feedHasNew');
-
-  showToast('✨ 已发布到动态');
-
-  const coupleScreen = document.getElementById('coupleScreen');
-  if (coupleScreen?.classList.contains('active')) renderCoupleFeedFromHistory();
-}
+// ----- 旧版"用户草稿弹窗"已退役 -----
+// 旧机制：系统在特殊事件（买大件/收礼/和好/纪念日/中秋等节日商品）后主动弹窗，
+// 让用户从 AI 生成的 3 条文案里选一条发布。新版 Feed 已有完整的用户自主发帖入口，
+// 这套 showUserDraftCard / selectDraftOption / dismissUserDraft / publishUserDraft
+// 已全部移除，触发入口也一并停用。节日/日期系统本身保留（见 profile.js FESTIVALS）。
 
 // ----- 只渲染历史（不重新生成） -----
 function renderCoupleFeedFromHistory() {
