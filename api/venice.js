@@ -262,6 +262,20 @@ export default async function handler(req, res) {
     const _contentLen = typeof _rawContent === 'string' ? _rawContent.trim().length : 0;
     const _diagResult = (!_hasChoices || !_hasMessage) ? 'BAD_RESPONSE_SHAPE'
       : (_contentLen > 0 ? 'OK' : 'UPSTREAM_EMPTY');
+    // 仅 BAD_RESPONSE_SHAPE 时附加"结构层"信息：只记字段名/类型/布尔，绝不记任何 value
+    let _shape;
+    if (_diagResult === 'BAD_RESPONSE_SHAPE') {
+      const _isPlainObj = response !== null && typeof response === 'object' && !Array.isArray(response);
+      _shape = {
+        responseType: typeof response,
+        isArray: Array.isArray(response),
+        topLevelKeys: _isPlainObj ? Object.keys(response) : undefined,
+        choicesType: typeof response?.choices,
+        choicesIsArray: Array.isArray(response?.choices),
+        errorObjectPresent: _isPlainObj ? ('error' in response) : false,
+        dataObjectPresent: _isPlainObj ? ('data' in response) : false,
+      };
+    }
     console.warn('[GrokDiag]', {
       reqId: _diag.reqId,
       result: _diagResult,
@@ -273,6 +287,7 @@ export default async function handler(req, res) {
       contentType: _contentType,
       contentLen: _contentLen,
       finishReason: _choice?.finish_reason,
+      ...(_shape ? { shape: _shape } : {}),
     });
 
     const text = _deglue(response.choices?.[0]?.message?.content?.trim() || '');
