@@ -327,7 +327,11 @@ CRITICAL rules for "content":
 - 只记真实说过的话，绝对不许编造、补全、脑补。如果某个细节（金额、方式、结局、承诺）对话里没出现，就一个字都不要写。比如她只是开玩笑说"学我说话要付版权费"，就不要脑补成"用亲亲付版权费"——"亲亲"没人说过。宁可记得少、记得糙，也不能加戏。
 - 要具体，不要抽象。记住实际发生的事、原话、具体的名字/地点/数字，而不是"她今天心情不好"这类空泛总结。宁可原样保留她说的关键词。
 - Preserve EXACT relationships and facts. 她说奶奶就不要写成妈妈；说了具体名字/地点/数字就一字不差保留。Never generalize or guess a relationship.
-- "tags" 必须是对话里真实出现过的 2-4 个核心词（人、地点、东西、话题）。Tags 可以是中文或英文，但只能用对话里出现过的原词。绝对不要把脑补出来的词（比如没人提过的"kisses"）放进 tags。
+- "tags" 是用于以后「关键词字面检索」这条记忆的召回词，不是文章翻译。规则：
+  · 挑 2-4 个这条记忆里真正的核心词（人、地点、东西、话题），必须是对话里真实出现过 / 真实指代的东西，绝不脑补（比如没人提过的"kisses"就不许放）。
+  · 每个核心词尽量同时给「中文」和「对应英文」两种写法，方便用户之后用中文或英文都能召回同一条记忆。例：核心是"黑色大肥猫的故事"→ ["黑色大肥猫","黑猫","故事","black fat cat","black cat","story"]。若某词本来就是英文原词（如人名 Ghost、地名），中英一致时给一个即可。
+  · 只要高信息量的词。绝对不要放 a / I / it / me / you / go / thing / love 这种过于宽泛或过短的英文词——它们会导致大量误召回。
+  · 总量控制在 6 个以内，宁可少而准。
 - Only extract if it matters beyond this moment. Small talk, greetings, and passing remarks are NOT memories — for those return {"content": ""}.
 
 Format: JSON only
@@ -335,7 +339,7 @@ Format: JSON only
   "type": "milestone|secret|preference|event",
   "content": "1-2句简体中文记忆，忠实于她实际说的话，人称遵守上面规则",
   "importance": 1-10,
-  "tags": ["关键词1", "关键词2"]
+  "tags": ["中文核心词", "对应英文", "..."]
 }
 
 If nothing important, return: {"content": ""}
