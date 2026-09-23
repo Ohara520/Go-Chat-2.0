@@ -135,11 +135,36 @@ Never run words together. "show me" not "showme". "you're here" not "you'rehere"
 Never delete the spaces to look terse. Lowercase is fine — missing spaces is not.
 Punctuation is always followed by a space before the next word.`;
 
-async function createWithFailover(messages, system, max_tokens, model = VENICE_MODEL) {
+// ── 诊断日志辅助（只观测，不改变任何控制流/返回值）─────────
+function _diagReqId() {
+  return Math.random().toString(36).slice(2, 8);
+}
+function _hostOf(u) {
+  try { return new URL(u).host; } catch (_) { return 'unknown'; }
+}
+// 依据真实 error 对象分类；仅用 message 判断 timeout 关键字，绝不打印 message
+function _classifyErr(err) {
+  const status = (typeof err?.status === 'number') ? err.status : undefined;
+  const name = err?.name;
+  const code = err?.code;
+  const msg = typeof err?.message === 'string' ? err.message : '';
+  const isTimeout =
+    (typeof name === 'string' && /timeout/i.test(name)) ||
+    code === 'ETIMEDOUT' || code === 'ECONNABORTED' ||
+    /timed?\s*out|timeout|aborted/i.test(msg);
+  let result;
+  if (isTimeout) result = 'TIMEOUT';
+  else if (typeof status === 'number') result = 'HTTP_ERROR';
+  else result = 'NETWORK_OR_SDK_ERROR';
+  return { result, errName: name, errCode: code, status };
+}
+
+async function createWithFailover(messages, system, max_tokens, model = VENICE_MODEL, diag = null) {
   let lastErr = null;
   let lastStatus = null;
 
   for (const baseURL of BASE_URLS) {
+    const _attemptStart = Date.now();
     try {
       const client = new OpenAI({
         apiKey: process.env.GEMINI_API_KEY,
@@ -162,6 +187,18 @@ async function createWithFailover(messages, system, max_tokens, model = VENICE_M
         status: err.status,
         code: err.code,
         response: err.response?.data || err.response?.statusText
+      });
+      // 诊断日志：不打印 message/正文，只记技术类别 —— 能看出 8s TIMEOUT vs HTTP_ERROR vs 网络
+      const _c = _classifyErr(err);
+      console.warn('[GrokDiag]', {
+        reqId: diag?.reqId,
+        result: _c.result,
+        elapsedMs: Date.now() - _attemptStart,
+        model,
+        host: _hostOf(baseURL),
+        errName: _c.errName,
+        errCode: _c.errCode,
+        status: _c.status,
       });
       lastErr = err;
       lastStatus = err.status;
@@ -204,11 +241,39 @@ export default async function handler(req, res) {
       _antiRepeat = `\n\n[ANTI-REPEAT — HARD RULE]\nYour recent replies were:\n${_recentReplies.map((r, i) => `${i+1}. "${r.slice(0,60)}"`).join('\n')}\nThis reply must NOT repeat any word, phrase, opening, or structure from the above.\nIf you catch yourself starting the same way — stop and start over with a different word.`;
     }
 
+    const _diag = { reqId: _diagReqId(), start: Date.now() };
     const response = await createWithFailover(
       [{ role: 'user', content: user }],
       fullSystem + _antiRepeat + _SPACING_TAIL,
-      max_tokens
+      max_tokens,
+      VENICE_MODEL,
+      _diag
     );
+
+    // ── 诊断日志：SDK 调用成功后、在文本被抹平之前，观测真实响应结构 ──
+    // 只看结构与长度，绝不打印 content 本身。区分 OK / UPSTREAM_EMPTY / BAD_RESPONSE_SHAPE。
+    const _choice = response?.choices?.[0];
+    const _rawContent = _choice?.message?.content;
+    const _hasChoices = Array.isArray(response?.choices) && response.choices.length > 0;
+    const _hasMessage = !!_choice?.message;
+    const _contentType = _rawContent === null ? 'null'
+      : _rawContent === undefined ? 'undefined'
+      : typeof _rawContent;
+    const _contentLen = typeof _rawContent === 'string' ? _rawContent.trim().length : 0;
+    const _diagResult = (!_hasChoices || !_hasMessage) ? 'BAD_RESPONSE_SHAPE'
+      : (_contentLen > 0 ? 'OK' : 'UPSTREAM_EMPTY');
+    console.warn('[GrokDiag]', {
+      reqId: _diag.reqId,
+      result: _diagResult,
+      elapsedMs: Date.now() - _diag.start,
+      model: VENICE_MODEL,
+      host: _hostOf(BASE_URLS[0]),
+      hasChoices: _hasChoices,
+      hasMessage: _hasMessage,
+      contentType: _contentType,
+      contentLen: _contentLen,
+      finishReason: _choice?.finish_reason,
+    });
 
     const text = _deglue(response.choices?.[0]?.message?.content?.trim() || '');
 

@@ -622,6 +622,7 @@ async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateM
   // 最多 2 次：Grok 偶发整句吞空格（needsRetry），自动重发一次取更好的结果
   let _lastText = '';
   for (let attempt = 0; attempt < 2; attempt++) {
+    const _t0 = Date.now();
     try {
       const res = await fetchWithTimeout(endpoint, {
         method: 'POST',
@@ -643,6 +644,14 @@ async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateM
       if (text) _lastText = text;
       if (!data.needsRetry) return text;
     } catch (e) {
+      // 诊断日志：这是后端看不到的失败——浏览器到 /api/venice 的 fetch 本身没完成
+      // （网络错误 / 50s abort）。只记技术类别与耗时，绝不打印 prompt/正文。
+      console.warn('[GrokDiag][front]', {
+        branch: 'fetch-catch',
+        errName: e?.name,
+        elapsedMs: Date.now() - _t0,
+        attempt,
+      });
       return _lastText;
     }
   }
