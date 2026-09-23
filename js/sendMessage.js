@@ -1147,9 +1147,6 @@ async function _processMergedMessage(text) {
     }
 
     // ── 调情流程（走Venice/Grok）────────────────────────────
-    // TEMP TEST — 临时诊断：强制任意消息都走 Grok/Venice 通道，验证 grok-4.6 管道是否存活。
-    // 测试结束后删除下面这一行即可完全恢复正式路由。
-    isIntimate = true;
     if (isIntimate) {
       // 只标记真正命中调情关键词的用户消息
       const lastUserMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0];
