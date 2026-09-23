@@ -765,6 +765,8 @@ function checkTakeoutUpdates() {
       hist.unshift(order);
       localStorage.setItem('takeoutHistory', JSON.stringify(hist.slice(0, 50)));
     }
+    // 世界事实成立 → 无条件落地"近期事实"（不依赖是否在聊天页 / 表达是否成功）
+    _writeTakeoutFact(order);
     onGhostReceivedTakeout(order);
   });
 
@@ -777,10 +779,96 @@ function checkTakeoutUpdates() {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 外卖三态：世界事实 / 近期事实 / 表达状态（V1）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 表达状态：这份订单的主动收货反应"是否已经成功进入聊天"。按 order.id 幂等。
+// 只表示"说过"，不表示"是否知道/是否送达/是否进长期记忆"。
+function _takeoutReacted(id) {
+  try { return JSON.parse(localStorage.getItem('takeoutReactedIds') || '[]').includes(id); }
+  catch(e) { return false; }
+}
+function _markTakeoutReacted(id) {
+  try {
+    const ids = JSON.parse(localStorage.getItem('takeoutReactedIds') || '[]');
+    if (!ids.includes(id)) { ids.push(id); localStorage.setItem('takeoutReactedIds', JSON.stringify(ids.slice(-100))); }
+  } catch(e) {}
+}
+
+// 待表达队列读写（去重 by order.id；已表达过的不再入队）
+function _getPendingTakeout() {
+  try { return JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]'); }
+  catch(e) { return []; }
+}
+function _savePendingTakeout(arr) {
+  try { localStorage.setItem('pendingTakeoutReactions', JSON.stringify(arr)); } catch(e) {}
+}
+function _addPendingTakeout(order) {
+  if (_takeoutReacted(order.id)) return;
+  const pending = _getPendingTakeout();
+  if (pending.some(p => p.order && p.order.id === order.id)) return;
+  pending.push({ order, savedAt: Date.now() });
+  _savePendingTakeout(pending);
+}
+function _removePendingTakeout(id) {
+  const pending = _getPendingTakeout();
+  const next = pending.filter(p => !(p.order && p.order.id === id));
+  if (next.length !== pending.length) _savePendingTakeout(next);
+}
+
+// 正在表达中的订单（进程内，防止 refreshChatScreen / visibilitychange 重复调度同一单）
+const _takeoutExpressing = new Set();
+
+// 用户是否真正在聊天页（chatScreen active 且 messagesContainer 存在）
+function _isChatVisible() {
+  const cs = document.getElementById('chatScreen');
+  return !!(cs && cs.classList.contains('active') && document.getElementById('messagesContainer'));
+}
+
+// 送达即写入的"世界事实 → 近期事实"落地：无条件、不依赖是否在聊天页。
+// 1) sessionStorage.currentTakeout —— sendMessage.js 读的结构化近期事实 {name, arrivedAt}
+// 2) legacy longTermMemory note —— 保留日期戳 / 24h 清理 / 防重复 / 2000字上限
+function _writeTakeoutFact(order) {
+  try {
+    sessionStorage.setItem('currentTakeout', JSON.stringify({
+      name: order.nameEn || order.name,
+      arrivedAt: Date.now(),
+    }));
+  } catch(e) {}
+
+  try {
+    const kw = [(order.nameEn || '').toLowerCase(), '外卖', '点外卖', '给你点', '给你买', '点了吃的', 'takeout', 'ordered food', 'ordered you'];
+    const told = (chatHistory || []).filter(m => m.role === 'user' && !m._system).slice(-20)
+      .some(m => kw.some(k => k && (m.content || '').toLowerCase().includes(k)));
+    const _ltm  = localStorage.getItem('longTermMemory') || '';
+    const _now  = Date.now();
+    const _dateStr = new Date(_now).toISOString().split('T')[0];
+    const _note = told
+      ? `[${_dateStr}] She ordered takeout for you — 「${order.nameEn || order.name}」. It arrived. You have it. Confirm if she asks.`
+      : `[${_dateStr}] Takeout showed up — 「${order.nameEn || order.name}」. You didn't know she ordered it. You have it now. Confirm if she asks.`;
+    const _cutoff = new Date(_now - 24 * 3600 * 1000).toISOString().split('T')[0];
+    const _cleanedLtm = _ltm.split('\n').filter(line => {
+      const _m = line.match(/^\[(\d{4}-\d{2}-\d{2})\]/);
+      if (!_m) return true;
+      const _isTakeoutLine = /takeout|ordered food|ordered you/i.test(line);
+      if (_isTakeoutLine && _m[1] < _cutoff) return false;
+      return true;
+    }).join('\n');
+    if (!_cleanedLtm.includes(order.nameEn || order.name)) {
+      localStorage.setItem('longTermMemory', (_cleanedLtm + '\n' + _note).trim().slice(-2000));
+      if (typeof touchLocalState === 'function') touchLocalState();
+    }
+  } catch(e) {}
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Ghost 收到外卖
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async function onGhostReceivedTakeout(order, force = false) {
+  // 幂等：这份订单的主动收货反应已经成功进过聊天，不再重复表达
+  if (_takeoutReacted(order.id)) { _removePendingTakeout(order.id); return; }
+
   if (typeof showToast === 'function') showToast(`✅ ${order.emoji} ${order.name} 已送到 Ghost！`);
 
   // ── 外卖台词防重复池 ────────────────────────────────────
@@ -797,14 +885,17 @@ async function onGhostReceivedTakeout(order, force = false) {
   const told = (chatHistory || []).filter(m => m.role === 'user' && !m._system).slice(-20)
     .some(m => kw.some(k => k && (m.content || '').toLowerCase().includes(k)));
 
-  const container = document.getElementById('messagesContainer');
-  if (!container) {
-    // 不在聊天页面，存起来下次触发（不提前写 chatHistory，防止未卜先知）
-    const pending = JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]');
-    pending.push({ order, savedAt: Date.now() });
-    localStorage.setItem('pendingTakeoutReactions', JSON.stringify(pending));
+  if (!_isChatVisible()) {
+    // 不在聊天页面，存起表达状态下次真正进 Chat 时补（不提前写 chatHistory，防止未卜先知）
+    // 世界事实 / 近期事实已在 checkTakeoutUpdates 阶段无条件落地，这里只欠"主动表达"。
+    _addPendingTakeout(order);
     return;
   }
+
+  // 已在表达中（另一次调度正在处理这一单），不重复
+  if (_takeoutExpressing.has(order.id)) return;
+  // 标记表达中（同步，防止 setTimeout 未触发前被 refreshChatScreen/visibilitychange 重复调度）
+  _takeoutExpressing.add(order.id);
 
   // 在聊天页面才注入 system 消息，防止用户不在场时 Ghost 已经"知道收到了"
   if (typeof chatHistory !== 'undefined') {
@@ -838,28 +929,8 @@ async function onGhostReceivedTakeout(order, force = false) {
       if (typeof changeAffection === 'function') changeAffection(_affDelta);
       if (typeof changeTrustHeat === 'function') changeTrustHeat(_trustDelta);
 
-      // 写进长期记忆（带时间戳，24小时后自动过期）
-      try {
-        const _ltm  = localStorage.getItem('longTermMemory') || '';
-        const _now  = Date.now();
-        const _dateStr = new Date(_now).toISOString().split('T')[0];
-        const _note = told
-          ? `[${_dateStr}] She ordered takeout for you — 「${order.nameEn || order.name}」. It arrived. You have it. Confirm if she asks.`
-          : `[${_dateStr}] Takeout showed up — 「${order.nameEn || order.name}」. You didn't know she ordered it. You have it now. Confirm if she asks.`;
-        // 清理超过24小时的外卖记录，防止日记/对话一直提到旧外卖
-        const _cutoff = new Date(_now - 24 * 3600 * 1000).toISOString().split('T')[0];
-        const _cleanedLtm = _ltm.split('\n').filter(line => {
-          const _m = line.match(/^\[(\d{4}-\d{2}-\d{2})\]/);
-          if (!_m) return true; // 没有日期标记的行保留
-          const _isTakeoutLine = /takeout|ordered food|ordered you/i.test(line);
-          if (_isTakeoutLine && _m[1] < _cutoff) return false; // 超过24小时的外卖记录删除
-          return true;
-        }).join('\n');
-        if (!_cleanedLtm.includes(order.nameEn || order.name)) {
-          localStorage.setItem('longTermMemory', (_cleanedLtm + '\n' + _note).trim().slice(-2000));
-          if (typeof touchLocalState === 'function') touchLocalState();
-        }
-      } catch(e) {}
+      // 注：世界事实 / 近期事实（currentTakeout + longTermMemory note）已在
+      // checkTakeoutUpdates → _writeTakeoutFact 阶段无条件落地，这里不再重复写入。
 
       // Ghost 用 S 说一句反应（调情中存 pending 不打断）
       // 修复(#23)：从 pendingTakeoutReactions 回放时 force=true，绕过调情判断，
@@ -868,9 +939,9 @@ async function onGhostReceivedTakeout(order, force = false) {
       const _isFlirting = !force && (sessionStorage.getItem('loveOverride') === 'true'
         || (chatHistory || []).slice(-4).some(m => m._intimate));
       if (_isFlirting) {
-        const _pt = JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]');
-        _pt.push({ order, savedAt: Date.now() });
-        localStorage.setItem('pendingTakeoutReactions', JSON.stringify(_pt));
+        // 调情中不打断：留在待表达队列，释放表达锁，等下次真正进 Chat 时 force 重放
+        _addPendingTakeout(order);
+        _takeoutExpressing.delete(order.id);
       } else {
         try {
           const _descHint = order.desc ? `\nWhat it is: ${order.desc}` : '';
@@ -963,6 +1034,9 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
             if (_realMsgs.length > 0 && typeof saveHistory === 'function') saveHistory();
             if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
           }
+          // 表达真正落地（台词已进 chatHistory 并持久化）→ 标记已表达 + 出队
+          _markTakeoutReacted(order.id);
+          _removePendingTakeout(order.id);
         } catch(e) {
           console.warn('[外卖] 回复生成失败:', e);
           // 网络错误也兜底
@@ -973,12 +1047,20 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
             chatHistory.push({ role: 'assistant', content: _fallbackLine });
             if (typeof saveHistory === 'function') saveHistory();
           }
+          // 兜底台词也已进聊天 → 视为已表达
+          _markTakeoutReacted(order.id);
+          _removePendingTakeout(order.id);
         }
       }
 
       if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 
-    } catch(e) { console.warn('[外卖] 送达处理失败:', e); }
+    } catch(e) {
+      console.warn('[外卖] 送达处理失败:', e);
+    } finally {
+      // 释放表达锁：成功已标记 reacted，失败则留在 pending 等下次重试（不静默丢失）
+      _takeoutExpressing.delete(order.id);
+    }
   }, delay);
 }
 
@@ -1064,11 +1146,18 @@ function updateTakeoutCardHint() {
 
 function checkPendingTakeoutReactions() {
   try {
-    const pending = JSON.parse(localStorage.getItem('pendingTakeoutReactions') || '[]');
+    // 只在用户真正进入聊天页时消费待表达（防止回前台但人在 Feed/外卖页时误播）
+    if (!_isChatVisible()) return;
+    const pending = _getPendingTakeout();
     if (!pending.length) return;
-    localStorage.removeItem('pendingTakeoutReactions');
-    pending.forEach((item, idx) => {
-      setTimeout(() => onGhostReceivedTakeout(item.order, true), idx * 4000);
+    // 不整体清空：每单表达成功后由 onGhostReceivedTakeout 自行出队，失败保留重试。
+    // 跳过已表达 / 表达中的订单，避免重复调度。
+    let scheduled = 0;
+    pending.forEach((item) => {
+      const order = item && item.order;
+      if (!order || _takeoutReacted(order.id) || _takeoutExpressing.has(order.id)) return;
+      setTimeout(() => onGhostReceivedTakeout(order, true), scheduled * 4000);
+      scheduled++;
     });
   } catch(e) {}
 }
@@ -1077,6 +1166,7 @@ function checkPendingTakeoutReactions() {
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
+      // 送达检查与页面无关（只写世界事实/近期事实）；表达消费由 checkPendingTakeoutReactions 内部按可见性自控
       setTimeout(checkTakeoutUpdates, 500);
       setTimeout(checkPendingTakeoutReactions, 1000);
     }
