@@ -275,6 +275,22 @@ export default async function handler(req, res) {
         errorObjectPresent: _isPlainObj ? ('error' in response) : false,
         dataObjectPresent: _isPlainObj ? ('data' in response) : false,
       };
+      // error 元数据：先判类型，仅 plain object 才读纯技术字段（type/code/status/param）。
+      // 绝不读 message/detail/data，绝不 stringify —— 这些可能回显用户正文。
+      const _err = _isPlainObj ? response.error : undefined;
+      if (_err !== undefined) {
+        const _errIsPlainObj = _err !== null && typeof _err === 'object' && !Array.isArray(_err);
+        _shape.errorValueType = typeof _err;
+        _shape.errorIsArray = Array.isArray(_err);
+        if (_errIsPlainObj) {
+          _shape.errorKeys = Object.keys(_err);
+          _shape.errorType = typeof _err.type === 'string' ? _err.type : undefined;
+          _shape.errorCode = (typeof _err.code === 'string' || typeof _err.code === 'number') ? _err.code : undefined;
+          _shape.errorStatus = (typeof _err.status === 'string' || typeof _err.status === 'number') ? _err.status : undefined;
+          _shape.errorStatusCode = (typeof _err.statusCode === 'string' || typeof _err.statusCode === 'number') ? _err.statusCode : undefined;
+          _shape.errorParam = typeof _err.param === 'string' ? _err.param : undefined;
+        }
+      }
     }
     console.warn('[GrokDiag]', {
       reqId: _diag.reqId,
