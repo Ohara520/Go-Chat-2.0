@@ -1078,15 +1078,28 @@ async function generateFeedComments(postAuthorKey, postEn) {
     ? `This is ${userName}'s post. She is Ghost's wife${daysTogether} and part of the unit's circle. Teammates know her and may address her directly when it fits naturally.`
     : `This is ${authorName}'s post. Stay focused on the post itself. ${userName} (Ghost's wife) is part of the unit's circle, but do not mention her unless it naturally fits the conversation.`;
 
+  // BUG-2：发帖人是角色时，其真实身份由 actor key 决定（复用 _FEED_PERSONA），
+  // authorName 走的是 feedActorName → 可能是用户自定义昵称（botNickname，如 "Babe"）。
+  // 发帖人自己不在 commenters 里 → personaLines 不含发帖人身份，模型只能看到 "Babe [ghost]"，
+  // 便可能按昵称瞎猜性别/身份（如 "lass"）。这里把权威身份显式补进 prompt，昵称只作显示。
+  const authorPersona = _FEED_PERSONA[postAuthorKey];
+  const authorLine = isUserPost
+    ? `Post by ${authorName} [user]: "${postEn}"`
+    : `Post by [${postAuthorKey}] — real identity (authoritative, fixed by the actor key): ${authorPersona}
+The display name shown for [${postAuthorKey}] is "${authorName}", which may just be a nickname the reader chose — it does NOT define who they are, their gender, or their persona. Use the identity above.
+Post: "${postEn}"`;
+
   // 反编造铁律：模型爱在评论里瞎编生日日期/名字/数字（例如把"室友生日"当成她的生日，还编个"三月"）。
   // 只让它围着帖子本身说，需要引用她真实生日时用存档里的真值，没有就别提。
   const _uBday = localStorage.getItem('userBirthday') || '';
   const groundingRule = `GROUNDING — do NOT invent facts. Only reference details actually present in the post. Do NOT state a specific date, month, name, number, or whose event it is unless the post itself says so. Read the post carefully: if it is about someone else (a roommate, a friend, a teammate), the event belongs to THAT person — never reattribute it to ${userName} or anyone else. If a birthday, anniversary, or figure is not stated in the post, do NOT make one up; react to the moment without naming a date.${_uBday ? ` (For reference only, if and ONLY if the post is explicitly about ${userName}'s OWN birthday: hers is ${_uBday}, month-day. Do not use this otherwise.)` : ''}`;
 
-  const systemPrompt = `You generate a short Task Force 141 comment thread under a social post. ${contextLine} ${_feedDistanceRule()} ${groundingRule} Each comment has English + Chinese. Comments react to the post and to each other, in character. React to the social intent of the post, not just its literal content. If she is joking, teasing, being sarcastic, or deliberately posting something silly, play along or react naturally in character. Do not explain the joke or treat it like a factual statement. A dry reaction, playful jab, or deadpan response is often better than praise. No emojis, no hashtags, no pet names (babe/honey/love), no OOC sweetness. Return JSON only.`;
+  // BUG-2：显示名可能是用户自定义昵称，绝不能据此推断人物身份/性别。actor key（方括号里的）才是权威。
+  const identityRule = `IDENTITY — an actor's real identity is fixed by their bracketed key (e.g. [ghost] is Simon "Ghost" Riley, male), NOT by the display name shown next to it. A display name may be a nickname the reader chose (e.g. "Babe") and never changes who someone is, their gender, or their persona. When a display name and the key's identity seem to conflict, the key's identity wins. Do not guess anyone's gender or identity from a display name.`;
+  const systemPrompt = `You generate a short Task Force 141 comment thread under a social post. ${contextLine} ${identityRule} ${_feedDistanceRule()} ${groundingRule} Each comment has English + Chinese. Comments react to the post and to each other, in character. React to the social intent of the post, not just its literal content. If she is joking, teasing, being sarcastic, or deliberately posting something silly, play along or react naturally in character. Do not explain the joke or treat it like a factual statement. A dry reaction, playful jab, or deadpan response is often better than praise. No emojis, no hashtags, no pet names (babe/honey/love), no OOC sweetness. Return JSON only.`;
   // 默认每条都是对帖子的一级评论。只有当某条评论确实在回应上面已出现的某位评论者时，
   // 模型才在该条给出 replyTo=对方 key；不再由代码按评论顺序强行串成回复链。
-  const userPrompt = `Post by ${authorName} [${postAuthorKey}]: "${postEn}"
+  const userPrompt = `${authorLine}
 
 These teammates comment, in this order:
 ${personaLines}
