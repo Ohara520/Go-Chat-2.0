@@ -145,11 +145,9 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   const lastTriggeredAt = parseInt(localStorage.getItem('lastInnerThoughtAt') || '0');
   const msSinceLast = now - lastTriggeredAt;
 
-  const COOLDOWN_MS = 5 * 60 * 1000;   // 正常冷却：5分钟
-  const FORCE_MS    = 20 * 60 * 1000;  // 强制触发：20分钟没有心声就强制一次
+  const COOLDOWN_MS = 10 * 60 * 1000;   // 正常冷却：10分钟
 
   const inCooldown = msSinceLast < COOLDOWN_MS;
-  const forceTrigger = msSinceLast >= FORCE_MS;
 
   // 冷却期内：只有 justCared / coldWarCracking 可以插队
   if (inCooldown && !justCared && !coldWarCracking) return;
@@ -161,28 +159,28 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
     .map(m => m.content.toLowerCase()).join(' ');
   const _warmAtmosphere = /love|miss|想你|爱你|好想|抱|亲|喜欢|care|here for you|with you/.test(_recentCtx);
   const _intimateRecent = chatHistory.slice(-6).some(m => m._intimate);
-  const _atmosphereBoost = (_warmAtmosphere || _intimateRecent) ? 0.15 : 0;
+  const _atmosphereBoost = (_warmAtmosphere || _intimateRecent) ? 0.05 : 0;
 
   // ── 确定场景类型和触发概率 ───────────────────────────────
   let thoughtType = 'contrast';
   let triggerChance = 0;
 
-  if (justCared)           { thoughtType = 'behavior';  triggerChance = 0.90; }
-  else if (coldWarCracking){ thoughtType = 'crack';     triggerChance = 0.85; }
-  else if (jealousyHidden) { thoughtType = 'jealousy';  triggerChance = 0.80; }
-  else if (missedCue)      { thoughtType = 'delayed';   triggerChance = 0.75; }
-  else if (isStubborn)     { thoughtType = 'contrast';  triggerChance = 0.50; }
-  else if (hiddenCare)     { thoughtType = 'behavior';  triggerChance = 0.70; }
-  else if (heldBack)       { thoughtType = 'contrast';  triggerChance = 0.40; }
-  else if (noticedDetail)  { thoughtType = 'noticed';   triggerChance = 0.40; }
+  if (justCared)           { thoughtType = 'behavior';  triggerChance = 0.80; }
+  else if (coldWarCracking){ thoughtType = 'crack';     triggerChance = 0.80; }
+  else if (jealousyHidden) { thoughtType = 'jealousy';  triggerChance = 0.68; }
+  else if (missedCue)      { thoughtType = 'delayed';   triggerChance = 0.62; }
+  else if (isStubborn)     { thoughtType = 'contrast';  triggerChance = 0.32; }
+  else if (hiddenCare)     { thoughtType = 'behavior';  triggerChance = 0.52; }
+  else if (heldBack)       { thoughtType = 'contrast';  triggerChance = 0.22; }
+  else if (noticedDetail)  { thoughtType = 'noticed';   triggerChance = 0.22; }
   else {
-    // 日常随机：20%
+    // 日常随机：8%
     thoughtType = 'contrast';
-    triggerChance = 0.20;
+    triggerChance = 0.08;
   }
 
   const finalChance = Math.min(0.95, triggerChance + _atmosphereBoost);
-  if (!forceTrigger && Math.random() > finalChance) return;
+  if (Math.random() > finalChance) return;
 
   // ── 记录触发时间 ──────────────────────────────────────────
   localStorage.setItem('lastInnerThoughtAt', now);
@@ -205,15 +203,15 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
   const replySnippet = replyText.slice(0, 80).trim();
   const userSnippet = lastUserMsg.slice(0, 60).trim();
   const sceneHints = {
-    contrast:  `He just said: "${replySnippet}" — dry, clipped, deflecting. There was more he didn't say. What was actually going through his head?`,
-    jealousy:  `He just said: "${replySnippet}" — but something bothered him that he didn't name. What did he notice and swallow?`,
-    delayed:   `She said: "${userSnippet}" — he responded but missed the real thing she was sharing. What did he realize too late?`,
-    behavior:  `He just did something for her — the reply shows it. He won't explain why. What's the actual reason underneath?`,
-    crack:     `Cold war. He just said: "${replySnippet}" — still stiff, but something shifted slightly. What moved in him that he won't admit?`,
-    noticed:   `She just said: "${userSnippet}" — his reply was brief. But he caught something specific. One small thing he clocked and held onto.`,
+    contrast:  `You just said: "${replySnippet}" — dry, clipped, deflecting. There was more you didn't say. The thought you swallowed, right now.`,
+    jealousy:  `You just said: "${replySnippet}" — but something bothered you that you didn't name. What you noticed and swallowed.`,
+    delayed:   `She just said: "${userSnippet}" — you answered, but missed the real thing she was giving you. The small realization that hit a beat too late.`,
+    behavior:  `You just did something for her — your reply shows it. You won't explain why. The real reason, the one you don't say.`,
+    crack:     `Cold war. You just said: "${replySnippet}" — still stiff, but something shifted in you. The thing that moved that you won't admit.`,
+    noticed:   `She just said: "${userSnippet}" — you kept your reply brief. But you caught something specific. The one small thing you clocked and held onto.`,
   };
   const sceneHint = isBedtime
-    ? `She's heading to bed. He just said: "${replySnippet}". He noticed more than he let on.`
+    ? `She's heading to bed. You just said: "${replySnippet}". You noticed more than you let on.`
     : (sceneHints[thoughtType] || sceneHints.contrast);
 
   // 最近对话上下文（图片消息替换为占位符，防止Grok/Sonnet处理base64）
@@ -221,7 +219,7 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
     .filter(m => !m._system && !m._recalled)
     .slice(-8)
     .map(m => {
-      const who = m.role === 'user' ? 'Her' : 'Ghost';
+      const who = m.role === 'user' ? 'Her' : 'You';
       const hasPhoto = m._photoBase64 || Array.isArray(m.content);
       const content = hasPhoto ? '[sent a photo]' : (m.content || '').slice(0, 80);
       return `${who}: ${content}`;
@@ -231,7 +229,7 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
   // 异地规则：没见过面不写肢体接触
   const metInPerson = localStorage.getItem('metInPerson') === 'true';
   const longDistanceRule = !metInPerson
-    ? `\nLong-distance. She is not physically there. Do NOT write thoughts about holding her, hugging her, her being beside him, or any physical presence. Distance is real — if he misses her, it shows differently.`
+    ? `\nLong-distance. She is not physically there. Do NOT write thoughts about holding her, hugging her, her being beside you, or any physical presence. Distance is real — if you miss her, it shows differently.`
     : '';
 
   // 最近几条心声，防止重复
@@ -240,19 +238,24 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
     ? `\nDo NOT repeat or echo these recent inner thoughts:\n${recentThoughts.map(t => `- "${t}"`).join('\n')}`
     : '';
 
-  const thoughtPrompt = `You are Ghost. This is the thought he didn't say out loud.
+  const thoughtPrompt = `You are Ghost. This is the thought you didn't say out loud — the fragment in your own head, right now.
 
 One line. Rarely two.
-Lowercase. First person. Clipped.
-Not a description — the actual fragment that passed through his head.
+Lowercase. First person, your own head. Clipped.
+Not a description — the actual fragment that just passed through your mind.
 No scene-setting. No sighing. No "i'm sitting here thinking".
-Specific to this moment. Grounded in what just happened.
+Specific to this moment.
+
+Do not recap the conversation or explain what just happened.
+Do not narrate yourself from the outside.
+Do not summarize the scene for anyone.
+The context is already known — write only the thought that flashed through your head, not a report of it.
 
 The thought can be:
-— something he noticed but didn't name ("she did it again.")
-— something he almost said but swallowed ("shouldn't have left it there.")
+— something you noticed but didn't name ("she did it again.")
+— something you almost said but swallowed ("shouldn't have left it there.")
 — something small that landed harder than expected ("that one got through.")
-— something dry that masks what he actually feels ("fine. she's fine.")
+— something dry that masks what you actually feel ("fine. she's fine.")
 
 ${longDistanceRule}
 ${recentContext}
