@@ -1084,29 +1084,25 @@ async function generateFeedComments(postAuthorKey, postEn) {
   const groundingRule = `GROUNDING — do NOT invent facts. Only reference details actually present in the post. Do NOT state a specific date, month, name, number, or whose event it is unless the post itself says so. Read the post carefully: if it is about someone else (a roommate, a friend, a teammate), the event belongs to THAT person — never reattribute it to ${userName} or anyone else. If a birthday, anniversary, or figure is not stated in the post, do NOT make one up; react to the moment without naming a date.${_uBday ? ` (For reference only, if and ONLY if the post is explicitly about ${userName}'s OWN birthday: hers is ${_uBday}, month-day. Do not use this otherwise.)` : ''}`;
 
   const systemPrompt = `You generate a short Task Force 141 comment thread under a social post. ${contextLine} ${_feedDistanceRule()} ${groundingRule} Each comment has English + Chinese. Comments react to the post and to each other, in character. React to the social intent of the post, not just its literal content. If she is joking, teasing, being sarcastic, or deliberately posting something silly, play along or react naturally in character. Do not explain the joke or treat it like a factual statement. A dry reaction, playful jab, or deadpan response is often better than praise. No emojis, no hashtags, no pet names (babe/honey/love), no OOC sweetness. Return JSON only.`;
-  // 回复对象由代码固定成一条回复链，模型不许自己决定回谁：
-  // 第1条评论回复发帖人，之后每条回复上一位评论者。模型只需让文字贴合被指派的对象。
-  const _replyTargetKey = (i) => (i === 0 ? postAuthorKey : commenters[i - 1]);
-  const threadPlan = commenters
-    .map((k, i) => `${i + 1}. ${feedActorName(k)} [${k}] is replying to ${feedActorName(_replyTargetKey(i))} — write the line so it clearly addresses ${feedActorName(_replyTargetKey(i))}.`)
-    .join('\n');
+  // 默认每条都是对帖子的一级评论。只有当某条评论确实在回应上面已出现的某位评论者时，
+  // 模型才在该条给出 replyTo=对方 key；不再由代码按评论顺序强行串成回复链。
   const userPrompt = `Post by ${authorName} [${postAuthorKey}]: "${postEn}"
 
 These teammates comment, in this order:
 ${personaLines}
 
-This is a reply chain. Each comment addresses a fixed person (assigned below — you do NOT choose who replies to whom):
-${threadPlan}
-
-Write one short line each. Make each line actually address its assigned target. Do NOT output a "replyTo" field — that is decided for you.
-Return a JSON array only, same order and keys:
-[{"key":"${commenters[0]}","en":"...","zh":"..."}]`;
+By default each comment is a top-level reaction to the post. Only if a comment is genuinely responding to another teammate who already commented above it should it address that person — then set "replyTo" to that teammate's key for that comment. Most comments should react to the post, not to each other. Never reply to yourself, and never reply to someone who has not commented yet.
+Return a JSON array only, same order, keys "key","en","zh" and optional "replyTo":
+[{"key":"${commenters[0]}","en":"...","zh":"...","replyTo":"<key of the teammate this line answers, or omit for a top-level comment>"}]`;
 
   const valid = new Set(commenters);
-  // 回复链由位置固定：第 i 条回复上一位评论者，第 0 条回复发帖人（模型输出的 replyTo 一律忽略）
-  const _chainReplyTo = (list, author, idx) => {
-    const target = idx === 0 ? postAuthorKey : (list[idx - 1]?.author ?? postAuthorKey);
-    return target === author ? undefined : target;
+  // 校验模型给出的 replyTo：只有指向"已经出现过的其他评论者"才保留，否则回退为一级评论。
+  // list 是已按顺序生成的评论；idx 之前的 author 才算"已出现"。不允许 replyTo 自己/发帖人视为可选目标。
+  const _validReplyTo = (list, author, idx) => {
+    const t = list[idx]?.replyTo;
+    if (!t || t === author) return undefined;                 // 无目标 / 回复自己 → 一级评论
+    if (!list.slice(0, idx).some(c => c.author === t)) return undefined; // 目标不是"已出现的评论者" → 一级评论
+    return t;                                                  // 回复帖子本身也归为一级评论（上面的切片天然排除 postAuthor）
   };
 
   const _genOnce = async () => {
@@ -1126,7 +1122,7 @@ Return a JSON array only, same order and keys:
     return arr
       .filter(c => c && c.en && valid.has(c.key))
       .slice(0, 3)
-      .map(c => ({ author: c.key, en: c.en, zh: c.zh || '' }));
+      .map(c => ({ author: c.key, en: c.en, zh: c.zh || '', replyTo: valid.has(c.replyTo) ? c.replyTo : undefined }));
   };
 
   // BUG-20 硬校验：拦评论里"帖子没提的日期性信息"。命中→丢弃→重试一次→还命中/仍失败→fallback。
@@ -1139,16 +1135,16 @@ Return a JSON array only, same order and keys:
       console.log('[feed] 评论编造日期，丢弃重试', attempt);
       continue;
     }
-    out.forEach((c, i) => { c.replyTo = _chainReplyTo(out, c.author, i); });
+    out.forEach((c, i) => { c.replyTo = _validReplyTo(out, c.author, i); });
     return out;
   }
   return _fallbackChain();
 
   function _fallbackChain() {
-    return commenters.map((k, i) => {
+    // 兜底文案是通用静态句，没有语义回复目标 → 一律一级评论，不再按顺序串成回复链。
+    return commenters.map((k) => {
       const o = _FEED_FALLBACK[k]; const p = o[Math.floor(Math.random() * o.length)];
-      const target = i === 0 ? postAuthorKey : commenters[i - 1];
-      return { author: k, en: p.en, zh: p.zh, replyTo: target === k ? undefined : target };
+      return { author: k, en: p.en, zh: p.zh, replyTo: undefined };
     });
   }
 
