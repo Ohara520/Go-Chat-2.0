@@ -721,15 +721,27 @@ function feedEvent_sheIsBack(absentHours) {
 // ── 用户在聊天里要求 Ghost 发朋友圈 ──────────────────
 // 每天最多1次，超过了 Ghost 会拒绝
 // 返回: { ok: true } 或 { ok: false, reply: '拒绝文案' }
+// 纯本地、无副作用的资格检查：现在允许不允许执行"用户要求 Ghost 发帖"。
+// 只读取 localStorage 时间戳，不写 timestamp、不发帖、不调 API、不消耗次数。
+// sendMessage 主回复阶段和 handleUserFeedRequest 执行阶段共用这一个 source of truth，
+// 避免两边各写一份 6 * 3600 * 1000 之后漂移。
+const USER_FEED_REQ_COOLDOWN = 6 * 3600 * 1000;
+function getUserFeedRequestAvailability() {
+  const lastReqAt = parseInt(localStorage.getItem('lastUserFeedReqAt') || '0');
+  if (lastReqAt && Date.now() - lastReqAt < USER_FEED_REQ_COOLDOWN) {
+    return { allowed: false, reason: 'cooldown', remainingMs: USER_FEED_REQ_COOLDOWN - (Date.now() - lastReqAt) };
+  }
+  return { allowed: true, reason: null, remainingMs: 0 };
+}
+
 async function handleUserFeedRequest(userText = '') {
   // 限次：两条"用户要求发"之间至少隔 6 小时（防止一直让他发）。
   // 用独立 key，不和他自己发的日常动态互相干扰。
-  const REQ_COOLDOWN = 6 * 3600 * 1000;
-  const lastReqAt = parseInt(localStorage.getItem('lastUserFeedReqAt') || '0');
+  const _avail = getUserFeedRequestAvailability();
   const _banter = (typeof getBanterSweet === 'function') ? getBanterSweet() : -20;
 
   // 冷却期内 → Ghost 拒绝，拒绝口气也跟着 banterSweet 走
-  if (lastReqAt && Date.now() - lastReqAt < REQ_COOLDOWN) {
+  if (!_avail.allowed) {
     const declines = _banter >= 50 ? [
       "posted for you already. ask me again later, yeah?",
       "gave you one not long ago. don't push it — tonight, maybe.",

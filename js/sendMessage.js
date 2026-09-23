@@ -536,13 +536,23 @@ async function _processMergedMessage(text) {
   updateLoveResistance(text);
   checkLoveUnlockConditions();
 
-  // 用户主动要求Ghost发朋友圈
+  // 用户主动要求Ghost发朋友圈 —— 两层 action 检测
+  //  第一层 fast path：命中固定关键词 → 直接发帖，零额外 API。
+  //  第二层 semantic fallback：没命中固定词，但出现"社交发布"领域词时，
+  //    才花一次真正 DeepSeek 分类，判断用户是否在明确要求 Ghost 本人发帖。
+  //    (修复 BUG-7：像"去动态认罪""愿赌服输去动态承认"这种自然语言请求，
+  //     不含固定关键词，旧的 substring trigger 直接漏掉，Ghost 嘴上答应却没发。)
   const feedRequestKws = ['发条朋友圈','发个朋友圈','发朋友圈','po一条','晒一下','post something','发一条','你发一条','你po'];
-  if (feedRequestKws.some(k => text.toLowerCase().includes(k.toLowerCase()))) {
-    // 修复(#22)：原来调 maybeTriggerFeedPost()，它会从事件池里挑"最高分"事件，
-    // 常常是 user 侧事件(actor:'user') → 走 showUserDraftCard → 以"我方"发布，
-    // 导致"让他发朋友圈结果变成我们发的"。改为直接调专用的 handleUserFeedRequest，
-    // 它强制以 Ghost(botNickname) 作者发帖。
+  // 领域门槛：只有出现这些社交发布相关词，才值得再花一次分类调用
+  const feedDomainKws = ['朋友圈','动态','帖子','发帖','公开','晒','feed','post'];
+  const _lowerText = text.toLowerCase();
+  const _directFeedHit = feedRequestKws.some(k => _lowerText.includes(k.toLowerCase()));
+
+  // 修复(#22)：原来调 maybeTriggerFeedPost()，它会从事件池里挑"最高分"事件，
+  // 常常是 user 侧事件(actor:'user') → 走 showUserDraftCard → 以"我方"发布，
+  // 导致"让他发朋友圈结果变成我们发的"。改为直接调专用的 handleUserFeedRequest，
+  // 它强制以 Ghost(botNickname) 作者发帖。
+  const _triggerGhostFeedPost = () => {
     if (typeof handleUserFeedRequest === 'function') {
       setTimeout(async () => {
         const res = await handleUserFeedRequest(text).catch(() => null);
@@ -556,6 +566,38 @@ async function _processMergedMessage(text) {
     } else {
       feedEvent_dailyMoment();
       setTimeout(() => maybeTriggerFeedPost('user_request'), 3000);
+    }
+  };
+
+  // action intent 判定：同一条消息最多做一次分类，结果既喂给主聊天 prompt
+  // (让 Ghost 不在 cooldown 时画饼)，又决定后续是否真正触发 handler。
+  let _feedActionRequested = false;
+  if (_directFeedHit) {
+    // 第一层：固定关键词命中 → 本地即确定 action intent，不调用分类器
+    _feedActionRequested = true;
+  } else if (feedDomainKws.some(k => _lowerText.includes(k.toLowerCase())) && typeof callDeepSeekWithSystem === 'function') {
+    // 第二层：疑似社交发布语义 → 一次真正 DeepSeek 分类（走 /api/deepseek，非 Haiku）
+    // 只做 action intent 判断，不写文案、不回用户。
+    const _sys = `Determine whether the user's message is explicitly asking Ghost himself to publish a social/feed post right now. Return only YES or NO. YES only when the user is directing Ghost himself to make/publish a post (including making him admit/confess something in a post). Mentions of feeds/posts, the user's own post, asking what someone else posted, reading/liking/commenting on/deleting a post, or opinions about a post are NO.`;
+    const _ans = ((await callDeepSeekWithSystem(_sys, text, 8).catch(() => '')) || '').trim().toUpperCase();
+    if (_ans.startsWith('YES')) _feedActionRequested = true;
+  }
+
+  // 修复 BUG-7(第二部分)：主回复承诺必须和 action 可执行状态一致。
+  //  在主聊天模型调用前，用纯本地无副作用的资格检查确定"现在能不能发"，
+  //  据此给主聊天一个内部 hint，并决定是否真的触发发帖 handler（cooldown 中不空跑）。
+  let _feedActionHint = '';
+  if (_feedActionRequested) {
+    const _avail = (typeof getUserFeedRequestAvailability === 'function')
+      ? getUserFeedRequestAvailability()
+      : { allowed: true };
+    if (!_avail.allowed) {
+      // unavailable（cooldown）→ 明确告诉模型别答应、别声称已发；也不空跑 handler。
+      _feedActionHint = "[Feed action: unavailable — you posted for her not long ago and can't post again right now. Do NOT promise to post, do NOT say you'll do it, do NOT claim you posted. Just respond naturally in character — you can be dry about it, but no post is happening this turn.]";
+    } else {
+      // available/pending → 允许答应去做，但 action 还没成功，禁止声称"已经发了"。
+      _feedActionHint = "[Feed action: accepted but not completed yet. You may agree to do it (dry, in character), but do NOT claim it's already posted and do NOT tell her to go look yet — the post hasn't gone up.]";
+      _triggerGhostFeedPost();
     }
   }
 
@@ -1163,6 +1205,7 @@ async function _processMergedMessage(text) {
       _timeAskHint,
       _antiLoopHint,
       _longContentHint,
+      _feedActionHint,
       sceneHint || '[React directly to what she just said. Take it at face value.]',
       responseMode,
       workHint,
