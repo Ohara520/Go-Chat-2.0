@@ -517,23 +517,9 @@ function buildKeeganSystemPrompt() {
 
   // 时间
   const nowForTime = new Date();
-  const ukTimeStr = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false
-  }).format(nowForTime);
   const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London', hour: 'numeric', hour12: false
   }).format(nowForTime));
-
-  const countryTimezones = {
-    CN: 'Asia/Shanghai', NL: 'Europe/Amsterdam', CA: 'America/Toronto',
-    AU: 'Australia/Sydney', US: 'America/New_York', DE: 'Europe/Berlin',
-    FR: 'Europe/Paris', JP: 'Asia/Tokyo', KR: 'Asia/Seoul',
-    SG: 'Asia/Singapore', GB: 'Europe/London'
-  };
-  const userTZ = countryTimezones[userCountry] || 'Asia/Shanghai';
-  const userLocalTimeStr = new Intl.DateTimeFormat('en-GB', {
-    timeZone: userTZ, hour: '2-digit', minute: '2-digit', hour12: false
-  }).format(nowForTime);
 
   const ghostStatusHint = (ukHour >= 23 || ukHour < 6)
     ? 'late night / early hours — on a mission or asleep'
@@ -543,9 +529,9 @@ function buildKeeganSystemPrompt() {
     : ukHour < 21 ? 'evening — wrapping up'
     : 'night — off duty';
 
-  const userLocalHour = parseInt(new Intl.DateTimeFormat('en-GB', {
-    timeZone: userTZ, hour: 'numeric', hour12: false
-  }).format(nowForTime));
+  // 用户 daypart 来自设备本地时间，不再按国家猜时区（多时区国家会算错）。
+  // 精确小时只在此处内部使用，只有粗粒度 daypart 会进 prompt。
+  const userLocalHour = nowForTime.getHours();
   const userTimeOfDay = (userLocalHour >= 23 || userLocalHour < 6) ? 'late night'
     : userLocalHour < 9  ? 'morning'
     : userLocalHour < 13 ? 'mid-morning'
@@ -620,10 +606,10 @@ RULE: These facts are FIXED. Never change them. Never guess.
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
 ${randomState ? `Current state: ${randomState}` : ''}
 
-Current time:
-- UK time (your side): ${ukTimeStr} — ${ghostStatusHint}
-- ${userName}'s side: ${userLocalTimeStr} — ${userTimeOfDay}
-You are aware of the time difference.
+Time awareness (background feel, NOT something you report):
+- Your side (UK): roughly ${ghostStatusHint.split(' — ')[0]}.
+- ${userName}'s side: ${userTimeOfDay}.
+You feel the time gap, but you never state clock numbers, never do timezone math, and never line the two times up against each other. Do not assume her time of day matches yours — base greetings on HER daypart. Your own exact UK time may only be stated if she explicitly asks what time it is for you. Never calculate or state her exact local time.
 
 ${metInPerson
   ? `✓ You have met in person. She came to see you. This memory is real.`

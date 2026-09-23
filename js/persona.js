@@ -685,13 +685,6 @@ function buildSystemPrompt() {
   const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London', hour: 'numeric', hour12: false
   }).format(nowForTime));
-  const countryTimezones = {
-    CN: 'Asia/Shanghai', NL: 'Europe/Amsterdam', CA: 'America/Toronto',
-    AU: 'Australia/Sydney', US: 'America/New_York', DE: 'Europe/Berlin',
-    FR: 'Europe/Paris', JP: 'Asia/Tokyo', KR: 'Asia/Seoul',
-    SG: 'Asia/Singapore', GB: 'Europe/London'
-  };
-  const userTZ = countryTimezones[userCountry] || 'Asia/Shanghai';
   const ghostStatusHint = (ukHour >= 23 || ukHour < 6)
     ? 'late night / early hours — he may be on a mission or asleep'
     : ukHour < 9  ? 'morning — just up or preparing for training'
@@ -699,9 +692,9 @@ function buildSystemPrompt() {
     : ukHour < 17 ? 'afternoon — standing down or on standby'
     : ukHour < 21 ? 'evening — wrapping up, winding down'
     : 'night — relaxing or heading to bed';
-  const userLocalHour = parseInt(new Intl.DateTimeFormat('en-GB', {
-    timeZone: userTZ, hour: 'numeric', hour12: false
-  }).format(nowForTime));
+  // 用户 daypart 来自设备本地时间，不再按国家猜时区（多时区国家会算错）。
+  // 精确小时只在此处内部使用，只有粗粒度 daypart 会进 prompt。
+  const userLocalHour = nowForTime.getHours();
   const userTimeOfDay = (userLocalHour >= 23 || userLocalHour < 6) ? 'late night'
     : userLocalHour < 9  ? 'morning'
     : userLocalHour < 13 ? 'mid-morning'

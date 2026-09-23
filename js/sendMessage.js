@@ -708,7 +708,7 @@ async function _processMergedMessage(text) {
       } else if (_isRoutine) {
         // 早晚安/吃饭 — 这是注意到她的窗口，不是收尾的窗口
         const r = Math.random();
-        if (r < 0.55) responseMode = '[Response mode: notice one thing — what time it is on her side, what she might be doing, something specific. Attentive without announcing it.]';
+        if (r < 0.55) responseMode = '[Response mode: notice one thing — roughly what part of her day it is, what she might be doing, something specific. Attentive without announcing it. Never state a clock time for her side.]';
         else if (r < 0.85) responseMode = '[Response mode: meet it in kind. You are awake too / eating too / it is late your side too. Small, real, not flagged.]';
         // 15% 留空 — 让 buildPacingBlock 自然控制
       } else if (_moodMain <= 4) {
