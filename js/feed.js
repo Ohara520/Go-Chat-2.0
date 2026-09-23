@@ -423,7 +423,7 @@ function renderCoupleFeed(posts) {
   }
 
   posts.forEach(post => {
-    if (!post || !post.en) return;
+    if (!post || (!post.en && !post.photo)) return; // BUG-6：允许纯图片帖（无正文）渲染
     const authorKey = post.author || 'ghost';
     const postAvatarHTML = feedActorAvatar(authorKey);
     const nameClass = feedActorNameClass(authorKey);
@@ -1056,9 +1056,15 @@ const _FEED_FALLBACK = {
 };
 
 // 一次调用生成整串评论（含可选 replyTo），失败降级为每人一句兜底
-async function generateFeedComments(postAuthorKey, postEn) {
+async function generateFeedComments(postAuthorKey, postEn, photoDescription) {
   const commenters = _rollFeedCommenters(postAuthorKey);
   if (!commenters.length) return [];
+
+  // BUG-6：图片帖把一次性生成的客观图片描述作为附加视觉上下文传进来。
+  // 这是模型能理解的"图里客观有什么"，不是用户 caption，也不替角色做情绪/关系判断。
+  const _photoBlock = photoDescription
+    ? `\nAttached photo (objective visual description of the image, this is NOT the poster's own words): "${photoDescription}"`
+    : '';
 
   const authorName = feedActorName(postAuthorKey);
   const userName = localStorage.getItem('userName') || '你';
@@ -1083,16 +1089,19 @@ async function generateFeedComments(postAuthorKey, postEn) {
   // 发帖人自己不在 commenters 里 → personaLines 不含发帖人身份，模型只能看到 "Babe [ghost]"，
   // 便可能按昵称瞎猜性别/身份（如 "lass"）。这里把权威身份显式补进 prompt，昵称只作显示。
   const authorPersona = _FEED_PERSONA[postAuthorKey];
+  // BUG-6：纯图片帖 postEn 为空，caption 行标注"(no caption — photo only)"，
+  // 让模型知道要围着图片描述评论，而不是当作没有任何上下文。
+  const _captionText = postEn ? `"${postEn}"` : (photoDescription ? '(no caption — photo only)' : '""');
   const authorLine = isUserPost
-    ? `Post by ${authorName} [user]: "${postEn}"`
+    ? `Post by ${authorName} [user]: ${_captionText}${_photoBlock}`
     : `Post by [${postAuthorKey}] — real identity (authoritative, fixed by the actor key): ${authorPersona}
 The display name shown for [${postAuthorKey}] is "${authorName}", which may just be a nickname the reader chose — it does NOT define who they are, their gender, or their persona. Use the identity above.
-Post: "${postEn}"`;
+Post: ${_captionText}${_photoBlock}`;
 
   // 反编造铁律：模型爱在评论里瞎编生日日期/名字/数字（例如把"室友生日"当成她的生日，还编个"三月"）。
   // 只让它围着帖子本身说，需要引用她真实生日时用存档里的真值，没有就别提。
   const _uBday = localStorage.getItem('userBirthday') || '';
-  const groundingRule = `GROUNDING — do NOT invent facts. Only reference details actually present in the post. Do NOT state a specific date, month, name, number, or whose event it is unless the post itself says so. Read the post carefully: if it is about someone else (a roommate, a friend, a teammate), the event belongs to THAT person — never reattribute it to ${userName} or anyone else. If a birthday, anniversary, or figure is not stated in the post, do NOT make one up; react to the moment without naming a date.${_uBday ? ` (For reference only, if and ONLY if the post is explicitly about ${userName}'s OWN birthday: hers is ${_uBday}, month-day. Do not use this otherwise.)` : ''}`;
+  const groundingRule = `GROUNDING — do NOT invent facts. Only reference details actually present in the post${photoDescription ? ' or in the attached photo description' : ''}. Do NOT state a specific date, month, name, number, or whose event it is unless the post itself says so. Read the post carefully: if it is about someone else (a roommate, a friend, a teammate), the event belongs to THAT person — never reattribute it to ${userName} or anyone else. If a birthday, anniversary, or figure is not stated in the post, do NOT make one up; react to the moment without naming a date.${_uBday ? ` (For reference only, if and ONLY if the post is explicitly about ${userName}'s OWN birthday: hers is ${_uBday}, month-day. Do not use this otherwise.)` : ''}`;
 
   // BUG-2：显示名可能是用户自定义昵称，绝不能据此推断人物身份/性别。actor key（方括号里的）才是权威。
   const identityRule = `IDENTITY — an actor's real identity is fixed by their bracketed key (e.g. [ghost] is Simon "Ghost" Riley, male), NOT by the display name shown next to it. A display name may be a nickname the reader chose (e.g. "Babe") and never changes who someone is, their gender, or their persona. When a display name and the key's identity seem to conflict, the key's identity wins. Do not guess anyone's gender or identity from a display name.`;
@@ -1637,7 +1646,7 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
 
 // ----- 插入帖子（新 flat 结构，feedPosts key）-----
 function insertFeedPost(post) {
-  if (!post || !post.en) return;
+  if (!post || (!post.en && !post.photo)) return; // BUG-6：允许纯图片帖（无正文）
   if (!post.id) post.id = 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   if (!post.ts) post.ts = Date.now();
 
@@ -2168,13 +2177,16 @@ async function submitFeedCompose() {
     zhLine = _isMeaningful(t, text) ? t.trim() : '';
   }
 
+  // 捕获本次配图引用（_feedComposePhoto 是模块级变量，弹窗重开会被重置，先存本地副本）
+  const _postPhoto = _feedComposePhoto ? { idbKey: _feedComposePhoto.idbKey, idbIndex: _feedComposePhoto.idbIndex } : null;
+
   // 先发帖（无评论），立刻显示——评论稍后异步补上，更像真人陆续来评论
   const postId = 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   insertFeedPost({
     id: postId,
     author: 'user',
     en, zh: zhLine,
-    photo: _feedComposePhoto ? { idbKey: _feedComposePhoto.idbKey, idbIndex: _feedComposePhoto.idbIndex } : null,
+    photo: _postPhoto,
     ts: Date.now(),
     likes: 1,
     liked: false,
@@ -2192,14 +2204,64 @@ async function submitFeedCompose() {
   if (typeof showToast === 'function') showToast('✨ 已发布到动态');
   renderCoupleFeedFromHistory();
 
+  // BUG-6：图片帖先做一次视觉理解，把客观描述持久化到帖子，再拿去生成评论。
+  // 一张图只识一次；失败静默降级为纯文字评论，不阻断发帖（帖子上面已经发出去了）。
+  let _photoDesc = '';
+  if (_postPhoto) {
+    _photoDesc = await describeFeedPhoto(_postPhoto);
+    if (_photoDesc) {
+      const list = getFeedPosts();
+      const p = list.find(x => String(x.id) === String(postId));
+      if (p) { p.photoDescription = _photoDesc; saveFeedPosts(list); }
+      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    }
+  }
+
   // 评论延迟送达（8~20秒随机），生成后写回对应帖子再刷新
-  scheduleFeedComments(postId, 'user', en);
+  scheduleFeedComments(postId, 'user', en, _photoDesc);
+}
+
+// BUG-6：对用户图片帖执行一次视觉理解，得到简短客观的图片描述。
+// 复用现有 /api/chat 多模态能力（photo.js 已用同一通道识图），不新建图片 API 层。
+// 只在发帖时调用一次，结果持久化到 post.photoDescription，后续评论/重载都复用。
+// 失败静默返回空串，绝不阻断发帖。
+async function describeFeedPhoto(photo) {
+  try {
+    if (!photo || !photo.idbKey) return '';
+    const list = await loadPhotosFromIDB(photo.idbKey);
+    const b64 = list && list[photo.idbIndex || 0];
+    if (!b64) return '';
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 90,
+        // 只描述"图里客观有什么"：简短、事实性；不推断情绪/关系，不解释梗，不替角色评论。
+        // 明确要求识别玩偶/毛绒/照片中的照片等，避免把玩偶当真人。
+        system: 'You are an objective image describer. In ONE short factual English sentence, describe only what is literally visible in the photo: the main objects, people, setting. If something is a plush toy, doll, figure, poster, screen, or a photo-of-a-photo, say so explicitly — do not treat depicted characters as real present people. Do NOT infer emotions, relationships, backstory, or intent. Do NOT write a caption or a comment. Just state what is in the image.',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+            { type: 'text', text: 'Describe this image objectively in one sentence.' }
+          ]
+        }]
+      })
+    }, 12000);
+    if (!res.ok) return '';
+    const d = await res.json();
+    return (d.content?.[0]?.text || '').trim();
+  } catch(e) {
+    console.warn('[feed] 图片理解失败，降级为纯文字评论:', e.message || e);
+    return '';
+  }
 }
 
 // 异步生成评论并陆续写回指定帖子（一条一条冒出来，像真人陆续来评论）
-async function scheduleFeedComments(postId, authorKey, postEn) {
+async function scheduleFeedComments(postId, authorKey, postEn, photoDescription) {
   try {
-    const comments = await generateFeedComments(authorKey, postEn);
+    const comments = await generateFeedComments(authorKey, postEn, photoDescription);
     if (!comments || !comments.length) return;
 
     // 每条评论各自延迟：第一条 20~50 秒才来，之后每条再隔 15~60 秒
