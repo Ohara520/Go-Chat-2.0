@@ -1766,7 +1766,10 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef) {
   try {
     // 图片消息替换为占位符传给Grok——Grok看不到图，用占位符保留上下文
     // 关键：去除 Grok 自己的重复回复，防止它抄自己形成复读机循环
-    const _rawSlice = rawHistory.slice(-8);
+    // 本轮 user message 在进入本函数前已 push 进 chatHistory（见 sendMessage 顶部），
+    // 因此是 rawHistory 的最后一条。这里 slice(-8, -1) 排除它，只取历史；
+    // 当前这轮由下面 '\nHer: ' + text 显式追加一次，避免当前消息重复两遍。
+    const _rawSlice = rawHistory.slice(-8, -1);
     const _seenOpenings = new Set();
     const recentMsgs = _rawSlice.map(m => {
       const who = m.role === 'user' ? 'Her' : 'Ghost';
