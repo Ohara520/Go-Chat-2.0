@@ -718,3 +718,32 @@ function buildIntimacyBlock(userText) {
 
   return stateBriefing + '\n' + persona + '\n' + levelBlock;
 }
+
+// ── Gemini intimate route 专用 ──────────────────────────────
+// 只产出真实 runtime state + 必要 safety boundary，
+// 不注入旧 Grok 行为导演文案（INTIMACY_LEVELS / FLIRT_CORE_BASE / HE_MOVES /
+// NEVER_BECOME / HE_SEES_HER）—— 这些已由 Gemini Intimacy Persona 负责或不再需要。
+// 复用现有 risk gate 与 state 机制（含 flirtProgress 衰减/override 消费副作用），
+// 不改动内部状态机制本身。
+function buildIntimacyRuntimeBlock(userText) {
+  // 风险闸门：与 buildIntimacyBlock 相同的入口拦截 + 副作用（重置进度、清 override）
+  const risk = detectRiskIntent(userText || '');
+  if (risk !== 'none') {
+    console.warn('[intimacy] risk gate triggered (runtime):', risk);
+    saveFlirtProgress(0);
+    sessionStorage.setItem('nonFlirtStreak', '0');
+    consumeIntimacyOverride();
+    const stateBriefing = buildIntimateStateBriefing();
+    // 风险场景：真实 state + safety boundary，不灌人设
+    return stateBriefing + '\n' + (RISK_BOUNDARIES[risk] || RISK_BOUNDARIES.self_degrading);
+  }
+
+  const intent = detectIntimateIntent(userText || '');
+  // 不在此调用 getCurrentIntimacyStep()：同一轮 sendMessage.js:945-946 已对非 none intent
+  // （含 explicit）执行过一次，flirtProgress / nonFlirtStreak 衰减与推进已落地。此处再调是
+  // 同轮重复写入，故移除。
+  if (intent !== 'none') consumeIntimacyOverride();
+
+  // 只回真实 runtime state
+  return buildIntimateStateBriefing();
+}

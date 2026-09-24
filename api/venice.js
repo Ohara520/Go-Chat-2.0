@@ -4,8 +4,9 @@ const BASE_URLS = [
   'https://api.yunjintao.com/v1',
 ];
 
-// 调情通道的 Grok 模型。抽成常量：模型抖动时一处切换全局生效
-const VENICE_MODEL = 'grok-4.7';
+// 调情通道 intimate engine。抽成常量：模型抖动时一处切换全局生效
+// 已从 grok-4.7 迁移到中转站 gemini-3.8-flash（OpenAI-compatible route 不变）
+const VENICE_MODEL = 'gemini-3.8-flash';
 
 const PER_NODE_TIMEOUT_MS = 8000;
 
@@ -232,19 +233,15 @@ export default async function handler(req, res) {
       ? `\n\n[INTIMATE MEMORY — what he remembers from before]\n${intimateMemory}\nThis is his memory. He does not recite it. It just shapes how he reads her tonight.`
       : '';
 
-    const fullSystem = VENICE_INTIMATE_LAYER + '\n\n' + safeSystem + memoryBlock;
-
-    // 前端传来的最近 Ghost 回复列表，用于反重复
-    const _recentReplies = (req.body.recentGhostReplies || []).slice(0, 5);
-    let _antiRepeat = '';
-    if (_recentReplies.length >= 2) {
-      _antiRepeat = `\n\n[ANTI-REPEAT — HARD RULE]\nYour recent replies were:\n${_recentReplies.map((r, i) => `${i+1}. "${r.slice(0,60)}"`).join('\n')}\nThis reply must NOT repeat any word, phrase, opening, or structure from the above.\nIf you catch yourself starting the same way — stop and start over with a different word.`;
-    }
+    // Gemini route：不再前置旧 Grok intimate persona（VENICE_INTIMATE_LAYER），
+    // 也不再追加 Grok 专用 anti-repeat / spacing patch。
+    // system prompt 以前端传来的 Shared Core + runtime state + Gemini Persona 为主。
+    const fullSystem = safeSystem + memoryBlock;
 
     const _diag = { reqId: _diagReqId(), start: Date.now() };
     const response = await createWithFailover(
       [{ role: 'user', content: user }],
-      fullSystem + _antiRepeat + _SPACING_TAIL,
+      fullSystem,
       max_tokens,
       VENICE_MODEL,
       _diag
@@ -306,7 +303,8 @@ export default async function handler(req, res) {
       ...(_shape ? { shape: _shape } : {}),
     });
 
-    const text = _deglue(response.choices?.[0]?.message?.content?.trim() || '');
+    // Gemini route：不再对输出做 Grok 专用 _deglue 补空格 postprocess。
+    const text = response.choices?.[0]?.message?.content?.trim() || '';
 
     // 检测严重吞空格 → 标记需要重试
     // 判据：有一个 15+ 字母的超长粘连串，或 2 个以上 10+ 的串

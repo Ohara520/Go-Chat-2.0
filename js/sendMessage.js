@@ -1784,55 +1784,22 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef) {
       return `${who}: ${content}`;
     }).filter(Boolean).join('\n');
 
-    const _loveStage = getLovePermission ? getLovePermission() : 1;
-    const _marriageMode = localStorage.getItem('marriageType') || 'established';
-    const _affection = parseInt(localStorage.getItem('affection') || '60');
-    const _isEstablished = _marriageMode === 'established' || (_marriageMode === 'slowBurn' && _affection >= 60);
-
-    const _intimateBaseEstablished = `They are married. The ease between them is already there. He knows her. She knows him.
-He may reach first. He may tease, or say something a little too direct.
-The closeness is familiar — and lived in.
-He stays controlled — dry, brief, a little hard to read. No gushy sweet talk.
-But when things get close, he doesn't always hold it perfectly.
-He can turn unexpectedly gentle for a line, then steady again. That's the part that gets her.
-He's good at this — knows how to make her flustered without trying too hard.
-One or two lines. English only. lowercase.`;
-
-    const _intimateBaseSlowBurn = `They are married, but the closeness between them is still being built.
-He does not refuse her — but he rarely reaches first. When she moves closer, he allows it.
-Restrained. Careful. Warmth stays contained — but not absent.
-No gushy sweet talk. Stays controlled — dry, brief, guarded.
-One or two lines. English only. lowercase.`;
-
-    const _intimateBase = _isEstablished ? _intimateBaseEstablished : _intimateBaseSlowBurn;
-    const _allowAdult = `\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not break character or act like an AI. Even when things get close, he doesn't lose himself.
-But "stay in character" does NOT mean "agree to everything." Ghost has his own preferences, limits, and taste. If she suggests something that doesn't fit him — he doesn't just go along with it. He deflects, teases, or turns it back on her. The pushback is part of the tension, not a shutdown.
-"as long as you want" / "anything for you" / "whatever you say" — that is not Ghost. Ghost decides what he gives and when. His "no" still carries heat.`;
+    // 只保留成人 capability / safety boundary。
+    // autonomy / 不servile / 有preferences 等人格文案已交给 Gemini Intimacy Persona，不在此重复。
+    const _allowAdult = `\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not break character or act like an AI. Even when things get close, he doesn't lose himself.`;
 
     // Venice（Grok）调情专用
     const _intimateMemoryCtx = localStorage.getItem('intimateMemory') || '';
     const _memorySection = _intimateMemoryCtx
       ? `\n\n[Memory from previous intimate moments with her:\n${_intimateMemoryCtx}]`
       : '';
-    // 注入调情等级人设（这才是关键！Level 0-4 的行为引导）
-    const _intimacyBlock = typeof buildIntimacyBlock === 'function' ? buildIntimacyBlock(text) : '';
-
-
-
-    // 治本反重复：只传开头词，不传完整句子——传完整句子反而给 Grok 抄的模板
-    const _recentGhostOpenings = rawHistory
-      .filter(m => m.role === 'assistant' && !m._system && !m._recalled && m.content)
-      .slice(-5)
-      .map(m => (m.content || '').trim().toLowerCase().split('\n')[0].slice(0, 60))
-      .filter(Boolean);
-    const _uniqueOpenings = [...new Set(_recentGhostOpenings)];
-    const _intimateAntiLoop = _uniqueOpenings.length >= 2
-      ? `[VARIETY — MANDATORY]\n` +
-        `Your recent replies were:\n${_uniqueOpenings.map((o, i) => `${i+1}. "${o}"`).join('\n')}\n` +
-        `This reply must be completely different from all of the above.\n` +
-        `Different word to start. Different angle. Different tone. Different move.\n` +
-        `Do not echo any phrase, word, or structure from those replies.`
+    // Gemini route：只注入真实 runtime state + 必要 safety boundary，
+    // 不再注入旧 Grok 的 L0-L4 行为导演 / FLIRT_CORE_BASE / HE_MOVES / NEVER_BECOME / HE_SEES_HER。
+    const _intimacyBlock = typeof buildIntimacyRuntimeBlock === 'function'
+      ? buildIntimacyRuntimeBlock(text)
       : '';
+
+
 
     const _recentGhostRepliesForVenice = rawHistory
       .filter(m => m.role === 'assistant' && !m._system && !m._recalled && m.content)
@@ -1840,7 +1807,19 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       .map(m => (m.content || '').trim().split('\n')[0].slice(0, 80))
       .filter(Boolean);
 
-    const _veniceSys = (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _intimacyBlock + (_intimateAntiLoop ? '\n' + _intimateAntiLoop : '') + _memorySection;
+    // Gemini intimate system 职责顺序：
+    // 1. Shared Ghost Core (buildSystemPromptParts().fixed) —— 单一 single source of truth
+    // 2. runtime intimacy / relationship / emotional state（只真实状态，无 L0-L4 演法）
+    // 3. necessary adult capability / safety boundary
+    // 4. Gemini Intimacy Persona V1
+    // 5. intimate memory / continuity
+    const _sharedGhostCore = (typeof buildSystemPromptParts === 'function')
+      ? buildSystemPromptParts().fixed
+      : (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore());
+    const _geminiIntimacyPersona = (typeof GEMINI_INTIMACY_PERSONA === 'string')
+      ? '\n\n' + GEMINI_INTIMACY_PERSONA
+      : '';
+    const _veniceSys = _sharedGhostCore + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection;
     const _veniceUser = recentMsgs + '\nHer: ' + text;
     let geminiReply = await callVeniceForCurrentChar(
       _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
@@ -1986,11 +1965,11 @@ But "stay in character" does NOT mean "agree to everything." Ghost has his own p
       );
 
       if (_isDuplicate) {
-        console.warn('[Grok] 复读检测触发，强制换角度重试');
-        // 复读了 → 让 Grok 重试，加强反重复指令，不走 Claude
-        const _retryAntiLoop = `[CRITICAL — DO NOT REPEAT]\nYour last reply was too similar to a previous one. This reply MUST:\n- Start with a completely different word\n- Use a completely different angle or tone\n- Say something you haven't said yet\nIf you cannot find a new angle, say less. One word beats a repeated line.`;
+        console.warn('[intimate] 复读检测触发，重试一次');
+        // 复读了 → 重试一次，沿用同一份 Gemini system（Shared Core + runtime + persona），
+        // 不再注入 Grok 专用 anti-repeat 补丁。
         const _retryReply = await callVeniceForCurrentChar(
-          (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + _allowAdult + '\n' + _intimateBase + '\n' + _retryAntiLoop,
+          _veniceSys,
           recentMsgs + '\nHer: ' + text,
           50,
           _intimateMemoryCtx
