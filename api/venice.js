@@ -5,7 +5,7 @@ const BASE_URLS = [
 ];
 
 // 调情通道的 Grok 模型。抽成常量：模型抖动时一处切换全局生效
-const VENICE_MODEL = 'grok-4.6';
+const VENICE_MODEL = 'grok-4.7';
 
 const PER_NODE_TIMEOUT_MS = 8000;
 

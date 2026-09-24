@@ -1048,14 +1048,19 @@ async function _processMergedMessage(text) {
           fetchDeepSeek(
             '你是一个消息分类器。你的唯一任务是分析用户消息并返回JSON。不要代入任何角色，不要回复用户，不要扮演任何人。\n' +
             '只返回JSON，不要其他文字。\n' +
-            '格式：{"flirt":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
+            '格式：{"flirt":false,"suggestive":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
             'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
             'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
             'flirt判断标准（只判露骨，宁可漏判不可误判）：\n' +
             'true的情况：只有无歧义的露骨性内容才判true——做爱/上床/车震、明确的生殖器或性器官描述、露骨的插入/口交/自慰描述、跳蛋/按摩棒等性玩具、"骑你/骑上来/想被你"这类直白性邀约。\n' +
-            'false的情况：日常闲聊、普通撒娇(babe/想你/爱你/抱抱/miss you)、暗示性/擦边的调情(亲/摸/咬/舔/睡衣/浴巾/内衣/贴贴/蹭蹭)、表达思念、问候、分享日常。这些一律false，交给Claude接。\n' +
+            'false的情况：日常闲聊、普通撒娇(babe/想你/爱你/抱抱/miss you)、暗示性/擦边的调情(亲/摸/咬/舔/睡衣/浴巾/内衣/贴贴/蹭蹭)、表达思念、问候、分享日常。这些flirt一律false，交给Claude接。\n' +
             '不确定或只是擦边就判false——擦边调情走Claude(它接得住)，只有明确露骨才走Grok。\n' +
-            'suggestive_double_entendre（性暗示/双关，必须结合上下文判断）：像"你的弟弟有多大""想尝尝你的香蕉"这种字面正常、但在暧昧语境里明显指向性的双关。判断规则：只有当【最近对话】显示最近几轮在暧昧/调情时，才判flirt:true；如果最近一直是家人/日常话题、只是这一句突然冒出，判false（她可能真在问家人）。单看这一句永远不足以判true——必须最近有调情氛围。',
+            'suggestive判断标准（性暗示/双关/隐晦承接，独立于flirt判断，用整句语义判断而不是抓单词）：\n' +
+            'true的情况：\n' +
+            '  (1) 这一句本身的主导含义就指向对方身体/性，哪怕用词委婉——例如问成年男性的"弟弟"放左边还是右边、"安静状态下多少cm"、"想尝尝你的香蕉"。判断依据是"这句话最自然的读法是不是在问性/身体"，不是有没有敏感词。\n' +
+            '  (2) 【最近对话】已经在暧昧/身体/性话题上，这一句是承接（包括没有实义的追问，如"你回答我嘛""继续""说嘛""然后呢"，此时它是在追问上一轮那个隐晦问题）。\n' +
+            'false的情况：这一句有真实且自然的普通读法、且不带身体/性双关——例如真在聊家人弟弟、问物品尺寸、日常问候闲聊。只要整句更像正常话题就判false。\n' +
+            '注意：不要因为出现"弟弟""cm""香蕉"等某个词就判true——必须是整句在这个语境下最自然的读法确实指向性，才判true。孤立一个词不算。',
             `【最近对话】\n${_haikuCtx}\n\n【要分类的这句】她说：${text}`,
             100
           ),
@@ -1066,7 +1071,10 @@ async function _processMergedMessage(text) {
           const combinedResult = safeParseJSON(combinedRaw);
           if (combinedResult) {
             if (!_intimacyForceCleared) {
-              if (combinedResult.flirt === true) {
+              if (combinedResult.flirt === true || combinedResult.suggestive === true) {
+                // flirt=露骨直接进 Grok；suggestive=分类器结合整句语义/最近语境判定的
+                // 隐晦双关或承接（含首句自证），也进 Grok。打破"首句漏判→无 _intimate 标记
+                // →后续拿不到调情证据→永远进不去"的自举死锁。
                 isIntimate = true;
               } else {
                 // 修复：收紧余温强制路由——只有消息本身有调情倾向（emotion=撒娇+不是明确日常），才留在Grok
