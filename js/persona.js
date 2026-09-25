@@ -683,11 +683,9 @@ function buildSystemPrompt() {
   const isMilestone = marriageDaysTotal > 0 &&
     (marriageDaysTotal === 52 || (marriageDaysTotal % 100 === 0) || marriageDaysTotal === 365);
 
-  // 时间
+  // 时间 —— Ghost 当地小时来自统一 Ghost Time Authority（profile.js），随所在地时区变化
   const nowForTime = new Date();
-  const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London', hour: 'numeric', hour12: false
-  }).format(nowForTime));
+  const ukHour = getGhostHour();
   const ghostStatusHint = (ukHour >= 23 || ukHour < 6)
     ? 'late night / early hours — he may be on a mission or asleep'
     : ukHour < 9  ? 'morning — just up or preparing for training'

@@ -137,9 +137,10 @@ ${_chatSnippet}`;
         `\n`;
     }
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayWeekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][yesterday.getDay()];
+    // 昨天星期几：从 Ghost 当地"今天"倒推一天，随所在地时区变化。
+    const _wkNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const _todayIdx = _wkNames.indexOf(getGhostWeekday());
+    const yesterdayWeekday = _wkNames[(_todayIdx + 6) % 7];
 
     // v2: 读取 Ghost 当前心情，让日记反映真实情绪而非默认忧郁
     const mood = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;

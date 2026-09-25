@@ -20,20 +20,23 @@
 // 数据表
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// tz: IANA 时区名（Ghost Time Authority 用）。用 IANA 名而非固定偏移，让 Intl 自动处理夏令时。
+// tz: null = 真实时区未知（Classified/Undisclosed）；由 getGhostTimeZone() 在运行时回落 Europe/London，
+// 那只是 compatibility fallback，不代表这些地点真在英国。
 const LOCATIONS = [
-  { name: 'Hereford Base',        weight: 25, weatherCity: 'Hereford',   reason: 'Routine garrison and training.', type: 'base' },
-  { name: 'Manchester',           weight: 12, weatherCity: 'Manchester', reason: 'Leave. Back home.',              type: 'leave' },
-  { name: 'London',               weight: 8,  weatherCity: 'London',     reason: 'NATO coordination briefing.',   type: 'leave' },
-  { name: 'Edinburgh',            weight: 5,  weatherCity: 'Edinburgh',  reason: 'Highland terrain training.',    type: 'base' },
-  { name: 'Germany',              weight: 5,  weatherCity: 'Berlin',     reason: 'NATO joint exercise.',          type: 'deployed' },
-  { name: 'Poland',               weight: 4,  weatherCity: 'Warsaw',     reason: 'Eastern European support op.',  type: 'deployed' },
-  { name: 'Norway',               weight: 4,  weatherCity: 'Oslo',       reason: 'Arctic warfare training.',      type: 'deployed' },
-  { name: 'Amsterdam',            weight: 3,  weatherCity: 'Amsterdam',  reason: 'European transit. Brief stop.', type: 'deployed' },
-  { name: 'Paris',                weight: 3,  weatherCity: 'Paris',      reason: 'NATO intel coordination.',      type: 'deployed' },
-  { name: 'Dublin',               weight: 3,  weatherCity: 'Dublin',     reason: 'Cross-border liaison mission.', type: 'deployed' },
-  { name: 'Tokyo',                weight: 3,  weatherCity: 'Tokyo',      reason: 'Far East joint exercise.',      type: 'deployed' },
-  { name: 'Undisclosed Location', weight: 3,  weatherCity: null,         reason: null,                            type: 'deployed' },
-  { name: 'Classified',           weight: 2,  weatherCity: null,         reason: null,                            type: 'deployed' },
+  { name: 'Hereford Base',        weight: 25, weatherCity: 'Hereford',   reason: 'Routine garrison and training.', type: 'base',     tz: 'Europe/London' },
+  { name: 'Manchester',           weight: 12, weatherCity: 'Manchester', reason: 'Leave. Back home.',              type: 'leave',    tz: 'Europe/London' },
+  { name: 'London',               weight: 8,  weatherCity: 'London',     reason: 'NATO coordination briefing.',   type: 'leave',    tz: 'Europe/London' },
+  { name: 'Edinburgh',            weight: 5,  weatherCity: 'Edinburgh',  reason: 'Highland terrain training.',    type: 'base',     tz: 'Europe/London' },
+  { name: 'Germany',              weight: 5,  weatherCity: 'Berlin',     reason: 'NATO joint exercise.',          type: 'deployed', tz: 'Europe/Berlin' },
+  { name: 'Poland',               weight: 4,  weatherCity: 'Warsaw',     reason: 'Eastern European support op.',  type: 'deployed', tz: 'Europe/Warsaw' },
+  { name: 'Norway',               weight: 4,  weatherCity: 'Oslo',       reason: 'Arctic warfare training.',      type: 'deployed', tz: 'Europe/Oslo' },
+  { name: 'Amsterdam',            weight: 3,  weatherCity: 'Amsterdam',  reason: 'European transit. Brief stop.', type: 'deployed', tz: 'Europe/Amsterdam' },
+  { name: 'Paris',                weight: 3,  weatherCity: 'Paris',      reason: 'NATO intel coordination.',      type: 'deployed', tz: 'Europe/Paris' },
+  { name: 'Dublin',               weight: 3,  weatherCity: 'Dublin',     reason: 'Cross-border liaison mission.', type: 'deployed', tz: 'Europe/Dublin' },
+  { name: 'Tokyo',                weight: 3,  weatherCity: 'Tokyo',      reason: 'Far East joint exercise.',      type: 'deployed', tz: 'Asia/Tokyo' },
+  { name: 'Undisclosed Location', weight: 3,  weatherCity: null,         reason: null,                            type: 'deployed', tz: null },
+  { name: 'Classified',           weight: 2,  weatherCity: null,         reason: null,                            type: 'deployed', tz: null },
 ];
 
 // ghost_knows: true=主动提; 'heard'=听说过会祝福; false=不知道
@@ -306,13 +309,69 @@ async function updateWeather(city) {
   }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Ghost Time Authority —— 唯一回答"Ghost 当前所在地几点"的地方
+// 只给世界事实（现在几点），不解释"这个点该干嘛"。消费者拿到 hour 后各自解释。
+// currentLocation → LOCATIONS.tz → Ghost local time。tz 未知/异常时回落 Europe/London（仅兼容兜底）。
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const _GHOST_TZ_FALLBACK = 'Europe/London';
+
+function getGhostTimeZone() {
+  try {
+    const loc = localStorage.getItem('currentLocation');
+    const entry = LOCATIONS.find(l => l.name === loc);
+    // 查不到该地点，或该地点真实时区未知（Classified/Undisclosed，tz:null）→ 兼容兜底
+    return (entry && entry.tz) ? entry.tz : _GHOST_TZ_FALLBACK;
+  } catch(e) {
+    return _GHOST_TZ_FALLBACK;
+  }
+}
+
+function getGhostHour() {
+  try {
+    return parseInt(new Intl.DateTimeFormat('en-GB', {
+      timeZone: getGhostTimeZone(), hour: 'numeric', hour12: false
+    }).format(new Date()));
+  } catch(e) {
+    return parseInt(new Intl.DateTimeFormat('en-GB', {
+      timeZone: _GHOST_TZ_FALLBACK, hour: 'numeric', hour12: false
+    }).format(new Date()));
+  }
+}
+
+// Ghost 当地日期，YYYY-MM-DD。en-CA 保证 Intl 直接吐 ISO 格式的年月日。
+function getGhostDateStr() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: getGhostTimeZone(), year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+  } catch(e) {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: _GHOST_TZ_FALLBACK, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+  }
+}
+
+// Ghost 当地星期，英文全称（Sunday…Saturday）。与 getGhostDateStr 同一时区，天然对齐。
+function getGhostWeekday() {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: getGhostTimeZone(), weekday: 'long'
+    }).format(new Date());
+  } catch(e) {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: _GHOST_TZ_FALLBACK, weekday: 'long'
+    }).format(new Date());
+  }
+}
+
 function updateUKTime() {
   const el = document.getElementById('botUKTime');
   if (!el) return;
-  const ukTime = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false
+  const ghostTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: getGhostTimeZone(), hour: '2-digit', minute: '2-digit', hour12: false
   }).format(new Date());
-  el.textContent = ukTime;
+  el.textContent = ghostTime;
 }
 
 function getUserCountry() {

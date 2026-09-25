@@ -23,7 +23,8 @@ const TAKEOUT_PRICE_MULTIPLIER = 2.5;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function getTakeoutFee() {
-  const h = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }));
+  // 时段费按 Ghost 当地时间（外卖送到他所在地）—— 统一 Ghost Time Authority
+  const h = getGhostHour();
   if (h >= 2  && h < 6)  return { fee: 18.0, label: '凌晨配送费', time: '02–06' };
   if (h >= 6  && h < 11) return { fee: 8.0,  label: '早间配送费', time: '06–11' };
   if (h >= 11 && h < 18) return { fee: 8.0,  label: '日常配送费', time: '11–18' };
@@ -915,7 +916,7 @@ async function onGhostReceivedTakeout(order, force = false) {
   setTimeout(async () => {
     try {
       // ── 情绪变化 ─────────────────────────────────────────
-      const _feeHour     = parseInt(new Date().toLocaleString('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hour12: false }));
+      const _feeHour     = getGhostHour();
       const _isLateNight = _feeHour >= 2 && _feeHour < 6;
       const _wasHungry   = _detectMealStatus() === 'hungry';
       const _todayCount  = getTodayTakeoutCount();
@@ -1095,9 +1096,8 @@ function _detectMealStatus() {
 
 // 当前英国时间是否是饭点，返回提示文字或 null
 function _getMealTimeHint() {
-  const h = parseInt(new Date().toLocaleString('en-GB', {
-    timeZone: 'Europe/London', hour: 'numeric', hour12: false
-  }));
+  // 饭点按 Ghost 当地时间 —— 统一 Ghost Time Authority
+  const h = getGhostHour();
   if (h >= 7  && h < 9)  return '早餐时间到了';
   if (h >= 12 && h < 14) return '该吃午饭了';
   if (h >= 18 && h < 20) return '晚餐时间到了';

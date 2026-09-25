@@ -1310,10 +1310,8 @@ He feels like: someone who rarely posts, but when he does, it comes from a real 
       body_language:       `Physical sensation: stood too long, fingers stiff, walked further than expected, cold got through the jacket.`,
     };
 
-    // 真实日期，防止模型瞎编"又到周五了"
-    const _now = new Date();
-    const _weekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][_now.getDay()];
-    const _dateStr = `${_weekday}, ${_now.toISOString().slice(0, 10)}`;
+    // 真实日期，防止模型瞎编"又到周五了"。走 Ghost Local DateTime，随所在地时区变化。
+    const _dateStr = `${getGhostWeekday()}, ${getGhostDateStr()}`;
 
     return `Write one Ghost social media post.
 
@@ -1587,9 +1585,9 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
   };
 
   // 真实日期铁律：注入每条帖子（所有角色 + 所有事件类型），禁止模型自己编星期几/日期
-  const _rNow = new Date();
-  const _rWeekday = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][_rNow.getDay()];
-  const _rDateRule = `\n\nREAL DATE — today is ${_rWeekday}, ${_rNow.toISOString().slice(0,10)}. If the post references a day of week or date, you MUST use exactly this. Do NOT invent a different weekday (e.g. "another friday") unless today truly is that day.`;
+  const _rWeekday = getGhostWeekday();
+  const _rDateStr = getGhostDateStr();
+  const _rDateRule = `\n\nREAL DATE — today is ${_rWeekday}, ${_rDateStr}. If the post references a day of week or date, you MUST use exactly this. Do NOT invent a different weekday (e.g. "another friday") unless today truly is that day.`;
 
   // 距离铁律注入每条帖子（daily_moment 的 Ghost 分支已在 buildGhostDailyPrompt 内含，这里重复无害）
   const prompt = (promptMap[evt.type] || promptMap['daily_moment']) + '\n\n' + _feedDistanceRule() + _photoHint + _rDateRule;
