@@ -17,6 +17,52 @@ function getSbUserId() {
   return localStorage.getItem('sb_user_id');
 }
 
+// ── purchaseFacts 合并（Phase 1.5）───────────────────────────
+// purchaseFacts 是"发生过就不该消失"的历史事实。characters 云同步默认
+// last-write-wins，多设备离线购买会互相覆盖丢 Purchase。这里改为按
+// purchaseId 做并集/去重，任意一侧有的记录都保留，幂等。
+function _parseFactArray(raw) {
+  if (raw == null) return [];
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(v) ? v : [];
+  } catch(e) { return []; }
+}
+// 每条 Purchase 的去重键：优先 purchaseId；旧记录无 purchaseId 时用
+// name+ts+total 组合兜底，保证跨设备同一条不会被当成两条。
+function _factDedupKey(f) {
+  if (f && f.purchaseId) return 'id:' + f.purchaseId;
+  return 'legacy:' + [f && f.name, f && f.ts, f && f.total].join('|');
+}
+// 并集去重多个 fact 数组，按 ts 升序（无 ts 视为 0）。
+// Phase 2：同一 purchaseId 是"同一历史事实"，Delivery 建成后会补 deliveryId。
+// 因此同 key 不再简单丢弃后来者，而是 enrich：非空 deliveryId 不被旧的空版本吞掉，
+// 旧空版本也不清空已有 deliveryId。不同 purchaseId key 不同，永不互相合并。幂等。
+function _mergePurchaseFacts(/* ...arrays */) {
+  const byKey = new Map();
+  const order = [];
+  for (let i = 0; i < arguments.length; i++) {
+    const arr = _parseFactArray(arguments[i]);
+    for (const f of arr) {
+      if (!f || typeof f !== 'object') continue;
+      const k = _factDedupKey(f);
+      if (!byKey.has(k)) {
+        byKey.set(k, f);
+        order.push(k);
+      } else {
+        // enrich：仅当已存版本缺 deliveryId 而新版本有时，补上关联。
+        const cur = byKey.get(k);
+        if (cur.deliveryId == null && f.deliveryId != null) {
+          byKey.set(k, { ...cur, deliveryId: f.deliveryId });
+        }
+      }
+    }
+  }
+  const out = order.map(k => byKey.get(k));
+  out.sort((a, b) => (a && a.ts || 0) - (b && b.ts || 0));
+  return out;
+}
+
 // 从云端加载数据到localStorage
 async function loadFromCloud() {
   const sb = getSbClient();
@@ -215,6 +261,23 @@ async function loadFromCloud() {
           if (!charData || typeof charData !== 'object') return;
           _charKeys.forEach(key => {
             if (charData[key] !== undefined && charData[key] !== null) {
+              // purchaseFacts 特殊处理（Phase 1.5）：按 purchaseId 并集去重，
+              // 不做 last-write-wins 覆盖。云端快照 + 本地前缀 key 合并写回前缀 key；
+              // 当前角色再把 前缀 + 标准 key 一起并集写回标准 key。
+              // 并集不会丢数据，因此无视 cloudIsNewer，始终合并。
+              if (key === 'purchaseFacts') {
+                const _cloudFacts = charData[key];
+                const _localPrefixed = localStorage.getItem(`${charId}_purchaseFacts`);
+                const _mergedPrefixed = _mergePurchaseFacts(_localPrefixed, _cloudFacts);
+                localStorage.setItem(`${charId}_purchaseFacts`,
+                  JSON.stringify(_mergedPrefixed));
+                if (charId === _currentChar) {
+                  const _localStd = localStorage.getItem('purchaseFacts');
+                  const _mergedStd = _mergePurchaseFacts(_localStd, _mergedPrefixed);
+                  localStorage.setItem('purchaseFacts', JSON.stringify(_mergedStd));
+                }
+                return;
+              }
               // chatHistory 特殊处理（修复退出重进丢记录）：
               // profile.characters 快照只在节流 saveToCloud 时更新，是陈旧的；
               // 第1步已把最新的 chat_history 列合并进标准 chatHistory。

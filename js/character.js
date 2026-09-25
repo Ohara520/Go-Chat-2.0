@@ -83,6 +83,7 @@ const CHARACTER_KEYS = [
   'feedPosts', 'coupleFeedHistory', 'coupleFeedDate', 'lastFeedPostAt',
   'organicFeedCount',
   'marketTriggered', 'purchasedItems', 'purchaseCounts',
+  'purchaseFacts',
   'intimateTriggered',
   // 心声
   'lastInnerThought', 'lastInnerThoughtAt',

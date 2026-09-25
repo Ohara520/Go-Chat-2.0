@@ -82,7 +82,9 @@ function _capDeliveries(deliveries, limitDone = 20) {
   localStorage.setItem('deliveries', JSON.stringify([...pending, ...finished]));
 }
 
-function addDelivery(product, isGhostSend, isLuxury) {
+// Phase 2：新增可选第4参 purchaseId，把这条快递关联回它的 Purchase Fact。
+// 旧调用方不传即为 null，行为完全不变。返回刚创建的 delivery，供上游回填 deliveryId。
+function addDelivery(product, isGhostSend, isLuxury, purchaseId) {
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
   let totalMs = isGhostSend
     ? (Math.floor(Math.random() * 2) + 1) * 24 * 3600 * 1000
@@ -104,6 +106,8 @@ function addDelivery(product, isGhostSend, isLuxury) {
 
   const delivery = {
     id: now + '_' + Math.random().toString(36).slice(2, 8),
+    // Phase 2：Purchase↔Delivery 顶层关联。非 Mall 购买路径（反寄/自愈补发）为 null。
+    purchaseId: purchaseId || null,
     name: product.name,
     emoji: product.emoji,
     isGhostSend,
@@ -134,6 +138,7 @@ function addDelivery(product, isGhostSend, isLuxury) {
   // 防止在途快递被挤出数组后既不送达也不上架、凭空消失
   _capDeliveries(deliveries);
   renderDeliveryTracker();
+  return delivery;
 }
 
 

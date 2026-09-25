@@ -2080,6 +2080,29 @@
     color: rgba(100,100,100,0.6);
     box-shadow: none; cursor: not-allowed;
 }
+.buy-modal-share {
+    width: 100%; margin-top: 10px; padding: 11px; border-radius: 14px;
+    border: 1.5px solid rgba(120,180,90,0.32);
+    background: rgba(255,255,255,0.55);
+    color: #4a8a30; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+}
+.buy-modal-share:active { background: rgba(120,180,90,0.12); transform: scale(0.98); }
+
+/* 聊天里分享的商品卡片 */
+.chat-product-card {
+    display: flex; align-items: center; gap: 12px;
+    max-width: 260px; padding: 12px 14px;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(140,190,100,0.28);
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(60,120,40,0.08);
+}
+.chat-product-emoji { font-size: 34px; flex-shrink: 0; }
+.chat-product-info { display: flex; flex-direction: column; gap: 3px; text-align: left; min-width: 0; }
+.chat-product-name { font-size: 13px; font-weight: 700; color: #1e3d20; }
+.chat-product-desc { font-size: 11px; color: rgba(40,90,30,0.55); line-height: 1.35; }
+.chat-product-price { font-size: 14px; font-weight: 700; color: #3a7a2a; }
 .buy-cancel-btn { flex: 1; padding: 12px; border-radius: 14px; border: 1px solid rgba(120,180,90,0.45); background: rgba(255,255,255,0.65); color: #4a8a30; font-size: 13px; font-weight: 600; cursor: pointer; }
 .buy-confirm-btn { flex: 2; padding: 12px; border-radius: 14px; border: none; background: linear-gradient(135deg, rgba(90,154,70,0.85), rgba(120,185,85,0.8)); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
 .buy-confirm-btn:disabled { opacity: 0.45; cursor: not-allowed; }

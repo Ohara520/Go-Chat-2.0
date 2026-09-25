@@ -384,6 +384,22 @@ function appendGhostSticker(id) {
 // ===== 历史记录重建渲染 =====
 // initChat 调用，把 localStorage 里的 chatHistory 全部重建到 DOM
 
+// 聊天里的商品卡片（分享入口 + 历史恢复共用）
+function renderChatProductCard(p) {
+  const emoji = p.emoji || '🎁';
+  const name = p.name || '';
+  const desc = p.desc || '';
+  const price = (typeof p.price === 'number') ? `£${p.price.toLocaleString()}` : (p.price || '');
+  return `<div class="chat-product-card">
+    <div class="chat-product-emoji">${emoji}</div>
+    <div class="chat-product-info">
+      <div class="chat-product-name">${name}</div>
+      ${desc ? `<div class="chat-product-desc">${desc}</div>` : ''}
+      ${price ? `<div class="chat-product-price">${price}</div>` : ''}
+    </div>
+  </div>`;
+}
+
 function renderChatHistory(chatHistory) {
   const container = document.getElementById('messagesContainer');
   if (!container) return;
@@ -457,6 +473,16 @@ function renderChatHistory(chatHistory) {
         }).catch(() => {
           div.innerHTML = `<div style="opacity:0.4;font-size:12px;padding:8px;">📷 图片</div>`;
         });
+        return;
+      }
+
+      // 用户分享到聊天的商品卡片
+      if (msg._product) {
+        const div = document.createElement('div');
+        div.className = 'message user';
+        div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
+        div.innerHTML = renderChatProductCard(msg._product);
+        container.appendChild(div);
         return;
       }
 
