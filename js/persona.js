@@ -560,6 +560,7 @@ function buildSystemPrompt() {
   const userName        = localStorage.getItem('userName') || '你';
   const location        = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locationReason  = localStorage.getItem('currentLocationReason');
+  const weather         = (localStorage.getItem('lastWeatherDisplay') || '').replace(/^undefined$/i, '').trim();
   const coupleFeedSummary = localStorage.getItem('coupleFeedSummary') || '';
 
   // 🔧 获取用户最后一条消息，用于检索相关长期记忆
@@ -760,6 +761,7 @@ RULE: These facts are FIXED. Never change them. Never guess. Only share the spec
 
 Current location: ${location}${locationReason ? ` (${locationReason})` : ''}
 You are from ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}. That is where you grew up. You are currently at ${location}.
+${weather ? `Current weather where you are: ${weather} (a plain fact about your surroundings — notice it or don't; it does not dictate what you do or how you feel)` : ''}
 ${randomState ? `Current state: ${randomState}` : ''}
 
 Time awareness (background feel, NOT something you report):
