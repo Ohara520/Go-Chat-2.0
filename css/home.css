@@ -428,6 +428,10 @@
     .card-icon  { font-size: 24px; margin-bottom: 6px; }
     .card-title { font-size: 13px; }
     .card-desc  { font-size: 10px; }
+    /* 图片卡不吃通用卡的手机内边距/小圆角：保持图满边、圆角柔和 */
+    .us-row .photo-card,
+    .life-row .photo-card,
+    .you-row .photo-card { padding: 0; border-radius: 18px; }
 }
 
 
