@@ -2915,18 +2915,15 @@ function _updateHomeHero() {
   if (metaEl) {
     metaEl.textContent = [ghostTime, weather].filter(Boolean).join(' · ');
   }
-  _renderHeroWeatherOnly(weather);
+  _renderHeroWeatherOnly();
 }
-// 顶部问候区那一行天气（母稿里 greeting 下面的地点+天气行）
-function _renderHeroWeatherOnly(weather) {
+// 顶部问候区那一行：显示用户自己的国家（不是 Ghost 的地点/天气）
+function _renderHeroWeatherOnly() {
   const el = document.getElementById('heroWeather');
   if (!el) return;
-  if (weather === undefined) {
-    const wEl = document.getElementById('botWeather');
-    weather = (wEl && wEl.textContent.trim()) || (localStorage.getItem('lastWeatherDisplay') || '').trim();
-  }
-  const loc = localStorage.getItem('currentLocation') || 'Hereford Base';
-  el.textContent = weather ? (loc + ' · ' + weather) : loc;
+  const code = localStorage.getItem('userCountry') || 'CN';
+  const info = (typeof COUNTRY_DATA !== 'undefined' && COUNTRY_DATA[code]) ? COUNTRY_DATA[code] : null;
+  el.textContent = info ? ((info.flag ? info.flag + ' ' : '') + info.name) : code;
 }
 
 // 更新弹窗里的天数 + Ghost 头像
