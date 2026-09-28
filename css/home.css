@@ -187,7 +187,7 @@
 
 @media (max-width: 480px) {
     .home-hero {
-        min-height: 72vh;
+        min-height: 52vh;
         padding: calc(30px + env(safe-area-inset-top)) 24px 0;
     }
     .hero-greeting { font-size: 23px; }
