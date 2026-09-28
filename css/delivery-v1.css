@@ -1,0 +1,321 @@
+/* ═══════════════════════════════════════
+   Delivery V1 — 我的快递主页
+   奶油白 / 鼠尾草绿 / 英伦生活感衬线
+═══════════════════════════════════════ */
+
+#deliveryScreen {
+    display: none;
+    background: #f4efe6;
+}
+#deliveryScreen.active {
+    display: block !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ── Hero ── */
+.dlv-hero {
+    position: relative;
+    min-height: 260px;
+    padding: 0 20px 26px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background-image: url('../images/ui-backgrounds/delivery/delivery-hero.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #efe8da;
+}
+/* 极轻左侧/底部渐变，仅保证文字可读，不压黑图片 */
+.dlv-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+        linear-gradient(90deg, rgba(60,54,42,0.28) 0%, rgba(60,54,42,0.10) 34%, rgba(60,54,42,0) 60%),
+        linear-gradient(180deg, rgba(60,54,42,0) 55%, rgba(244,239,230,0.55) 88%, #f4efe6 100%);
+    pointer-events: none;
+}
+.dlv-hero-back {
+    position: absolute; top: 16px; left: 14px; z-index: 3;
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px;
+    padding: 0; margin: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.24);
+    color: #f4efe6;
+    font-size: 22px; line-height: 1;
+    cursor: pointer;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    transition: transform 0.15s;
+}
+.dlv-hero-back:active { transform: scale(0.92); }
+.dlv-hero-copy {
+    position: relative; z-index: 2;
+    text-shadow: 0 1px 12px rgba(40,34,24,0.35);
+}
+.dlv-hero-title {
+    margin: 0;
+    font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+    font-size: 46px; font-weight: 600;
+    letter-spacing: 7px;
+    color: #fbf8f1;
+    line-height: 1;
+    text-indent: 7px;
+}
+.dlv-hero-zh {
+    margin-top: 6px;
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 19px; font-weight: 500;
+    letter-spacing: 8px;
+    color: #f4efe6;
+    text-indent: 8px;
+}
+.dlv-hero-tag {
+    margin-top: 14px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 15px; font-weight: 500;
+    font-style: italic;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+    color: rgba(251,248,241,0.92);
+    max-width: 62%;
+}
+
+/* ── 正文容器 ── */
+.dlv-body {
+    padding: 4px 16px 40px;
+    background: #f4efe6;
+}
+
+/* ── 分组区块 ── */
+.dlv-group { margin-top: 22px; }
+.dlv-group:first-child { margin-top: 6px; }
+.dlv-group-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 4px 12px;
+}
+.dlv-group-icon {
+    width: 26px; height: 26px; flex-shrink: 0;
+    color: #7f9663;
+}
+.dlv-group-icon svg { width: 100%; height: 100%; display: block; }
+.dlv-group-titles { display: flex; flex-direction: column; line-height: 1.15; }
+.dlv-group-zh {
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    color: #46583a;
+}
+.dlv-group-en {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 12px; font-weight: 600; letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(127,150,99,0.7);
+}
+.dlv-group-count {
+    margin-left: auto;
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 12px; font-weight: 500; letter-spacing: 0.5px;
+    color: rgba(90,80,58,0.6);
+    padding-right: 4px;
+}
+
+/* ── 在途包裹卡 ── */
+.dlv-card {
+    background: #fffdf8;
+    border: 1px solid rgba(160,140,110,0.14);
+    border-radius: 18px;
+    box-shadow: 0 4px 18px rgba(90,75,50,0.05);
+    padding: 14px;
+    margin-bottom: 14px;
+}
+.dlv-card-top {
+    display: flex; align-items: flex-start; gap: 13px;
+}
+.dlv-thumb {
+    width: 78px; height: 78px; flex-shrink: 0;
+    border-radius: 13px;
+    overflow: hidden;
+    background: #eee6d6;
+    display: flex; align-items: center; justify-content: center;
+}
+.dlv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dlv-thumb-emoji { font-size: 34px; line-height: 1; }
+.dlv-card-mid { flex: 1; min-width: 0; padding-top: 2px; }
+.dlv-card-name {
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.3px;
+    color: #3f4a34;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dlv-card-status {
+    margin-top: 5px;
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 12.5px; font-weight: 500;
+    color: #7f9663;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dlv-card-right {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+    padding-top: 2px;
+}
+.dlv-eta {
+    display: flex; flex-direction: column; align-items: flex-end;
+    background: rgba(127,150,99,0.10);
+    border-radius: 11px;
+    padding: 7px 11px;
+    line-height: 1.25;
+}
+.dlv-eta-label {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 10px; font-weight: 500; letter-spacing: 1px;
+    color: rgba(90,80,58,0.6);
+}
+.dlv-eta-date {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 14px; font-weight: 700;
+    color: #55684a;
+}
+/* ── 动态时间线 ── */
+.dlv-timeline {
+    display: flex; align-items: flex-start;
+    margin-top: 15px;
+    padding: 0 2px;
+}
+.dlv-tl-step {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center;
+    position: relative;
+    min-width: 0;
+}
+/* 连接线：画在每个非首节点左侧 */
+.dlv-tl-step:not(:first-child)::before {
+    content: '';
+    position: absolute;
+    top: 8px; left: -50%; width: 100%; height: 2px;
+    background: rgba(160,140,110,0.22);
+    z-index: 0;
+}
+.dlv-tl-step.done:not(:first-child)::before,
+.dlv-tl-step.current:not(:first-child)::before {
+    background: #7f9663;
+}
+.dlv-tl-dot {
+    position: relative; z-index: 1;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: #f0e9db;
+    border: 2px solid rgba(160,140,110,0.3);
+    display: flex; align-items: center; justify-content: center;
+    box-sizing: border-box;
+}
+.dlv-tl-dot svg { width: 10px; height: 10px; display: block; color: #fff; }
+.dlv-tl-step.done .dlv-tl-dot {
+    background: #7f9663; border-color: #7f9663;
+}
+.dlv-tl-step.current .dlv-tl-dot {
+    background: #5f7548; border-color: #5f7548;
+    box-shadow: 0 0 0 4px rgba(127,150,99,0.16);
+}
+.dlv-tl-label {
+    margin-top: 7px;
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.2px;
+    color: rgba(90,80,58,0.55);
+    text-align: center;
+    line-height: 1.2;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis;
+}
+.dlv-tl-step.done .dlv-tl-label,
+.dlv-tl-step.current .dlv-tl-label { color: #55684a; font-weight: 600; }
+
+/* ── 已送达卡（紧凑） ── */
+.dlv-hist {
+    display: flex; align-items: center; gap: 12px;
+    background: #fbf8f1;
+    border: 1px solid rgba(160,140,110,0.12);
+    border-radius: 14px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+.dlv-hist-thumb {
+    width: 52px; height: 52px; flex-shrink: 0;
+    border-radius: 10px; overflow: hidden;
+    background: #ebe3d3;
+    display: flex; align-items: center; justify-content: center;
+}
+.dlv-hist-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dlv-hist-thumb-emoji { font-size: 24px; line-height: 1; }
+.dlv-hist-mid { flex: 1; min-width: 0; }
+.dlv-hist-name {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 14px; font-weight: 600;
+    color: #4a5340;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dlv-hist-meta {
+    margin-top: 3px;
+    display: flex; align-items: center; gap: 7px;
+}
+.dlv-hist-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 11px; font-weight: 600;
+    color: #7f9663;
+}
+.dlv-hist-badge svg { width: 13px; height: 13px; }
+.dlv-hist-date {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 11px; color: rgba(90,80,58,0.55);
+}
+
+/* ── 空状态 ── */
+.dlv-empty {
+    text-align: center;
+    padding: 28px 20px;
+    color: rgba(90,80,58,0.5);
+}
+.dlv-empty-zh {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 13px; font-weight: 500;
+    color: rgba(90,80,58,0.55);
+}
+.dlv-empty-en {
+    margin-top: 5px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 13px; font-style: italic; letter-spacing: 0.5px;
+    color: rgba(127,150,99,0.6);
+}
+/* 全空：整页安静占位 */
+.dlv-empty-full {
+    text-align: center;
+    padding: 60px 24px;
+}
+.dlv-empty-full-icon {
+    width: 46px; height: 46px; margin: 0 auto 16px;
+    color: rgba(127,150,99,0.45);
+}
+.dlv-empty-full-icon svg { width: 100%; height: 100%; }
+.dlv-empty-full-zh {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    font-size: 15px; font-weight: 600; letter-spacing: 1px;
+    color: rgba(90,80,58,0.6);
+}
+.dlv-empty-full-en {
+    margin-top: 7px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 14px; font-style: italic; letter-spacing: 0.5px;
+    color: rgba(127,150,99,0.6);
+}
+
+/* ── 窄屏保护 (~390px) ── */
+@media (max-width: 400px) {
+    .dlv-hero-title { font-size: 40px; letter-spacing: 5px; }
+    .dlv-hero-tag { max-width: 74%; }
+    .dlv-thumb { width: 68px; height: 68px; }
+    .dlv-tl-label { font-size: 9px; }
+    .dlv-eta { padding: 6px 9px; }
+}

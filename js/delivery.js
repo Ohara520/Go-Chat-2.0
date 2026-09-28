@@ -16,6 +16,16 @@
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 反寄系统总开关（临时关闭）
+// 反寄寄出的仍是老版 emoji 形式的商品，与 V1 商城的真实商品图不一致，
+// 暂时关闭整条反寄通道；等反寄接入真实商品后，把这里改回 true 即可整体恢复。
+// 关闭时：不寄出、不播报"寄了东西"、不排队攒 pending，避免画饼。
+// 用户寄给 Ghost / 用户自购 / 签收 / 遗失赔偿等其余快递功能不受影响。
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+window.REVERSE_DELIVERY_ENABLED = false;
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 破防检测
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -108,6 +118,12 @@ function addDelivery(product, isGhostSend, isLuxury, purchaseId) {
     id: now + '_' + Math.random().toString(36).slice(2, 8),
     // Phase 2：Purchase↔Delivery 顶层关联。非 Mall 购买路径（反寄/自愈补发）为 null。
     purchaseId: purchaseId || null,
+    productId: typeof getProductId === 'function'
+      ? getProductId(product)
+      : (product.id || null),
+    image: product.id
+      ? ('images/products/' + product.id + '.png')
+      : '',
     name: product.name,
     emoji: product.emoji,
     isGhostSend,
@@ -204,6 +220,9 @@ function showPurchaseReceipt(delivery) {
 // 返回 true=已下单，false=被拦截未下单。调用方（尤其是用户明确索要的路径）
 // 必须依据返回值决定是否播报"已寄出"，否则会出现"嘴上说寄了、系统没寄"的画饼。
 function addGhostReverseDelivery(item, emotionType) {
+  // 反寄总开关关闭：直接不寄，返回 false 让上游不要播报"已寄出"。
+  if (window.REVERSE_DELIVERY_ENABLED === false) return false;
+
   // 用户明确索要（explicit_request）不受惊喜冷却限制——上游已用每周配额节流。
   // 惊喜类（情绪/特产）才共用 7 天全局冷却，保证稀有。
   const isExplicitRequest = emotionType === 'explicit_request';
@@ -441,68 +460,6 @@ async function onGhostReceived(delivery) {
   const pd = delivery.productData;
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
   _addDeliveryNotice({ id: 'recv_' + delivery.id, type: 'ghost_received', itemName: delivery.name, itemEmoji: delivery.emoji || '📦' });
-
-  // ── 私密商品 ──────────────────────────────────
-  if (pd.isIntimate) {
-    const tipHint = pd.tip ? `\n\nItem-specific tone anchor (do not quote verbatim): "${pd.tip}"` : '';
-    const prompt  = `[SPECIAL ITEM: INTIMATE / SUGGESTIVE ITEMS]
-She sent him 「${delivery.name}」. He just received it.
-
-He understands exactly what it implies.
-He doesn't react immediately.
-He doesn't joke it off, and he doesn't respond explicitly.
-He may acknowledge it with a short line, slightly off.
-He may push back a little — questioning the intention.
-But he doesn't reject it.
-He keeps it indirect. No explicit language.
-If something can be implied, he implies it.
-He controls the pace.${tipHint}
-
-One or two lines. Lowercase. English only.]`;
-
-    let replyI = '';
-    try {
-      const resDS = await fetchWithTimeout('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system: buildGhostStyleCore() + '\nYou are Simon Riley. Stay in character at all times.',
-          user: prompt, max_tokens: 150
-        })
-      }, 10000);
-      if (resDS.ok) {
-        const dataDS  = await resDS.json();
-        const candidate = dataDS.text?.trim() || '';
-        if (candidate && !_isDeliveryBreakout(candidate)) replyI = candidate;
-      }
-    } catch(e) {}
-
-    // Haiku 兜底
-    if (!replyI) {
-      try {
-        const line = await callHaiku(
-          buildDeliverySystem(),
-          [...chatHistory.slice(-8), { role: 'user', content: prompt }]
-        );
-        if (line && !_isDeliveryBreakout(line)) replyI = line.trim();
-      } catch(e) {}
-    }
-
-    if (replyI) {
-      appendMessage('bot', replyI);
-      chatHistory.push({ role: 'assistant', content: replyI });
-      // 【改】系统私信改成英文简化版
-      chatHistory.push({
-        role: 'user',
-        content: `[you received something intimate from her. you know. carry it.]`,
-        _system: true,
-        _delivery: true
-      });
-      _safeDeliverySaveHistory();
-      changeAffection(2);
-    }
-    return;
-  }
 
   // ── 恶作剧礼物 ───────────────────────────────
   if (pd.isJokeGift || delivery.name === '《讨好老婆的99招》') {
@@ -961,9 +918,16 @@ He doesn't make a thing out of it. But there's a slight edge — not at her, at 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function renderDeliveryTracker() {
+  // Delivery V1 的「我的快递」页面已接管物流展示。
+  // 保留函数与所有调用点，仅停止在 NOA MARKET 顶部渲染旧物流条。
   const tracker = document.getElementById('deliveryTracker');
-  if (!tracker) return;
+  if (tracker) {
+    tracker.style.display = 'none';
+    tracker.innerHTML = '';
+  }
+  return;
 
+  // eslint-disable-next-line no-unreachable
   const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
   const now        = Date.now();
 

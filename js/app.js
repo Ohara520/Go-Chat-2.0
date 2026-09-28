@@ -77,6 +77,7 @@ function openScreen(id) {
     if (id === 'secretScreen'       && typeof loadSecretScreen        === 'function') loadSecretScreen();
     if (id === 'marketScreen'       && typeof initMarket             === 'function') { initMarket(); checkDeliveryUpdates(); }
     if (id === 'takeoutScreen'      && typeof initTakeoutScreen      === 'function') initTakeoutScreen();
+    if (id === 'deliveryScreen'     && typeof renderDeliveryPage     === 'function') renderDeliveryPage();
     if (id === 'achievementScreen'  && typeof switchAchievementTab   === 'function') switchAchievementTab('story');
     // 回到主页时按当前时间重算外卖餐段提示，避免跨餐段后仍留着旧提示
     if (id === 'mainScreen'         && typeof updateTakeoutCardHint  === 'function') updateTakeoutCardHint();

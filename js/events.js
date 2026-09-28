@@ -542,6 +542,8 @@ async function handlePostReplyEvents(userText, reply, intent) {
       break;
 
     case 'reverse_package': {
+      // 反寄总开关关闭：不生成台词、不寄件（正常情况下 pickReadyPendingEvent 已拦在上游）。
+      if (window.REVERSE_DELIVERY_ENABLED === false) break;
       const _pool2 = (typeof GHOST_REVERSE_POOL !== 'undefined')
         ? (GHOST_REVERSE_POOL[intent.emotionType] || GHOST_REVERSE_POOL['思念'] || [])
         : [];
@@ -573,6 +575,8 @@ async function handlePostReplyEvents(userText, reply, intent) {
 // 【低优先级】sentKey 后续改成带周期（如30天），防止地点永久失效
 
 async function checkLocationSpecialTrigger(userText) {
+  // 反寄总开关关闭：地点特产反寄整条跳过。
+  if (window.REVERSE_DELIVERY_ENABLED === false) return;
   try {
     // ── 获取当前地点 ──────────────────────────────
     const rawLocation = localStorage.getItem('currentLocation') || 'Hereford Base';
@@ -725,6 +729,8 @@ async function checkLocationSpecialTrigger(userText) {
 // ── 主动触发：Ghost在某地点待够3天自动反寄 ──────────────
 // 在 initChat 或每日签到后调用
 function checkLocationSpecialAutoTrigger() {
+  // 反寄总开关关闭：地点特产主动反寄整条跳过。
+  if (window.REVERSE_DELIVERY_ENABLED === false) return;
   try {
     const rawLocation = localStorage.getItem('currentLocation') || '';
     if (!rawLocation) return;

@@ -8,11 +8,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="color-scheme" content="light only">
 <title>Go Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/welcome.css">
 <link rel="stylesheet" href="css/home.css">
 <link rel="stylesheet" href="css/chat.css">
 <link rel="stylesheet" href="css/voice.css">
+<link rel="stylesheet" href="css/delivery-v1.css">
 <style>
 /* ===== 情侣空间封面重设计 ===== */
 .couple-petal-container { display: none !important; }
@@ -533,107 +537,135 @@
 </div>
 
 <div class="screen" id="mainScreen">
-    <div class="main-content">
 
-      <!-- 角色信息条 + 切换按钮 -->
-      <div style="display:flex;align-items:center;gap:10px;padding:4px 2px 8px;grid-column: 1 / -1;">
-        <div style="flex:1;background:rgba(255,255,255,0.62);backdrop-filter:blur(14px);
-          -webkit-backdrop-filter:blur(14px);border-radius:18px;padding:10px 14px;
-          border:1px solid rgba(255,255,255,0.85);
-          box-shadow:0 3px 12px rgba(80,140,55,0.08);
-          display:flex;align-items:center;gap:12px;">
-          <div style="position:relative;flex-shrink:0;">
-            <img id="mainCharAvatar" src=""
-              style="width:42px;height:42px;border-radius:50%;object-fit:cover;
-              border:2px solid rgba(255,255,255,0.85);
-              box-shadow:0 2px 8px rgba(80,140,55,0.15);display:none;"
-              onerror="this.style.display='none';document.getElementById('mainCharAvaFallback').style.display='flex'">
-            <div id="mainCharAvaFallback" style="width:42px;height:42px;border-radius:50%;
-              background:linear-gradient(135deg,rgba(155,205,125,0.5),rgba(90,154,70,0.4));
-              display:flex;align-items:center;justify-content:center;font-size:20px;
-              border:2px solid rgba(255,255,255,0.85);">👤</div>
-            <div id="mainCharOnline" style="position:absolute;bottom:1px;right:1px;
-              width:10px;height:10px;border-radius:50%;background:#4ade80;
-              border:2px solid white;"></div>
+    <!-- ═══ 首页 Hero（独立于卡片 grid）═══ -->
+    <div id="homeHero" class="home-hero">
+      <div class="home-hero-inner">
+        <div class="hero-greeting" id="heroGreeting">Good morning,</div>
+        <div class="hero-name">Mrs. Riley.</div>
+        <div class="hero-date" id="heroDate"></div>
+        <div class="hero-weather" id="heroWeather"></div>
+
+        <!-- Ghost 主卡 -->
+        <div class="hero-ghost-card" onclick="openScreen('chatScreen')">
+          <img class="ghost-avatar-img hero-ghost-avatar" src="images/ghost-avatar.jpg">
+          <div class="hero-ghost-info">
+            <div class="hero-ghost-label">GHOST</div>
+            <div class="hero-ghost-name">Simon Riley</div>
+            <div class="hero-ghost-loc" id="heroGhostLoc"></div>
+            <div class="hero-ghost-meta" id="heroGhostMeta"></div>
           </div>
-          <div style="flex:1;min-width:0;">
-            <div id="mainCharName" style="font-size:15px;font-weight:700;color:#1e3d20;
-              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ghost</div>
-            <div id="mainCharSub" style="font-size:10px;color:rgba(40,80,35,0.5);margin-top:1px;">
-              Simon Riley · Manchester, UK</div>
-            <div id="mainCharDays" style="font-size:10px;color:rgba(40,80,35,0.38);margin-top:2px;"></div>
-          </div>
+          <div class="hero-chat-btn">Chat&nbsp;→</div>
         </div>
-        <!-- 切换按钮 -->
-        <button onclick="openCharacterSelect()" style="
-          width:42px;height:42px;border-radius:50%;flex-shrink:0;
-          background:rgba(255,255,255,0.62);backdrop-filter:blur(14px);
-          -webkit-backdrop-filter:blur(14px);
-          border:1px solid rgba(255,255,255,0.85);
-          box-shadow:0 3px 12px rgba(80,140,55,0.08);
-          font-size:18px;cursor:pointer;display:flex;
-          align-items:center;justify-content:center;
-          transition:transform 0.2s;" title="切换角色">⇄</button>
-      </div>
-
-      <div class="card card-large" onclick="openScreen('chatScreen')">
-        <div class="card-icon">💬</div>
-        <div class="card-title">聊天</div>
-        <div class="card-desc" id="mainChatDesc">与Ghost聊天</div>
-      </div>
-      <div class="card" id="calendarCard" onclick="openScreen('calendarScreen');setTimeout(()=>{if(typeof initCalendar==='function')initCalendar();},80);">
-        <div class="card-icon" id="calendarCardIcon">📅</div>
-        <div class="card-title">纪念</div>
-        <div class="card-desc" id="calendarCardDesc">点点滴滴</div>
-      </div>
-      <div class="card" onclick="openScreen('collectionScreen')">
-        <div class="card-icon">⭐</div>
-        <div class="card-title">收藏</div>
-        <div class="card-desc">珍贵时刻</div>
-      </div>
-      <div class="card" onclick="openScreen('marketScreen')">
-        <div class="card-icon">🏪</div>
-        <div class="card-title">商城</div>
-        <div class="card-desc" id="marketCardDesc">买礼物</div>
-      </div>
-      <div class="card" id="walletCard" onclick="openScreen('walletScreen')">
-        <div class="card-icon" id="walletCardIcon">💳</div>
-        <div class="card-title">钱包</div>
-        <div class="card-desc">虚拟币</div>
-      </div>
-      <div class="card achievement-card" onclick="openScreen('achievementScreen')">
-        <div class="card-icon">📖</div>
-        <div class="card-title">故事书</div>
-        <div class="card-desc" id="mainAchievementDesc">我们的故事</div>
-      </div>
-      <div class="card secret-card" onclick="openScreen('secretScreen')">
-        <div class="card-icon">💌</div>
-        <div class="card-title">秘密</div>
-        <div class="card-desc">只有Ghost知道</div>
-      </div>
-      <div class="card work-card" onclick="openScreen('careerScreen');setTimeout(()=>{if(typeof renderCareerSelection==='function')renderCareerSelection();},80);">
-        <div class="card-icon">💼</div>
-        <div class="card-title">职业</div>
-        <div class="card-desc" id="careerCardDesc">选择你的事业</div>
-      </div>
-      <div class="card vocab-card" onclick="openScreen('diaryScreen');setTimeout(async()=>{if(typeof generateDiaryEntry==='function')await generateDiaryEntry();if(typeof renderDiary==='function')renderDiary();},80);">
-        <div class="card-icon">📓</div>
-        <div class="card-title">日记</div>
-        <div class="card-desc">Ghost的私人日记</div>
-      </div>
-      <div class="card" onclick="openScreen('takeoutScreen')" style="background:linear-gradient(135deg,rgba(255,220,150,0.45),rgba(255,200,100,0.32)) !important;border:1px solid rgba(220,160,50,0.35) !important;">
-        <div class="card-icon">🛵</div>
-        <div class="card-title">外卖</div>
-        <div class="card-desc" id="takeoutCardDesc">给Ghost点外卖</div>
-      </div>
-      <div class="card shelf-card" id="shelfCard"
-           onclick="openScreen('shelfScreen');setTimeout(()=>{if(typeof renderGiftShelf==='function')renderGiftShelf();},80);"
-           style="background:linear-gradient(135deg,rgba(180,220,180,0.42),rgba(200,240,210,0.32)) !important;border:1px solid rgba(120,180,120,0.32) !important;">
-        <div class="card-icon">🎧</div>
-        <div class="card-title">声之匣</div>
-        <div class="card-desc">西蒙的声音</div>
       </div>
     </div>
+
+    <!-- ═══ US — 我们的故事 ═══ -->
+    <section class="home-section us-section">
+      <div class="section-head">
+        <div class="section-head-title"><span class="section-head-en">US</span><span class="section-head-sep">—</span><span class="section-head-zh">我们的故事</span></div>
+        <div class="section-head-chevron">›</div>
+      </div>
+      <div class="us-row">
+        <div class="card photo-card" id="calendarCard" onclick="openScreen('calendarScreen');setTimeout(()=>{if(typeof initCalendar==='function')initCalendar();},80);">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-memories.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">纪念</div>
+            <div class="photo-card-sub">MEMORIES</div>
+          </div>
+        </div>
+        <div class="card photo-card" onclick="openScreen('collectionScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-saved.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">收藏</div>
+            <div class="photo-card-sub">SAVED</div>
+          </div>
+        </div>
+        <div class="card photo-card achievement-card" onclick="openScreen('achievementScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">故事书</div>
+            <div class="photo-card-sub">OUR STORY</div>
+          </div>
+        </div>
+        <div class="card photo-card secret-card" onclick="openScreen('secretScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-secret.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">秘密</div>
+            <div class="photo-card-sub">ONLY GHOST KNOWS</div>
+          </div>
+        </div>
+        <div class="card photo-card vocab-card" onclick="openScreen('diaryScreen');setTimeout(async()=>{if(typeof generateDiaryEntry==='function')await generateDiaryEntry();if(typeof renderDiary==='function')renderDiary();},80);">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-diary.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">日记</div>
+            <div class="photo-card-sub">GHOST'S DIARY</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ LIFE — 生活日常 ═══ -->
+    <section class="home-section life-section">
+      <div class="section-head">
+        <div class="section-head-title"><span class="section-head-en">LIFE</span><span class="section-head-sep">—</span><span class="section-head-zh">生活日常</span></div>
+        <div class="section-head-chevron">›</div>
+      </div>
+      <div class="life-row">
+        <div class="card photo-card" onclick="openScreen('marketScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-market.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">商城</div>
+            <div class="photo-card-sub">NOA MARKET</div>
+          </div>
+        </div>
+        <div class="card photo-card" onclick="openScreen('takeoutScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-takeout.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">外卖</div>
+            <div class="photo-card-sub">TAKEOUT</div>
+          </div>
+        </div>
+        <div class="card photo-card" onclick="openScreen('deliveryScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-delivery.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">快递</div>
+            <div class="photo-card-sub">DELIVERY</div>
+          </div>
+        </div>
+        <div class="card photo-card" id="walletCard" onclick="openScreen('walletScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-wallet.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">钱包</div>
+            <div class="photo-card-sub">WALLET</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ YOU — 你的世界 ═══ -->
+    <section class="home-section you-section">
+      <div class="section-head">
+        <div class="section-head-title"><span class="section-head-en">YOU</span><span class="section-head-sep">—</span><span class="section-head-zh">你的世界</span></div>
+        <div class="section-head-chevron">›</div>
+      </div>
+      <div class="you-row">
+        <div class="card photo-card" onclick="openScreen('careerScreen');setTimeout(()=>{if(typeof renderCareerSelection==='function')renderCareerSelection();},80);">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-career.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">职业</div>
+            <div class="photo-card-sub">CAREER</div>
+          </div>
+        </div>
+        <div class="card photo-card" id="shelfCard" onclick="openScreen('shelfScreen');setTimeout(()=>{if(typeof renderGiftShelf==='function')renderGiftShelf();},80);">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-voice.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">声之匣</div>
+            <div class="photo-card-sub">VOICE</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- QQ群弹窗 -->
     <div id="qqGroupModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
@@ -1105,14 +1137,19 @@
 
   <!-- 商城页 -->
   <div class="screen" id="marketScreen">
-    <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
-      <div class="screen-title">🏪 商城</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-        <button onclick="openDeliveryComplaint()" style="display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:20px;border:1.5px solid rgba(90,154,70,0.3);background:rgba(255,255,255,0.6);color:#2d6028;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
-          📮 投诉
+    <div class="market-hero">
+      <button class="back-button market-hero-back" onclick="openScreen('mainScreen')">‹</button>
+      <div class="market-hero-copy">
+        <div class="market-hero-eyebrow">a little more for your everyday</div>
+        <h1 class="market-hero-title">NOA MARKET</h1>
+        <div class="market-hero-sub">Life &amp; Little Things</div>
+      </div>
+      <div class="market-hero-actions">
+        <button class="market-hero-cart" onclick="openCart()" aria-label="购物车">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M2.5 3.5h2.2l2 12.2a1.5 1.5 0 0 0 1.5 1.3h8.4a1.5 1.5 0 0 0 1.5-1.2l1.4-7.3H6"/></svg>
+          <span id="cartBadge" class="cart-badge" style="display:none;"></span>
         </button>
-        <div id="marketBalanceDisplay" style="font-size:13px;color:#2d6028;font-weight:600;padding-right:4px;">£0</div>
+        <div id="marketBalanceDisplay" class="market-hero-balance">£0</div>
       </div>
     </div>
     <div class="market-container">
@@ -1125,6 +1162,19 @@
       <!-- 商品网格 -->
       <div id="productsGrid" class="products-grid"></div>
     </div>
+  </div>
+
+  <!-- 快递 V1「我的快递」主页 -->
+  <div class="screen" id="deliveryScreen">
+    <div class="dlv-hero">
+      <button class="dlv-hero-back" onclick="openScreen('mainScreen')" aria-label="返回">‹</button>
+      <div class="dlv-hero-copy">
+        <h1 class="dlv-hero-title">DELIVERY</h1>
+        <div class="dlv-hero-zh">我的快递</div>
+        <div class="dlv-hero-tag">Some things take time,<br>but they always find their way to you.</div>
+      </div>
+    </div>
+    <div class="dlv-body" id="deliveryBody"></div>
   </div>
 
   <!-- 外卖页 -->
@@ -1482,6 +1532,158 @@
     </div>
   </div>
 
+  <!-- NOA MARKET 商品详情页（全屏） -->
+  <div id="productDetailOverlay" class="pdetail-overlay">
+    <div class="pdetail-page">
+      <div class="pdetail-topbar">
+        <button class="pdetail-icon-btn" onclick="closeProductDetail()">‹</button>
+        <div class="pdetail-topbar-right">
+          <button class="pdetail-icon-btn pdetail-cart-icon" onclick="openCart()" title="购物车" aria-label="购物车"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.2l2.1 12.1a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.3L21 7H6"/></svg><span id="pdetailCartBadge" class="cart-badge" style="display:none;"></span></button>
+          <button class="pdetail-icon-btn" onclick="_pdetailShare()" title="发给他看" aria-label="发给他看"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 10.5 13.5"/><path d="M21 3l-6.7 18-3.8-8.2L2.3 9.2 21 3z"/></svg></button>
+        </div>
+      </div>
+      <div class="pdetail-scroll">
+        <div id="pdetailHero" class="pdetail-hero"></div>
+        <div class="pdetail-body">
+          <div class="pdetail-title-row">
+            <div class="pdetail-title-names">
+              <div id="pdetailNameCn" class="pdetail-name-cn"></div>
+              <div id="pdetailNameEn" class="pdetail-name-en"></div>
+            </div>
+            <div id="pdetailPrice" class="pdetail-price"></div>
+          </div>
+          <div id="pdetailDesc" class="pdetail-desc"></div>
+          <div id="pdetailAttrs" class="pdetail-attrs"></div>
+        </div>
+      </div>
+      <div class="pdetail-actions">
+        <button class="pdetail-cart-btn" onclick="_pdetailAddToCart()"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span>加入购物车</span></button>
+        <button id="pdetailBuyBtn" class="pdetail-buy-btn" onclick="_pdetailBuyNow()">立即购买</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOA MARKET 购物车（全屏） -->
+  <div id="cartOverlay" class="cart-overlay">
+    <div class="cart-page">
+      <div class="cart-topbar">
+        <button class="cart-icon-btn" onclick="closeCart()">‹</button>
+        <div class="cart-brand">NOA MARKET</div>
+        <span class="cart-topbar-spacer"></span>
+      </div>
+      <div class="cart-heading">
+        <div class="cart-heading-titles">
+          <div class="cart-title-cn">你的选择</div>
+          <div class="cart-title-en">YOUR SELECTION</div>
+        </div>
+        <div id="cartCount" class="cart-count"></div>
+      </div>
+      <div id="cartReceipt" class="cart-receipt">
+        <div id="cartList" class="cart-list"></div>
+        <div id="cartFooter" class="cart-footer">
+          <div class="cart-summary">
+            <div class="cart-summary-row">
+              <span class="cart-summary-label">商品总额</span>
+              <span id="cartSubtotal" class="cart-summary-val">£0</span>
+            </div>
+            <div class="cart-summary-row">
+              <span class="cart-summary-label">配送费用</span>
+              <span class="cart-summary-val cart-shipping-note">结算时计算</span>
+            </div>
+            <div class="cart-summary-row cart-total-row">
+              <span class="cart-total-label">总计</span>
+              <span id="cartTotal" class="cart-total-val">£0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="cartEmpty" class="cart-empty">
+        <div class="cart-empty-icon">🛍️</div>
+        <div class="cart-empty-text">购物车还是空的</div>
+        <div class="cart-empty-sub">去 NOA MARKET 逛逛吧</div>
+      </div>
+    </div>
+    <div id="cartActionbar" class="cart-actionbar">
+      <div class="cart-actionbar-inner">
+        <button class="cart-continue-btn" onclick="closeCart()">继续购物</button>
+        <button id="cartCheckoutBtn" class="cart-checkout-btn" onclick="_cartCheckout()">去结算</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOA MARKET Checkout 确认订单（全屏） -->
+  <div id="checkoutOverlay" class="checkout-overlay">
+    <div class="checkout-page">
+      <div class="checkout-topbar">
+        <button class="cart-icon-btn" onclick="closeCheckout()">‹</button>
+        <div class="cart-brand">NOA MARKET</div>
+        <span class="cart-topbar-spacer"></span>
+      </div>
+      <div class="checkout-heading">
+        <div class="cart-heading-titles">
+          <div class="cart-title-cn">确认订单</div>
+          <div class="cart-title-en">CHECKOUT</div>
+        </div>
+        <div id="checkoutHeadingCount" class="cart-count"></div>
+      </div>
+      <div class="checkout-scroll">
+        <div class="checkout-panel">
+          <div class="checkout-section-head">
+            <span class="checkout-section-title">订单商品 <span id="checkoutCount" class="checkout-count"></span></span>
+          </div>
+          <div id="checkoutList" class="checkout-list"></div>
+          <div class="checkout-summary">
+            <div class="cart-summary-row">
+              <span class="cart-summary-label">商品总额</span>
+              <span id="checkoutSubtotal" class="cart-summary-val">£0</span>
+            </div>
+            <div class="cart-summary-row">
+              <span class="cart-summary-label">配送费用</span>
+              <span id="checkoutShipping" class="cart-summary-val">£0</span>
+            </div>
+            <div class="cart-summary-row cart-total-row">
+              <span class="cart-total-label">合计</span>
+              <span id="checkoutTotal" class="cart-total-val">£0</span>
+            </div>
+          </div>
+        </div>
+        <div class="checkout-pay">
+          <div class="checkout-pay-head">
+            <div class="checkout-pay-title-cn">付款方式</div>
+            <div class="checkout-pay-title-en">PAYMENT METHOD</div>
+          </div>
+          <div class="checkout-pay-opt selected" data-pay="user" onclick="_checkoutSelectPay('user')">
+            <div class="checkout-pay-main">
+              <div class="checkout-pay-name">我的余额</div>
+              <div class="checkout-pay-desc">使用账户余额支付</div>
+            </div>
+            <div class="checkout-pay-right"><span id="checkoutPayUserBal" class="checkout-pay-val">£0</span><span class="checkout-pay-check">✓</span></div>
+          </div>
+          <div class="checkout-pay-opt" data-pay="ghost" onclick="_checkoutSelectPay('ghost')">
+            <div class="checkout-pay-main">
+              <div class="checkout-pay-name">Ghost Card</div>
+              <div class="checkout-pay-desc">使用他的卡支付</div>
+            </div>
+            <div class="checkout-pay-right"><span id="checkoutPayGhostBal" class="checkout-pay-val">£0</span><span class="checkout-pay-check">✓</span></div>
+          </div>
+          <div class="checkout-pay-opt" data-pay="ghost_pay" onclick="_checkoutSelectPay('ghost_pay')">
+            <div class="checkout-pay-main">
+              <div class="checkout-pay-name">让他代付</div>
+              <div class="checkout-pay-desc">把这笔订单交给他</div>
+            </div>
+            <div class="checkout-pay-right"><span class="checkout-pay-check">✓</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="checkout-footer">
+        <div class="checkout-actions">
+          <button class="checkout-back-btn" onclick="_checkoutBackToCart()">返回购物车</button>
+          <button id="checkoutConfirmBtn" class="checkout-confirm-btn" onclick="_checkoutConfirm()">确认购买</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 快递详情弹窗 -->
   <div id="deliveryModal" class="delivery-modal-overlay" style="display:none;" onclick="closeDeliveryModal()">
     <div class="delivery-modal" onclick="event.stopPropagation()">
@@ -1662,6 +1864,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/wallet.js"></script>
 <script src="js/money.js"></script>
 <script src="js/delivery.js"></script>
+<script src="js/delivery-ui.js"></script>
 <script src="js/feedPhotos.js"></script>
 <script src="js/feed.js"></script>
 <script src="js/shop.js"></script>
@@ -1911,10 +2114,6 @@ document.addEventListener('DOMContentLoaded', () => {
   background: linear-gradient(135deg, rgba(255,245,200,0.7), rgba(255,225,180,0.65));
   border-color: rgba(220,170,80,0.4);
 }
-.shelf-gift-card.is-intimate {
-  background: linear-gradient(135deg, rgba(255,200,210,0.6), rgba(255,180,210,0.55));
-  border-color: rgba(220,120,160,0.4);
-}
 .shelf-gift-emoji {
   font-size: 30px;
   flex: 0 0 38px;
@@ -1957,17 +2156,6 @@ document.addEventListener('DOMContentLoaded', () => {
   font-style: normal;
   color: #8a6da0;
   margin-top: 4px;
-}
-
-/* —— 主页卡片解锁状态 —— */
-.shelf-card.shelf-unlocked .card-desc {
-  color: #8a3d8a !important;
-  font-weight: 800;
-  animation: shelf-pulse 2s ease-in-out infinite;
-}
-@keyframes shelf-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.65; }
 }
 
 /* —— 约会城市选择 —— */
@@ -2598,6 +2786,7 @@ async function selectCharacterAndClose(charId) {
 
   // 更新主页信息条
   setTimeout(_updateMainCharInfo, 100);
+  setTimeout(_updateHomeHero, 120);
 }
 
 // 更新主页角色信息条
@@ -2610,7 +2799,6 @@ function _updateMainCharInfo() {
   const subEl = document.getElementById('mainCharSub');
   const daysEl = document.getElementById('mainCharDays');
   const avatarEl = document.getElementById('mainCharAvatar');
-  const descEl = document.getElementById('mainChatDesc');
   const onlineEl = document.getElementById('mainCharOnline');
 
   // 同时更新聊天页顶部名字
@@ -2637,7 +2825,6 @@ function _updateMainCharInfo() {
     if (avatarEl) avatarEl.style.display = 'none';
     if (_avaFallback) _avaFallback.style.display = 'flex';
   }
-  if (descEl) descEl.textContent = '与' + config.name + '聊天';
   if (onlineEl) onlineEl.style.background = config.id === 'keegan' ? '#60c4e0' : '#4ade80';
 
   // 相处天数
@@ -2650,6 +2837,96 @@ function _updateMainCharInfo() {
       daysEl.textContent = config.id === 'keegan' ? '点击开始 · 第一天' : '';
     }
   }
+}
+
+// ── 首页 Hero：用户本地时间的问候/日期/背景 + Ghost 真相源卡 ──
+// 独立于 _updateMainCharInfo，只管 Hero，不碰角色信息条逻辑。
+function _homeHeroDaypart(hour) {
+  if (hour >= 5 && hour < 11) return 'morning';
+  if (hour >= 11 && hour < 18) return 'day';
+  return 'night';
+}
+function _updateHomeHero() {
+  const hero = document.getElementById('homeHero');
+  if (!hero) return;
+
+  // —— 用户本地时间（直接用浏览器 Date，不接 Ghost Time Authority）——
+  const now = new Date();
+  const daypart = _homeHeroDaypart(now.getHours());
+
+  // 背景：与问候同一个 daypart 判断，图文一致
+  const bgMap = {
+    morning: 'images/ui-backgrounds/home/home-bg-morning.png',
+    day:     'images/ui-backgrounds/home/home-bg-day.png',
+    night:   'images/ui-backgrounds/home/home-bg-night.png',
+  };
+  hero.style.backgroundImage = `url('${bgMap[daypart]}')`;
+
+  const greetMap = {
+    morning: 'Good morning,',
+    day:     'Good afternoon,',
+    night:   'Good evening,',
+  };
+  const greetEl = document.getElementById('heroGreeting');
+  if (greetEl) greetEl.textContent = greetMap[daypart];
+
+  const dateEl = document.getElementById('heroDate');
+  if (dateEl) {
+    // 例：Sunday, 27 September
+    const wd = now.toLocaleDateString('en-GB', { weekday: 'long' });
+    const dm = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    dateEl.textContent = wd + ', ' + dm;
+  }
+
+  // —— Ghost 卡：复用 profile.js 真相源，不重新计算 ——
+  // 保证地点/天气已初始化（initLocation 幂等，updateWeather 有缓存）
+  let loc = localStorage.getItem('currentLocation');
+  if (!loc && typeof initLocation === 'function') {
+    const chosen = initLocation();
+    loc = chosen && chosen.name;
+    if (typeof updateWeather === 'function') updateWeather(chosen && chosen.weatherCity);
+  }
+  loc = loc || 'Hereford Base';
+
+  const locEl = document.getElementById('heroGhostLoc');
+  if (locEl) locEl.textContent = loc;
+
+  // Ghost 当地时间：复用 getGhostTimeZone（profile.js 真相源）
+  let ghostTime = '';
+  try {
+    ghostTime = new Intl.DateTimeFormat('en-GB', {
+      timeZone: (typeof getGhostTimeZone === 'function') ? getGhostTimeZone() : 'Europe/London',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(now);
+  } catch(e) {}
+
+  // Ghost 当前天气：复用 botWeather / lastWeatherDisplay（profile.js 真相源）
+  let weather = '';
+  const wEl = document.getElementById('botWeather');
+  if (wEl && wEl.textContent.trim()) weather = wEl.textContent.trim();
+  if (!weather) weather = (localStorage.getItem('lastWeatherDisplay') || '').trim();
+  // 天气缓存过期/为空时后台刷新，回来再渲染一次（不阻塞）
+  if (!weather && typeof updateWeather === 'function') {
+    const city = localStorage.getItem('currentWeatherCity') || '';
+    if (city) Promise.resolve(updateWeather(city)).then(() => _renderHeroWeatherOnly());
+  }
+
+  const metaEl = document.getElementById('heroGhostMeta');
+  if (metaEl) {
+    metaEl.textContent = [ghostTime, weather].filter(Boolean).join(' · ');
+  }
+  _renderHeroWeatherOnly(weather);
+}
+// 顶部问候区那一行天气（母稿里 greeting 下面的地点+天气行）
+function _renderHeroWeatherOnly(weather) {
+  const el = document.getElementById('heroWeather');
+  if (!el) return;
+  if (weather === undefined) {
+    const wEl = document.getElementById('botWeather');
+    weather = (wEl && wEl.textContent.trim()) || (localStorage.getItem('lastWeatherDisplay') || '').trim();
+  }
+  const loc = localStorage.getItem('currentLocation') || 'Hereford Base';
+  el.textContent = weather ? (loc + ' · ' + weather) : loc;
 }
 
 // 更新弹窗里的天数 + Ghost 头像
@@ -2683,6 +2960,10 @@ function _updateCharSelectDays() {
 // 页面加载时初始化主页信息条
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(_updateMainCharInfo, 500);
+  setTimeout(_updateHomeHero, 520);
+  // Hero 用户本地时间/日期每分钟刷新（跨越 daypart 边界时自动切背景+问候）
+  if (window._heroInterval) clearInterval(window._heroInterval);
+  window._heroInterval = setInterval(_updateHomeHero, 60000);
 });
 </script>
 
@@ -2733,32 +3014,57 @@ body.theme-keegan #switchLoadingStatus { color:rgba(26,58,80,0.5); }
   width: 100%; max-width: 480px;
   height: calc(60px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(255,255,255,0.72);
+  background: rgba(248,244,237,0.82);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-  border-top: 1px solid rgba(255,255,255,0.85);
-  box-shadow: 0 -4px 20px rgba(80,140,55,0.08);
+  border-top: 1px solid rgba(160,140,110,0.14);
+  box-shadow: 0 -4px 20px rgba(90,75,50,0.06);
   display: none;
   align-items: flex-start;
   padding-top: 8px;
   z-index: 200;
 ">
   <div class="tab-bar-item tab-active" onclick="switchTab('main')" id="tab-main">
-    <div class="tab-bar-icon">🏠</div>
-    <div class="tab-bar-label">主页</div>
-    <div class="tab-bar-dot" id="dot-main"></div>
+    <div class="tab-bar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3.5 10.5 12 4l8.5 6.5"/>
+        <path d="M5.5 9.5V19a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/>
+        <path d="M9.5 20v-5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V20"/>
+      </svg>
+    </div>
+    <div class="tab-bar-label">首页</div>
   </div>
   <div class="tab-bar-item" onclick="switchTab('chat')" id="tab-chat">
-    <div class="tab-bar-icon">💬</div>
+    <div class="tab-bar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 15.5a1.5 1.5 0 0 1-1.5 1.5H8l-4 3.5V6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5z"/>
+        <circle cx="8.5" cy="11" r="0.6" fill="currentColor" stroke="none"/>
+        <circle cx="12" cy="11" r="0.6" fill="currentColor" stroke="none"/>
+        <circle cx="15.5" cy="11" r="0.6" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
     <div class="tab-bar-label">聊天</div>
     <div class="tab-bar-dot" id="dot-chat" style="display:none;"></div>
   </div>
   <div class="tab-bar-item" onclick="switchTab('couple')" id="tab-couple">
-    <div class="tab-bar-icon">🌸</div>
+    <div class="tab-bar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="1.9"/>
+        <ellipse cx="12" cy="6.4" rx="2.1" ry="2.9"/>
+        <ellipse cx="12" cy="17.6" rx="2.1" ry="2.9"/>
+        <ellipse cx="6.4" cy="12" rx="2.9" ry="2.1"/>
+        <ellipse cx="17.6" cy="12" rx="2.9" ry="2.1"/>
+      </svg>
+    </div>
     <div class="tab-bar-label">情侣空间</div>
     <div class="tab-bar-dot" id="dot-couple" style="display:none;"></div>
   </div>
   <div class="tab-bar-item" onclick="switchTab('me')" id="tab-me">
-    <div class="tab-bar-icon">👤</div>
+    <div class="tab-bar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="3.4"/>
+        <path d="M5.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/>
+      </svg>
+    </div>
     <div class="tab-bar-label">我的</div>
     <div class="tab-bar-dot" id="dot-me" style="display:none;"></div>
   </div>
@@ -2767,23 +3073,29 @@ body.theme-keegan #switchLoadingStatus { color:rgba(26,58,80,0.5); }
 <style>
 .tab-bar-item {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; gap: 2px;
-  cursor: pointer; padding: 2px 0; transition: all 0.2s;
+  align-items: center; gap: 4px;
+  cursor: pointer; padding: 2px 0; transition: all 0.25s ease;
+  color: rgba(120,105,80,0.5);
 }
-.tab-bar-item:active { transform: scale(0.92); }
-.tab-bar-icon { font-size: 22px; transition: transform 0.2s; }
+.tab-bar-item:active { transform: scale(0.94); }
+.tab-bar-icon {
+  width: 25px; height: 25px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.25s ease, color 0.25s ease;
+}
+.tab-bar-icon svg { width: 100%; height: 100%; display: block; }
 .tab-bar-label {
   font-size: 10px; font-weight: 500;
-  color: rgba(50,100,40,0.38); letter-spacing: 0.2px; white-space: nowrap;
+  color: rgba(120,105,80,0.5); letter-spacing: 0.3px; white-space: nowrap;
+  transition: color 0.25s ease, font-weight 0.25s ease;
 }
 .tab-bar-dot {
   width: 4px; height: 4px; border-radius: 50%;
-  background: #5a9a46; margin-top: 1px;
+  background: #9c6b3f; margin-top: 1px;
 }
-.tab-active .tab-bar-label { color: #2d6028 !important; font-weight: 700; }
-.tab-active .tab-bar-icon { transform: scale(1.12); }
-/* 主页内容底部留白，不被 Tab Bar 遮住 */
-#mainScreen .main-content { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+.tab-active { color: #8a5a34; }
+.tab-active .tab-bar-label { color: #6b4a2c !important; font-weight: 700; }
+.tab-active .tab-bar-icon { color: #8a5a34; transform: translateY(-1px); }
 </style>
 
 <script>
@@ -2833,7 +3145,7 @@ window.openScreen = function(screenId) {
   const tb = document.getElementById('mainTabBar');
   if (!tb) return;
   const hideFor = ['chatScreen','profileScreen','coupleScreen','walletScreen',
-    'careerScreen','diaryScreen','marketScreen','takeoutScreen',
+    'careerScreen','diaryScreen','marketScreen','takeoutScreen','deliveryScreen',
     'achievementScreen','collectionScreen','calendarScreen','secretScreen','charFeedScreen'];
   if (screenId === 'mainScreen') {
     tb.style.display = 'flex';

@@ -115,6 +115,8 @@ const MERGE_DELAY = 300;
 // fetchSonnetWithCache 定义在 api.js，此处不重复
 
 function pickReadyPendingEvent() {
+  // 反寄总开关关闭：不消费 pending，反寄事件不浮出（不生成台词、不寄件）。
+  if (window.REVERSE_DELIVERY_ENABLED === false) return null;
   const pending = getPendingReversePackages();
   if (!pending.length) return null;
   const ready = pending.find(p => p.triggerAtTurn <= _globalTurnCount);
@@ -1640,9 +1642,6 @@ async function _processMergedMessage(text) {
     // 情绪/商城触发：提高到45%（原25%太低）
     // 每轮 30% 概率跑反寄/情绪判断（原为 0.85，与"惊喜才珍贵"的设计冲突，且注释谎称 25%）
     if (Math.random() < 0.30) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
-    if (chatHistory.slice(-6).some(m => m._intimate)) {
-      setTimeout(() => { try { checkIntimateHighlight(text, reply); } catch(e) {} }, 1500);
-    }
     if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);

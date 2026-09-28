@@ -246,6 +246,7 @@ async function switchCharacter(newCharId) {
 
   // 10. 更新主页信息条
   if (typeof _updateMainCharInfo === 'function') setTimeout(_updateMainCharInfo, 100);
+  if (typeof _updateHomeHero === 'function') setTimeout(_updateHomeHero, 120);
 
   // 解锁：切换完成，允许自动保存
   window._characterSwitching = false;

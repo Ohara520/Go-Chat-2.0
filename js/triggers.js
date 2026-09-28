@@ -56,58 +56,6 @@ function clearProductTrigger(name) {
   localStorage.setItem('marketTriggered', JSON.stringify(triggered));
 }
 
-// ── 私密商品高亮辅助函数 ──────────────────────────────────
-function getIntimateProductTrigger(name) {
-  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
-  const item = triggered[name];
-  if (!item) return null;
-  if (Date.now() - item.timestamp > 5 * 24 * 3600 * 1000) return null; // 5天冷却
-  return item.reason;
-}
-
-function clearIntimateProductTrigger(name) {
-  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
-  delete triggered[name];
-  localStorage.setItem('intimateTriggered', JSON.stringify(triggered));
-}
-
-// ── 私密商品高亮触发 ──────────────────────────────────────
-async function checkIntimateHighlight(userText, botReply) {
-  // 预筛：本轮或最近几条有 _intimate 标记才调模型
-  const hasIntimate = chatHistory.slice(-6).some(m => m._intimate);
-  if (!hasIntimate) return;
-
-  // 5天冷却
-  const lastAt = parseInt(localStorage.getItem('intimateHighlightAt') || '0');
-  if (Date.now() - lastAt < 5 * 24 * 3600 * 1000) return;
-
-  try {
-    const raw = await fetchDeepSeek(
-      `你是一个情绪判断器。只返回JSON，不要其他文字。
-Ghost replied: "${botReply.slice(0, 200)}"
-Did Ghost show clear desire or wanting — through implication, tension, or controlled restraint? Answer only JSON: {"desire": true} or {"desire": false}`,
-      `判断`,
-      30
-    );
-    const result = safeParseJSON(raw);
-    if (!result?.desire) return;
-  } catch(e) { return; }
-
-  localStorage.setItem('intimateHighlightAt', Date.now());
-
-  // 随机选1件私密商品高亮
-  const pool = (typeof MARKET_PRODUCTS !== 'undefined' && MARKET_PRODUCTS.intimate) || [];
-  const purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
-  const available = pool.filter(p => !purchased.includes(p.name));
-  if (available.length === 0) return;
-
-  const picked = available[Math.floor(Math.random() * available.length)];
-  const triggered = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
-  triggered[picked.name] = { reason: '他很想要你', timestamp: Date.now() };
-  localStorage.setItem('intimateTriggered', JSON.stringify(triggered));
-}
-
-
 // ============================================================
 // 核心：checkTriggersAndEmotion
 // 每轮25%概率触发（由sendMessage.js控制）
@@ -182,6 +130,9 @@ emotion强度：轻/中/重`,
     // ── 3. 情绪反寄触发 ───────────────────────────────────
     // 修复：用 IIFE 隔离局部 return，原版这些 return 会跳过整个函数（含步骤4）
     if (result.emotion?.triggered) (() => {
+      // 反寄总开关关闭：不排队攒情绪反寄，避免通道重开后一次性涌出。
+      if (window.REVERSE_DELIVERY_ENABLED === false) return;
+
       const type      = result.emotion.type;
       const intensity = result.emotion.intensity;
 

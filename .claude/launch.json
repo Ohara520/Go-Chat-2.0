@@ -4,8 +4,8 @@
     {
       "name": "go-chat-static",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["-y", "http-server", ".", "-p", "8791", "-c-1"],
-      "port": 8791
+      "runtimeArgs": ["-y", "http-server", ".", "-c-1"],
+      "autoPort": true
     }
   ]
 }

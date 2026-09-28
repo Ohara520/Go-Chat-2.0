@@ -72,7 +72,7 @@ body::after {
     overflow: hidden;
 }
 .screen.active { display: flex; }
-#mainScreen { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#mainScreen { overflow-y: auto; -webkit-overflow-scrolling: touch; background: #f4efe6; }
 #coupleScreen.active { display: block !important; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 

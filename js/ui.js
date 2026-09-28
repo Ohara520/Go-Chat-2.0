@@ -384,19 +384,100 @@ function appendGhostSticker(id) {
 // ===== 历史记录重建渲染 =====
 // initChat 调用，把 localStorage 里的 chatHistory 全部重建到 DOM
 
-// 聊天里的商品卡片（分享入口 + 历史恢复共用）
+// 聊天里的商品分享小票卡（分享入口 + 历史恢复共用）
 function renderChatProductCard(p) {
-  const emoji = p.emoji || '🎁';
   const name = p.name || '';
-  const desc = p.desc || '';
+  const nameEn = p.nameEn || '';
   const price = (typeof p.price === 'number') ? `£${p.price.toLocaleString()}` : (p.price || '');
-  return `<div class="chat-product-card">
-    <div class="chat-product-emoji">${emoji}</div>
-    <div class="chat-product-info">
-      <div class="chat-product-name">${name}</div>
-      ${desc ? `<div class="chat-product-desc">${desc}</div>` : ''}
-      ${price ? `<div class="chat-product-price">${price}</div>` : ''}
+  let visual = `<div class="share-card-img share-card-img--empty"></div>`;
+  if (p.id) {
+    // 复用商品现有分享图 images/share/<id>.png
+    const src = `images/share/${p.id}.png`;
+    const fallback = '<div class=&quot;share-card-img share-card-img--empty&quot;></div>';
+    visual = `<img class="share-card-img" src="${src}" alt="${name.replace(/"/g, '&quot;')}" loading="lazy" onerror="this.outerHTML='${fallback}'">`;
+  }
+  return `<div class="share-card">
+    <div class="share-card-head">
+      <span class="share-card-brand">NOA MARKET</span>
+      <span class="share-card-kicker">PRODUCT SHARE</span>
     </div>
+    <div class="share-card-body">
+      ${visual}
+      <div class="share-card-info">
+        <div class="share-card-name">${name}</div>
+        ${nameEn ? `<div class="share-card-name-en">${nameEn}</div>` : ''}
+        ${price ? `<div class="share-card-price">${price}</div>` : ''}
+      </div>
+    </div>
+    <div class="share-card-divider"></div>
+    <div class="share-card-foot">NOA MARKET · SHARED</div>
+  </div>`;
+}
+
+// 代付请求卡（静态展示，沿用分享小票视觉；三种状态切同一个 status 区）
+// order = { items:[{id,name,nameEn,price,qty}], shipping, status:'waiting'|'approved'|'declined' }
+function _payCardMoney(n) { return `£${(n || 0).toLocaleString()}`; }
+
+function _payCardItemRow(it) {
+  const name = it.name || '';
+  const nameEn = it.nameEn || '';
+  const qty = it.qty || 1;
+  const linePrice = (typeof it.price === 'number') ? `${_payCardMoney(it.price)} × ${qty}` : '';
+  let visual = `<div class="share-card-img share-card-img--empty"></div>`;
+  if (it.id) {
+    const src = `images/share/${it.id}.png`;
+    const fallback = '<div class=&quot;share-card-img share-card-img--empty&quot;></div>';
+    visual = `<img class="share-card-img" src="${src}" alt="${name.replace(/"/g, '&quot;')}" loading="lazy" onerror="this.outerHTML='${fallback}'">`;
+  }
+  return `<div class="pay-card-item">
+    ${visual}
+    <div class="share-card-info">
+      <div class="share-card-name">${name}</div>
+      ${nameEn ? `<div class="share-card-name-en">${nameEn}</div>` : ''}
+      ${linePrice ? `<div class="share-card-price">${linePrice}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderPayRequestCard(order) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const shipping = (typeof order.shipping === 'number') ? order.shipping : 0;
+  const status = order.status || 'waiting';
+
+  const itemsTotal = items.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0);
+  const total = itemsTotal + shipping;
+
+  const shown = items.slice(0, 2);
+  const remaining = items.length - shown.length;
+  const rows = shown.map(_payCardItemRow).join('');
+  const moreRow = remaining > 0
+    ? `<div class="pay-card-more">+ ${remaining} MORE ITEM${remaining > 1 ? 'S' : ''}</div>`
+    : '';
+
+  const statusMeta = {
+    waiting:  { cls: 'is-waiting',  mark: '○', label: 'WAITING FOR HIM', showAmount: false },
+    approved: { cls: 'is-approved', mark: '✓', label: 'PAID BY HIM',     showAmount: true  },
+    declined: { cls: 'is-declined', mark: '—', label: 'DECLINED',        showAmount: true  },
+  }[status] || { cls: 'is-waiting', mark: '○', label: 'WAITING FOR HIM', showAmount: false };
+
+  const statusHtml = `<div class="pay-card-status ${statusMeta.cls}">
+    <span class="pay-card-status-label"><span class="pay-card-status-mark">${statusMeta.mark}</span>${statusMeta.label}</span>
+    ${statusMeta.showAmount ? `<span class="pay-card-status-amount">${_payCardMoney(total)}</span>` : ''}
+  </div>`;
+
+  const idAttr = order.requestId ? ` data-pay-request-id="${String(order.requestId).replace(/"/g, '')}"` : '';
+  return `<div class="share-card pay-card"${idAttr}>
+    <div class="share-card-head">
+      <span class="share-card-brand">NOA MARKET</span>
+      <span class="share-card-kicker">PAYMENT REQUEST</span>
+    </div>
+    <div class="pay-card-items">${rows}${moreRow}</div>
+    <div class="pay-card-summary">
+      <div class="pay-card-line"><span>Shipping</span><span>${_payCardMoney(shipping)}</span></div>
+      <div class="share-card-divider"></div>
+      <div class="pay-card-line pay-card-total"><span>TOTAL</span><span>${_payCardMoney(total)}</span></div>
+    </div>
+    ${statusHtml}
   </div>`;
 }
 
@@ -482,6 +563,16 @@ function renderChatHistory(chatHistory) {
         div.className = 'message user';
         div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
         div.innerHTML = renderChatProductCard(msg._product);
+        container.appendChild(div);
+        return;
+      }
+
+      // 代付请求卡（同一张卡随决策更新状态，历史恢复时按存下的最终状态渲染）
+      if (msg._payCard) {
+        const div = document.createElement('div');
+        div.className = 'message user';
+        div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
+        div.innerHTML = renderPayRequestCard(msg._payCard);
         container.appendChild(div);
         return;
       }

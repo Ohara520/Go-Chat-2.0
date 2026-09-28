@@ -41,18 +41,15 @@ function canUnlockProduct(product) {
 // ===== 商城系统 (shop.js) =====
 // ===== 商城系统 =====
 
+// NOA MARKET V1 分类：7 个新分类。内部 key 保持不变（购买/定价/季节逻辑按 key 分支，改 key 等于动购买逻辑），仅调整 label 与展示顺序。
 const MARKET_CATEGORIES = [
-  { id: 'clothing', label: '👕 服装' },
-  { id: 'food',     label: '🍫 食品' },
-  { id: 'gift',     label: '🎁 特别礼物' },
-  { id: 'medical',  label: '💊 医疗关怀' },
-  { id: 'fromhome', label: '🏠 从家寄给他' },
-  { id: 'luxury',   label: '💎 精品专柜' },
-  // { id: 'myitems',  label: '🛍️ 我的专区' },  // 已下架：用户自穿商品鸡肋，隐藏入口（商品数据保留，isUserItem逻辑不受影响）
-  { id: 'lifecare', label: '🧴 生活照顾' },
-  { id: 'wishlist', label: '✈️ 面基计划' },
-  { id: 'home',     label: '🏡 建立小家' },
-  { id: 'intimate', label: '🔒 私密专区' },
+  { id: 'food',     label: '食饮' },   // product-001~012
+  { id: 'clothing', label: '穿搭' },   // product-013~024
+  { id: 'lifecare', label: '护理' },   // product-025~035
+  { id: 'luxury',   label: '奢品' },   // product-036~047 + product-061
+  { id: 'specialty',label: '特产' },   // product-048~060
+  { id: 'home',     label: '资产' },   // product-062~069
+  { id: 'wishlist', label: '特殊' },   // product-070~072
 ];
 
 function getMarketCategories() {
@@ -60,180 +57,570 @@ function getMarketCategories() {
 }
 
 const MARKET_PRODUCTS = {
+  // ── NOA MARKET V1 穿搭 ──
+  // 旧 clothing-01~14 emoji prototype 已废弃；此处为 V1 正式商品，ID = product-NNN 全局流水号。
+  // 图片按 ID 绑定 images/products/<id>.png。emoji 仅作图片加载失败时的 fallback。
   clothing: [
-    { id: 'clothing-01', emoji: '🧦', name: '美利奴羊毛袜（三双）', desc: '透气抗菌，长时间行军脚也干爽',            price: 48,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-02', emoji: '👖', name: '战术工装裤',           desc: '耐磨多口袋，任务日常两相宜',              price: 180, shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-03', emoji: '👕', name: 'Merino羊毛T恤',       desc: '基础款，细腻柔软，他每天都会穿',          price: 65,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-04', emoji: '🧢', name: '战术棒球帽',           desc: '低调百搭，任务之外的他',                  price: 55,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-05', emoji: '🩲', name: 'CK内裤',               desc: '低调有质感，你懂的',                      price: 55,  shipping: 35, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'clothing-06', emoji: '👟', name: '简约帆布休闲鞋',       desc: '低调干净，不在任务时的他',                price: 95,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-07', emoji: '🧣', name: '苏格兰格纹围巾',       desc: '正宗苏格兰格纹，保暖又好看',              price: 68,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-08', emoji: '🖤', name: '黑色简约皮带',         desc: '低调有质感，他不会主动买',                price: 75,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-09', emoji: '🧥', name: '厚实连帽卫衣',         desc: '营地休息时穿的，宽松舒适',                price: 88,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-10', emoji: '🥾', name: '战术军靴（升级款）',   desc: '比上一双更耐穿，任务首选',                price: 220, shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-11', emoji: '🕶️', name: '墨镜',                 desc: 'Ghost标配，低调又帅',                     price: 95,  shipping: 35, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'clothing-12', emoji: '🧤', name: '战术手套',             desc: '防割耐磨，任务必备',                      price: 85,  shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-13', emoji: '🪖', name: '战术腰包',             desc: '轻便实用，日常外出也能用',                price: 128, shipping: 35, maxPurchase: 2 },
-    { id: 'clothing-14', emoji: '🧦', name: '军用美利奴羊毛袜礼盒', desc: '防臭耐磨，长途任务的秘密武器',            price: 48,  shipping: 25, maxPurchase: 2 },
+    { id: 'product-013', emoji: '🧦', name: '美利奴羊毛袜（三双装）', nameEn: 'Merino Wool Socks (3-Pack)', price: 90,
+      desc: '美利奴羊毛混纺，米白、灰、橄榄三色一组。质地细软，透气吸湿，长时间穿着保持干爽。',
+      features: [
+        { label: '材质', value: '美利奴羊毛混纺' },
+        { label: '组合', value: '三色三双装' },
+        { label: '功能', value: '透气吸湿' },
+        { label: '包装', value: '盒装' },
+      ] },
+    { id: 'product-014', emoji: '🧥', name: '灰褐羊毛大衣', nameEn: 'Taupe Wool Overcoat', price: 1280,
+      desc: '中长款羊毛面料大衣，灰褐色，翻领单排扣。面料厚实挺括，版型利落。',
+      features: [
+        { label: '材质', value: '羊毛面料' },
+        { label: '版型', value: '中长款' },
+        { label: '设计', value: '翻领单排扣' },
+        { label: '颜色', value: '灰褐色' },
+      ] },
+    { id: 'product-015', emoji: '👟', name: '简约低帮休闲鞋', nameEn: 'Minimal Low-Top Sneakers', price: 420,
+      desc: '米白色低帮休闲鞋，皮质鞋面搭配橡胶大底。鞋型简约，线条干净。',
+      features: [
+        { label: '材质', value: '皮质鞋面' },
+        { label: '鞋底', value: '橡胶大底' },
+        { label: '鞋型', value: '低帮' },
+        { label: '颜色', value: '米白色' },
+      ] },
+    { id: 'product-016', emoji: '🥾', name: '切尔西短靴', nameEn: 'Chelsea Boots', price: 680,
+      desc: '真皮切尔西靴，两侧松紧带，无鞋带穿脱。中筒靴型。',
+      features: [
+        { label: '材质', value: '真皮' },
+        { label: '靴型', value: '中筒切尔西' },
+        { label: '穿脱', value: '两侧松紧带' },
+        { label: '颜色', value: '深棕色' },
+      ] },
+    { id: 'product-017', emoji: '🧥', name: '羊羔绒领飞行夹克', nameEn: 'Sherpa-Collar Bomber Jacket', price: 760,
+      desc: '飞行夹克版型，领口拼接羊羔绒，袖口与下摆罗纹收口。外层耐磨，内里保暖。',
+      features: [
+        { label: '材质', value: '羊羔绒拼接' },
+        { label: '版型', value: '飞行夹克' },
+        { label: '设计', value: '罗纹收口' },
+        { label: '颜色', value: '橄榄绿' },
+      ] },
+    { id: 'product-018', emoji: '🖤', name: '棕色真皮腰带', nameEn: 'Brown Leather Belt', price: 260,
+      desc: '头层牛皮腰带，棕色，金属针扣。质地厚实。',
+      features: [
+        { label: '材质', value: '头层牛皮' },
+        { label: '搭扣', value: '金属针扣' },
+        { label: '颜色', value: '棕色' },
+        { label: '包装', value: '盒装' },
+      ] },
+    { id: 'product-019', emoji: '🧣', name: '苏格兰格纹羊毛围巾', nameEn: 'Scottish Wool Tartan Scarf', price: 220,
+      desc: '苏格兰羊毛织造，深红、墨绿、藏蓝格纹，两端流苏收边。质地厚软。',
+      features: [
+        { label: '材质', value: '苏格兰羊毛' },
+        { label: '花纹', value: '格纹' },
+        { label: '工艺', value: '流苏收边' },
+        { label: '颜色', value: '深红墨绿藏蓝' },
+      ] },
+    { id: 'product-020', emoji: '🧳', name: '橄榄绿帆布旅行包', nameEn: 'Olive Canvas Weekender Bag', price: 540,
+      desc: '帆布包身，皮革包边与提手，附可拆卸肩带。做旧质感，容量充足。',
+      features: [
+        { label: '材质', value: '帆布拼皮革' },
+        { label: '背法', value: '手提·可拆卸肩带' },
+        { label: '工艺', value: '做旧处理' },
+        { label: '颜色', value: '橄榄绿' },
+      ] },
+    { id: 'product-021', emoji: '🧥', name: '鼠尾草绿拉链连帽卫衣', nameEn: 'Sage Green Zip-Up Hoodie', price: 320,
+      desc: '全拉链连帽卫衣，加绒内里，宽松版型。手感厚实柔软。',
+      features: [
+        { label: '材质', value: '加绒棉质' },
+        { label: '版型', value: '宽松' },
+        { label: '设计', value: '全拉链连帽' },
+        { label: '颜色', value: '鼠尾草绿' },
+      ] },
+    { id: 'product-022', emoji: '👕', name: '灰褐圆领T恤', nameEn: 'Taupe Crew-Neck Tee', price: 150,
+      desc: '纯棉圆领短袖T恤，灰褐色，暗纹提花。手感柔软。',
+      features: [
+        { label: '材质', value: '纯棉' },
+        { label: '领型', value: '圆领' },
+        { label: '工艺', value: '暗纹提花' },
+        { label: '颜色', value: '灰褐色' },
+      ] },
+    { id: 'product-023', emoji: '🖤', name: '印字连帽卫衣', nameEn: 'Printed Hoodie', price: 280,
+      desc: '黑色连帽卫衣，胸前印 "MY WIFE IS THE PRETTIEST" 字样与爱心图案。加绒内里，宽松版型。',
+      features: [
+        { label: '材质', value: '加绒棉质' },
+        { label: '版型', value: '宽松' },
+        { label: '印花', value: '胸前字母与爱心' },
+        { label: '颜色', value: '黑色' },
+      ] },
+    { id: 'product-024', emoji: '🧥', name: '做旧腊质工装夹克', nameEn: 'Waxed Field Jacket', price: 890,
+      desc: '腊质涂层工装夹克，橄榄棕做旧色，灯芯绒翻领，多口袋。面料防泼水。',
+      features: [
+        { label: '材质', value: '腊质涂层棉' },
+        { label: '领型', value: '灯芯绒翻领' },
+        { label: '设计', value: '多口袋·防泼水' },
+        { label: '颜色', value: '橄榄棕' },
+      ] },
   ],
+  // ── NOA MARKET V1 食饮 ──
+  // 旧 food-01~14 emoji prototype 已废弃；此处为 V1 正式商品，ID = product-NNN 全局流水号。
+  // 图片按 ID 绑定 images/products/<id>.png。name/desc/price 为占位骨架，后续补充。
   food: [
-    { id: 'food-01', emoji: '🫖', name: '英式早餐茶礼盒',       desc: '经典拼配，他值夜班时来一杯，附骨瓷杯',    price: 88,  shipping: 25, maxPurchase: 2 },
-    { id: 'food-02', emoji: '🧀', name: '手工切达奶酪拼盘',     desc: '英格兰农场熟成，配饼干红酒都合适',        price: 128, shipping: 30, maxPurchase: 2 },
-    { id: 'food-03', emoji: '🍫', name: '比利时黑巧克力礼盒',   desc: '85%可可，苦里回甘，像他这个人',          price: 95,  shipping: 25, maxPurchase: 2 },
-    { id: 'food-04', emoji: '☕', name: '精品咖啡豆礼盒',         desc: '三种产区，他每天早上用得上，附手冲说明',  price: 98,  shipping: 30, maxPurchase: 2 },
-    { id: 'food-05', emoji: '🍯', name: '苏格兰高地蜂蜜套装',     desc: '三种花种，高地野生，玻璃罐精装',          price: 78,  shipping: 25, maxPurchase: 2 },
-    { id: 'food-06', emoji: '🌾', name: '格兰诺拉营地早餐礼盒',   desc: '野燕麦+坚果+蔓越莓，营地早餐首选',       price: 55,  shipping: 25, maxPurchase: 2 },
-    { id: 'food-07', emoji: '🍫', name: '比利时限量松露巧克力',   desc: '手工制作，礼盒密封，不甜腻',              price: 108, shipping: 30, maxPurchase: 2 },
-    { id: 'food-08', emoji: '🥩', name: '英式真空培根香肠礼盒',   desc: '本地猪肉，无添加，冷链直发',              price: 88,  shipping: 35, maxPurchase: 2 },
-    { id: 'food-09', emoji: '🍃', name: '多产区精装茶叶礼盒',     desc: '四种产区，附茶具说明，适合他这种不喝茶的',price: 75,  shipping: 25, maxPurchase: 2 },
-    { id: 'food-10', emoji: '🥃', name: '苏格兰威士忌（12年）',   desc: '单一麦芽，12年陈酿，礼盒装',             price: 198, shipping: 20, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'food-11', emoji: '🥃', name: 'Macallan威士忌（18年）', desc: '麦卡伦18年，限量礼盒，他会记得这瓶',    price: 580, shipping: 25, maxPurchase: 1, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'food-12', emoji: '🥜', name: '高蛋白坚果能量棒礼盒',   desc: '任务口粮，随时补能，12支装',              price: 65,  shipping: 25, maxPurchase: 2 },
-    { id: 'food-13', emoji: '🫖', name: '英国伯爵红茶礼盒',       desc: '经典佛手柑香，附骨瓷茶杯，精致又实用',   price: 78,  shipping: 25, maxPurchase: 2 },
-    { id: 'food-14', emoji: '🍬', name: '苏格兰手工奶糖礼盒',     desc: '地道英国甜点，奶香浓郁，老配方',          price: 55,  shipping: 20, maxPurchase: 2 },
-  ],
-  gift: [
-    { id: 'gift-01', emoji: '📖', name: '皮面手账本',           desc: '真皮封面，可刻名，让他记点任务外的事',    price: 180, shipping: 20, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'gift-02', emoji: '🖼️', name: '定制合照相框',         desc: '把你们的第一张合照放进去，摆在他床头',    price: 220, shipping: 25, unlock: SHOP_UNLOCK_TIERS.warm, lostReplace: { emoji: '🖼️', name: '相册礼盒', desc: 'Ghost补寄的，说照片他自己冲了一份' } },
-    { id: 'gift-03', emoji: '🧦', name: '羊绒保暖袜礼盒',       desc: '三双装，野外驻训脚不冷，细节里的在乎',    price: 150, shipping: 15 },
-    { id: 'gift-04', emoji: '🌷', name: '永生玫瑰',              desc: '真花处理工艺，永不凋谢的爱意',            price: 480, shipping: 30, unlock: SHOP_UNLOCK_TIERS.warm, lostReplace: { emoji: '🌹', name: '玫瑰香氛礼盒', desc: 'Ghost补寄的，换了形式但一样的心意' } },
-    { id: 'gift-05', emoji: '🕯️', name: '香薰蜡烛',             desc: '雪松+琥珀香，为他的营地添一点温度',       price: 128, shipping: 15 },
-    { id: 'gift-06', emoji: '🖼️', name: '定制相框',              desc: '放上你们最美的合影，永久保存',             price: 280, shipping: 30, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'gift-07', emoji: '🎶', name: '音乐盒',                desc: '播放你们专属的那首歌',                     price: 320, shipping: 30, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'gift-08', emoji: '💝', name: '情侣吊坠',              desc: '925银，两颗心拼在一起的设计',             price: 580, shipping: 30, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'gift-09', emoji: '🗺️', name: '定制地图',              desc: '标注你们两个城市，手工木框装裱',           price: 258, shipping: 30, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'gift-10', emoji: '🪖', name: '定制军牌',              desc: '刻着两个人名字，他会戴着的',               price: 320, shipping: 30, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'gift-11', emoji: '📷', name: '合照相册',              desc: '手工装订，留住你们在一起的每个瞬间',       price: 198, shipping: 30, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'gift-12', emoji: '☕', name: '便携咖啡滤杯套装',       desc: '野外冲咖啡用，轻便，他用得上',             price: 68,  shipping: 15 },
-    { id: 'gift-13', emoji: '🌡️', name: 'Stanley保温水壶',       desc: '营地必备，保温12小时，低调实用',           price: 118, shipping: 15 },
-    { id: 'gift-14', emoji: '💌', name: '手写信纸礼盒',           desc: '你写给他的，亲手折好寄过去',               price: 88,  shipping: 15, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'gift-15', emoji: '🔪', name: '瑞士军刀（Victorinox限量）', desc: '多功能，精工细作，任务外的好伙伴', price: 198, shipping: 20, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'gift-16', emoji: '📓', name: '战术笔记本+Fisher太空笔', desc: '零重力书写，任务随时记录',              price: 128, shipping: 15 },
-    { id: 'gift-17', emoji: '📻', name: '军用手摇收音机',         desc: '老式设计，应急通讯，有点浪漫',             price: 168, shipping: 20, unlock: SHOP_UNLOCK_TIERS.soft },
+    { id: 'product-001', emoji: '🍞', name: '黑麦手工面包', nameEn: 'Dark Rye Artisan Bread', price: 120,
+      desc: '以黑麦粉为主、混合小麦粉手工揉制，长时间发酵后烘烤。外皮偏硬，内里紧实有嚼劲，带黑麦特有的微酸和谷物香。',
+      features: [
+        { label: '类型', value: '面包' },
+        { label: '风味', value: '浓郁谷物香气' },
+        { label: '配方', value: '黑麦与谷物制作' },
+        { label: '包装', value: '袋装' },
+      ] },
+    { id: 'product-002', emoji: '🍫', name: '比利时手工巧克力', nameEn: 'Belgian Artisan Chocolates', price: 380,
+      desc: '一盒多颗装，含黑巧、牛奶巧与夹心口味，表面手工淋面装饰。入口先苦后甜，可可味明显，夹心部分偏软。',
+      features: [
+        { label: '类型', value: '巧克力' },
+        { label: '风味', value: '可可香气与甜味' },
+        { label: '组合', value: '多种巧克力口味' },
+        { label: '包装', value: '礼盒装' },
+      ] },
+    { id: 'product-003', emoji: '☕', name: '高地咖啡豆', nameEn: 'Highland Brew Coffee Beans', price: 260,
+      desc: '整颗咖啡豆，中度烘焙，酸苦平衡。冲煮时香气偏坚果和焦糖调，口感醇厚，尾韵干净。',
+      features: [
+        { label: '类型', value: '咖啡豆' },
+        { label: '风味', value: '烘焙香气' },
+        { label: '烘焙', value: '均衡烘焙' },
+        { label: '包装', value: '咖啡豆袋装' },
+      ] },
+    { id: 'product-004', emoji: '🥩', name: '高地牛排', nameEn: 'Highland Reserve Steak', price: 1800,
+      desc: '厚切原切牛排，带均匀油花，冷冻锁鲜。煎制后外层焦香、内里多汁，肉味浓。',
+      features: [
+        { label: '类型', value: '牛排' },
+        { label: '风味', value: '浓郁肉香' },
+        { label: '保存', value: '冷冻保存' },
+        { label: '包装', value: '真空包装' },
+      ] },
+    { id: 'product-005', emoji: '🥔', name: '魔鬼椒薯片', nameEn: "Devil's Heat Chips", price: 180,
+      desc: '薄切土豆片油炸后裹上魔鬼椒调味粉。咬下去脆，辣味来得直接，尾段带一点焦香。',
+      features: [
+        { label: '类型', value: '薯片' },
+        { label: '风味', value: '香辣口感' },
+        { label: '特点', value: '辣味配方' },
+        { label: '包装', value: '袋装' },
+      ] },
+    { id: 'product-006', emoji: '🧃', name: '苏格兰苹果汁', nameEn: 'Scottish Orchard Apple Juice', price: 220,
+      desc: '苹果压榨制成的果汁，颜色偏浅金，果香清爽，甜中带一点酸，冰镇后更明显。玻璃瓶装。',
+      features: [
+        { label: '类型', value: '果汁饮品' },
+        { label: '风味', value: '自然苹果香气' },
+        { label: '特点', value: '清爽果味' },
+        { label: '包装', value: '玻璃瓶装' },
+      ] },
+    { id: 'product-007', emoji: '🍟', name: '香脆细薯条', nameEn: 'Crispy Shoestring Fries', price: 160,
+      desc: '细切土豆条，预炸后冷冻。复炸或烘烤后外层酥脆、内里绵软，薯香明显。',
+      features: [
+        { label: '类型', value: '冷冻食品' },
+        { label: '风味', value: '经典薯香' },
+        { label: '特点', value: '细切薯条' },
+        { label: '包装', value: '冷冻袋装' },
+      ] },
+    { id: 'product-008', emoji: '🐻', name: '巨型软糖熊', nameEn: 'Giant Gummy Bear', price: 260,
+      desc: '单只约 2kg 的整块水果味软糖，橡皮糖质地，透亮红色。口感偏韧有嚼劲，果味偏甜。',
+      features: [
+        { label: '类型', value: '软糖' },
+        { label: '规格', value: '约 2kg 整块' },
+        { label: '风味', value: '水果甜味' },
+        { label: '包装', value: '礼盒装' },
+      ] },
+    { id: 'product-009', emoji: '🥣', name: '枫糖莓果格兰诺拉', nameEn: 'Maple Berry Granola', price: 140,
+      desc: '燕麦为主，混合杏仁、腰果、蔓越莓、蓝莓与南瓜籽，以枫糖调味后低温烘烤成块。口感松脆，坚果和果干味明显。',
+      features: [
+        { label: '类型', value: '谷物麦片' },
+        { label: '配料', value: '燕麦、坚果、莓果干' },
+        { label: '风味', value: '枫糖与坚果香' },
+        { label: '包装', value: '自封袋装' },
+      ] },
+    { id: 'product-010', emoji: '🍝', name: '意大利面礼盒', nameEn: "Terre d'Italia Pasta Set", price: 420,
+      desc: '一套意式食材组合，含格拉尼亚诺 IGP 铜模拉制林圭尼面、罗勒番茄酱与初榨橄榄油。面条用 100% 硬粒小麦制作，酱料以意大利番茄为主。',
+      features: [
+        { label: '类型', value: '意面套装' },
+        { label: '组合', value: '意面、番茄酱、橄榄油' },
+        { label: '工艺', value: '铜模拉制' },
+        { label: '包装', value: '手提礼盒' },
+      ] },
+    { id: 'product-011', emoji: '🥤', name: '高地可乐', nameEn: 'Highland Cola', price: 160,
+      desc: '玻璃瓶装可乐，每瓶 330ml，深棕色气泡饮料。以天然原料调制，口感偏经典可乐味，气足偏甜。',
+      features: [
+        { label: '类型', value: '碳酸饮料' },
+        { label: '规格', value: '6 × 330ml 玻璃瓶' },
+        { label: '风味', value: '经典可乐' },
+        { label: '包装', value: '整箱装' },
+      ] },
+    { id: 'product-012', emoji: '🍬', name: '极酸挑战礼盒', nameEn: 'Extreme Sour Challenge Box', price: 200,
+      desc: '含酸味软糖、酸味糖带、酸味硬糖、酸味软条、酸味豆和爆酸粒共 6 种。表面裹酸味糖粉，入口酸味强烈，之后转甜。',
+      features: [
+        { label: '类型', value: '混装糖果' },
+        { label: '组合', value: '6 种酸味糖果' },
+        { label: '风味', value: '强酸后回甜' },
+        { label: '包装', value: '铁盒分格装' },
+      ] },
   ],
   lifecare: [
-    { id: 'lifecare-01', emoji: '🧴', name: '洗发沐浴套装',       desc: '雪松木质香，替他把日用品也想到了',        price: 78,  shipping: 25, isGhostGift: true, maxPurchase: 2 },
-    { id: 'lifecare-02', emoji: '🪥', name: '电动牙刷',           desc: '他老用最简单那种，给他换个好的',          price: 320, shipping: 30, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'lifecare-03', emoji: '🧼', name: '须后水',             desc: '刮完胡子拍一点，清冽不刺激',              price: 168, shipping: 25, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'lifecare-04', emoji: '🤲', name: '护手霜（军用级）',   desc: '野外皲裂用得上，他自己绝不会买',          price: 58,  shipping: 20, isGhostGift: true, maxPurchase: 2 },
-    { id: 'lifecare-05', emoji: '💋', name: '润唇膏',             desc: '风吹日晒的嘴唇，替他润一润',              price: 38,  shipping: 15, isGhostGift: true, maxPurchase: 2 },
-    { id: 'lifecare-06', emoji: '🧴', name: '止汗走珠',           desc: '高强度任务也清爽，细节里的体面',          price: 48,  shipping: 20, isGhostGift: true, maxPurchase: 2 },
-    { id: 'lifecare-07', emoji: '🧺', name: '洗衣液礼盒',         desc: '雪松味，洗完衣服像有人在照顾他',          price: 65,  shipping: 25, isGhostGift: true, maxPurchase: 2 },
-    { id: 'lifecare-08', emoji: '☕', name: '便携手冲咖啡壶',     desc: '营地也能喝口像样的，晨起提神',            price: 220, shipping: 30, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'lifecare-09', emoji: '🫙', name: '军绿保温杯',         desc: '大容量耐摔，值夜班灌满热水',              price: 120, shipping: 25, isGhostGift: true, maxPurchase: 2 },
-    { id: 'lifecare-10', emoji: '😴', name: '耳塞眼罩套装',       desc: '嘈杂环境也能补觉，替他把觉睡好',          price: 55,  shipping: 15, isGhostGift: true, maxPurchase: 2 },
-    { id: 'lifecare-11', emoji: '🔥', name: '暖手宝',             desc: '冬天驻训冻手，揣一个，像你的手',          price: 88,  shipping: 20, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'lifecare-12', emoji: '✂️', name: '指甲刀套装',         desc: '不锈钢一整套，糙汉也得收拾利索',          price: 45,  shipping: 15, isGhostGift: true, maxPurchase: 2 },
+    { id: 'product-025', emoji: '🧴', name: '雪松香氛洗护套装', nameEn: 'Cedarwood Shampoo & Conditioner Set', price: 320,
+      desc: '雪松木质香调洗护套装，洗发露 300ml 搭配护发素 200ml。琥珀色压泵瓶与米色软管包装，雪松枝叶图案设计。',
+      features: [
+        { label: '组成', value: '洗发露 300ml + 护发素 200ml' },
+        { label: '香调', value: '雪松木质' },
+        { label: '包装', value: '琥珀瓶 + 米色软管' },
+        { label: '图案', value: '雪松枝叶印刷' },
+      ] },
+    { id: 'product-026', emoji: '🪒', name: '剃须护理套装', nameEn: 'Shaving Care Set', price: 280,
+      desc: '剃须护理四件套，含剃须膏 100ml、须后水 100ml、獾毛刷、金属安全剃刀。剃须膏为软管包装，须后水为玻璃瓶，刷柄木质，剃刀金属网纹手柄。',
+      features: [
+        { label: '组成', value: '膏 + 水 + 刷 + 刀' },
+        { label: '包装', value: '软管 + 玻璃瓶' },
+        { label: '刷毛', value: '獾毛' },
+        { label: '刀柄', value: '金属网纹' },
+      ] },
+    { id: 'product-027', emoji: '🪥', name: '声波电动牙刷', nameEn: 'Sonic Electric Toothbrush', price: 420,
+      desc: '白色立式电动牙刷，机身标注 Clean / White / Sensitive / Massage 四档模式，配充电底座及两支替换刷头。刷头为蓝白双色刷毛。',
+      features: [
+        { label: '驱动', value: '声波震动' },
+        { label: '模式', value: '四档切换' },
+        { label: '配件', value: '充电座 + 2 刷头' },
+        { label: '刷毛', value: '蓝白双色' },
+      ] },
+    { id: 'product-028', emoji: '🤲', name: '无香护手霜', nameEn: 'Fragrance-Free Hand Cream', price: 120,
+      desc: '米白色软管护手霜 75ml，Fragrance Free / Moisturizing / For Everyday Care 标注，黑色螺旋挤压盖。',
+      features: [
+        { label: '容量', value: '75ml' },
+        { label: '香调', value: '无香配方' },
+        { label: '质地', value: '霜状' },
+        { label: '包装', value: '软管螺旋盖' },
+      ] },
+    { id: 'product-029', emoji: '🩹', name: '急救护理包', nameEn: 'First Aid Kit', price: 260,
+      desc: '米色帆布手提急救包，红色十字标识，内含创可贴、酒精棉片、医用胶布、不锈钢剪刀、镊子等基础应急物资。红色拉链提手设计。',
+      features: [
+        { label: '材质', value: '帆布外壳' },
+        { label: '组成', value: '创可贴 + 消毒 + 器械' },
+        { label: '设计', value: '红十字标识' },
+        { label: '提手', value: '红色拉链' },
+      ] },
+    { id: 'product-030', emoji: '🥒', name: '黄瓜面膜', nameEn: 'Cucumber Face Mask', price: 180,
+      desc: '黄瓜图案包装面膜，5 片装盒 + 单片独立包装。包装印有黄瓜切片与水珠视觉，包装标注 Hydrating / Soothing / Cooling。',
+      features: [
+        { label: '规格', value: '5 片装' },
+        { label: '包装', value: '独立袋装' },
+        { label: '视觉', value: '黄瓜切片印刷' },
+        { label: '标注', value: 'Hydrating / Soothing / Cooling' },
+      ] },
+    { id: 'product-031', emoji: '💆', name: '颈肩加热按摩器', nameEn: 'Neck & Shoulder Heating Massager', price: 980,
+      desc: '米灰色织物披肩式按摩器，内嵌加热按摩球，加热 + 按摩结构，三键控制设计，USB 供电，可调节固定带。',
+      features: [
+        { label: '结构', value: '加热 + 按摩' },
+        { label: '控制', value: '三键控制设计' },
+        { label: '材质', value: '织物外层' },
+        { label: '供电', value: 'USB 供电' },
+      ] },
+    { id: 'product-032', emoji: '😴', name: '睡眠遮光眼罩', nameEn: 'Sleep Eye Mask', price: 160,
+      desc: '深灰色丝绒眼罩，鼻梁贴合凹槽设计，可调节松紧带，配同色束口收纳袋。包装标注 Soft / Light Blocking / Comfortable Fit。',
+      features: [
+        { label: '材质', value: '丝绒面料' },
+        { label: '设计', value: '鼻梁凹槽贴合' },
+        { label: '调节', value: '松紧带' },
+        { label: '配件', value: '束口收纳袋' },
+      ] },
+    { id: 'product-033', emoji: '🧴', name: '按摩精油', nameEn: 'Relaxing Massage Oil', price: 220,
+      desc: '琥珀色玻璃瓶装按摩精油100ml，木质瓶盖，瓶身与包装印有草本枝叶图案。',
+      features: [
+        { label: '容量', value: '100ml' },
+        { label: '瓶身', value: '琥珀玻璃' },
+        { label: '瓶盖', value: '木质' },
+        { label: '包装', value: '纸盒装' },
+      ] },
+    { id: 'product-034', emoji: '💋', name: '草莓润唇膏', nameEn: 'Strawberry Lip Balm', price: 90,
+      desc: '粉色旋转管润唇膏 4.5g，草莓图案外壳，膏体呈粉红色。标注 Moisturizing / Softening / Daily Care。',
+      features: [
+        { label: '容量', value: '4.5g' },
+        { label: '形态', value: '旋转管膏体' },
+        { label: '香调', value: '草莓' },
+        { label: '外壳', value: '草莓印花' },
+      ] },
+    { id: 'product-035', emoji: '🔥', name: '便携式暖手宝', nameEn: 'Portable Hand Warmer', price: 350,
+      desc: '米粉色鹅卵石造型充电暖手宝，正面三点电量指示灯，底部圆形开关键。包装标注 Fast Heating / Lightweight / Compact Size / Long Lasting Warmth。',
+      features: [
+        { label: '造型', value: '鹅卵石弧面' },
+        { label: '指示', value: '三点电量灯' },
+        { label: '开关', value: '底部圆键' },
+        { label: '供电', value: '充电式' },
+      ] },
   ],
 
-  medical: [
-    { id: 'medical-01', emoji: '💪', name: '乳清蛋白粉',         desc: '训练后补充，帮他把身体练得更扛',          price: 280, shipping: 30, isGhostGift: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'medical-02', emoji: '🦴', name: '氨糖软骨素',         desc: '护关节，常年负重训练的人用得上',          price: 220, shipping: 25, isGhostGift: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'medical-03', emoji: '👁️', name: '人工泪液眼药水',     desc: '熬夜值班眼睛干，滴两滴缓解',              price: 68,  shipping: 20, isGhostGift: true, maxPurchase: 2 },
-    { id: 'medical-04', emoji: '🌙', name: '进口褪黑素软糖',     desc: '倒时差睡不着时来两粒，比药片温和',        price: 78,  shipping: 20, isGhostGift: true, maxPurchase: 2 },
-    { id: 'medical-05', emoji: '🤕', name: '感冒退烧备用药',     desc: '一整套备着，他病了身边没人照顾',          price: 88,  shipping: 20, isGhostGift: true, maxPurchase: 2 },
-    { id: 'medical-06', emoji: '💤', name: '褪黑素助眠片',         desc: '倒时差、睡不着时来一片，你替他备着',      price: 78,  shipping: 20, maxPurchase: 2 },
-    { id: 'medical-07', emoji: '🦵', name: '肌肉酸痛按摩膏',       desc: '训练后揉一揉，缓解酸痛，军用级',          price: 68,  shipping: 20, maxPurchase: 2 },
-    { id: 'medical-08', emoji: '🩹', name: '英国药妆急救包',         desc: '创可贴/消炎/碘伏一套，你替他备着',        price: 88,  shipping: 20, maxPurchase: 2 },
-    { id: 'medical-09', emoji: '💊', name: '维生素C+D泡腾片礼盒',    desc: '增强免疫，关心他的健康，每天一片',        price: 65,  shipping: 20, maxPurchase: 2 },
-    { id: 'medical-10', emoji: '🦴', name: '运动护膝护腕套装',       desc: '训练防伤，比他自己想到的还周到',          price: 118, shipping: 25, maxPurchase: 2 },
-    { id: 'medical-11', emoji: '🧴', name: '军用无味洗护套装',       desc: '无香无色，任务中不暴露气味',              price: 75,  shipping: 20, maxPurchase: 2 },
-    { id: 'medical-12', emoji: '🌡️', name: '电子体温计+退烧贴套装', desc: '生病了你替他备着，他嘴硬也知道你在乎',   price: 58,  shipping: 15, maxPurchase: 2 },
-    { id: 'medical-13', emoji: '💆', name: '肌肉放松精油套装',       desc: '训练后恢复，他不会主动买但用得上',        price: 98,  shipping: 20, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'medical-14', emoji: '🧴', name: '男士护肤套装',           desc: '让他好好保养自己，你看着放心',            price: 220, shipping: 30, unlock: SHOP_UNLOCK_TIERS.soft },
-  ],
+  // ── NOA MARKET V1 精品 ──
+  // 旧 luxury-01~23 品牌 prototype 已废弃；此处为 V1 正式商品，ID = product-NNN 全局流水号。
+  // 图片按 ID 绑定 images/products/<id>.png。本类邮费统一 35。
   luxury: [
-    { id: 'luxury-01', emoji: '⌚', name: 'Omega 海马腕表', desc: '低调硬朗，任务外也压得住场', price: 6800, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '⌚', name: '机械腕表', desc: 'Ghost说抱歉，补了一块' } },
-    { id: 'luxury-02', emoji: '🖊️', name: 'Montblanc 钢笔', desc: '签字用得上，刻他名字缩写', price: 3200, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future, lostReplace: { emoji: '🖊️', name: '钢笔', desc: 'Ghost补了一支' } },
-    { id: 'luxury-03', emoji: '🥃', name: '单一麦芽威士忌珍藏', desc: '苏格兰酒厂限定，值夜后一小杯', price: 1800, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-04', emoji: '🧥', name: 'Cashmere羊绒毛衣',        desc: '苏格兰产地，极细软糯，穿上就不想脱',           price: 680,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'luxury-05', emoji: '🧥', name: 'Barbour蜡质夹克',          desc: '英国经典户外品牌，低调有质感',                 price: 980,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-06', emoji: '🧥', name: 'Belstaff皮夹克',           desc: '英国品牌，低调有型，他不会主动要但会记得',      price: 1800, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-07', emoji: '🥾', name: "Church's德比皮鞋",         desc: '英国皇室御用，低调精致，任务外的正装',         price: 980,  shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'luxury-08', emoji: '🧥', name: 'Gore-Tex冲锋衣',           desc: '防水防风，野外任务必备，顶配版',               price: 1380, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-09', emoji: '💍', name: 'Cartier 戒指（情侣款）', desc: 'Love系列，你戴一枚，他戴一枚', price: 5800, shipping: 35, isUserItem: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '🎖️', name: '定制军牌', desc: 'Ghost刻了两个人的名字' } },
-    { id: 'luxury-10', emoji: '⌚', name: 'Rolex 劳力士（送 Ghost）', desc: 'Submariner 潜航者，他不会承认自己喜欢', price: 8500, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '👜', name: '名牌包包', desc: 'Ghost说抱歉，补了一个' } },
-    { id: 'luxury-11', emoji: '🧥', name: 'Belstaff军旅背包（限量）', desc: '英国品牌，Ghost同款，限量版', price: 1280, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
-    { id: 'luxury-12', emoji: '🪒', name: 'Tom Ford 剃须套装', desc: '低调有质感，让他好好保养', price: 580, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-13', emoji: '🔥', name: '定制Zippo打火机', desc: '刻着Simon名字，只属于他一个人的', price: 680, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-14', emoji: '🔦', name: 'Surefire战术手电筒套装', desc: '特种部队标配，限量款，低调实用', price: 980, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
-    { id: 'luxury-15', emoji: '🔭', name: '蔡司战术望远镜', desc: '德国顶级光学，野外必备，他用得上', price: 1380, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.future },
-    { id: 'luxury-16', emoji: '🗡️', name: '定制战术刀（刻名字）', desc: '手工锻造，刻着Simon的名字，只属于他', price: 1280, shipping: 35, isGhostGift: true, unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-17', emoji: '📗', name: '《讨好老婆的99招》', desc: '诺亚亲笔撰写，限量珍藏版，全球仅此一册', price: 5200, shipping: 35, isGhostGift: true, isJokeGift: true, unlock: SHOP_UNLOCK_TIERS.committed, lostReplace: { emoji: '📕', name: '《继续讨好老婆的99招》', desc: 'Ghost说这次保证不丢' } },
-    // ── 用户自己的奢侈品 ──
-    { id: 'luxury-18', emoji: '👜', name: 'LV Neverfull 手提包', desc: '经典帆布，实用又百搭，你值得', price: 3200, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-19', emoji: '👛', name: 'Chanel 小号CF包', desc: '菱格纹，金链，每个女生的梦', price: 8800, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.committed },
-    { id: 'luxury-20', emoji: '🧣', name: 'Hermès 丝巾', desc: '法国产地，限量印花，系法百变', price: 980, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'luxury-21', emoji: '💄', name: 'Dior 口红套装', desc: '经典999+限定色，礼盒装', price: 680, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'luxury-22', emoji: '🌊', name: 'La Mer 精华套装', desc: '顶级海洋护肤，认真对待自己', price: 1580, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'luxury-23', emoji: '💎', name: 'Tiffany 项链', desc: '925银+纯金，简单但很对', price: 1280, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.warm },
+    { id: 'product-036', name: '便携复古音箱', nameEn: 'Portable Retro Speaker', price: 780, shipping: 35,
+      desc: '复古造型蓝牙音箱，金属网罩面板配木质外框，顶部旋钮控制音量与频道。内置电池，可提手携带。',
+      features: [
+        { label: '连接', value: '蓝牙无线' },
+        { label: '外框', value: '木质' },
+        { label: '面板', value: '金属网罩' },
+        { label: '供电', value: '内置电池' },
+      ] },
+    { id: 'product-037', name: '蜡质防水夹克', nameEn: 'Waxed Waterproof Jacket', price: 1180, shipping: 35,
+      desc: '蜡质涂层棉夹克，翻领拉链门襟，前身多口袋。表层防水，内里格纹衬布。',
+      features: [
+        { label: '材质', value: '蜡质涂层棉' },
+        { label: '功能', value: '防水' },
+        { label: '门襟', value: '拉链' },
+        { label: '内里', value: '格纹衬布' },
+      ] },
+    { id: 'product-038', name: '皮革旅行手提包', nameEn: 'Leather Travel Holdall', price: 1580, shipping: 35,
+      desc: '头层牛皮旅行包，双提手配可拆卸肩带，顶部拉链开合，两侧金属扣。容量适合短途出行。',
+      features: [
+        { label: '材质', value: '头层牛皮' },
+        { label: '背法', value: '手提·可拆卸肩带' },
+        { label: '开合', value: '顶部拉链' },
+        { label: '五金', value: '金属扣' },
+      ] },
+    { id: 'product-039', name: '黑色马术雕塑', nameEn: 'Black Equestrian Sculpture', price: 960, shipping: 35,
+      desc: '黑色树脂马匹雕塑，站立姿态，配深色底座。表面哑光处理，可作桌面或书架摆件。',
+      features: [
+        { label: '材质', value: '树脂' },
+        { label: '造型', value: '站立马匹' },
+        { label: '表面', value: '哑光' },
+        { label: '底座', value: '深色' },
+      ] },
+    { id: 'product-040', name: '玫瑰金螺钉戒指', nameEn: 'Rose Gold Screw Ring', price: 1280, shipping: 35,
+      desc: '玫瑰金色金属戒指，环身刻有一圈螺钉纹样，抛光表面。附收纳礼盒。',
+      features: [
+        { label: '材质', value: '金属' },
+        { label: '颜色', value: '玫瑰金色' },
+        { label: '纹样', value: '螺钉环刻' },
+        { label: '包装', value: '礼盒装' },
+      ] },
+    { id: 'product-041', name: '棕色皮质德比鞋', nameEn: 'Brown Leather Derby Shoes', price: 890, shipping: 35,
+      desc: '棕色真皮德比鞋，开放式系带结构，皮革大底，鞋头翼纹雕花。',
+      features: [
+        { label: '材质', value: '真皮' },
+        { label: '结构', value: '开放式系带' },
+        { label: '鞋底', value: '皮革' },
+        { label: '鞋头', value: '翼纹雕花' },
+      ] },
+    { id: 'product-042', name: '黑色机械腕表', nameEn: 'Black Mechanical Watch', price: 2680, shipping: 35,
+      desc: '黑色表盘机械腕表，不锈钢表壳，皮质表带，表背透明可见机芯。',
+      features: [
+        { label: '机芯', value: '机械' },
+        { label: '表壳', value: '不锈钢' },
+        { label: '表带', value: '皮质' },
+        { label: '表背', value: '透明可视' },
+      ] },
+    { id: 'product-043', name: '圆顶玻璃台灯', nameEn: 'Dome Glass Table Lamp', price: 720, shipping: 35,
+      desc: '圆顶玻璃灯罩台灯，黄铜底座与拉链开关，暖光灯泡。灯罩为绿色玻璃。',
+      features: [
+        { label: '灯罩', value: '绿色玻璃' },
+        { label: '底座', value: '黄铜' },
+        { label: '开关', value: '拉链式' },
+        { label: '光色', value: '暖光' },
+      ] },
+    { id: 'product-044', name: '智能旅行箱', nameEn: 'Smart Luggage', price: 1680, shipping: 35,
+      desc: '硬壳拉杆旅行箱，四向万向轮，内置 USB 充电接口与 TSA 密码锁，机身侧面手提把手。',
+      features: [
+        { label: '箱体', value: '硬壳' },
+        { label: '滚轮', value: '四向万向轮' },
+        { label: '充电', value: 'USB 接口' },
+        { label: '锁具', value: 'TSA 密码锁' },
+      ] },
+    { id: 'product-045', name: '格纹羊毛围巾', nameEn: 'Checked Wool Scarf', price: 420, shipping: 35,
+      desc: '羊毛织造围巾，格纹图案，两端流苏收边。质地厚软。',
+      features: [
+        { label: '材质', value: '羊毛' },
+        { label: '花纹', value: '格纹' },
+        { label: '工艺', value: '流苏收边' },
+        { label: '手感', value: '厚软' },
+      ] },
+    { id: 'product-046', name: '黑色钢笔礼盒', nameEn: 'Black Fountain Pen Gift Set', price: 980, shipping: 35,
+      desc: '黑色树脂笔杆钢笔，金属笔夹与镀金笔尖，附上墨器与礼盒。',
+      features: [
+        { label: '笔杆', value: '黑色树脂' },
+        { label: '笔尖', value: '镀金' },
+        { label: '笔夹', value: '金属' },
+        { label: '配件', value: '上墨器 + 礼盒' },
+      ] },
+    { id: 'product-047', name: '便携投影仪', nameEn: 'Portable Projector', price: 1980, shipping: 35,
+      desc: '小型便携投影仪，支持无线投屏，内置扬声器，顶部对焦旋钮，配电源适配器。',
+      features: [
+        { label: '投屏', value: '无线' },
+        { label: '音响', value: '内置扬声器' },
+        { label: '对焦', value: '顶部旋钮' },
+        { label: '配件', value: '电源适配器' },
+      ] },
+    { id: 'product-061', name: '好丈夫秘籍', nameEn: 'The Good Husband Manual', price: 888, shipping: 35,
+      desc: '精装指导手册，收录日常相处、沟通方式、生活习惯与关系维护等主题内容。采用收藏级书盒包装，深红色封面搭配金色压纹设计，打造一本关于成为好丈夫的趣味指南。',
+      features: [
+        { label: '类型', value: '精装指导手册' },
+        { label: '内容', value: '沟通·相处·生活技巧' },
+        { label: '装帧', value: '硬壳精装' },
+        { label: '包装', value: '礼盒装' },
+      ] },
   ],
-  fromhome: [
-    { id: 'fromhome-01', emoji: '🥮', name: '广式月饼礼盒',         desc: '双黄莲蓉，中秋寄给他，讲讲这是什么节',    price: 88,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-02', emoji: '🌶️', name: '老干妈家乡辣酱套装',   desc: '三瓶装，他第一次吃辣到冒汗还停不下来',    price: 48,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-03', emoji: '🥟', name: '手工速冻饺子',         desc: '猪肉白菜馅，教他下锅，家的味道',          price: 68,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-04', emoji: '🦆', name: '北京烤鸭礼盒',     desc: '真空包装，附上饼和甜面酱，教他怎么吃', price: 98,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-05', emoji: '🌸', name: '云南鲜花饼',       desc: '玫瑰馅，酥皮，甜而不腻',               price: 75,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-06', emoji: '🌶️', name: '四川麻辣零食礼包', desc: '辣条、麻辣花生、牛肉干，一套',         price: 88,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-07', emoji: '🍃', name: '杭州龙井茶',       desc: '明前龙井，铁罐装，清香',               price: 148, shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-08', emoji: '🥜', name: '新疆坚果礼盒',     desc: '核桃、红枣、巴旦木，产地直发',         price: 118, shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-09', emoji: '🍜', name: '柳州螺蛳粉',       desc: '正宗广西螺蛳粉，臭香臭香的，敢不敢试', price: 68,  shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-10', emoji: '🦀', name: '阳澄湖大闸蟹礼盒', desc: '正宗阳澄湖，活蟹急冻，附蘸料和围裙，教他怎么吃', price: 198, shipping: 25, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'fromhome-11', emoji: '🫙', name: '云南野生松茸礼盒', desc: '新鲜烘干，顶级食材，他肯定没吃过',     price: 168, shipping: 20, isFromHome: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-  ],
-  myitems: [
-    // 穿搭
-    { id: 'myitems-01', emoji: '👗', name: '蕾丝连衣裙',   desc: '精致小心机，穿了让他看看',             price: 98,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-02', emoji: '🧶', name: '针织毛衣',     desc: '奶油色，软糯，秋冬必备',               price: 75,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-03', emoji: '👘', name: '格纹短裙',     desc: '小心机显腿长，让他见见你的腿',         price: 82,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-04', emoji: '👚', name: '奶油色卫衣',   desc: '宽松慵懒，在家穿也好看',               price: 65,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    // 护肤
-    { id: 'myitems-05', emoji: '🧴', name: '玫瑰身体乳',   desc: '好好照顾自己',                         price: 55,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-06', emoji: '✨', name: '精华液套装',   desc: '好好保养，让他见到最好的你',           price: 138, shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-07', emoji: '🛁', name: '泡澡浴盐礼盒', desc: '三种香型，好好泡一下',                 price: 78,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-08', emoji: '🌹', name: '香水',         desc: '留下味道，让他想你',                   price: 198, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.soft },
-    // 零食甜点
-    { id: 'myitems-09', emoji: '🍰', name: '草莓千层蛋糕', desc: '犒劳一下自己',                         price: 48,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-10', emoji: '🧁', name: '奶油泡芙礼盒', desc: '买给自己的快乐',                       price: 55,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    { id: 'myitems-11', emoji: '🫖', name: '下午茶套餐',   desc: '一个人也要好好过',                     price: 68,  shipping: 0, isUserItem: true, userCategory: 'self' },
-    // 私密
-    { id: 'myitems-12', emoji: '🩱', name: '缎面吊带睡衣', desc: '丝滑贴身，睡觉穿的',                  price: 108, shipping: 0, isUserItem: true, userCategory: 'self', unlock: SHOP_UNLOCK_TIERS.soft },
-    { id: 'myitems-13', emoji: '👙', name: '透视睡裙',     desc: '薄薄的，若隐若现',                     price: 138, shipping: 0, isUserItem: true, userCategory: 'self', isIntimate: true, unlock: SHOP_UNLOCK_TIERS.intimate },
-    { id: 'myitems-14', emoji: '🌸', name: '蕾丝情趣内衣', desc: '给他看的',                             price: 188, shipping: 0, isUserItem: true, userCategory: 'self', isIntimate: true, unlock: SHOP_UNLOCK_TIERS.intimate },
+  // ── NOA MARKET V1 特产 ──
+  // 中国地方特产分类。ID = product-NNN 全局流水号，图片按 ID 绑定 images/products/<id>.png。
+  // 本类邮费统一 28。
+  specialty: [
+    { id: 'product-048', name: '金华火腿', nameEn: 'Jinhua Ham', price: 420, shipping: 28,
+      desc: '浙江金华后腿腌制风干火腿，经上盐、翻腿、晾晒、发酵长时间制成。肉色暗红，咸香浓郁，切片蒸煮或炖汤取味。',
+      features: [
+        { label: '产地', value: '浙江金华' },
+        { label: '部位', value: '猪后腿' },
+        { label: '工艺', value: '腌制风干发酵' },
+        { label: '食用', value: '切片蒸煮·炖汤' },
+      ] },
+    { id: 'product-049', name: '湖南酱板鸭', nameEn: 'Hunan Sauced Duck', price: 128, shipping: 28,
+      desc: '整鸭经腌制、卤煮、压平、烘干制成，色泽酱红，肉质紧实。咸辣入味，带卤香，可直接撕食或蒸后切块。',
+      features: [
+        { label: '产地', value: '湖南' },
+        { label: '原料', value: '整鸭' },
+        { label: '工艺', value: '腌卤压平烘干' },
+        { label: '口味', value: '咸辣' },
+      ] },
+    { id: 'product-050', name: '潮汕牛肉丸', nameEn: 'Chaoshan Beef Balls', price: 98, shipping: 28,
+      desc: '牛后腿肉手工捶打成浆再挤制成丸，冷冻保存。质地弹韧，久煮不散，可下汤或打边炉。',
+      features: [
+        { label: '产地', value: '广东潮汕' },
+        { label: '原料', value: '牛后腿肉' },
+        { label: '工艺', value: '手工捶打' },
+        { label: '保存', value: '冷冻' },
+      ] },
+    { id: 'product-051', name: '杭州龙井茶', nameEn: 'Hangzhou Longjing Tea', price: 260, shipping: 28,
+      desc: '绿茶，扁平挺直的炒青工艺，汤色浅黄清亮，香气清高，滋味回甘。铁罐密封包装。',
+      features: [
+        { label: '产地', value: '浙江杭州' },
+        { label: '工艺', value: '炒青' },
+        { label: '外形', value: '扁平挺直' },
+        { label: '包装', value: '铁罐密封' },
+      ] },
+    { id: 'product-052', name: '贵州老干妈', nameEn: 'Lao Gan Ma Chili Sauce', price: 60, shipping: 28,
+      desc: '辣椒配豆豉、菜籽油炒制的下饭酱，玻璃瓶装。香辣带油香，可拌饭拌面或作调料。',
+      features: [
+        { label: '产地', value: '贵州' },
+        { label: '主料', value: '辣椒·豆豉' },
+        { label: '口味', value: '香辣' },
+        { label: '包装', value: '玻璃瓶' },
+      ] },
+    { id: 'product-053', name: '柳州螺蛳粉', nameEn: 'Liuzhou Snail Rice Noodles', price: 68, shipping: 28,
+      desc: '袋装速食米粉，配螺蛳熬制汤底、酸笋、腐竹、花生等料包。汤味酸辣带发酵气味，煮泡后食用。',
+      features: [
+        { label: '产地', value: '广西柳州' },
+        { label: '配料', value: '米粉·酸笋·腐竹' },
+        { label: '汤底', value: '螺蛳熬制' },
+        { label: '形态', value: '袋装速食' },
+      ] },
+    { id: 'product-054', name: '南京活珠子', nameEn: 'Nanjing Balut', price: 78, shipping: 28,
+      desc: '孵化中的鸡蛋煮制而成，蛋内含半成形雏形。真空冷藏包装，煮熟后配椒盐食用。',
+      features: [
+        { label: '产地', value: '江苏南京' },
+        { label: '原料', value: '孵化鸡蛋' },
+        { label: '食用', value: '配椒盐' },
+        { label: '保存', value: '冷藏' },
+      ] },
+    { id: 'product-055', name: '东北手工水饺', nameEn: 'Northeast Handmade Dumplings', price: 68, shipping: 28,
+      desc: '手工包制的猪肉酸菜馅水饺，冷冻保存。皮厚馅足，下锅水煮后食用。',
+      features: [
+        { label: '产地', value: '东北' },
+        { label: '馅料', value: '猪肉酸菜' },
+        { label: '工艺', value: '手工包制' },
+        { label: '保存', value: '冷冻' },
+      ] },
+    { id: 'product-056', name: '泉州土笋冻', nameEn: 'Quanzhou Sandworm Jelly', price: 75, shipping: 28,
+      desc: '沙虫熬煮后自然凝结成冻，胶质透明。冷藏包装，口感爽滑弹韧，配蒜蓉、酱油或醋食用。',
+      features: [
+        { label: '产地', value: '福建泉州' },
+        { label: '原料', value: '沙虫熬制' },
+        { label: '口感', value: '爽滑弹韧' },
+        { label: '保存', value: '冷藏' },
+      ] },
+    { id: 'product-057', name: '四川麻辣零食', nameEn: 'Sichuan Spicy Snack Set', price: 88, shipping: 28,
+      desc: '麻辣味零食组合，含辣条、麻辣花生、豆干、牛肉粒等，独立小包分装。麻辣咸香。',
+      features: [
+        { label: '产地', value: '四川' },
+        { label: '组合', value: '辣条·花生·豆干·牛肉粒' },
+        { label: '口味', value: '麻辣咸香' },
+        { label: '包装', value: '独立小包' },
+      ] },
+    { id: 'product-058', name: '阳澄湖大闸蟹', nameEn: 'Yangcheng Lake Hairy Crab', price: 198, shipping: 28,
+      desc: '阳澄湖出产的河蟹，青壳白肚，蟹黄饱满。附蘸料，活蟹绑扎后冷链发货，蒸制后食用。',
+      features: [
+        { label: '产地', value: '阳澄湖' },
+        { label: '外形', value: '青壳白肚' },
+        { label: '食用', value: '蒸制·配蘸料' },
+        { label: '配送', value: '冷链' },
+      ] },
+    { id: 'product-059', name: '云南鲜花饼', nameEn: 'Yunnan Rose Flower Cake', price: 75, shipping: 28,
+      desc: '以食用玫瑰花瓣为馅的酥皮点心，饼皮层次分明，花香明显，甜度适中。盒装。',
+      features: [
+        { label: '产地', value: '云南' },
+        { label: '馅料', value: '食用玫瑰花瓣' },
+        { label: '饼皮', value: '酥皮' },
+        { label: '包装', value: '盒装' },
+      ] },
+    { id: 'product-060', name: '青岛烤鱼片', nameEn: 'Qingdao Grilled Fish Slices', price: 90, shipping: 28,
+      desc: '海鱼去骨压制烘烤成片，即食零食。质地干韧有嚼劲，带海产咸鲜微甜。袋装。',
+      features: [
+        { label: '产地', value: '山东青岛' },
+        { label: '原料', value: '海鱼' },
+        { label: '工艺', value: '压制烘烤' },
+        { label: '包装', value: '袋装' },
+      ] },
   ],
   wishlist: [
-    { id: 'wishlist-01', emoji: '✈️', name: '去曼城找他的机票', unlock: SHOP_UNLOCK_TIERS.committed, desc: '攒够了！终于可以飞去找他了！', price: 6800, badge: '跨越距离', isReunion: true, ghostMsg: "You are coming? ...Good. I will be at the airport." },
-    { id: 'wishlist-02', emoji: '🏨', name: '曼彻斯特酒店', unlock: SHOP_UNLOCK_TIERS.committed, desc: '订好了房间，等他任务结束', price: 6000, badge: '我在等你', isReunion: true, ghostMsg: 'I will be there. Promise.' },
-    { id: 'wishlist-03', emoji: '🗺️', name: '英国旅行计划', unlock: SHOP_UNLOCK_TIERS.committed, desc: '伦敦、爱丁堡、曼城，全部去打卡', price: 8000, badge: '异国追爱', isReunion: true, ghostMsg: 'I will be your guide. Every city.' },
+    // 面基三件套（剧情资产）：name 为拥有判定键，保持不变以保护旧购买记录；id 改为 product-070/071/072 仅用于绑定新图片；displayName 为展示名。
+    { id: 'product-070', emoji: '✈️', name: '去曼城找他的机票', displayName: '跨洋航班邀请函', unlock: SHOP_UNLOCK_TIERS.committed, desc: '一张连接两座城市的航班票据。它记录的不只是出发时间与航班信息，更代表一次跨越距离的旅程开始。在故事里，它是抵达约定地点的重要凭证，也是一次真实相遇前的第一步。', modelContext: '这是她前往曼彻斯特与你见面的航班安排，是面基计划的一部分。', price: 6800, badge: '跨越距离', isReunion: true, ghostMsg: "You are coming? ...Good. I will be at the airport." },
+    { id: 'product-071', emoji: '🏨', name: '曼彻斯特酒店', displayName: '城市入住纪念房卡', unlock: SHOP_UNLOCK_TIERS.committed, desc: '一张属于旅途中的城市入住凭证。它记录抵达后的停留空间，以及两个人在陌生城市中共同留下的时间。不是普通住宿用品，而是一段旅程开始后的纪念物。', modelContext: '这是她来曼彻斯特与你见面期间的酒店住宿，是面基计划的一部分。', price: 6000, badge: '我在等你', isReunion: true, ghostMsg: 'I will be there. Promise.' },
+    { id: 'product-072', emoji: '🗺️', name: '英国旅行计划', displayName: '英国旅行典藏指南', unlock: SHOP_UNLOCK_TIERS.committed, desc: '一本记录英国城市、人文景观与旅行路线的收藏指南。包含城市介绍、旅行规划与探索记录，是提前准备旅程的重要资料。它象征着对未来目的地的期待，以及一次完整旅程的开始。', modelContext: '这是她来英国与你见面后、你们一起在英国各地旅行的行程计划，是面基计划的一部分。', price: 8000, badge: '异国追爱', isReunion: true, ghostMsg: 'I will be your guide. Every city.' },
   ],
   home: [
-    { id: 'home-01', emoji: '🚗', name: '代步小车',     desc: '城市代步，低调实用',              price: 12000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 1, unlock: SHOP_UNLOCK_TIERS.future },
-    { id: 'home-02', emoji: '🚙', name: '越野SUV',      desc: '宽敞舒适，长途短途都合适',        price: 28000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 2, unlock: SHOP_UNLOCK_TIERS.committed },
-    { id: 'home-03', emoji: '🏎️', name: '豪华跑车',     desc: '顶配限量，不是人人都敢买',        price: 80000,  shipping: 0, isHomeItem: true, homeType: 'car',   tier: 3, unlock: { affection: 92, trust: 88, days: 60 } },
-    { id: 'home-04', emoji: '🏠', name: '曼彻斯特公寓', desc: '靠近市中心，交通方便',            price: 98000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 1, unlock: SHOP_UNLOCK_TIERS.future },
-    { id: 'home-05', emoji: '🏡', name: '赫里福德独栋', desc: '有院子，安静，空间够大',          price: 260000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 2, unlock: SHOP_UNLOCK_TIERS.committed },
-    { id: 'home-06', emoji: '🏰', name: '苏格兰庄园',   desc: '占地广阔，风景绝美',              price: 800000, shipping: 0, isHomeItem: true, homeType: 'house', tier: 3, unlock: { affection: 92, trust: 88, days: 60 } },
-    { id: 'home-07', emoji: '🌿', name: '英国一块地',   desc: '属于自己的一片土地',              price: 500000, shipping: 0, isHomeItem: true, homeType: 'land',  tier: 1, unlock: SHOP_UNLOCK_TIERS.committed },
-    { id: 'home-08', emoji: '🏔️', name: '苏格兰高地',   desc: '远离喧嚣，只有风和你',            price: 1500000,shipping: 0, isHomeItem: true, homeType: 'land',  tier: 2, unlock: { affection: 92, trust: 88, days: 60 } },
-    { id: 'home-09', emoji: '🐾', name: '宠物系统',     desc: '养一只属于你们的小动物',          price: 0,      shipping: 0, isHomeItem: true, homeType: 'pet',   comingSoon: true },
-  ],
-  intimate: [
-    { id: 'intimate-01', emoji: '🧴', name: '按摩精油套装',   desc: '雪松木质香，帮他放松紧绷的肩',            price: 128, shipping: 20, isIntimate: true, ghostReact: 'dry', tip: 'come here then.', unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'intimate-02', emoji: '👕', name: '情侣睡衣',       desc: '同款两件，一件寄给他，一件你自己穿',      price: 168, shipping: 15, isIntimate: true, tip: 'wear yours. i will know.', unlock: SHOP_UNLOCK_TIERS.intimate },
-    { id: 'intimate-03', emoji: '🛡️', name: '超大号避孕套',   desc: '最大号，她特意挑的，他懂',                                price: 68,  shipping: 30, isIntimate: true, tip: "...noted.", unlock: SHOP_UNLOCK_TIERS.intimate },
-    { id: 'intimate-04', emoji: '🌹', name: '情趣骰子礼盒',   desc: '六面各有惊喜，每一面都是只属于你们的游戏',            price: 68,  shipping: 10, isIntimate: true, ghostReact: 'dry', tip: "we'll see.", unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'intimate-05', emoji: '🪢', name: '丝绒眼罩套装',   desc: '遮住视线，感官才会更清醒，配柔软绑带',                price: 148, shipping: 25, isIntimate: true, ghostReact: 'controlled', tip: 'noted.', unlock: SHOP_UNLOCK_TIERS.intimate },
-    { id: 'intimate-06', emoji: '🧴', name: '情侣按摩油礼盒', desc: '三种香型，分别对应三种心情，你自己选',                price: 178, shipping: 25, isIntimate: true, ghostReact: 'practical', tip: "picked one. don't ask which.", unlock: SHOP_UNLOCK_TIERS.intimate },
-    { id: 'intimate-07', emoji: '💋', name: '远程震动玩具',     desc: '隔着时区也能在一起，手机连接，他来控制',              price: 388, shipping: 35, isIntimate: true, ghostReact: 'controlled', tip: "i'll figure it out.", badge: '异地专属', unlock: SHOP_UNLOCK_TIERS.committed },
-    { id: 'intimate-08', emoji: '🎲', name: '亲密挑战卡牌',     desc: '52张，每张都是一个只属于你们的约定',                  price: 78,  shipping: 10, isIntimate: true, ghostReact: 'dry',        tip: "52 cards. we won't need all of them.", unlock: SHOP_UNLOCK_TIERS.warm },
-    { id: 'intimate-09', emoji: '🍓', name: '可食用身体彩绘套装', desc: '草莓和巧克力两色，画什么由你决定',                  price: 118, shipping: 25, isIntimate: true, ghostReact: 'dry',        tip: 'creative.', unlock: SHOP_UNLOCK_TIERS.warm },
-    // 已下架：情趣应用年费会员（软件类无需快递，暂时下架）
+    // ── NOA MARKET V1 资产（车/房）──
+    // 资产不是物品、不收邮费；shipping 字段复用为「手续费」固定 100。无解锁门槛（门槛是旧版遗留）。
+    // 图片按 ID 绑定 images/products/<id>.png，加载失败回退 emoji。
+    { id: 'product-062', emoji: '🚗', name: 'MINI Cooper 城市通勤座驾', nameEn: 'MINI Cooper', price: 32000, shipping: 100, isHomeItem: true, homeType: 'car',
+      desc: '经典城市车型，紧凑车身设计，搭配标志性外观风格，适合日常城市驾驶。' },
+    { id: 'product-063', emoji: '🏡', name: 'Cornwall Seaside Cottage 康沃尔海岸小屋', nameEn: 'Cornwall Seaside Cottage', price: 1200000, shipping: 100, isHomeItem: true, homeType: 'house',
+      desc: '位于海岸附近的石质住宅，拥有海景环境与传统英式建筑外观。' },
+    { id: 'product-064', emoji: '🏠', name: 'Herefordshire Country House 英式乡村住宅', nameEn: 'Herefordshire Country House', price: 2800000, shipping: 100, isHomeItem: true, homeType: 'house',
+      desc: '英国乡村独栋住宅，拥有庭院、花园以及周围自然景观。' },
+    { id: 'product-065', emoji: '🌲', name: 'Woodland Retreat 森林隐居小屋', nameEn: 'Woodland Retreat', price: 950000, shipping: 100, isHomeItem: true, homeType: 'house',
+      desc: '隐藏于森林环境中的私人住宅，周围有树林、溪流和自然景观。' },
+    { id: 'product-066', emoji: '🚙', name: 'Land Rover Defender 探索型越野车', nameEn: 'Land Rover Defender', price: 85000, shipping: 100, isHomeItem: true, homeType: 'car',
+      desc: '经典越野车型，拥有坚固车身设计与户外驾驶风格。' },
+    { id: 'product-067', emoji: '🏙️', name: 'Manchester Skyline Residence 曼彻斯特城市景观公寓', nameEn: 'Manchester Skyline Residence', price: 1850000, shipping: 100, isHomeItem: true, homeType: 'house',
+      desc: '现代城市住宅，拥有落地窗设计与城市天际线景观。' },
+    { id: 'product-068', emoji: '🏎️', name: 'Porsche 911 性能跑车收藏', nameEn: 'Porsche 911', price: 150000, shipping: 100, isHomeItem: true, homeType: 'car',
+      desc: '经典运动跑车设计，流畅车身比例与驾驶体验结合，作为私人座驾收藏。' },
+    { id: 'product-069', emoji: '🏰', name: '苏格兰高地私人庄园', nameEn: 'Scottish Highland Private Estate', price: 88000000, shipping: 100, isHomeItem: true, homeType: 'house',
+      desc: '位于苏格兰高地的私人庄园资产。远离城市喧嚣，拥有独立建筑、广阔土地以及自然景观视野。这里不仅是一处住所，更是一片属于自己的私人空间。' },
   ],
 };
+
+// 商品资格：只有房车地（isHomeItem）与面基三件套（isReunion）才会永久拥有 / 售罄；
+// 其余全部商品（含消耗品、普通礼物）一律允许重复购买，maxPurchase 不作为永久拥有信号
+// （不改动 purchaseCounts / purchasedItems 记录）
+function isUniqueProduct(p) {
+  return !!(p && (p.isHomeItem || p.isReunion));
+}
+
+// 商品主视觉：有 id 则用 images/products/<id>.png，加载失败自动回退 emoji；
+// 无 id（季节/入冬限定）直接用 emoji。不新增数据字段。
+function renderProductVisual(p) {
+  const emojiHtml = `<div class="product-emoji">${p.emoji || ''}</div>`;
+  if (!p || !p.id) return emojiHtml;
+  const src = `images/products/${p.id}.png`;
+  const fallback = emojiHtml.replace(/"/g, '&quot;');
+  return `<img class="product-img" src="${src}" alt="${(p.name || '').replace(/"/g, '&quot;')}" loading="lazy" onerror="this.outerHTML='${fallback}'">`;
+}
 
 // 阶段0：稳定商品ID读取助手（只读，不消费；不改动任何 name-keyed 旧逻辑）
 function getProductId(product) {
   return product && product.id ? product.id : null;
+}
+// NOA MARKET V1 商品：id 形如 product-NNN。V1 商品 price 即最终售价，不再套用旧 ×1.8 倍率。
+function isV1MarketProduct(product) {
+  return !!(product && typeof product.id === 'string' && product.id.startsWith('product-'));
 }
 function getProductById(id) {
   if (!id) return null;
@@ -242,6 +629,26 @@ function getProductById(id) {
     if (found) return found;
   }
   return null;
+}
+
+// 特殊企划 Collection 成员配置（唯一事实源，勿扩展成通用 engine）。
+// 成员用稳定 productId 声明；拥有判定走 productId → 商品对象 → 中文 name → purchasedItems，
+// 以兼容老用户按 name 记账的历史记录，不迁移 localStorage、不改 name、不改历史购买记录。
+const SPECIAL_COLLECTIONS = [
+  {
+    id: 'reunion',
+    productIds: ['product-070', 'product-071', 'product-072'],
+    rewardFlag: 'metInPerson',
+  },
+];
+
+// 把某 Collection 的 productIds 解析为中文 name 列表（回查 MARKET_PRODUCTS，保持声明顺序）。
+function getCollectionItemNames(collectionId) {
+  const col = SPECIAL_COLLECTIONS.find(c => c.id === collectionId);
+  if (!col) return [];
+  return col.productIds
+    .map(pid => { const p = getProductById(pid); return p ? p.name : null; })
+    .filter(Boolean);
 }
 
 // 阶段1：Purchase Fact 事实层（新实体，与 legacy purchasedItems/purchaseCounts 并写）
@@ -294,13 +701,10 @@ function setPurchaseFactDelivery(purchaseId, deliveryId) {
 }
 
 // 节日限定：从家寄给他（节日前3天解锁，过了消失）
-const SEASONAL_FROM_HOME = [
-  { month: 4,  day: 5,  emoji: '🍡', name: '青团礼盒',   desc: '清明时节，艾草青团，甜糯',               price: 75, shipping: 20, isFromHome: true, festival: '清明节' },
-  { month: 6,  day: 19, emoji: '🎋', name: '粽子礼盒',   desc: '端午五芳斋，红枣蛋黄各半箱',             price: 95, shipping: 20, isFromHome: true, festival: '端午节' },
-  { month: 9,  day: 25, emoji: '🥮', name: '月饼礼盒',   desc: '广式莲蓉蛋黄，精装铁盒，中秋限定',       price: 148, shipping: 20, isFromHome: true, festival: '中秋节' },
-  { month: 2,  day: 17, emoji: '🧧', name: '年货大礼包', desc: '糖果、坚果、肉干，满满一箱新年味道',       price: 188, shipping: 20, isFromHome: true, festival: '春节' },
-  { month: 12, day: 21, emoji: '🥟', name: '冬至饺子/汤圆礼包', desc: '速冻装，跟他说冬至要吃这个',     price: 85, shipping: 20, isFromHome: true, festival: '冬至' },
-];
+// 老 emoji prototype 已退役（用户 2026-09-28 决议删除节日从家寄限定）。
+// 保留空数组与 getSeasonalFromHome()，各调用点走 length 判断自然不再上架。
+// 老用户存档里已购的 isFromHome 记录按 name 记账，指向已删商品仍静默无害。
+const SEASONAL_FROM_HOME = [];
 
 function getSeasonalFromHome() {
   const today = new Date();
@@ -316,22 +720,10 @@ function getSeasonalFromHome() {
 
 // 入冬限定：入冬自动上架，开春自动下架（窗口 9/20–次年 3/1）。
 // cat 标明并入哪个商城分类；winterTag 触发商城「入冬限定」角标。
-const WINTER_SEASONAL = [
-  // ── 穿他身上 clothing ──
-  { cat: 'clothing', emoji: '🧶', name: '卷檐针织帽',        desc: '压到眉骨，值夜岗不冻耳朵',                 price: 52,  shipping: 25, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
-  { cat: 'clothing', emoji: '🧣', name: '抓绒战术脖套',      desc: '拉上去连脸一起挡风，他会用',               price: 42,  shipping: 25, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
-  { cat: 'clothing', emoji: '🩲', name: '美利奴保暖打底套装', desc: '贴身穿在作训服里，零下也扛得住',           price: 120, shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
-  { cat: 'clothing', emoji: '👖', name: '法兰绒家居长裤',    desc: '回营地脱下作训服，松松垮垮那条',           price: 78,  shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.warm },
-  // ── 吃喝 food（应季热饮）──
-  { cat: 'food', emoji: '🍷', name: '热红酒香料包', desc: '丁香肉桂橙皮一包，冬夜煮一锅',                     price: 58, shipping: 20, isGhostGift: true, winterTag: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-  { cat: 'food', emoji: '🍫', name: '比利时热可可罐', desc: '浓到挂勺，值夜班冻手时冲一杯',                   price: 68, shipping: 20, isGhostGift: true, winterTag: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-  // ── 礼物 gift ──
-  { cat: 'gift', emoji: '🫙', name: '焖烧保温饭盒',   desc: '早上装热的中午还烫嘴，别老啃冷口粮',       price: 95,  shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
-  { cat: 'gift', emoji: '🔊', name: '防摔蓝牙音箱',   desc: '营地放点动静，不至于太安静',               price: 158, shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.soft },
-  { cat: 'gift', emoji: '📸', name: '拍立得相机',     desc: '当场出照片，逼他拍一张贴储物柜',           price: 220, shipping: 30, isGhostGift: true, winterTag: true, unlock: SHOP_UNLOCK_TIERS.warm },
-  // ── 家乡味 fromhome（秋冬限定）──
-  { cat: 'fromhome', emoji: '🌰', name: '糖炒栗子礼盒', desc: '现炒真空封，教他剥壳，冬天街边的味道',     price: 58, shipping: 20, isFromHome: true, winterTag: true, maxPurchase: 2, unlock: SHOP_UNLOCK_TIERS.soft },
-];
+// 老 emoji prototype 已退役（用户 2026-09-28 决议删除入冬限定）。
+// 保留空数组与 getWinterSeasonal()/isWinterWindow()，各调用点走 length 判断自然不再上架。
+// 老用户存档里已购的 winterTag/isGhostGift 记录按 name 记账，指向已删商品仍静默无害。
+const WINTER_SEASONAL = [];
 
 // 入冬窗口：9/20 – 次年 3/1（跨年，用 月*100+日 比较）
 function isWinterWindow() {
@@ -508,119 +900,6 @@ const GHOST_REVERSE_POOL = {
   ],
 };
 
-// ===== 异地私密反寄池（触发条件：异地天数 + 亲密度）=====
-const GHOST_INTIMATE_REVERSE_POOL = [
-  { emoji: '🎀', name: '蕾丝睡衣套装',     desc: 'Ghost悄悄寄来的，什么都没说', tip: "wear it.",         ghostReact: 'flustered' },
-  { emoji: '🌙', name: '情趣内衣·军绿款', desc: '军绿配黑色蕾丝，他挑的',       tip: "you'll know why.", ghostReact: 'flustered' },
-];
-
-// ===== 意图层：为私密反寄决定 intent =====
-function decideIntimateIntent() {
-  const affection = parseInt(localStorage.getItem('affection') || '60');
-  const trust = typeof getTrustHeat === 'function' ? getTrustHeat() : 60;
-  // claim 权重随关系深度提升
-  const claimWeight = Math.max(0.1, Math.min(0.5, (affection - 70) / 60));
-  const pushWeight  = 0.4;
-  const testWeight  = Math.max(0.1, 0.5 - claimWeight);
-  const total = testWeight + pushWeight + claimWeight;
-  const r = Math.random() * total;
-  if (r < testWeight) return 'test';
-  if (r < testWeight + pushWeight) return 'push';
-  return 'claim';
-}
-
-// intent → 系统消息措辞（告知 S 他寄东西的动机）
-function intentSystemNote(itemName, intent) {
-  const notes = {
-    test:  `[System: You quietly sent her "${itemName}". You're not sure why — just wanted to see how she'd react. Said nothing. Let her find out.]`,
-    push:  `[System: You quietly sent her "${itemName}". She's been pushing it lately — you decided to take the lead. No explanation. Let it speak for itself.]`,
-    claim: `[System: You quietly sent her "${itemName}". No particular reason — you picked it, you sent it. There's a sense of "she's yours" in there. You won't say that out loud.]`,
-  };
-  return notes[intent] || notes.test;
-}
-
-// 异地久了自动触发一次私密反寄
-function checkIntimateReverseDelivery() {
-  const marriageDate = localStorage.getItem('marriageDate');
-  if (!marriageDate) return;
-  const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
-  if (days < 30) return;
-
-  const affection = parseInt(localStorage.getItem('affection') || '60');
-  if (affection < 75) return;
-
-  const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  if (coldWar) return;
-
-  const doneKey = 'intimateReverseDone';
-  if (localStorage.getItem(doneKey)) return;
-
-  if (typeof canTriggerReverseDelivery === 'function' && !canTriggerReverseDelivery()) return;
-
-  const pool = GHOST_INTIMATE_REVERSE_POOL;
-  const sentNames = JSON.parse(localStorage.getItem('deliveryHistory') || '[]')
-    .filter(d => d.isGhostSend).map(d => d.name);
-  const available = pool.filter(p => !sentNames.includes(p.name));
-  if (available.length === 0) return;
-  const item = available[Math.floor(Math.random() * available.length)];
-
-  // 意图层：异地久了默认偏 claim，但仍走权重
-  const intent = decideIntimateIntent();
-
-  localStorage.setItem(doneKey, '1');
-  if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
-
-  // 说话延迟 30s ~ 3min（让用户觉得"他在想什么"）
-  const talkDelay = (Math.floor(Math.random() * 150) + 30) * 1000;
-  // 物流延迟 2-4 天
-  const deliveryDelay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
-
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({
-      role: 'user',
-      content: intentSystemNote(item.name, intent),
-      _system: true
-    });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-
-  // 延迟后 Ghost 说一句话（不解释，不提寄东西）
-  setTimeout(async () => {
-    if (typeof _isSending !== 'undefined' && _isSending) return;
-    const intentLines = {
-      test:  `[System: You just made a decision but you're not saying anything. Say something unrelated, or go quiet. Do not mention sending anything.]`,
-      push:  `[System: You just took the lead back. Say one line — some weight to it, nothing explicit. Do not mention sending anything.]`,
-      claim: `[System: You just did something — there's a quiet sense of "she's yours" in it. One casual line, no explanation. Do not mention sending anything.]`,
-    };
-    try {
-      const res = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 60,
-          system: typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '',
-          messages: [...(chatHistory || []).filter(m => !m._system).slice(-6),
-            { role: 'user', content: intentLines[intent] || intentLines.test }]
-        })
-      }, 8000);
-      const data = await res.json();
-      const line = data.content?.[0]?.text?.trim() || '';
-      if (line && typeof appendMessage === 'function') {
-        appendMessage('bot', line);
-        chatHistory.push({ role: 'assistant', content: line });
-        if (typeof saveHistory === 'function') saveHistory();
-      }
-    } catch(e) {}
-  }, talkDelay);
-
-  setTimeout(() => {
-    if (typeof addGhostReverseDelivery === 'function') {
-      addGhostReverseDelivery({ ...item, isIntimate: true, _secretDelivery: true, intent }, 'intimate');
-    }
-  }, deliveryDelay);
-}
-
 let currentCategory = 'clothing';
 let pendingProduct = null;
 let pendingCategory = null;
@@ -675,7 +954,7 @@ function _healOrphanPurchases() {
 
 function initMarket() {
   const el = document.getElementById('marketBalanceDisplay');
-  if (el) el.textContent = '£' + getBalance().toFixed(2);
+  if (el) el.textContent = '£' + Math.round(getBalance()).toLocaleString('en-GB');
   _healOrphanPurchases();   // 自愈：救回"买了但快递从没创建"的孤儿礼物
   renderDeliveryTracker();
   renderMarket(currentCategory || 'clothing');
@@ -685,6 +964,7 @@ function initMarket() {
     if (typeof checkAndShowDeliveryNotices === 'function') checkAndShowDeliveryNotices();
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
   }, 400);
+  updateCartBadge();
 }
 
 function renderMarket(categoryId) {
@@ -697,55 +977,6 @@ function renderMarket(categoryId) {
   }
   // 安全解析 localStorage，防止数据损坏导致商城空白
   const _safeGet = (key, def) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(e) { return def; } };
-
-  // 私密专区
-  if (categoryId === 'intimate') {
-    const gridEl3 = document.getElementById('productsGrid');
-    if (!gridEl3) return;
-    const purchased = _safeGet('purchasedItems', []);
-    const purchaseCounts = _safeGet('purchaseCounts', {});
-    // 修改：全部显示，未解锁的显示锁定状态，不再隐藏
-    const allIntimateProducts = MARKET_PRODUCTS.intimate || [];
-    const intimateTriggered = _safeGet('intimateTriggered', {});
-    const now = Date.now();
-    let intimateHtml = '';
-    allIntimateProducts.forEach((p, i) => {
-      const isUnlocked = canUnlockProduct(p);
-      const maxBuy = p.maxPurchase || 1;
-      const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
-      const owned = buyCount >= maxBuy;
-      const btnLabel = p.isUserItem ? '🛍️ 为自己购买' : '📦 寄给 Ghost';
-
-      const iTrigger = intimateTriggered[p.name];
-      const isHighlighted = isUnlocked && !owned && iTrigger && (now - iTrigger.timestamp < 2 * 24 * 3600 * 1000);
-
-      const lockIconSvg = ``;
-      const badgeHtml = !isUnlocked
-        ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(180,40,80,0.85),rgba(140,30,100,0.8));color:#ffd0e0;border:none;font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;">🔒 继续相处后解锁</div>`
-        : isHighlighted
-          ? `<div class="ghost-mentioned-tag" style="background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(192,132,252,0.15));border:1px solid rgba(236,72,153,0.5);color:#be185d;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">💡 也许正合时机</div>`
-          : p.badge
-            ? `<div class="ghost-mentioned-tag" style="background:rgba(236,72,153,0.12);border-color:rgba(236,72,153,0.4);color:#be185d;">💕 ${p.badge}</div>`
-            : '';
-
-      const actionHtml = !isUnlocked
-        ? `<button class="product-buy-btn intimate-buy-btn" disabled style="opacity:0.6;cursor:not-allowed;">🔒 未解锁</button>`
-        : owned
-          ? `<div class="product-owned-tag">✅ 已购买</div>`
-          : `<button class="product-buy-btn intimate-buy-btn" onclick="openBuyModal(${i})">${btnLabel}</button>`;
-
-      intimateHtml += `<div class="product-card intimate-card ${owned ? 'owned-card' : ''} ${isHighlighted ? 'ghost-mentioned' : ''}" style="${!isUnlocked ? 'opacity:0.75;' : ''}">
-        ${badgeHtml}
-        <div class="product-emoji">${p.emoji}</div>
-        <div class="product-name">${p.name}</div>
-        <div class="product-desc">${!isUnlocked ? '继续和他相处，慢慢解锁' : p.desc}</div>
-        <div class="product-price">${!isUnlocked ? '🔒 ' : ''}£${(p.isReunion || p.isHomeItem ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</div>
-        ${actionHtml}
-      </div>`;
-    });
-    gridEl3.innerHTML = intimateHtml;
-    return;
-  }
 
   // 修改：全部显示，未解锁的显示锁定状态
   const isFromHome = categoryId === 'fromhome';
@@ -769,8 +1000,7 @@ function renderMarket(categoryId) {
 
   // 修复：wishlist分类顶部加三件套进度条（避免嵌套模板字符串，防止浏览器解析崩溃）
   if (isWishlist) {
-    const _reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
-    const _reunionEmojis = ['✈️','🏨','🗺️'];
+    const _reunionItems = getCollectionItemNames('reunion');
     const _reunionBought = _reunionItems.map(function(n) { return purchased.includes(n); });
     const _reunionCount = _reunionBought.filter(Boolean).length;
     const _allDone = _reunionCount === 3;
@@ -778,25 +1008,57 @@ function renderMarket(categoryId) {
     document.getElementById('_reunionProgress')?.remove();
     const _progEl = document.createElement('div');
     _progEl.id = '_reunionProgress';
-    _progEl.style.cssText = 'margin:0 0 16px;padding:16px;background:' + (_allDone ? 'linear-gradient(135deg,rgba(90,154,70,0.15),rgba(120,185,85,0.1))' : 'rgba(245,240,255,0.8)') + ';border:1px solid ' + (_allDone ? 'rgba(90,154,70,0.4)' : 'rgba(168,85,247,0.2)') + ';border-radius:16px;';
 
-    const _titleText = _allDone ? '🎉 三件套集齐！独家音频剧场《面基》已解锁' : ('✈️ 面基计划进度 ' + _reunionCount + '/3');
-    const _itemsHtml = _reunionItems.map(function(name, idx) {
+    // Collection Card：0/3~2/3 与 3/3 共用同一张卡（背景/尺寸/排版/字体不变），仅 Reward 区域随完成态切换
+    _progEl.style.cssText = 'position:relative;margin:0 0 16px;border-radius:18px;overflow:hidden;background:#f2ede3;box-shadow:0 4px 16px rgba(60,50,35,0.08);';
+
+    const _dotsHtml = [0,1,2].map(function(idx) {
       const bought = _reunionBought[idx];
-      return '<div style="flex:1;text-align:center;padding:8px 4px;border-radius:10px;background:' + (bought ? 'rgba(90,154,70,0.15)' : 'rgba(200,200,200,0.15)') + ';border:1px solid ' + (bought ? 'rgba(90,154,70,0.4)' : 'rgba(200,200,200,0.3)') + ';">'
-        + '<div style="font-size:20px;">' + _reunionEmojis[idx] + '</div>'
-        + '<div style="font-size:10px;color:' + (bought ? '#2d6028' : '#999') + ';margin-top:3px;">' + (bought ? '✅ 已购' : '未购') + '</div>'
-        + '</div>';
+      const _dot = '<div style="width:13px;height:13px;border-radius:50%;border:1.5px solid ' + (bought ? '#5a7048' : '#b7ad98') + ';background:' + (bought ? '#5a7048' : 'transparent') + ';flex:0 0 auto;"></div>';
+      const _line = idx < 2 ? '<div style="flex:1;height:1.5px;background:' + (_reunionBought[idx] && _reunionBought[idx+1] ? '#5a7048' : (_reunionBought[idx] ? 'linear-gradient(90deg,#5a7048,#c9bfa8)' : '#c9bfa8')) + ';"></div>' : '';
+      return _dot + _line;
     }).join('');
-    const _bottomText = _allDone
-      ? '<div style="text-align:center;margin-top:10px;"><button onclick="openScreen(\'shelfScreen\');setTimeout(()=>{if(typeof renderGiftShelf===\'function\')renderGiftShelf();},80);" style="font-size:12px;font-weight:600;color:#fff;background:linear-gradient(135deg,#5a9a46,#3d7a2a);border:none;border-radius:14px;padding:7px 18px;cursor:pointer;">🎧 去声之匣收听《面基》 →</button></div>'
-      : '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center;">集齐三件套，解锁独家音频剧场《面基》</div>';
 
-    _progEl.innerHTML = '<div style="font-size:13px;font-weight:700;color:' + (_allDone ? '#2d6028' : '#5b21b6') + ';margin-bottom:10px;">' + _titleText + '</div>'
-      + '<div style="display:flex;gap:8px;margin-bottom:10px;">' + _itemsHtml + '</div>'
-      + '<div style="background:rgba(200,200,200,0.2);border-radius:4px;height:6px;overflow:hidden;">'
-      + '<div style="width:' + (_reunionCount/3*100) + '%;height:100%;background:linear-gradient(90deg,#a855f7,#7c3aed);border-radius:4px;transition:width 0.4s;"></div>'
-      + '</div>' + _bottomText;
+    const _rewardHtml = _allDone
+      ? '<div style="display:flex;align-items:center;gap:10px;">'
+          + '<div style="width:30px;height:30px;border-radius:50%;background:#5a7048;display:flex;align-items:center;justify-content:center;flex:0 0 auto;">'
+            + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+          + '</div>'
+          + '<div style="flex:1;">'
+            + '<div style="font-size:9px;letter-spacing:2px;color:#5a7048;font-weight:600;">COLLECTION COMPLETE</div>'
+            + '<div style="font-size:14px;color:#4a4436;font-weight:600;margin-top:2px;">声之匣 ·《面基》已解锁</div>'
+          + '</div>'
+          + '<button onclick="openScreen(\'shelfScreen\');setTimeout(()=>{if(typeof renderGiftShelf===\'function\')renderGiftShelf();},80);" style="flex:0 0 auto;font-size:12px;font-weight:600;color:#fff;background:#5a7048;border:none;border-radius:16px;padding:8px 16px;cursor:pointer;letter-spacing:0.5px;">去收听 →</button>'
+        + '</div>'
+      : '<div style="display:flex;align-items:center;gap:10px;">'
+          + '<div style="width:30px;height:30px;border-radius:50%;border:1.5px solid #b7ad98;display:flex;align-items:center;justify-content:center;flex:0 0 auto;">'
+            + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8a7f68" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+          + '</div>'
+          + '<div>'
+            + '<div style="font-size:9px;letter-spacing:2px;color:#8a7f68;font-weight:600;">UNLOCKS</div>'
+            + '<div style="font-size:14px;color:#4a4436;font-weight:600;margin-top:2px;">声之匣 ·《面基》</div>'
+            + '<div style="font-size:11px;color:#9a917c;margin-top:2px;">集齐三件套，解锁独家音频剧场《面基》</div>'
+          + '</div>'
+        + '</div>';
+
+    _progEl.innerHTML =
+      '<div style="position:absolute;inset:0;background:url(\'images/ui-backgrounds/collections/reunion-bg.webp\') right center / cover no-repeat;"></div>'
+      + '<div style="position:absolute;inset:0;background:linear-gradient(90deg,#f2ede3 42%,rgba(242,237,227,0.85) 58%,rgba(242,237,227,0.15) 78%,transparent 100%);"></div>'
+      + '<div style="position:relative;padding:18px 20px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+          + '<div>'
+            + '<div style="font-size:10px;letter-spacing:2.5px;color:#8a7f68;font-weight:600;margin-bottom:6px;">SPECIAL COLLECTION</div>'
+            + '<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:26px;line-height:1.05;color:#4a4436;letter-spacing:0.5px;">MEET IN PERSON</div>'
+            + '<div style="font-size:13px;color:#6b6350;margin-top:3px;letter-spacing:1px;">面基计划</div>'
+          + '</div>'
+          + '<div style="text-align:right;flex:0 0 auto;padding-left:12px;">'
+            + '<div style="font-family:Georgia,serif;font-size:30px;line-height:1;color:#4a4436;">' + _reunionCount + ' <span style="color:#b7ad98;">/</span> 3</div>'
+            + '<div style="font-size:9px;letter-spacing:2px;color:#8a7f68;font-weight:600;margin-top:4px;">COLLECTED</div>'
+          + '</div>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:6px;margin:18px 0 16px;max-width:230px;">' + _dotsHtml + '</div>'
+        + _rewardHtml
+      + '</div>';
 
     if (gridEl.parentNode) gridEl.parentNode.insertBefore(_progEl, gridEl);
   } else {
@@ -805,14 +1067,17 @@ function renderMarket(categoryId) {
 
   gridEl.innerHTML = products.map((p, i) => {
     try {
-    const isUnlocked = canUnlockProduct(p);  // 关系是否满足解锁条件
+    // 特殊三件套（wishlist）取消关系门槛：从一开始即可查看/购买，直接走新版实拍卡而非绿色锁定卡。
+    // 不改商品数据，也不影响 isReunion/unique/购买进度/metInPerson/《面基》解锁链。
+    const isUnlocked = canUnlockProduct(p) || categoryId === 'wishlist';  // 关系是否满足解锁条件
     const maxBuy = p.maxPurchase || 1;
     const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
-    const owned = buyCount >= maxBuy;
+    // 普通商品允许无限复购；仅一次性商品沿用 buyCount>=maxBuy 售罄
+    const owned = isUniqueProduct(p) && buyCount >= maxBuy;
     const onSale = weeklySale && weeklySale.name === p.name;
     let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
     const _isBigTicket = p.isReunion || p.isHomeItem;
-    if (!isLuxury && !_isBigTicket) displayPrice = Math.round(displayPrice * 1.8);
+    if (!isLuxury && !_isBigTicket && !isV1MarketProduct(p)) displayPrice = Math.round(displayPrice * 1.8);
     const triggerReason = isUnlocked && typeof getProductTrigger === 'function' ? getProductTrigger(p.name) : null;
     const isLocked = p.requiresItem && !purchased.includes(p.requiresItem);
     const discountPct = onSale ? Math.round((1 - weeklySale.discount) * 100) : 0;
@@ -834,49 +1099,52 @@ function renderMarket(categoryId) {
 
     // 未解锁：显示锁定卡片
     if (!isUnlocked) {
-      // luxury用金色系，其他用卡片原色
-      const tipStyle = isLuxury
-        ? `background:linear-gradient(135deg,rgba(200,160,60,0.9),rgba(170,120,30,0.85));color:#fff8dc;border:none;`
-        : `background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#4a7a30;`;
-      const btnStyle = isLuxury
-        ? `background:linear-gradient(135deg,rgba(160,120,40,0.55),rgba(130,90,30,0.5));color:rgba(245,232,192,0.75);border:1px solid rgba(200,160,60,0.3);cursor:not-allowed;`
-        : `background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#5a8a40;cursor:not-allowed;`;
-      const cardStyle = isLuxury ? '' : `background:#f4f9f0;border:1px solid rgba(140,190,100,0.22);`;
+      // NOA MARKET V1：奢品不再用金色系锁定样式，与其他分类统一
+      const tipStyle = `background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#4a7a30;`;
+      const btnStyle = `background:rgba(80,130,55,0.1);border:1px solid rgba(90,150,60,0.28);color:#5a8a40;cursor:not-allowed;`;
+      const cardStyle = `background:#f4f9f0;border:1px solid rgba(140,190,100,0.22);`;
       return `
-        <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''}"
+        <div class="product-card ${isWishlist?'wishlist-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''}"
              style="${cardStyle}opacity:0.82;cursor:pointer;"
              onclick="showToast('继续和 Ghost 相处，解锁更多商品 ✨')">
           <div class="ghost-mentioned-tag" style="${tipStyle}font-size:9px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;">🔒 继续相处后解锁</div>
           <div class="product-emoji">${p.emoji}</div>
-          <div class="product-name">${p.name}</div>
+          <div class="product-name">${p.displayName || p.name}</div>
           <div class="product-desc">继续和他相处，慢慢解锁</div>
-          <div class="product-price">£${(p.isReunion || p.isHomeItem ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</div>
+          <div class="product-price">£${(p.isReunion || p.isHomeItem || isV1MarketProduct(p) ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</div>
           <button class="product-buy-btn" disabled style="${btnStyle}display:flex;align-items:center;justify-content:center;">🔒 未解锁</button>
         </div>`;
     }
 
     return `
-      <div class="product-card ${isWishlist?'wishlist-card':''} ${isLuxury?'luxury-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
+      <div class="product-card ${isWishlist?'wishlist-card':''} ${isFromHome?'fromhome-card':''} ${isHome?'home-card':''} ${owned?'owned-card':''} ${triggerReason&&!owned?'ghost-mentioned':''} ${onSale&&!owned?'on-sale-card':''}"
            data-pname="${p.name.replace(/"/g,'__DQUOTE__')}" data-pcat="${categoryId}"
-           onclick="${owned||isLocked?'':'(function(el){openBuyModal_byName(el.dataset.pname.replace(/__DQUOTE__/g,String.fromCharCode(34)),el.dataset.pcat)})(this)'}">
+           onclick="${owned||isLocked?'':'(function(el){openProductDetail(el.dataset.pname.replace(/__DQUOTE__/g,String.fromCharCode(34)),el.dataset.pcat)})(this)'}">
         ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
         ${p.festival&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(255,200,100,0.15);border-color:rgba(255,180,50,0.4);color:#b45309;">🎋 ${p.festival}限定</div>` : ''}
         ${p.winterTag&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(140,190,230,0.16);border-color:rgba(90,150,210,0.42);color:#2563a8;">❄️ 入冬限定</div>` : ''}
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">💡 ${triggerReason}</div>` : ''}
         ${isLocked ? '<div class="ghost-mentioned-tag" style="background:#9ca3af">🔒 需先买机票</div>' : ''}
-        <div class="product-emoji">${p.emoji}</div>
+        <div class="product-media">${renderProductVisual(p)}</div>
         ${onSale&&!owned ? `<div class="sale-discount-badge">✦ TODAY ONLY · ${discountLabel}</div>` : ''}
-        <div class="product-name">${p.name}</div>
-        ${isWishlist&&p.badge ? `<div class="product-badge-preview">🏅 ${p.badge}</div>` : ''}
-        ${p.desc ? `<div class="product-desc">${p.desc}</div>` : ''}
-        <div class="product-price ${isWishlist?'wishlist-price':''}">
-          ${onSale ? `<span class="sale-original-price">£${((isLuxury || p.isReunion || p.isHomeItem) ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</span>` : ''}
-          £${displayPrice.toLocaleString()}
+        <div class="product-info">
+          <div class="product-name">${p.displayName || p.name}</div>
+          ${p.nameEn ? `<div class="product-name-en">${p.nameEn}</div>` : ''}
+          ${isWishlist&&p.badge ? `<div class="product-badge-preview">🏅 ${p.badge}</div>` : ''}
+          <div class="product-foot">
+            <div class="product-price ${isWishlist?'wishlist-price':''}">
+              ${onSale ? `<span class="sale-original-price">£${((isLuxury || p.isReunion || p.isHomeItem || isV1MarketProduct(p)) ? p.price : Math.round(p.price * 1.8)).toLocaleString()}</span>` : ''}
+              £${displayPrice.toLocaleString()}
+            </div>
+            ${owned
+              ? `<div class="product-owned-tag">${isHome?'已购置':'已售罄'}</div>`
+              : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''} ${isFromHome?'fromhome-buy-btn':''} ${isHome?'home-buy-btn':''}" aria-label="加入购物车" data-pid="${(p.id||'').replace(/"/g,'&quot;')}" onclick="event.stopPropagation();(function(el){var id=el.dataset.pid;if(!id)return;addToCart(id);if(typeof showToast==='function')showToast('🛒 已加入购物车');})(this)">
+                  <span class="add-label">ADD</span><span class="add-plus">+</span>
+                  ${showCount ? `<span class="buy-count">${buyCount}/${maxBuy}</span>` : ''}
+                </button>`
+            }
+          </div>
         </div>
-        ${owned
-          ? `<div class="product-owned-tag">${isHome?'✅ 已购置':'🔴 已售罄'}</div>`
-          : `<button class="product-buy-btn ${isWishlist?'wishlist-buy-btn':''} ${isFromHome?'fromhome-buy-btn':''} ${isHome?'home-buy-btn':''}">${isWishlist?'💝 加入宝贝':isFromHome?'📦 寄给他':isHome?'🏡 购置':'🛒 购买'}${showCount ? ` (${buyCount}/${maxBuy})` : ''}</button>`
-        }
       </div>`;
     } catch(e) { console.warn('[shop] 商品渲染失败:', e, p?.name); return ''; }
   }).join('');
@@ -920,7 +1188,7 @@ function openBuyModal(idx) {
   let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
   // 非奢侈品涨价（经济系统平衡），机票/酒店/车/房直接显示原价
   const _isBigTicketModal = p.isReunion || p.isHomeItem;
-  if (!isLuxury && !_isBigTicketModal) displayPrice = Math.round(displayPrice * 1.8);
+  if (!isLuxury && !_isBigTicketModal && !isV1MarketProduct(p)) displayPrice = Math.round(displayPrice * 1.8);
   // 花艺师职业福利：商店打折（奢侈品除外）
   const _shopDiscount = (typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
   if (_shopDiscount > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount / 100));
@@ -933,15 +1201,17 @@ function openBuyModal(idx) {
   const isWishlist = currentCategory === 'wishlist';
 
   document.getElementById('buyModalEmoji').textContent = p.emoji;
-  document.getElementById('buyModalName').textContent = p.name;
+  document.getElementById('buyModalName').textContent = p.displayName || p.name;
   document.getElementById('buyModalDesc').textContent = p.desc || '';
   const _isBigTicketBase = p.isReunion || p.isHomeItem;
-  const _basePrice = (isLuxury || _isBigTicketBase) ? p.price : Math.round(p.price * 1.8);
+  const _basePrice = (isLuxury || _isBigTicketBase || isV1MarketProduct(p)) ? p.price : Math.round(p.price * 1.8);
   const _hasDiscount = _shopDiscount > 0 && displayPrice < _basePrice;
   const _shippingFree = shipping === 0 && (p.shipping > 0 || !p.isUserItem);
+  // 资产（车/房）不是物品、不收邮费：费用叫「手续费」；其余商品仍叫「运费」
+  const _feeWord = p.isHomeItem ? '手续费' : '运费';
   document.getElementById('buyModalPrice').innerHTML = _hasDiscount
-    ? `<span style="text-decoration:line-through;color:#ccc;font-size:12px;">£${_basePrice}</span> £${displayPrice.toLocaleString()}<span style="font-size:11px;color:#5a9a46;"> (-${_shopDiscount}%)</span><span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ' · 免运费' : ` + £${shipping} 运费`}</span>`
-    : `£${displayPrice.toLocaleString()}<span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ' · 免运费' : ` + £${shipping} 运费`}</span>`;
+    ? `<span style="text-decoration:line-through;color:#ccc;font-size:12px;">£${_basePrice}</span> £${displayPrice.toLocaleString()}<span style="font-size:11px;color:#5a9a46;"> (-${_shopDiscount}%)</span><span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ` · 免${_feeWord}` : ` + £${shipping} ${_feeWord}`}</span>`
+    : `£${displayPrice.toLocaleString()}<span style="font-size:12px;color:#a07bc0;font-weight:500">${_shippingFree ? ` · 免${_feeWord}` : ` + £${shipping} ${_feeWord}`}</span>`;
   document.getElementById('buyModalBalance').innerHTML = `余额：£${bal.toFixed(2)}&nbsp;&nbsp;合计：<b style="color:#7c3fa0">£${total.toLocaleString()}</b>`;
 
   const reasonEl = document.getElementById('buyModalReason');
@@ -965,7 +1235,8 @@ function openBuyModal(idx) {
   // 必须用 buyCount >= maxBuy 判断，和 renderMarket 保持一致
   const maxBuy = p.maxPurchase || 1;
   const buyCount = purchaseCounts[p.name] || (purchased.includes(p.name) ? 1 : 0);
-  const isOwned = buyCount >= maxBuy;
+  // 与 renderMarket 保持一致：普通商品允许复购，仅一次性商品售罄
+  const isOwned = isUniqueProduct(p) && buyCount >= maxBuy;
 
   const ghostBal = typeof getGhostCardBalance === 'function' ? getGhostCardBalance() : 0;
   const canAfford = bal >= total || ghostBal >= total;
@@ -991,11 +1262,757 @@ function closeBuyModal() {
   pendingProduct = null;
 }
 
+// ===== NOA MARKET 商品详情页（全屏）=====
+// 只负责展示 + 把动作转发给既有函数：
+// 发给他看 → shareProductToChat；立即购买 → openBuyModal_byName（进原购买弹窗，
+// 最终仍走未改动的 confirmPurchase）。不碰钱包/购买记录/物流/图片管线。
+let _pdetailProduct = null;
+let _pdetailCategory = null;
+
+// 只读：与 openBuyModal 相同的展示价规则（不改 openBuyModal，避免影响原购买流程）
+function _pdetailDisplayPrice(p, categoryId) {
+  const isLuxury = categoryId === 'luxury';
+  const weeklySale = isLuxury && typeof getWeeklySale === 'function' ? getWeeklySale() : null;
+  const onSale = weeklySale && weeklySale.name === p.name;
+  let price = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
+  const isBigTicket = p.isReunion || p.isHomeItem;
+  if (!isLuxury && !isBigTicket && !isV1MarketProduct(p)) price = Math.round(price * 1.8);
+  const shopDiscount = (typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
+  if (shopDiscount > 0) price = Math.round(price * (1 - shopDiscount / 100));
+  return price;
+}
+
+function openProductDetail(name, categoryId) {
+  const cat = categoryId || currentCategory;
+  let list = MARKET_PRODUCTS[cat] || [];
+  if (cat === 'fromhome' && typeof getSeasonalFromHome === 'function') list = [...list, ...getSeasonalFromHome()];
+  try { const w = getWinterSeasonal(cat); if (w.length) list = [...list, ...w]; } catch(e) {}
+  const p = list.find(x => x.name === name);
+  if (!p) return;
+
+  _pdetailProduct = p;
+  _pdetailCategory = cat;
+
+  const heroEl = document.getElementById('pdetailHero');
+  if (heroEl) heroEl.innerHTML = typeof renderProductVisual === 'function'
+    ? renderProductVisual(p)
+    : `<div class="product-emoji">${p.emoji || ''}</div>`;
+
+  document.getElementById('pdetailNameCn').textContent = p.displayName || p.name || '';
+  document.getElementById('pdetailNameEn').textContent = p.nameEn || '';
+  document.getElementById('pdetailDesc').textContent = p.desc || '';
+  document.getElementById('pdetailPrice').textContent = '£' + _pdetailDisplayPrice(p, cat).toLocaleString();
+
+  const attrsEl = document.getElementById('pdetailAttrs');
+  if (attrsEl) {
+    let rows = [];
+    if (Array.isArray(p.features)) {
+      rows = p.features.filter(f => f && (f.label || (f.value != null && f.value !== '')));
+    } else if (Array.isArray(p.attributes)) {
+      rows = p.attributes.filter(a => a && a.label).map(a => ({ label: a.label, value: '' }));
+    }
+    attrsEl.innerHTML = rows.map(f => `
+      <div class="pdetail-attr-item">
+        <div class="pdetail-attr-name">${f.label || ''}</div>
+        <div class="pdetail-attr-value">${f.value != null ? f.value : ''}</div>
+      </div>`).join('');
+  }
+
+  const buyBtn = document.getElementById('pdetailBuyBtn');
+  if (buyBtn) buyBtn.textContent = '£' + _pdetailDisplayPrice(p, cat).toLocaleString() + ' · 立即购买';
+
+  const overlay = document.getElementById('productDetailOverlay');
+  if (overlay) overlay.classList.add('show');
+}
+
+function closeProductDetail() {
+  const overlay = document.getElementById('productDetailOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+// ===== NOA MARKET 购物车（UI 层）=====
+// 只读展示 + 数量/删除的本地状态维护，不触碰购买流程/钱包/好感。
+// noaCart: [{ id, qty }]，商品数据一律回查 MARKET_PRODUCTS（getProductById），购物车不存价格快照。
+function getNoaCart() {
+  try { return JSON.parse(localStorage.getItem('noaCart') || '[]'); }
+  catch(e) { return []; }
+}
+function saveNoaCart(cart) {
+  try { localStorage.setItem('noaCart', JSON.stringify(cart)); } catch(e) {}
+}
+function _cartResolveItems() {
+  return getNoaCart().map(row => {
+    const p = getProductById(row.id);
+    if (!p) return null;
+    return { p, qty: Math.max(1, row.qty | 0 || 1) };
+  }).filter(Boolean);
+}
+
+// ── Cart Core V1：购物车基础状态（只存 productId + quantity，价格一律回查）──
+// 加入购物车：不存在则 qty=1，已存在则 +1。
+function addToCart(productId) {
+  if (!productId || !getProductById(productId)) return;
+  const cart = getNoaCart();
+  const row = cart.find(r => String(r.id) === String(productId));
+  if (row) row.qty = (row.qty | 0 || 1) + 1;
+  else cart.push({ id: productId, qty: 1 });
+  saveNoaCart(cart);
+  updateCartBadge();
+}
+// 修改数量（绝对值语义）：quantity <= 0 时移除。
+function updateCartQuantity(productId, quantity) {
+  const q = quantity | 0;
+  if (q <= 0) { removeFromCart(productId); return; }
+  const cart = getNoaCart();
+  const row = cart.find(r => String(r.id) === String(productId));
+  if (!row) return;
+  row.qty = q;
+  saveNoaCart(cart);
+  updateCartBadge();
+}
+// 删除商品。
+function removeFromCart(productId) {
+  saveNoaCart(getNoaCart().filter(r => String(r.id) !== String(productId)));
+  updateCartBadge();
+}
+// 给 UI 的合并结构：从商品数据源取 name/nameEn/image/实际单价，再合并 quantity。
+function getCartItems() {
+  return _cartResolveItems().map(({ p, qty }) => {
+    const price = _pdetailDisplayPrice(p, _cartCategoryOf(p));
+    return {
+      productId: p.id,
+      name: p.displayName || p.name || '',
+      nameEn: p.nameEn || '',
+      image: p.id ? ('images/products/' + p.id + '.png') : '',
+      emoji: p.emoji || '',
+      price,
+      quantity: qty,
+    };
+  });
+}
+// 总价：复用商城实际价格逻辑（_pdetailDisplayPrice），不含运费（Checkout 阶段再算）。
+function getCartTotal() {
+  return getCartItems().reduce((sum, it) => sum + it.price * it.quantity, 0);
+}
+// Header / 详情页购物车角标：显示所有 quantity 总和，为空时隐藏。
+function updateCartBadge() {
+  const total = getNoaCart().reduce((n, r) => n + Math.max(0, r.qty | 0), 0);
+  ['cartBadge', 'pdetailCartBadge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (total > 0) { el.textContent = total > 99 ? '99+' : String(total); el.style.display = 'flex'; }
+    else { el.textContent = ''; el.style.display = 'none'; }
+  });
+}
+function openCart() {
+  renderCart();
+  const overlay = document.getElementById('cartOverlay');
+  if (overlay) overlay.classList.add('show');
+}
+function closeCart() {
+  const overlay = document.getElementById('cartOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+function renderCart() {
+  const items = _cartResolveItems();
+  const listEl = document.getElementById('cartList');
+  const emptyEl = document.getElementById('cartEmpty');
+  const footerEl = document.getElementById('cartFooter');
+  const receiptEl = document.getElementById('cartReceipt');
+  const actionbarEl = document.getElementById('cartActionbar');
+  const countEl = document.getElementById('cartCount');
+  const isEmpty = items.length === 0;
+
+  if (countEl) countEl.textContent = isEmpty ? '' : items.reduce((n, it) => n + it.qty, 0) + ' 件商品';
+  if (emptyEl) emptyEl.style.display = isEmpty ? 'flex' : 'none';
+  if (receiptEl) receiptEl.style.display = isEmpty ? 'none' : 'block';
+  if (footerEl) footerEl.style.display = isEmpty ? 'none' : 'block';
+  if (actionbarEl) actionbarEl.style.display = isEmpty ? 'none' : 'block';
+  if (listEl) listEl.style.display = isEmpty ? 'none' : 'block';
+  if (isEmpty) { if (listEl) listEl.innerHTML = ''; return; }
+
+  let subtotal = 0;
+  listEl.innerHTML = items.map(({ p, qty }) => {
+    const price = _pdetailDisplayPrice(p, _cartCategoryOf(p));
+    subtotal += price * qty;
+    const visual = (typeof renderProductVisual === 'function') ? renderProductVisual(p) : `<div class="product-emoji">${p.emoji || ''}</div>`;
+    const idAttr = String(p.id).replace(/"/g, '&quot;');
+    return `
+      <div class="cart-item">
+        <div class="cart-item-thumb">${visual}</div>
+        <div class="cart-item-main">
+          <div class="cart-item-name-cn">${p.displayName || p.name || ''}</div>
+          <div class="cart-item-name-en">${p.nameEn || ''}</div>
+          <div class="cart-item-row">
+            <span class="cart-item-price">£${price.toLocaleString()}</span>
+            <div class="cart-qty">
+              <button class="cart-qty-btn" onclick="cartSetQty('${idAttr}', -1)" aria-label="减少">−</button>
+              <span class="cart-qty-num">${qty}</span>
+              <button class="cart-qty-btn" onclick="cartSetQty('${idAttr}', 1)" aria-label="增加">+</button>
+            </div>
+          </div>
+        </div>
+        <button class="cart-item-del" onclick="cartRemove('${idAttr}')" aria-label="删除">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>`;
+  }).join('');
+
+  const subEl = document.getElementById('cartSubtotal');
+  const totalEl = document.getElementById('cartTotal');
+  const checkoutBtn = document.getElementById('cartCheckoutBtn');
+  const totalQty = items.reduce((n, it) => n + it.qty, 0);
+  if (subEl) subEl.textContent = '£' + subtotal.toLocaleString();
+  if (totalEl) totalEl.textContent = '£' + subtotal.toLocaleString();
+  if (checkoutBtn) checkoutBtn.textContent = '去结算 (' + totalQty + ')';
+  updateCartBadge();
+}
+function _cartCategoryOf(p) {
+  for (const cat in MARKET_PRODUCTS) {
+    if (MARKET_PRODUCTS[cat].some(x => x.id === p.id)) return cat;
+  }
+  return currentCategory;
+}
+function cartSetQty(id, delta) {
+  const cart = getNoaCart();
+  const row = cart.find(r => String(r.id) === String(id));
+  if (!row) return;
+  // +/- 按钮下限锁 1；删除交给垃圾桶按钮（removeFromCart），不在这里触发移除。
+  updateCartQuantity(id, Math.max(1, (row.qty | 0 || 1) + delta));
+  renderCart();
+}
+function cartRemove(id) {
+  removeFromCart(id);
+  renderCart();
+}
+// 购物车「去结算」：把购物车整理成 { productId, quantity } 交给统一 Checkout。
+function _cartCheckout() {
+  const items = getNoaCart().map(r => ({ productId: r.id, quantity: Math.max(1, r.qty | 0 || 1) }));
+  if (!items.length) { if (typeof showToast === 'function') showToast('🛒 购物车还是空的'); return; }
+  closeCart();
+  openCheckout(items);
+}
+
+// ===== NOA MARKET Checkout（结算页，UI 骨架）=====
+// 本阶段只做入口统一 + 展示：_checkoutItems 只存 { productId, quantity }，
+// 名称/图片/价格一律回查 MARKET_PRODUCTS（getProductById）。不接支付/运费/Purchase/Delivery。
+let _checkoutItems = [];
+let _checkoutPay = 'user'; // user | ghost | ghost_pay，仅 UI 选择状态，不触发扣款
+
+function openCheckout(items) {
+  _checkoutItems = (items || [])
+    .filter(it => it && it.productId && getProductById(it.productId))
+    .map(it => ({ productId: it.productId, quantity: Math.max(1, it.quantity | 0 || 1) }));
+  _checkoutPay = 'user';
+  renderCheckout();
+  const overlay = document.getElementById('checkoutOverlay');
+  if (overlay) overlay.classList.add('show');
+}
+
+function closeCheckout() {
+  const overlay = document.getElementById('checkoutOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function renderCheckout() {
+  const listEl = document.getElementById('checkoutList');
+  if (!listEl) return;
+  const countEl = document.getElementById('checkoutCount');
+  const subEl = document.getElementById('checkoutSubtotal');
+  const shipEl = document.getElementById('checkoutShipping');
+  const totalEl = document.getElementById('checkoutTotal');
+  const btn = document.getElementById('checkoutConfirmBtn');
+
+  let subtotal = 0;
+  let totalQty = 0;
+  let shipping = 0;  // 按不同 productId 各收一次，不随 quantity 重复
+  const _careerFree = typeof isCareerFreeShipping === 'function' && isCareerFreeShipping();
+  listEl.innerHTML = _checkoutItems.map(it => {
+    const p = getProductById(it.productId);
+    if (!p) return '';
+    const price = _pdetailDisplayPrice(p, _cartCategoryOf(p));
+    subtotal += price * it.quantity;
+    totalQty += it.quantity;
+    if (!_careerFree) {
+      const isLuxury = _cartCategoryOf(p) === 'luxury';
+      shipping += (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));
+    }
+    const visual = (typeof renderProductVisual === 'function') ? renderProductVisual(p) : `<div class="product-emoji">${p.emoji || ''}</div>`;
+    return `
+      <div class="checkout-item">
+        <div class="checkout-item-thumb">${visual}</div>
+        <div class="checkout-item-main">
+          <div class="checkout-item-name-cn">${p.displayName || p.name || ''}</div>
+          <div class="checkout-item-name-en">${p.nameEn || ''}</div>
+          <div class="checkout-item-qty">数量 × ${it.quantity}</div>
+        </div>
+        <div class="checkout-item-price">£${price.toLocaleString()}</div>
+      </div>`;
+  }).join('');
+
+  const total = subtotal + shipping;
+  if (countEl) countEl.textContent = totalQty > 0 ? '(' + totalQty + ')' : '';
+  const headCountEl = document.getElementById('checkoutHeadingCount');
+  if (headCountEl) headCountEl.textContent = totalQty > 0 ? totalQty + '件商品' : '';
+  if (subEl) subEl.textContent = '£' + subtotal.toLocaleString();
+  if (shipEl) shipEl.textContent = shipping === 0 ? '免运费' : '£' + shipping.toLocaleString();
+  if (totalEl) totalEl.textContent = '£' + total.toLocaleString();
+
+  // 付款方式：两个余额仅展示，不改动任何算法
+  const userBalEl = document.getElementById('checkoutPayUserBal');
+  if (userBalEl) {
+    const bal = typeof getBalance === 'function' ? getBalance() : 0;
+    userBalEl.textContent = '£' + Math.round(bal).toLocaleString('en-GB');
+  }
+  const ghostBalEl = document.getElementById('checkoutPayGhostBal');
+  if (ghostBalEl) {
+    const gbal = typeof getGhostCardBalance === 'function' ? getGhostCardBalance() : 0;
+    ghostBalEl.textContent = '£' + Math.round(gbal).toLocaleString('en-GB');
+  }
+  document.querySelectorAll('.checkout-pay-opt').forEach(el => {
+    el.classList.toggle('selected', el.getAttribute('data-pay') === _checkoutPay);
+  });
+
+  if (btn) {
+    const label = _checkoutPay === 'ghost_pay' ? '发给他  £' : '确认购买  £';
+    btn.textContent = label + total.toLocaleString();
+  }
+}
+
+// 切换付款方式：仅更新 UI 选择状态与按钮文案，不执行任何扣款。
+function _checkoutSelectPay(pay) {
+  if (pay !== 'user' && pay !== 'ghost' && pay !== 'ghost_pay') return;
+  _checkoutPay = pay;
+  renderCheckout();
+}
+
+// 确认购买：本轮只接通 user / ghost 两种现有支付方式，ghost_pay 保持占位。
+// 支付成功后一律汇入唯一的 _finishPurchase()，不重建 Purchase / Delivery。
+function _checkoutConfirm() {
+  if (_checkoutPay === 'ghost_pay') { _checkoutConfirmGhostPay(); return; }
+  if (_checkoutPay !== 'user' && _checkoutPay !== 'ghost') return;
+  if (!_checkoutItems.length) { if (typeof showToast === 'function') showToast('🛒 购物车还是空的'); return; }
+
+  // 复用 renderCheckout 的同一套价格/运费口径，逐件算出 lineTotal（含各自运费）。
+  const _careerFree = typeof isCareerFreeShipping === 'function' && isCareerFreeShipping();
+  const lines = [];
+  let total = 0;
+  for (const it of _checkoutItems) {
+    const p = getProductById(it.productId);
+    if (!p) continue;
+    const cat = _cartCategoryOf(p);
+    const isLuxury = cat === 'luxury';
+    const price = _pdetailDisplayPrice(p, cat);
+    const ship = _careerFree ? 0 : (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));
+    const lineTotal = price * it.quantity + ship;
+    total += lineTotal;
+    lines.push({ p, cat, isLuxury, lineTotal });
+  }
+  if (!lines.length || total <= 0) return;
+
+  // 扣款：额度不足则保持 Checkout，不建 Purchase / Delivery。
+  if (_checkoutPay === 'user') {
+    const bal = getBalance();
+    if (bal < total) { if (typeof showToast === 'function') showToast('💔 余额不足！'); return; }
+    setBalance(bal - total);
+    addTransaction({ icon: '🛍️', name: 'NOA MARKET 结算', amount: -total });
+    if (typeof renderWallet === 'function') renderWallet();
+  } else {
+    // ghost：spendGhostCard 自带额度检查/扣款/交易/reaction，成功才继续。
+    const _ghostCat = lines.every(ln => ln.p.isUserItem) ? 'self' : 'for_him';
+    if (!spendGhostCard(total, 'NOA MARKET 结算', _ghostCat)) { if (typeof showToast === 'function') showToast('💔 Ghost Card 额度不足！'); return; }
+  }
+
+  // 汇入唯一的 _finishPurchase：逐件建 Purchase / Delivery，用各自 lineTotal 与类别。
+  closeCheckout();
+  const _payer = _checkoutPay;
+  for (const ln of lines) {
+    pendingCategory = ln.cat;
+    _finishPurchase(ln.p, false, ln.isLuxury, ln.lineTotal, _payer);
+  }
+}
+
+// ===== ghost_pay 接线：把现有 Checkout / decidePayOrder / _finishPurchase 串起来 =====
+// 锁跟随真实请求生命周期，不用固定 2 秒锁。approve 进入 _finishPurchase 前确认未 consumed。
+let _payInFlight = false;
+
+// 用现有 Checkout 口径逐件算出 lines（与 user/ghost 分支一致），返回 { lines, total }。
+function _buildCheckoutLines() {
+  const _careerFree = typeof isCareerFreeShipping === 'function' && isCareerFreeShipping();
+  const lines = [];
+  let total = 0;
+  for (const it of _checkoutItems) {
+    const p = getProductById(it.productId);
+    if (!p) continue;
+    const cat = _cartCategoryOf(p);
+    const isLuxury = cat === 'luxury';
+    const price = _pdetailDisplayPrice(p, cat);
+    const ship = _careerFree ? 0 : (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));
+    const lineTotal = price * it.quantity + ship;
+    total += lineTotal;
+    lines.push({ p, cat, isLuxury, price, qty: it.quantity, ship, lineTotal });
+  }
+  return { lines, total };
+}
+
+// 隐藏代付历史：只做 decidePayOrder 的事实上下文，不展示给用户。仅记 approve / decline。
+function _loadPayHistory() {
+  try { return JSON.parse(localStorage.getItem('payOrderHistory') || '[]'); } catch (e) { return []; }
+}
+function _recordPayHistory(entry) {
+  const hist = _loadPayHistory();
+  hist.push(entry);
+  // 只留最近 50 条，防止 localStorage 膨胀。
+  localStorage.setItem('payOrderHistory', JSON.stringify(hist.slice(-50)));
+}
+// 给模型的事实上下文：最近 5 次 + 24h 摘要。不写任何"该拒绝"的规则。
+function _buildPayHistoryContext() {
+  const hist = _loadPayHistory();
+  if (!hist.length) return '';
+  const recent = hist.slice(-5).map(h => {
+    const when = new Date(h.timestamp).toISOString().slice(0, 16).replace('T', ' ');
+    return `- ${when} · ${h.name} · £${h.total} · ${String(h.decision).toUpperCase()}`;
+  });
+  const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const last24 = hist.filter(h => h.timestamp >= dayAgo);
+  const reqCount = last24.length;
+  const approveCount = last24.filter(h => h.decision === 'approve').length;
+  const coveredTotal = last24.filter(h => h.decision === 'approve').reduce((s, h) => s + (h.total || 0), 0);
+  return [
+    '[For your context only — factual record of recent pay-order requests. Not a rule; you still decide freely:',
+    'Recent (up to 5):',
+    ...recent,
+    `Last 24h: ${reqCount} request(s), ${approveCount} approved, you covered £${coveredTotal} so far.]`,
+  ].join('\n');
+}
+
+// 代付历史条目里的简要商品名：首件名 +（多件时）「等 N 件」。
+function _payOrderBriefName(snapshotItems) {
+  const items = Array.isArray(snapshotItems) ? snapshotItems : [];
+  if (!items.length) return '(空订单)';
+  const first = items[0].name || items[0].displayName || '商品';
+  return items.length > 1 ? `${first} 等 ${items.length} 件` : first;
+}
+
+// 聊天里插入一张代付卡（存进 chatHistory，可被后续状态更新命中）。
+function _insertPayCard(order) {
+  chatHistory.push({ role: 'user', content: `[代付请求] ${_payOrderBriefName(order.items)} · £${order.total}`, _payCard: order });
+  if (typeof saveHistory === 'function') saveHistory();
+  if (typeof openScreen === 'function') openScreen('chatScreen');
+}
+
+// 按 requestId 更新代付卡状态：改 chatHistory 数据 + 就地重渲 DOM 节点，不生成第二张卡。
+function _updatePayCardStatus(requestId, status) {
+  const rec = chatHistory.find(m => m._payCard && m._payCard.requestId === requestId);
+  if (rec) {
+    rec._payCard.status = status;
+    if (typeof saveHistory === 'function') saveHistory();
+  }
+  const el = document.querySelector('[data-pay-request-id="' + String(requestId).replace(/"/g, '') + '"]');
+  if (el && rec) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = renderPayRequestCard(rec._payCard);
+    const fresh = wrap.firstElementChild;
+    if (fresh) el.replaceWith(fresh);
+  }
+}
+
+// 移除某张代付卡（fail 恢复 Checkout 时用，避免留下永久 waiting 卡）。
+function _removePayCard(requestId) {
+  const idx = chatHistory.findIndex(m => m._payCard && m._payCard.requestId === requestId);
+  if (idx !== -1) { chatHistory.splice(idx, 1); if (typeof saveHistory === 'function') saveHistory(); }
+  const el = document.querySelector('[data-pay-request-id="' + String(requestId).replace(/"/g, '') + '"]');
+  if (el) { const p = el.closest('.message'); (p || el).remove(); }
+}
+
+function _reopenCheckout() {
+  const overlay = document.getElementById('checkoutOverlay');
+  if (overlay) overlay.classList.add('show');
+  renderCheckout();
+}
+
+async function _checkoutConfirmGhostPay() {
+  if (_payInFlight) return; // 慢响应期间重复点击不产生第二次请求
+  if (!_checkoutItems.length) { if (typeof showToast === 'function') showToast('🛒 购物车还是空的'); return; }
+
+  // 1. 冻结当前订单：商品语义走现有 _freezePayOrderItem，不另组商品数据。
+  const frozenItems = _checkoutItems.map(_freezePayOrderItem).filter(Boolean);
+  if (!frozenItems.length) return;
+
+  // 展示口径 lines（与 user/ghost 完全一致），用于卡片显示与最终建单。
+  const { lines, total } = _buildCheckoutLines();
+  if (!lines.length || total <= 0) return;
+  const subtotal = lines.reduce((s, ln) => s + ln.price * ln.qty, 0);
+  const shipping = lines.reduce((s, ln) => s + ln.ship, 0);
+
+  const snapshot = { items: frozenItems, subtotal, shipping, total };
+  const requestId = 'pay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+
+  // 2. 上锁 + 禁止重复提交。
+  _payInFlight = true;
+
+  // 3. 插入 Payment Request 卡（waiting）。卡片显示用 lines（含图片/中文名/英文名/数量）。
+  const displayItems = lines.map(ln => ({
+    id: ln.p.id, name: ln.p.displayName || ln.p.name || '', nameEn: ln.p.nameEn || '',
+    price: ln.price, qty: ln.qty,
+  }));
+  const cardOrder = { requestId, items: displayItems, shipping, total, status: 'waiting' };
+  closeCheckout();
+  _insertPayCard(cardOrder);
+
+  // 4. 调用现有 decidePayOrder（附带隐藏历史摘要作事实上下文）。
+  let result;
+  try {
+    result = await decidePayOrder(snapshot, { historyContext: _buildPayHistoryContext() });
+  } catch (e) {
+    result = { decision: 'fail', reply: '', reason: 'exception' };
+  }
+
+  const decision = result && result.decision;
+  const reply = (result && result.reply || '').trim();
+
+  // 5a. approve
+  if (decision === 'approve') {
+    // 防重复：进入建单前确认未 consumed；一旦开始立即标记。
+    if (cardOrder._consumed) { _payInFlight = false; return; }
+    cardOrder._consumed = true;
+
+    _updatePayCardStatus(requestId, 'approved');
+    if (reply && typeof appendMessage === 'function') {
+      appendMessage('assistant', reply);
+      chatHistory.push({ role: 'assistant', content: reply });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    // 不扣用户余额、不调用 spendGhostCard。逐件进现有 _finishPurchase(..., 'ghost_pay')。
+    for (const ln of lines) {
+      pendingCategory = ln.cat;
+      _finishPurchase(ln.p, false, ln.isLuxury, ln.lineTotal, 'ghost_pay');
+    }
+    _recordPayHistory({ timestamp: Date.now(), name: _payOrderBriefName(frozenItems), total, decision: 'approve' });
+    _payInFlight = false;
+    return;
+  }
+
+  // 5b. decline
+  if (decision === 'decline') {
+    _updatePayCardStatus(requestId, 'declined');
+    if (reply && typeof appendMessage === 'function') {
+      appendMessage('assistant', reply);
+      chatHistory.push({ role: 'assistant', content: reply });
+      if (typeof saveHistory === 'function') saveHistory();
+    }
+    // 不扣款、不建 Purchase/Delivery。Checkout 仍可继续选别的付款方式。
+    _recordPayHistory({ timestamp: Date.now(), name: _payOrderBriefName(frozenItems), total, decision: 'decline' });
+    _reopenCheckout();
+    _payInFlight = false;
+    return;
+  }
+
+  // 5c. fail / timeout / API error / 无合法 decision：不 decline 也不 approve。
+  // 卡只有三态，不临时造第四态——撤掉这张 waiting 卡并恢复 Checkout，给轻提示，允许重试。
+  // fail 不计入 approve/decline 消费历史。
+  _removePayCard(requestId);
+  if (typeof showToast === 'function') showToast('💫 没送出去，再试一次');
+  _reopenCheckout();
+  _payInFlight = false;
+}
+
+// ===== 代付：Ghost 本人看到具体订单后自主决定是否替用户付款 =====
+// 本轮只实现模型决策函数：独立、可测试，不接 Checkout / 不扣款 / 不建 Purchase / Delivery。
+// 语义：ghost_pay ≠ 现金转账，不复用 _transfer，不扣用户余额/Ghost Card。
+// 沿用 SEND_GIFT 的「自然回复 + 隐藏 token」模式：PAY_ORDER:APPROVE / PAY_ORDER:DECLINE。
+// 决定必须来自 Ghost 人格与关系上下文，禁止 Math.random / 前端价格阈值。
+// 失败（API/超时/空回复/无合法 token/token 冲突）→ decision:'fail'，绝不默认 approve。
+
+// 冻结订单单件语义（唯一读 MARKET_PRODUCTS 的地方）：从 {productId, quantity} 提取
+// 给模型看的安全字段。只带 name / enName / productCategory / desc(短) / price / quantity，
+// 不带 productId / image / badge / unlock / isReunion / features 明细 / CSS / maxPurchase 等内部字段。
+// 不带 recipient：NOA MARKET 已有既定购买语境，特殊商品（机票/酒店/资产等）的真实用途
+// 由 name + productCategory + desc 表达，而非归类成"买给 User/Ghost"。
+function _freezePayOrderItem(rawItem) {
+  const p = (rawItem && rawItem.productId && typeof getProductById === 'function')
+    ? getProductById(rawItem.productId) : null;
+  if (!p) return null;
+  const catId = typeof _cartCategoryOf === 'function' ? _cartCategoryOf(p) : '';
+  const catLabel = (typeof MARKET_CATEGORIES !== 'undefined'
+    ? (MARKET_CATEGORIES.find(c => c.id === catId) || {}).label : '') || catId || '';
+  // 简介取 desc 的短版本（约 100–150 字符），不传完整详情。
+  let brief = (p.desc || '').trim().replace(/\s+/g, ' ');
+  if (brief.length > 140) brief = brief.slice(0, 140).trim() + '…';
+  const out = {
+    name: p.displayName || p.name || '',
+    enName: p.nameEn || '',
+    productCategory: catLabel,
+    desc: brief,
+    price: typeof p.price === 'number' ? p.price : 0,
+    quantity: Math.max(1, (rawItem.quantity | 0) || 1),
+  };
+  // 语义歧义商品可选隐藏字段：只给模型看，不进 UI，不替换 desc。
+  // 仅按字段存在与否判断，不硬编码 isReunion / 商品 ID。
+  if (p.modelContext) out.modelContext = String(p.modelContext).trim();
+  return out;
+}
+
+// 从冻结订单 snapshot 生成给模型看的订单描述。纯渲染，只读 snapshot，不依赖全局商品表。
+function _payOrderSnapshotText(snapshot) {
+  const items = Array.isArray(snapshot && snapshot.items) ? snapshot.items : [];
+  const blocks = items.map(it => {
+    const name = it.name || it.displayName || '(未命名商品)';
+    const en = it.enName || it.nameEn || '';
+    const qty = Math.max(1, it.quantity | 0 || 1);
+    const price = typeof it.price === 'number' ? it.price : 0;
+    const cat = it.productCategory || it.category || '';
+    const desc = (it.desc || '').trim();
+    const mctx = (it.modelContext || '').trim();
+    const head = `- ${name}${en ? ` (${en})` : ''} ×${qty} @ £${price}`;
+    const lines = [head];
+    if (cat) lines.push(`  类别: ${cat}`);
+    if (desc) lines.push(`  简介: ${desc}`);
+    if (mctx) lines.push(`  背景（仅你知道）: ${mctx}`);
+    return lines.join('\n');
+  });
+  const subtotal = typeof snapshot.subtotal === 'number' ? snapshot.subtotal : 0;
+  const shipping = typeof snapshot.shipping === 'number' ? snapshot.shipping : 0;
+  const total = typeof snapshot.total === 'number' ? snapshot.total : (subtotal + shipping);
+  return [
+    'ORDER (frozen snapshot):',
+    blocks.join('\n') || '(no items)',
+    `Subtotal: £${subtotal}`,
+    `Shipping: £${shipping}`,
+    `Total: £${total}`,
+  ].join('\n');
+}
+
+// 解析模型输出：抽出 PAY_ORDER token，从展示 reply 中彻底清除。
+// 返回 { decision:'approve'|'decline'|'fail', reply } ；无合法/冲突 token → fail。
+function _parsePayOrderReply(rawReply) {
+  if (!rawReply || !String(rawReply).trim()) return { decision: 'fail', reply: '', reason: 'empty' };
+  let reply = String(rawReply)
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const matches = reply.match(/PAY_ORDER:\s*(APPROVE|DECLINE)/ig) || [];
+  // token 一律从展示 reply 中清除（无论是否合法）。
+  reply = reply.replace(/PAY_ORDER:\s*\w*/ig, '').replace(/\n{3,}/g, '\n').trim();
+
+  if (matches.length === 0) return { decision: 'fail', reply, reason: 'no_token' };
+
+  const decisions = matches.map(m => (m.split(':')[1] || '').trim().toUpperCase());
+  const uniq = [...new Set(decisions)];
+  if (uniq.length !== 1) return { decision: 'fail', reply, reason: 'token_conflict' };
+  if (uniq[0] !== 'APPROVE' && uniq[0] !== 'DECLINE') return { decision: 'fail', reply, reason: 'token_invalid' };
+
+  return { decision: uniq[0].toLowerCase(), reply, reason: null };
+}
+
+// 代付模型决策：输入冻结订单 snapshot，返回 { decision, reply }。
+// 复用现有最小模型调用 (/api/chat) 与 persona 上下文 (buildSystemPrompt)。
+async function decidePayOrder(snapshot, opts) {
+  opts = opts || {};
+  if (!snapshot || !Array.isArray(snapshot.items) || !snapshot.items.length) {
+    return { decision: 'fail', reply: '', reason: 'bad_snapshot' };
+  }
+
+  const orderText = _payOrderSnapshotText(snapshot);
+  const instruction = [
+    '[System: She is checking out a specific order and is asking YOU to pay for it — to cover this exact basket for her.',
+    'This is NOT a cash request. "Asking for cash" and "asking you to pay one specific order you can see" are different scenarios — this is the latter.',
+    'You can see the exact items and the total below, so you decide for yourself, in character, whether you cover this order for her. You may say yes or no; a husband is free to do either.',
+    'This does NOT change the existing rule that you never hand her raw cash — the Ghost Card is still how her own spending works. This is about you paying one order you can see, not transferring money.',
+    '',
+    orderText,
+    '',
+    'Reply naturally to her in your own voice (one short, in-character line). Then, on its very last line, output exactly one hidden control token:',
+    'PAY_ORDER:APPROVE   (you cover this order for her)',
+    'PAY_ORDER:DECLINE   (you do not cover it this time)',
+    'Output the token exactly once. Do not explain the token. Base the decision on who you are and where things stand between you, not on the number alone.]',
+  ];
+  // 事实性上下文：最近代付摘要（可选）。只是事实，不含任何"该拒绝"的规则。
+  if (opts.historyContext) {
+    instruction.splice(instruction.length - 1, 0, '', opts.historyContext);
+  }
+  const instructionText = instruction.join('\n');
+
+  // 独立一次性调用：不写入 chatHistory，不污染主聊天流程。
+  const sys = typeof buildSystemPrompt === 'function' ? buildSystemPrompt() : '';
+  const ctx = (typeof chatHistory !== 'undefined' && Array.isArray(chatHistory))
+    ? chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content).slice(-10).map(m => ({ role: m.role, content: m.content }))
+    : [];
+  const messages = [...ctx, { role: 'user', content: instructionText }];
+
+  let rawReply = '';
+  try {
+    const _fetch = typeof fetchWithTimeout === 'function' ? fetchWithTimeout : fetch;
+    const res = await _fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: typeof getMainModel === 'function' ? getMainModel() : undefined,
+        max_tokens: 400,
+        system: sys,
+        messages,
+      }),
+    }, opts.timeoutMs || 15000);
+    if (!res || !res.ok) return { decision: 'fail', reply: '', reason: 'http_' + (res && res.status) };
+    const data = await res.json();
+    rawReply = (data && data.content && data.content[0] && data.content[0].text) || '';
+  } catch (e) {
+    return { decision: 'fail', reply: '', reason: (e && e.name === 'AbortError') ? 'timeout' : 'network' };
+  }
+
+  // 破防检测：模型跳出人格时按 fail 处理，绝不默认 approve。
+  if (typeof isBreakout === 'function' && isBreakout(rawReply)) {
+    return { decision: 'fail', reply: '', reason: 'breakout' };
+  }
+
+  return _parsePayOrderReply(rawReply);
+}
+
+// 测试钩子：暴露纯解析函数，便于用 mock snapshot 验证，不触发任何网络/扣款。
+if (typeof window !== 'undefined') {
+  window.decidePayOrder = decidePayOrder;
+  window._parsePayOrderReply = _parsePayOrderReply;
+  window._payOrderSnapshotText = _payOrderSnapshotText;
+  window._freezePayOrderItem = _freezePayOrderItem;
+}
+
+// 返回购物车：关闭 Checkout，回到购物车。
+function _checkoutBackToCart() {
+  closeCheckout();
+  if (typeof openCart === 'function') openCart();
+}
+
+function _pdetailShare() {
+  const p = _pdetailProduct;
+  if (!p) return;
+  closeProductDetail();
+  if (typeof shareProductToChat === 'function') {
+    shareProductToChat({ id: p.id, emoji: p.emoji, name: p.name, displayName: p.displayName || '', nameEn: p.nameEn || '', desc: p.desc || '', price: p.price });
+  }
+}
+
+// 商品详情「立即购买」：进入统一 Checkout（只带 { productId, quantity }）。
+function _pdetailBuyNow() {
+  const p = _pdetailProduct;
+  if (!p || !p.id) return;
+  closeProductDetail();
+  openCheckout([{ productId: p.id, quantity: 1 }]);
+}
+
+// 详情页「加入购物车」：只入购物车状态，不进购买/支付流程。
+function _pdetailAddToCart() {
+  const p = _pdetailProduct;
+  if (!p || !p.id) return;
+  addToCart(p.id);
+  if (typeof showToast === 'function') showToast('🛒 已加入购物车');
+}
+
 // 把当前弹窗里的商品「发给他看」——只进正常聊天主链，不碰购买/钱包/好感/独立reaction
 function shareCurrentProduct() {
   const p = pendingProduct;
   if (!p) return;
-  const product = { emoji: p.emoji, name: p.name, desc: p.desc || '', price: p.price };
+  const product = { id: p.id, emoji: p.emoji, name: p.name, displayName: p.displayName || '', nameEn: p.nameEn || '', desc: p.desc || '', price: p.price };
   closeBuyModal();
   shareProductToChat(product);
 }
@@ -1003,7 +2020,7 @@ function shareCurrentProduct() {
 function shareProductToChat(product) {
   if (!product || !product.name) return;
   const priceStr = (typeof product.price === 'number') ? `£${product.price}` : (product.price || '');
-  const content = `[分享了一个商品给你看] ${product.emoji || ''} ${product.name}${priceStr ? ` · ${priceStr}` : ''}${product.desc ? ` — ${product.desc}` : ''}`.trim();
+  const content = `[分享了一个商品给你看] ${product.emoji || ''} ${product.displayName || product.name}${priceStr ? ` · ${priceStr}` : ''}${product.desc ? ` — ${product.desc}` : ''}`.trim();
 
   chatHistory.push({ role: 'user', content, _product: product });
   if (typeof saveHistory === 'function') saveHistory();
@@ -1023,7 +2040,7 @@ function confirmPurchase() {
   let displayPrice = onSale ? Math.round(p.price * weeklySale.discount) : p.price;
   // 修复：大件商品（机票/酒店/车/房）不乘1.8，与openBuyModal保持一致
   const _isBigTicketConfirm = p.isReunion || p.isHomeItem;
-  if (!isLuxury && !_isBigTicketConfirm) displayPrice = Math.round(displayPrice * 1.8);
+  if (!isLuxury && !_isBigTicketConfirm && !isV1MarketProduct(p)) displayPrice = Math.round(displayPrice * 1.8);
   const _shopDiscount2 = (typeof getCareerShopDiscount === 'function') ? getCareerShopDiscount() : 0;
   if (_shopDiscount2 > 0) displayPrice = Math.round(displayPrice * (1 - _shopDiscount2 / 100));
   let shipping = p.isUserItem ? (isLuxury ? 45 : 25) : (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));
@@ -1103,9 +2120,10 @@ function _finishPurchase(p, isWishlist, isLuxury, total, payer) {
   try { _fact = addPurchaseFact(p, { category: pendingCategory, total: total, payer: payer || null, recipient: _recipient }); } catch(e) {}
   const _purchaseId = _fact && _fact.purchaseId || null;
 
-  const reunionItems = ['去曼城找他的机票','曼彻斯特酒店','英国旅行计划'];
-  if (reunionItems.every(n => purchased.includes(n)) && !localStorage.getItem('metInPerson')) {
-    localStorage.setItem('metInPerson', 'true');
+  const _reunionCol = SPECIAL_COLLECTIONS.find(c => c.id === 'reunion');
+  const reunionItems = getCollectionItemNames('reunion');
+  if (reunionItems.length && reunionItems.every(n => purchased.includes(n)) && !localStorage.getItem(_reunionCol.rewardFlag)) {
+    localStorage.setItem(_reunionCol.rewardFlag, 'true');
     setTimeout(() => showToast('🎧 三件套集齐！独家音频剧场《面基》已解锁，去声之匣收听'), 1500);
   }
 
@@ -1115,11 +2133,6 @@ function _finishPurchase(p, isWishlist, isLuxury, total, payer) {
   if (typeof clearProductTrigger === 'function') {
     try { clearProductTrigger(p.name); } catch(e) { console.warn('[shop] clearProductTrigger 失败:', e); }
   }
-  if (pendingCategory === 'intimate') {
-    const _iT = JSON.parse(localStorage.getItem('intimateTriggered') || '{}');
-    delete _iT[p.name]; localStorage.setItem('intimateTriggered', JSON.stringify(_iT));
-  }
-
   // 修复：加上扣款金额，防止用户看不到扣款反馈以为没成功而重复购买
   const _amtStr = total ? ` · 已扣款 £${total}` : '';
   if (isWishlist) showToast('💝 已加入心愿单！');
@@ -1162,6 +2175,10 @@ function getDayKey() {
 }
 
 function getWeeklySale() {
+  // NOA MARKET V1：奢品取消促销机制（TODAY ONLY / 折扣角标 / 划线价）。
+  // 奢品高级感靠图片、留白、字体、价格层级体现，不靠打折。
+  return null;
+  /* eslint-disable no-unreachable */
   const dayKey = 'dailySale_' + getDayKey();
   let sale = JSON.parse(localStorage.getItem(dayKey) || 'null');
   if (!sale) {
@@ -1183,12 +2200,6 @@ function getWeeklySale() {
 
 // ===== 商城+情绪触发（合并Haiku调用）=====
 // ===== 钱相关意图并行判断（不阻塞主回复）=====
-
-function confirmAge() {
-  document.getElementById('ageGateModal')?.remove();
-  renderMarket('intimate');
-}
-
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 快递投诉系统

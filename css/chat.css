@@ -1740,7 +1740,101 @@
 
 /* ===== 商城 ===== */
 #marketScreen { overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.market-container { padding: 0 0 40px; }
+.market-container { padding: 0 0 40px; background: #f6f2e9; }
+
+/* NOA MARKET 品牌头 — 买手店风：奶油白 + 鼠尾草绿，右侧留生活场景 */
+.market-hero {
+    position: relative;
+    display: flex; align-items: flex-end;
+    min-height: 150px;
+    padding: 16px 18px 18px;
+    background-image: url('../images/market/noa-header.png');
+    background-size: cover;
+    background-position: right center;
+    background-repeat: no-repeat;
+    background-color: #f3efe4;
+    overflow: hidden;
+}
+/* 左侧文字区可读性遮罩：奶油白从左向右淡出，不遮右侧生活场景 */
+.market-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(247,243,233,0.92) 0%, rgba(247,243,233,0.72) 34%, rgba(247,243,233,0.12) 58%, rgba(247,243,233,0) 72%);
+    pointer-events: none;
+}
+.market-hero-back {
+    position: absolute; top: 12px; left: 12px; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px;
+    padding: 0; margin: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(122,142,104,0.3);
+    background: rgba(255,255,255,0.6);
+    color: #4a5b3d;
+    font-size: 22px; line-height: 1;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: transform 0.15s;
+}
+.market-hero-back:active { transform: scale(0.92); }
+.market-hero-copy { position: relative; z-index: 1; }
+/* 小号引导语：安静、极宽字距，压住营销感 */
+.market-hero-eyebrow {
+    font-size: 9px; font-weight: 500;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(127,150,99,0.72);
+    margin-bottom: 8px;
+    padding-left: 2px;
+}
+/* 主标题：高级衬线，宽字距，克制的鼠尾草绿 */
+.market-hero-title {
+    margin: 0;
+    font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+    font-size: 40px; font-weight: 600;
+    letter-spacing: 6px;
+    color: #46583a;
+    line-height: 1;
+    text-indent: 6px;
+}
+/* 副标题：小号斜体衬线，浅鼠尾草绿，收窄存在感 */
+.market-hero-sub {
+    margin-top: 6px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 15px; font-weight: 500;
+    font-style: italic;
+    letter-spacing: 1.5px;
+    color: rgba(127,150,99,0.9);
+    padding-left: 3px;
+}
+.market-hero-actions {
+    position: absolute; top: 14px; right: 14px; z-index: 2;
+    display: flex; align-items: center; gap: 8px;
+}
+.market-hero-cart {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(122,142,104,0.28);
+    background: rgba(255,255,255,0.78);
+    color: #55684a;
+    cursor: pointer;
+    box-shadow: none;
+    backdrop-filter: blur(6px);
+    transition: transform 0.16s, box-shadow 0.16s;
+}
+.market-hero-cart svg { width: 17px; height: 17px; }
+.market-hero-cart:active { transform: scale(0.92); }
+.market-hero-balance {
+    font-size: 10.5px; font-weight: 500;
+    color: #7f9663;
+    background: rgba(255,255,255,0.66);
+    border: 1px solid rgba(122,142,104,0.2);
+    border-radius: 20px;
+    padding: 3px 9px;
+    backdrop-filter: blur(4px);
+}
 
 /* 商城顶部余额栏 */
 .market-balance-bar {
@@ -1765,69 +1859,93 @@
     content: '◈'; font-size: 11px; color: rgba(201,168,76,0.7);
 }
 
-/* 分类标签 */
+/* 分类标签 — 安静、无 emoji、鼠尾草绿高亮 */
 .category-tabs {
-    display: flex; overflow-x: auto; gap: 6px;
-    padding: 10px 16px 8px; scrollbar-width: none;
-    background: rgba(240,250,234,0.5);
-    border-bottom: 1px solid rgba(120,180,85,0.1);
+    display: flex; overflow-x: auto; gap: 8px;
+    padding: 14px 16px 12px; scrollbar-width: none;
+    background: #f6f2e9;
 }
 .category-tabs::-webkit-scrollbar { display: none; }
 .category-tab {
     white-space: nowrap;
-    padding: 7px 16px; border-radius: 20px;
-    font-size: 12px; font-weight: 500;
-    background: rgba(255,255,255,0.7);
-    border: 1px solid rgba(140,190,100,0.22);
-    color: rgba(40,90,30,0.6); cursor: pointer;
+    padding: 5px 14px; border-radius: 13px;
+    font-size: 12.5px; font-weight: 400;
+    background: transparent;
+    border: 1px solid rgba(122,142,104,0.2);
+    color: #6b7862; cursor: pointer;
     transition: all 0.18s; flex-shrink: 0;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.8px;
 }
 .category-tab.active {
-    background: linear-gradient(135deg, #4a8c38, #6aaa4e);
-    color: white; border-color: transparent;
-    box-shadow: 0 3px 12px rgba(70,130,50,0.28);
-    font-weight: 600;
+    background: #7f9663;
+    color: #fbfaf4; border-color: transparent;
+    font-weight: 500;
+    letter-spacing: 0.8px;
 }
 
-/* 商品网格 */
+/* 商品网格 — 双列，留白充足 */
 .products-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px 10px;
-    padding: 20px 12px 20px;
+    gap: 22px 14px;
+    padding: 22px 16px 24px;
+    background: #f6f2e9;
 }
 
-/* 普通商品卡片 */
+/* 普通商品卡片 — 买手店风：大图铺顶，左对齐信息，右下圆形购物按钮 */
 .product-card {
-    background: rgba(255,255,255,0.82);
-    backdrop-filter: blur(16px);
-    border-radius: 18px; padding: 16px 12px 12px;
-    border: 1px solid rgba(255,255,255,0.95);
-    box-shadow: 0 2px 12px rgba(60,120,40,0.07), 0 1px 3px rgba(0,0,0,0.04);
-    display: flex; flex-direction: column; align-items: center;
-    text-align: center; gap: 5px; cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
-    position: relative; overflow: visible;
+    background: #fdfbf5;
+    border-radius: 9px; padding: 0;
+    border: 1px solid rgba(122,142,104,0.12);
+    box-shadow: 0 2px 10px rgba(70,90,50,0.035);
+    display: flex; flex-direction: column; align-items: stretch;
+    text-align: left; cursor: pointer;
+    transition: transform 0.18s, box-shadow 0.18s;
+    position: relative; overflow: hidden;
 }
 .product-card:active {
-    transform: scale(0.97);
-    box-shadow: 0 1px 6px rgba(60,120,40,0.1);
+    transform: scale(0.985);
+    box-shadow: 0 2px 8px rgba(70,90,50,0.06);
 }
-.product-emoji { font-size: 36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); }
-.product-name { font-size: 13px; font-weight: 700; color: #1e3d20; letter-spacing: 0.1px; }
-.product-desc { font-size: 11px; color: rgba(40,90,30,0.5); line-height: 1.4; }
-.product-price { font-size: 15px; font-weight: 700; color: #3a7a2a; }
+.product-media {
+    width: 100%; aspect-ratio: 1 / 1;
+    background: #f0ece1;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+}
+.product-emoji { font-size: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.06)); }
+.product-img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.product-info {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 12px 13px 14px;
+    flex: 1;
+}
+.product-name { font-size: 14px; font-weight: 600; color: #33402c; letter-spacing: 0.2px; line-height: 1.3; }
+.product-name-en { font-size: 10px; font-weight: 400; color: #aab29f; letter-spacing: 0.6px; line-height: 1.3; text-transform: none; }
+.product-desc { display: none; }
+.product-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-top: auto; padding-top: 10px;
+    border-top: 1px solid rgba(120,135,100,0.14);
+}
+.product-price { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 19px; font-weight: 600; color: #3f4a37; letter-spacing: 0.2px; }
 .product-buy-btn {
-    width: 100%; padding: 7px 0; border: none; border-radius: 20px;
-    background: linear-gradient(135deg, rgba(74,140,56,0.85), rgba(106,170,78,0.8));
-    color: white; font-size: 11px; font-weight: 600;
-    cursor: pointer; transition: all 0.2s; margin-top: 4px;
-    box-shadow: 0 2px 8px rgba(70,130,50,0.2);
-    letter-spacing: 0.3px;
+    flex-shrink: 0; width: auto; height: 26px; padding: 0 4px;
+    border: none; border-radius: 0;
+    background: transparent;
+    color: #6f8656; cursor: pointer; transition: opacity 0.2s;
+    box-shadow: none;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    position: relative;
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
 }
-.product-buy-btn:active { transform: scale(0.95); opacity: 0.9; }
-.product-owned-tag { font-size: 11px; color: #059669; font-weight: 700; margin-top: 4px; }
+.product-buy-btn .add-label { line-height: 1; }
+.product-buy-btn .add-plus { font-size: 14px; font-weight: 500; letter-spacing: 0; line-height: 1; }
+.product-buy-btn .buy-count { font-size: 9px; font-weight: 700; letter-spacing: 0; }
+.product-buy-btn:active { transform: scale(0.94); opacity: 0.6; }
+.product-owned-tag { font-size: 11px; color: #8a9580; font-weight: 600; }
 
 /* 高亮触发 */
 .ghost-mentioned {
@@ -1861,8 +1979,10 @@
 }
 .wishlist-price { color: #2d7a20 !important; font-weight: 800; }
 .wishlist-buy-btn {
-    background: linear-gradient(135deg, rgba(74,140,56,0.88), rgba(106,170,78,0.82)) !important;
-    box-shadow: 0 2px 8px rgba(70,130,50,0.2) !important;
+    background: transparent !important;
+    border: none !important;
+    color: #6f8656 !important;
+    box-shadow: none !important;
 }
 .product-badge-preview {
     font-size: 10px; color: rgba(40,110,30,0.7);
@@ -1871,22 +1991,6 @@
 }
 
 /* ── 精品专柜 — 暗金奢华，商城唯一深色区（非Ghost Card）── */
-.luxury-card {
-    background: linear-gradient(145deg, #1a1a22, #242430) !important;
-    border: 1px solid rgba(201,168,76,0.28) !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(201,168,76,0.08) !important;
-    color: #f5e8c0 !important;
-}
-.luxury-card .product-emoji { filter: drop-shadow(0 2px 8px rgba(201,168,76,0.25)); }
-.luxury-card .product-name { color: #e8d898 !important; letter-spacing: 0.2px; }
-.luxury-card .product-desc { color: rgba(230,210,160,0.5) !important; }
-.luxury-card .product-price { color: #c9a84c !important; font-weight: 600; }
-.luxury-card .product-buy-btn {
-    background: linear-gradient(135deg, rgba(160,128,48,0.9), rgba(201,168,76,0.85)) !important;
-    color: #1a1a16 !important; font-weight: 700 !important;
-    box-shadow: 0 2px 10px rgba(160,128,48,0.3) !important;
-}
-
 /* ── Ghost Card 区域（商城最显眼的暗色） ── */
 .ghost-card-section {
     margin: 0 12px 16px;
@@ -1987,8 +2091,10 @@
     background: linear-gradient(145deg, rgba(255,255,255,0.75), rgba(222,245,210,0.62)) !important;
 }
 .home-buy-btn {
-    background: linear-gradient(135deg, rgba(65,130,45,0.85), rgba(95,160,60,0.8)) !important;
-    box-shadow: 0 2px 8px rgba(65,130,45,0.2) !important;
+    background: transparent !important;
+    border: none !important;
+    color: #6f8656 !important;
+    box-shadow: none !important;
 }
 
 /* 从家寄给他 */
@@ -1996,7 +2102,7 @@
     border: 1px solid rgba(200,165,80,0.3) !important;
     background: linear-gradient(145deg, rgba(255,255,255,0.72), rgba(252,245,225,0.6)) !important;
 }
-.fromhome-buy-btn { background: linear-gradient(135deg, rgba(180,135,55,0.82), rgba(210,165,75,0.78)) !important; }
+.fromhome-buy-btn { background: transparent !important; border: none !important; color: #b48737 !important; box-shadow: none !important; }
 
 /* 限时打折卡片 */
 .on-sale-card {
@@ -2046,7 +2152,7 @@
 .buy-modal-emoji { font-size: 52px; margin-bottom: 10px; }
 .buy-modal-name { font-size: 17px; font-weight: 700; color: #1e3d20; margin-bottom: 6px; }
 .buy-modal-desc { font-size: 12px; color: rgba(50,100,40,0.68); margin-bottom: 10px; line-height: 1.5; }
-.buy-modal-price { font-size: 26px; font-weight: 700; color: #2d7a20; margin-bottom: 4px; }
+.buy-modal-price { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 32px; font-weight: 600; color: #2d7a20; margin-bottom: 4px; }
 .buy-modal-reason {
   font-size: 11px;
   color: rgba(50,100,40,0.68);
@@ -2089,20 +2195,509 @@
 }
 .buy-modal-share:active { background: rgba(120,180,90,0.12); transform: scale(0.98); }
 
-/* 聊天里分享的商品卡片 */
-.chat-product-card {
-    display: flex; align-items: center; gap: 12px;
-    max-width: 260px; padding: 12px 14px;
-    background: rgba(255,255,255,0.9);
-    border: 1px solid rgba(140,190,100,0.28);
-    border-radius: 16px;
-    box-shadow: 0 2px 10px rgba(60,120,40,0.08);
+/* ===== NOA MARKET 商品详情页（全屏） ===== */
+.pdetail-overlay {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background: #f3f5ef;
 }
-.chat-product-emoji { font-size: 34px; flex-shrink: 0; }
-.chat-product-info { display: flex; flex-direction: column; gap: 3px; text-align: left; min-width: 0; }
-.chat-product-name { font-size: 13px; font-weight: 700; color: #1e3d20; }
-.chat-product-desc { font-size: 11px; color: rgba(40,90,30,0.55); line-height: 1.35; }
-.chat-product-price { font-size: 14px; font-weight: 700; color: #3a7a2a; }
+.pdetail-overlay.show { display: block; }
+.pdetail-page {
+    display: flex; flex-direction: column;
+    height: 100%; max-width: 480px; margin: 0 auto;
+    background: #f3f5ef;
+}
+.pdetail-topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; max-width: 480px; margin: 0 auto;
+}
+.pdetail-topbar-right { display: flex; align-items: flex-start; gap: 12px; }
+.pdetail-icon-btn {
+    position: relative;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(40,70,30,0.14);
+    color: #33502f; font-size: 19px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform 0.15s;
+}
+.pdetail-icon-btn:active { transform: scale(0.92); }
+.pdetail-cart-icon { font-size: 17px; cursor: pointer; }
+
+/* NOA MARKET 购物车角标（Header + 详情页共用） */
+.cart-badge {
+    position: absolute;
+    top: -4px; right: -4px;
+    min-width: 17px; height: 17px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: #d9534f;
+    color: #fff;
+    font-size: 10px; font-weight: 700; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(180,40,40,0.35);
+    pointer-events: none;
+}
+.pdetail-cart-icon svg, .pdetail-topbar-right svg { display: block; }
+.pdetail-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.pdetail-hero {
+    width: 100%; aspect-ratio: 1 / 1; background: #e7ebe1;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+}
+.pdetail-hero .product-img { width: 100%; height: 100%; object-fit: cover; }
+.pdetail-hero .product-emoji { font-size: 120px; }
+.pdetail-body {
+    background: #f3f5ef; border-radius: 22px 22px 0 0;
+    margin-top: -22px; position: relative; z-index: 2;
+    padding: 22px 20px 16px;
+}
+.pdetail-title-row {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+}
+.pdetail-title-names { min-width: 0; }
+.pdetail-name-cn { font-size: 22px; font-weight: 800; color: #26331f; line-height: 1.25; }
+.pdetail-name-en { font-size: 14px; color: #8a9a7c; margin-top: 3px; }
+.pdetail-name-en:empty { display: none; }
+.pdetail-price { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 30px; font-weight: 600; color: #26331f; white-space: nowrap; flex-shrink: 0; }
+.pdetail-desc {
+    margin-top: 16px; font-size: 14px; line-height: 1.9;
+    color: #5f6b54; white-space: pre-line;
+}
+.pdetail-attrs {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 22px;
+    border-top: 1px solid rgba(120,150,90,0.18);
+}
+.pdetail-attrs:empty { display: none; }
+.pdetail-attr-item {
+    padding: 15px 4px;
+    border-bottom: 1px solid rgba(120,150,90,0.18);
+}
+.pdetail-attr-item:nth-child(odd) {
+    padding-right: 18px;
+    border-right: 1px solid rgba(120,150,90,0.18);
+}
+.pdetail-attr-item:nth-child(even) { padding-left: 18px; }
+.pdetail-attr-name {
+    font-size: 11px; letter-spacing: 0.5px;
+    color: #9aa88c; line-height: 1.4;
+}
+.pdetail-attr-value {
+    font-size: 14px; color: #3a4a30; margin-top: 4px;
+    line-height: 1.45; white-space: pre-line;
+}
+.pdetail-actions {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    background: #f3f5ef; border-top: 1px solid rgba(120,150,90,0.15);
+}
+.pdetail-cart-btn {
+    flex: 1; padding: 14px 10px; border-radius: 12px;
+    border: 1px solid rgba(120,150,90,0.5);
+    background: transparent; color: #556844;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    transition: transform 0.15s;
+}
+.pdetail-cart-btn svg { display: block; flex-shrink: 0; }
+.pdetail-cart-btn:active { transform: scale(0.97); }
+.pdetail-buy-btn {
+    flex: 1.25; padding: 14px 10px; border-radius: 12px; border: none;
+    background: #6f855e; color: #fff; font-size: 15px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 2px 8px rgba(80,105,55,0.2);
+    transition: transform 0.15s;
+}
+.pdetail-buy-btn:active { transform: scale(0.97); }
+.pdetail-buy-btn:disabled {
+    background: rgba(150,160,140,0.5); box-shadow: none;
+    cursor: not-allowed; color: rgba(255,255,255,0.7);
+}
+
+/* ===== NOA MARKET 购物车（全屏） ===== */
+.cart-overlay {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background-color: #f6f2e9;
+    background-image:
+        linear-gradient(rgba(247,243,235,0.74), rgba(247,243,235,0.82)),
+        url('../images/market/cart-bg.png');
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+}
+.cart-overlay.show { display: block; }
+.cart-page {
+    display: flex; flex-direction: column;
+    height: 100%; max-width: 480px; margin: 0 auto;
+    background: transparent;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+.cart-topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 20px 4px;
+}
+.cart-icon-btn {
+    flex-shrink: 0;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: none;
+    background: transparent; color: #46583a;
+    font-size: 26px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform 0.15s;
+}
+.cart-icon-btn:active { transform: scale(0.92); }
+.cart-brand {
+    flex: 1; text-align: center;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; font-weight: 600; letter-spacing: 4px;
+    color: #384a2c;
+}
+.cart-topbar-spacer { flex-shrink: 0; width: 34px; }
+.cart-heading {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 6px 22px 14px;
+}
+.cart-heading-titles { min-width: 0; }
+.cart-title-cn {
+    font-size: 30px; font-weight: 800; color: #2f3d26; line-height: 1.1;
+    letter-spacing: 1px;
+}
+.cart-title-en {
+    font-size: 12px; font-weight: 600; letter-spacing: 3px;
+    color: rgba(122,142,104,0.85); margin-top: 5px;
+}
+.cart-count { font-size: 13px; font-weight: 500; color: #8a9a7c; white-space: nowrap; padding-bottom: 3px; }
+/* ===== 小票清单 receipt sheet ===== */
+.cart-receipt {
+    position: relative;
+    margin: 6px 20px 0;
+    background: #fffdf8;
+    border-radius: 5px;
+    padding: 6px 22px 0;
+    box-shadow: 0 10px 30px rgba(80,88,55,0.12);
+}
+.cart-receipt::before, .cart-receipt::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 11px;
+    background-image: radial-gradient(circle at 8px 11px, transparent 6px, #fffdf8 6.5px);
+    background-size: 16px 11px;
+}
+.cart-receipt::before { top: -10px; transform: rotate(180deg); }
+.cart-receipt::after { bottom: -10px; }
+.cart-list {
+    flex: 0 0 auto;
+    padding: 0;
+}
+.cart-item {
+    position: relative;
+    display: flex; gap: 14px;
+    padding: 17px 0;
+    background: transparent;
+}
+.cart-item + .cart-item { border-top: 1px dashed rgba(122,142,104,0.32); }
+.cart-item-thumb {
+    flex-shrink: 0;
+    width: 60px; height: 60px; border-radius: 10px; overflow: hidden;
+    background: rgba(238,240,231,0.7);
+    display: flex; align-items: center; justify-content: center;
+}
+.cart-item-thumb .product-img { width: 100%; height: 100%; object-fit: cover; }
+.cart-item-thumb .product-emoji { font-size: 32px; }
+.cart-item-main { flex: 1; min-width: 0; padding-right: 22px; }
+.cart-item-name-cn { font-size: 15px; font-weight: 700; color: #2f3d26; line-height: 1.25; }
+.cart-item-name-en {
+    font-size: 10.5px; font-weight: 500; letter-spacing: 0.4px;
+    color: #a0ac92; margin-top: 2px;
+}
+.cart-item-name-en:empty { display: none; }
+.cart-item-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px;
+}
+.cart-item-price {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 19px; font-weight: 600; color: #384a2c;
+}
+.cart-item-del {
+    position: absolute; top: 16px; right: 0;
+    width: 24px; height: 24px; border: none; background: transparent;
+    color: #c2cbb4; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s, transform 0.15s;
+}
+.cart-item-del:active { transform: scale(0.9); color: #8a9a7c; }
+.cart-qty {
+    display: flex; align-items: center; gap: 6px;
+}
+.cart-qty-btn {
+    width: 26px; height: 26px; border: 1px solid rgba(122,142,104,0.32); border-radius: 50%;
+    background: transparent; color: #6f855e;
+    font-size: 15px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, transform 0.12s;
+}
+.cart-qty-btn:active { background: rgba(127,150,99,0.14); transform: scale(0.9); }
+.cart-qty-num {
+    min-width: 26px; text-align: center;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 17px; font-weight: 600; color: #46583a;
+}
+.cart-empty {
+    flex: 1; display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px;
+    color: #8a9a7c;
+}
+.cart-empty-icon { font-size: 52px; opacity: 0.7; }
+.cart-empty-text { font-size: 16px; font-weight: 700; color: #5f6b54; }
+.cart-empty-sub { font-size: 13px; color: #a0ac92; }
+.cart-footer {
+    border-top: 1px dashed rgba(122,142,104,0.32);
+    padding: 16px 0 22px;
+}
+.cart-summary-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13.5px; color: #7a8a6c; padding: 5px 0;
+}
+.cart-summary-val {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 16px; font-weight: 600; color: #46583a;
+}
+.cart-shipping-note {
+    font-family: -apple-system, 'PingFang SC', sans-serif;
+    color: #8a9a7c; font-weight: 600; font-size: 13.5px;
+}
+.cart-total-row {
+    margin-top: 10px; padding-top: 14px;
+    border-top: 1px solid rgba(56,74,44,0.85);
+}
+.cart-total-label {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 21px; font-weight: 600; color: #2f3d26; letter-spacing: 1px;
+}
+.cart-total-val {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 32px; font-weight: 600; color: #2f3d26; letter-spacing: 0.5px;
+}
+.cart-actionbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: linear-gradient(to top, rgba(246,242,233,0.98) 62%, rgba(246,242,233,0));
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+}
+.cart-actionbar-inner {
+    display: flex; align-items: center; gap: 12px;
+    max-width: 480px; margin: 0 auto;
+}
+.cart-continue-btn {
+    flex: 1; padding: 15px 10px; border-radius: 18px;
+    border: 1.5px solid rgba(122,142,104,0.4);
+    background: rgba(255,255,255,0.5); color: #46583a;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 0.15s;
+}
+.cart-continue-btn:active { transform: scale(0.97); }
+.cart-checkout-btn {
+    flex: 1.35; padding: 15px 10px; border-radius: 18px; border: none;
+    background: #7d9268; color: #fdfcf7; font-size: 15px; font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer; box-shadow: 0 6px 18px rgba(100,120,80,0.24); transition: transform 0.15s;
+}
+.cart-checkout-btn:active { transform: scale(0.97); }
+
+/* ===== NOA MARKET Checkout 确认订单（全屏，沿用购物车样式） ===== */
+.checkout-overlay {
+    display: none; position: fixed; inset: 0; z-index: 10001;
+    background-color: #f6f2e9;
+    background-image:
+        linear-gradient(rgba(247,243,235,0.74), rgba(247,243,235,0.82)),
+        url('../images/market/cart-bg.png');
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+}
+.checkout-overlay.show { display: block; }
+.checkout-page {
+    display: flex; flex-direction: column;
+    height: 100%; max-width: 480px; margin: 0 auto;
+    background: transparent;
+}
+.checkout-topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 20px 4px;
+}
+.checkout-heading {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 6px 22px 14px;
+}
+.checkout-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 12px; }
+.checkout-panel {
+    position: relative;
+    margin: 12px 20px;
+    background: #fffdf8;
+    border-radius: 5px;
+    box-shadow: 0 10px 30px rgba(80,88,55,0.12);
+    padding: 20px 22px 4px;
+}
+.checkout-panel::before, .checkout-panel::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 11px;
+    background-image: radial-gradient(circle at 8px 11px, transparent 6px, #fffdf8 6.5px);
+    background-size: 16px 11px;
+}
+.checkout-panel::before { top: -10px; transform: rotate(180deg); }
+.checkout-panel::after { bottom: -10px; }
+.checkout-section-head {
+    display: flex; align-items: center; margin-bottom: 2px;
+    padding-bottom: 12px; border-bottom: 1px dashed rgba(122,142,104,0.32);
+}
+.checkout-section-title { font-size: 14px; font-weight: 700; color: #2f3d26; letter-spacing: 0.5px; }
+.checkout-count { font-size: 13px; font-weight: 500; color: #8a9a7c; }
+.checkout-list { display: flex; flex-direction: column; }
+.checkout-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 16px 0;
+}
+.checkout-item + .checkout-item { border-top: 1px dashed rgba(122,142,104,0.32); }
+.checkout-item-thumb {
+    width: 60px; height: 60px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+    background: rgba(238,240,231,0.7);
+    display: flex; align-items: center; justify-content: center;
+}
+.checkout-item-thumb .product-img { width: 100%; height: 100%; object-fit: cover; }
+.checkout-item-thumb .product-emoji { font-size: 30px; }
+.checkout-item-main { flex: 1; min-width: 0; }
+.checkout-item-name-cn { font-size: 15px; font-weight: 700; color: #2f3d26; line-height: 1.3; }
+.checkout-item-name-en { font-size: 10.5px; font-weight: 500; color: #a0ac92; margin-top: 3px; }
+.checkout-item-name-en:empty { display: none; }
+.checkout-item-qty {
+    display: inline-block; margin-top: 10px;
+    font-size: 12px; color: #8a9a7c; letter-spacing: 0.3px;
+}
+.checkout-item-price { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 19px; font-weight: 600; color: #46583a; flex-shrink: 0; }
+.checkout-summary {
+    margin-top: 2px; padding-top: 16px;
+    border-top: 1px dashed rgba(122,142,104,0.32);
+}
+.checkout-pay {
+    margin: 4px 22px 8px;
+}
+.checkout-pay-head { margin-bottom: 12px; }
+.checkout-pay-title-cn { font-size: 17px; font-weight: 700; color: #2f3d26; }
+.checkout-pay-title-en { font-size: 10px; font-weight: 600; letter-spacing: 2px; color: #a0ac92; margin-top: 2px; }
+.checkout-pay-opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(122,142,104,0.14);
+    cursor: pointer;
+}
+.checkout-pay-opt:last-child { border-bottom: none; }
+.checkout-pay-name { font-size: 15px; font-weight: 500; color: #55624a; transition: color 0.15s, font-weight 0.15s; }
+.checkout-pay-desc { font-size: 12px; color: #a0ac92; margin-top: 3px; }
+.checkout-pay-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.checkout-pay-val { font-size: 14px; color: #8a9a7c; }
+.checkout-pay-check { font-size: 14px; color: #7d9268; opacity: 0; transition: opacity 0.15s; }
+.checkout-pay-opt.selected .checkout-pay-name { color: #2f3d26; font-weight: 700; }
+.checkout-pay-opt.selected .checkout-pay-check { opacity: 1; }
+.checkout-footer {
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    background: transparent;
+}
+.checkout-actions { display: flex; align-items: stretch; gap: 12px; }
+.checkout-back-btn {
+    flex: 1; padding: 16px 10px; border-radius: 18px;
+    border: 1.5px solid rgba(122,142,104,0.4);
+    background: rgba(255,255,255,0.7); color: #46583a;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 0.15s;
+}
+.checkout-back-btn:active { transform: scale(0.97); }
+.checkout-confirm-btn {
+    flex: 1.55; padding: 16px 10px; border-radius: 18px; border: none;
+    background: #7d9268; color: #fdfcf7; font-size: 15px; font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer; box-shadow: 0 6px 18px rgba(100,120,80,0.24); transition: transform 0.15s;
+}
+.checkout-confirm-btn:active { transform: scale(0.97); }
+
+/* 聊天里分享的商品小票卡 */
+.share-card {
+    width: 250px; max-width: 78%;
+    padding: 12px 14px 10px;
+    background: #faf7f1;
+    border: 1px solid rgba(150,138,120,0.28);
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(120,105,85,0.06);
+    text-align: left;
+}
+.share-card-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 8px;
+}
+.share-card-brand {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    color: #4a4038;
+}
+.share-card-kicker {
+    font-size: 9px; font-weight: 500; letter-spacing: 1.5px;
+    color: rgba(120,108,92,0.65);
+}
+.share-card-body {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 12px;
+}
+.share-card-img {
+    width: 68px; height: 68px; flex-shrink: 0;
+    object-fit: cover; border-radius: 6px;
+    background: #f0ebe2;
+}
+.share-card-img--empty { background: #f0ebe2; }
+.share-card-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.share-card-name { font-size: 13px; font-weight: 600; color: #3a332c; line-height: 1.3; }
+.share-card-name-en {
+    font-size: 11px; font-weight: 400; letter-spacing: 0.2px;
+    color: rgba(120,108,92,0.75);
+}
+.share-card-price { font-size: 13px; font-weight: 500; color: #4a4038; margin-top: 5px; }
+.share-card-divider { height: 1px; background: rgba(150,138,120,0.22); margin: 12px 0 8px; }
+.share-card-foot {
+    font-size: 9px; font-weight: 500; letter-spacing: 1.5px;
+    color: rgba(120,108,92,0.55);
+}
+
+/* 代付请求卡（沿用分享小票视觉，信息稍多） */
+.pay-card { padding-bottom: 12px; }
+.pay-card-items { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.pay-card-item { display: flex; align-items: center; gap: 12px; }
+.pay-card-item .share-card-price { margin-top: 2px; }
+.pay-card-more {
+    font-size: 9px; font-weight: 500; letter-spacing: 1px;
+    color: rgba(120,108,92,0.6); padding-top: 2px;
+}
+.pay-card-summary { margin-top: 12px; }
+.pay-card-line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; color: rgba(90,80,68,0.85);
+}
+.pay-card-total { font-size: 13px; font-weight: 600; color: #3a332c; }
+.pay-card-total span:first-child { letter-spacing: 0.5px; }
+.pay-card-status {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 12px; padding: 9px 11px; border-radius: 7px;
+    font-size: 11px; letter-spacing: 0.8px;
+}
+.pay-card-status-label { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; }
+.pay-card-status-mark { font-size: 12px; }
+.pay-card-status-amount { font-weight: 500; }
+.pay-card-status.is-waiting {
+    background: rgba(150,138,120,0.1);
+    color: rgba(120,108,92,0.85);
+}
+.pay-card-status.is-approved {
+    background: rgba(120,145,110,0.12);
+    color: #5a6e50;
+}
+.pay-card-status.is-approved .pay-card-status-mark { color: #6f8a5f; }
+.pay-card-status.is-declined {
+    background: rgba(150,138,120,0.1);
+    color: rgba(95,80,68,0.8);
+}
+.pay-card-status.is-declined .pay-card-status-mark { color: #8a6f5f; }
+
 .buy-cancel-btn { flex: 1; padding: 12px; border-radius: 14px; border: 1px solid rgba(120,180,90,0.45); background: rgba(255,255,255,0.65); color: #4a8a30; font-size: 13px; font-weight: 600; cursor: pointer; }
 .buy-confirm-btn { flex: 2; padding: 12px; border-radius: 14px; border: none; background: linear-gradient(135deg, rgba(90,154,70,0.85), rgba(120,185,85,0.8)); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
 .buy-confirm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -2806,8 +3401,9 @@ body.theme-keegan .category-tab.active {
 
 /* 产品购买按钮 */
 body.theme-keegan .product-buy-btn {
-  background: linear-gradient(135deg, rgba(42,104,130,0.85), rgba(74,154,184,0.8));
-  box-shadow: 0 2px 8px rgba(40,100,140,0.2);
+  background: transparent;
+  box-shadow: none;
+  color: #3a7a96;
 }
 body.theme-keegan .buy-modal-confirm {
   background: linear-gradient(135deg, rgba(58,122,150,0.88), rgba(90,170,200,0.82));

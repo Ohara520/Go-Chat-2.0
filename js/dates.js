@@ -239,7 +239,6 @@ function recordGiftToShelf(delivery, ghostReaction) {
     price: (delivery.productData && delivery.productData.price) || 0,
     isLuxury: !!(delivery.productData && delivery.productData.isLuxury),
     isFromHome: !!(delivery.productData && delivery.productData.isFromHome),
-    isIntimate: !!(delivery.productData && delivery.productData.isIntimate),
     ghostReaction: (ghostReaction || '').trim().slice(0, 280),
     timestamp: Date.now()
   };
@@ -538,17 +537,6 @@ const AUDIO_DRAMAS = [
     mystery: true,                // 神秘：未解锁不剧透
     lockedHint: '',
     unlock: () => { try { return getDateUnlockState().reunionComplete; } catch(e) { return false; } },
-  },
-  {
-    id: 'flirty_call',
-    title: '暧昧来电',
-    cover: '📞',
-    audioUrl: '',
-    subtitle: '',
-    cues: null,
-    mystery: true,
-    lockedHint: '',
-    unlock: () => { try { return getGiftRecords().filter(g => g.isIntimate).length >= 3; } catch(e) { return false; } },
   },
 ];
 
