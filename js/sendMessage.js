@@ -700,7 +700,18 @@ async function _processMergedMessage(text) {
     // sessionStorage 里有且是6小时内的，认为外卖还"新鲜"
     const _hasFreshTakeout = _currentTakeout && (Date.now() - (_currentTakeout.arrivedAt || 0) < 6 * 3600 * 1000);
     const _hasTakeoutMemory = _hasFreshTakeout || /takeout showed up|she ordered takeout|you have it/i.test(_ltmNow);
-    if (_hasTakeoutMemory && /外卖|收到了吗|到了吗|吃了吗|好吃吗|怎么样|did.*arrive|did.*get|receiv|takeout|food.*arrive/i.test(t)) {
+
+    // ── 快递认知：只来自用户本轮话语，绝不读 isLostConfirmed ──
+    // 三级：not_arrived / suspected_lost / confirmed_lost。只给事实/不确定性，不加导演。
+    const _deliveryClaim = (typeof classifyUserDeliveryClaim === 'function')
+      ? classifyUserDeliveryClaim(t) : '';
+    if (_deliveryClaim === 'confirmed_lost') {
+      sceneHint = `[Known this turn, from her own words: she states the parcel is lost. Nothing beyond that is known — do not invent circumstances.]`;
+    } else if (_deliveryClaim === 'suspected_lost') {
+      sceneHint = `[Known this turn, from her own words: she is wondering / asking whether the parcel might be lost. She has NOT said it is lost — it is her worry, not a fact.]`;
+    } else if (_deliveryClaim === 'not_arrived') {
+      sceneHint = `[Known this turn, from her own words: the parcel is late / not yet received. Nothing indicates it is lost.]`;
+    } else if (_hasTakeoutMemory && /外卖|收到了吗|到了吗|吃了吗|好吃吗|怎么样|did.*arrive|did.*get|receiv|takeout|food.*arrive/i.test(t)) {
       // 优先用 sessionStorage 里的菜名（最准确），再从 longTermMemory 里找
       const _tkName = _hasFreshTakeout
         ? (_currentTakeout.name || '')
@@ -1667,7 +1678,6 @@ async function _processMergedMessage(text) {
       setTimeout(() => { try { checkAndGenerateInnerThought(finalParts[0] || reply, itEl); } catch(e) {} }, 1000);
     }
 
-    try { handleLostPackageClaim(text); } catch(e) {}
     handlePostReplyActions(text, reply, intent, pendingEvent).catch(e => console.warn('副行为出错:', e));
 
     _isSending = false;

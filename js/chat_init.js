@@ -6,7 +6,6 @@
 //   refreshChatScreen — 从其他页回到聊天页时的轻量刷新
 //   沉默计时器       — Ghost 主动发话（silence timer）
 //   主动发消息       — scheduleProactiveMessage / maybeProactiveMessage
-//   工资系统         — checkSalaryDay
 //   iOS键盘处理
 //
 // 依赖：api.js、ui.js、persona.js、state.js、events.js、
@@ -211,101 +210,11 @@ async function maybeProactiveMessage() {
   scheduleProactiveMessage();
 }
 
-// ===== 工资系统 =====
-function checkSalaryDay() {
-  const today = new Date();
-  if (today.getDate() < 25) return; // 25号及以后都可以补发
-
-  const salaryKey = 'salaryPaid_' + today.getFullYear() + '_' + (today.getMonth() + 1);
-
-  // 防重发：salaryKey 存在 OR 本月交易记录里有工资 → 已发过
-  const _txList = JSON.parse(localStorage.getItem('transactions') || '[]');
-  const _monthStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
-  const _alreadyPaid = localStorage.getItem(salaryKey)
-    || _txList.some(tx => tx.name === 'Ghost 月度工资' && tx.time && tx.time.startsWith(_monthStr));
-  if (_alreadyPaid) return;
-
-  // 根据本月出差天数浮动工资
-  const _monthKey  = 'locDays_' + today.getFullYear() + '_' + (today.getMonth() + 1);
-  const _locDays   = JSON.parse(localStorage.getItem(_monthKey) || '{"deployed":0,"base":0,"leave":0}');
-  const _total     = (_locDays.deployed || 0) + (_locDays.base || 0) + (_locDays.leave || 0) || 30;
-  const _deployRatio = (_locDays.deployed || 0) / _total;
-
-  // 无记录时（老用户首次/数据缺失）走正常档
-  const _noRecord = !localStorage.getItem(_monthKey);
-  let _salaryMin, _salaryMax;
-  if (_noRecord || (_deployRatio < 0.3 && _locDays.leave < 1)) {
-    _salaryMin = 15; _salaryMax = 25;
-  } else if (_deployRatio >= 0.6) {
-    _salaryMin = 22; _salaryMax = 32;
-  } else if ((_locDays.leave || 0) / _total >= 0.5) {
-    _salaryMin = 15; _salaryMax = 18;
-  } else {
-    _salaryMin = 15; _salaryMax = 25;
-  }
-  const salary = (Math.floor(Math.random() * (_salaryMax - _salaryMin + 1)) + _salaryMin) * 100;
-  localStorage.setItem('lastSalaryAmount', salary);
-  localStorage.setItem('lastSalaryMonth', today.getFullYear() + '-' + (today.getMonth() + 1));
-
-  // 立刻标记已发，防止 initChat 多次调用导致重复发薪
-  localStorage.setItem(salaryKey, salary.toString());
-
-  setTimeout(() => {
-    // 直接入账，不走转账卡片
-    if (typeof addTransaction === 'function') {
-      addTransaction({ icon: '💷', name: 'Ghost 月度工资', amount: salary });
-    }
-    if (typeof renderWallet === 'function') renderWallet();
-    if (typeof changeAffection === 'function') changeAffection(1);
-    if (typeof setRelationshipFlag === 'function') setRelationshipFlag('firstSalary', true);
-
-    // 告诉模型工资已发
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({
-        role: 'user',
-        content: `[System: Today is payday. You sent her your monthly salary £${salary}. It has been deposited into her account automatically. You can mention this naturally — keep it brief, matter-of-fact.]`,
-        _system: true
-      });
-    }
-
-    // Ghost 说一句
-    const _deployHint = _deployRatio >= 0.6 ? ' Been away most of the month.' : _deployRatio < 0.3 ? ' Quiet month.' : '';
-    const fallbacks = [
-      `this month's in. £${salary}.`,
-      `£${salary}. check your account.`,
-      `salary's in. £${salary}.`,
-      `sent. £${salary}. don't waste it.`,
-      `it's in your account. £${salary}.`,
-    ];
-    const fallbackLine = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-
-    if (typeof showTyping === 'function') showTyping();
-    setTimeout(async () => {
-      let line = '';
-      try {
-        line = await callGrokWithSystem(
-          `You are Simon Riley.\n\nYou just deposited your monthly salary into her account: £${salary}.${_deployHint}\n\nOne line. lowercase. This is routine — you do this every month. Not making a big deal. Just letting her know it's there.\n\nDo NOT say "transfer" or "sent you money". It's already in her account. Just confirm it landed.`,
-          'let her know.',
-          80
-        );
-        if (typeof isBreakout === 'function' && isBreakout(line)) line = '';
-      } catch(e) {}
-
-      if (!line || !line.trim()) line = fallbackLine;
-      line = line.trim().split('\n')[0];
-
-      if (typeof hideTyping === 'function') hideTyping();
-      if (typeof appendMessage === 'function') appendMessage('bot', line);
-      if (typeof chatHistory !== 'undefined') {
-        chatHistory.push({ role: 'assistant', content: line });
-        if (typeof saveHistory === 'function') saveHistory();
-      }
-    }, 1500);
-
-    if (typeof showToast === 'function') showToast('💷 Ghost 本月工资已到账 £' + salary + '！');
-    if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
-  }, 2000);
-}
+// ===== 工资系统 · 已退役（2026-10）=====
+// Ghost 每月底自动向用户钱包上交工资的机制已退役。
+// 9 月为最后一次合法发放，历史 transaction 与余额保留。
+// 新经济关系：用户职业收入=用户自己来源；Ghost Card=有限共享消费；
+// Ghost Pay=按订单自主承担。不再有固定月度送钱机制。
 
 // ===== 聊天页初始化 =====
 async function initChat() {
@@ -403,21 +312,7 @@ async function initChat() {
   // 检查离线扣好感
   if (typeof checkOfflinePenalty === 'function') checkOfflinePenalty();
 
-  // 工资检查
-  checkSalaryDay();
-
-  // 如果现在是24号，设定午夜定时器：0点自动触发工资检查
-  // 这样0点还在聊天的用户也能收到工资
-  const _today = new Date();
-  if (_today.getDate() === 24) {
-    const _midnight = new Date(_today);
-    _midnight.setDate(25);
-    _midnight.setHours(0, 0, 5, 0); // 0:00:05，留5秒确保日期翻转
-    const _msToMidnight = _midnight.getTime() - _today.getTime();
-    if (_msToMidnight > 0 && _msToMidnight < 24 * 3600 * 1000) {
-      setTimeout(() => checkSalaryDay(), _msToMidnight);
-    }
-  }
+  // Ghost 月度工资上交机制已退役（2026-10），不再自动入账 / 发消息。
 
   // 剧情解锁检查（sessionStart类型）
   setTimeout(() => { if (typeof checkStoryOnSessionStart === 'function') checkStoryOnSessionStart(); }, 1500);

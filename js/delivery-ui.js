@@ -147,12 +147,18 @@
     if (!body) return;
 
     var active = readList('deliveries').filter(function (d) {
-      return d && !d.done && !d.isLostConfirmed;
+      return d && !d.done && !d.isLostConfirmed && !d.voided;
     });
-    var history = readList('deliveryHistory');
+    var history = readList('deliveryHistory').filter(function (d) {
+      return d && !d.voided; // Migration B 作废的资产/特殊物流不进"已送达"列表
+    });
+    // 遗失分组：丢件留在 deliveries 数组、不进 deliveryHistory；paid 后仍保留在此
+    var lost = readList('deliveries').filter(function (d) {
+      return d && d.isLostConfirmed && !d.voided;
+    });
 
-    // 三种空状态：两者都无 → 整页安静占位
-    if (!active.length && !history.length) {
+    // 三种空状态：三者都无 → 整页安静占位
+    if (!active.length && !history.length && !lost.length) {
       body.innerHTML =
         '<div class="dlv-empty-full">' +
           '<div class="dlv-empty-full-icon">' + BOX_SVG + '</div>' +
@@ -204,9 +210,150 @@
     }
     html += '</div>';
 
+    // 遗失（仅在有丢件时出现，沿用运输中/已送达的卡片语言）
+    if (lost.length) {
+      html += '<div class="dlv-group">' +
+        '<div class="dlv-group-head">' +
+          '<span class="dlv-group-icon">' + ALERT_SVG + '</span>' +
+          '<span class="dlv-group-titles">' +
+            '<span class="dlv-group-zh">遗失</span>' +
+            '<span class="dlv-group-en">Lost in Transit</span>' +
+          '</span>' +
+          '<span class="dlv-group-count">' + lost.length + ' 件包裹</span>' +
+        '</div>';
+      html += lost.map(lostCardHtml).join('');
+      html += '</div>';
+    }
+
     body.innerHTML = html;
   }
 
+  // ── 遗失卡：沿用 dlv-hist 紧凑卡结构，只把徽章换成轻微异常提示 ──
+  function lostCardHtml(d) {
+    var paid = d.claimStatus === 'paid';
+    var badge = paid
+      ? '<span class="dlv-lost-badge dlv-lost-badge-done">' + CHECK_SVG + '已理赔</span>'
+      : '<span class="dlv-lost-badge">运输遗失</span>';
+    return '<div class="dlv-hist dlv-lost-card" onclick="openDeliveryLostDetail(&quot;' + esc(String(d.id)) + '&quot;)">' +
+      thumbHtml(d, 'dlv-hist-thumb', 'dlv-hist-thumb-emoji') +
+      '<div class="dlv-hist-mid">' +
+        '<div class="dlv-hist-name">' + esc(d.name || '包裹') + '</div>' +
+        '<div class="dlv-hist-meta">' + badge + '</div>' +
+      '</div>' +
+      '<span class="dlv-lost-chevron">›</span>' +
+    '</div>';
+  }
+
+  // ── 遗失包裹详情：就地替换 deliveryBody，不跳新页面 ──
+  function findLostById(id) {
+    return readList('deliveries').filter(function (d) {
+      return d && d.isLostConfirmed && !d.voided;
+    }).find(function (d) { return String(d.id) === String(id); });
+  }
+
+  function payerLabel(payer) {
+    if (payer === 'user') return '原路退回你的余额';
+    if (payer === 'ghost') return '原路退回 Ghost Card';
+    if (payer === 'ghost_pay') return '原路退回付款账户';
+    return '';
+  }
+
+  function claimActionHtml(d, info) {
+    var status = d.claimStatus || null;
+    if (status === 'paid') {
+      return '<div class="dlv-claim-done">' +
+        '<div class="dlv-claim-done-title">' + CHECK_SVG + '理赔完成</div>' +
+        '<div class="dlv-claim-done-sub">已原路退回</div>' +
+      '</div>';
+    }
+    if (status === 'processing') {
+      return '<div class="dlv-claim-done dlv-claim-processing">' +
+        '<div class="dlv-claim-done-title">理赔处理中</div>' +
+      '</div>';
+    }
+    if (info.eligible) {
+      return '<button class="dlv-claim-btn" onclick="onClaimDeliveryClick(&quot;' + esc(String(d.id)) + '&quot;)">申请理赔</button>';
+    }
+    // 老包裹不可理赔：置灰说明，不显示可点按钮
+    return '<button class="dlv-claim-btn" disabled>暂不可理赔</button>' +
+      '<div class="dlv-claim-hint">此包裹缺少可追溯的付款记录，无法申请理赔。</div>';
+  }
+
+  function lostDetailHtml(d) {
+    var info = (typeof window.getDeliveryClaimInfo === 'function')
+      ? window.getDeliveryClaimInfo(d)
+      : { eligible: false, payer: null, price: (d.productData && d.productData.price) || 0, refund: 0 };
+    var price = (d.productData && typeof d.productData.price === 'number') ? d.productData.price : 0;
+    var refund = (typeof info.refund === 'number') ? info.refund : price;
+    var showRefundRow = info.eligible || d.claimStatus === 'paid' || d.claimStatus === 'processing';
+
+    var rows = '';
+    rows += '<div class="dlv-info-row">' +
+      '<span class="dlv-info-label">商品原价</span>' +
+      '<span class="dlv-info-value">£' + price + '</span>' +
+    '</div>';
+    rows += '<div class="dlv-info-row">' +
+      '<span class="dlv-info-label">运费</span>' +
+      '<span class="dlv-info-value dlv-info-muted">不予赔付</span>' +
+    '</div>';
+    if (showRefundRow) {
+      rows += '<div class="dlv-info-row dlv-info-row-total">' +
+        '<span class="dlv-info-label">理赔金额</span>' +
+        '<span class="dlv-info-value dlv-info-strong">£' + refund + '</span>' +
+      '</div>';
+      if (info.payer) {
+        rows += '<div class="dlv-info-row">' +
+          '<span class="dlv-info-label">退款方式</span>' +
+          '<span class="dlv-info-value">' + esc(payerLabel(info.payer)) + '</span>' +
+        '</div>';
+      }
+    }
+
+    return '<button class="dlv-detail-back" onclick="renderDeliveryPage()">‹ 我的快递</button>' +
+      '<div class="dlv-card dlv-detail-card">' +
+        '<div class="dlv-card-top">' +
+          thumbHtml(d, 'dlv-thumb', 'dlv-thumb-emoji') +
+          '<div class="dlv-card-mid">' +
+            '<div class="dlv-card-name">' + esc(d.name || '包裹') + '</div>' +
+            '<div class="dlv-detail-status">运输途中遗失</div>' +
+          '</div>' +
+        '</div>' +
+        timelineHtml(d) +
+      '</div>' +
+      '<div class="dlv-detail-panel">' +
+        '<div class="dlv-detail-panel-title">理赔信息</div>' +
+        rows +
+      '</div>' +
+      '<div class="dlv-claim-action" id="dlvClaimAction">' +
+        claimActionHtml(d, info) +
+      '</div>';
+  }
+
+  function openDeliveryLostDetail(id) {
+    var body = document.getElementById('deliveryBody');
+    if (!body) return;
+    var d = findLostById(id);
+    if (!d) { renderDeliveryPage(); return; }
+    body.innerHTML = lostDetailHtml(d);
+    body.scrollTop = 0;
+  }
+
+  // 点击「申请理赔」：先落 processing，实际退款成功立即到 paid，就地刷新详情
+  function onClaimDeliveryClick(id) {
+    if (typeof window.claimDelivery !== 'function') return;
+    var res = window.claimDelivery(id);
+    // 无论 paid / processing_only，都重渲染当前详情反映最新状态
+    openDeliveryLostDetail(id);
+    if (res === 'ineligible') {
+      // 理论上按钮不会出现在不可理赔的包裹上；兜底回列表
+      renderDeliveryPage();
+    }
+  }
+
+  var ALERT_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19z"/><path d="M12 10v5"/><circle cx="12" cy="17.6" r="0.6" fill="currentColor" stroke="none"/></svg>';
+
   window.renderDeliveryPage = renderDeliveryPage;
+  window.openDeliveryLostDetail = openDeliveryLostDetail;
+  window.onClaimDeliveryClick = onClaimDeliveryClick;
 })();
 

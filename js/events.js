@@ -1032,13 +1032,9 @@ const STORY_EVENTS = [
     title: '薪日相托',
     desc: '发薪那天，他把钱转给了你。',
     triggerOn: 'message',
-    condition: (ctx) => !!localStorage.getItem('lastSalaryAmount') && !ctx.triggered('first_salary'),
-    execute: async () => {
-      const amount = localStorage.getItem('lastSalaryAmount') || '';
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你第一次给她转了工资£${amount}，想附一句话。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-      setRelationshipFlag('firstSalary');
-    }
+    // Ghost 月度工资上交机制已退役（2026-10）；此事件不再触发。历史 firstSalary flag 保留。
+    condition: (ctx) => false,
+    execute: async () => {}
   },
 
   // ━━━ 保护与站队 ━━━

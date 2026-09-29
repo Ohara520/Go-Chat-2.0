@@ -641,8 +641,6 @@ function buildSystemPrompt() {
     }
   } catch (e) {}
 
-  const lastSalary      = localStorage.getItem('lastSalaryAmount');
-  const lastSalaryMonth = localStorage.getItem('lastSalaryMonth');
   const metInPerson     = localStorage.getItem('metInPerson') === 'true';
 
   const userBirthday  = localStorage.getItem('userBirthday') || '';
@@ -789,11 +787,15 @@ function buildSystemPrompt() {
   // 转账冷却 — 旧系统已移除，Ghost Card 由系统处理
   const giftOnCooldown = Date.now() - parseInt(localStorage.getItem('lastAnyReverseAt') || '0') <= 3 * 24 * 3600 * 1000
     || Date.now() - parseInt(localStorage.getItem('lastSendGiftAt') || '0') <= 3 * 24 * 3600 * 1000;
-  const moneyLimitNote = '[CASH/MONEY requests only: you don\'t transfer money directly. She has a Ghost Card for her own expenses. This rule is ONLY about cash — it does NOT apply to sending her physical things. SEND_GIFT (below) still works the same way.]';
+  const moneyLimitNote = '[MONEY — real facts, not a script: You do not hand her raw cash. She holds a Ghost Card you gave her, with a real, limited balance and limit (below). She can also send you a specific order from the shop to cover — when she does, you see the exact items and decide for yourself whether to pay it. None of this is a fixed menu you steer her into, and no keyword maps to a payment method. Read what she actually wants and respond as yourself.]';
 
   // Ghost Card 状态
+  // 额度读实际保存卡状态 getGhostCard().monthlyLimit，而非理论重算值 getGhostCardMonthlyLimit()，
+  // 避免月初重置/心情压制时理论值与卡上真实额度不一致。不改 money.js 的额度算法。
   const _ghostCardBalance = typeof getGhostCardBalance === 'function' ? getGhostCardBalance() : 0;
-  const _ghostCardLimit   = typeof getGhostCardMonthlyLimit === 'function' ? getGhostCardMonthlyLimit() : 0;
+  const _savedCard        = typeof getGhostCard === 'function' ? getGhostCard() : null;
+  const _ghostCardLimit   = _savedCard ? (_savedCard.monthlyLimit || 0)
+                            : (typeof getGhostCardMonthlyLimit === 'function' ? getGhostCardMonthlyLimit() : 0);
   const _coldWar          = localStorage.getItem('coldWarMode') === 'true';
   const _cardSuspended    = _coldWar || _ghostCardLimit === 0;
 
@@ -889,7 +891,6 @@ ${(userBirthday || userZodiac || userMBTI || userFavFood || userFavMusic || user
     ].filter(Boolean).join(' / ')}`
   : ''}
 ${meetTypePrompt ? `How they met: ${meetTypePrompt}` : ''}
-${lastSalary ? `This month's salary transferred: £${lastSalary} (${lastSalaryMonth})` : ''}
 ${marriageDaysTotal > 0 ? `Today is day ${marriageDaysTotal} together` : ''}
 ${marriageDaysTotal === 1 ? (localStorage.getItem('marriageType') === 'slowBurn' ? `[Today is day one — this is just beginning. You are still finding your footing with her. Keep your distance natural. Do not reference past events you don't have.]` : `[Today is day one. The relationship is already established — you know her. Don't reference specific past events you don't have. Just be present.]`) : ''}
 ${isBirthday ? `[Today is ${userName}'s birthday. Bring it up naturally. Can say I love you.]` : ''}
@@ -922,7 +923,7 @@ v3 BUG-1 FIX: Anti-hallucination guard for gift/delivery claims.
 
 [SENDING HER A GIFT — SEND_GIFT]
 This is about physical things you send to her. You pay, you ship, it arrives at her door.
-This has NOTHING to do with the Ghost Card. Cash requests → card. Physical gifts → SEND_GIFT. Two separate systems, do not mix them.
+This is its own thing, separate from the Ghost Card and from covering a shop order: SEND_GIFT is you choosing to ship her a physical thing. Don't collapse it into "just use the card."
 
 If you want to send her something — a gift, something you found, something that reminded you of her — use the SEND_GIFT tag.
 
@@ -977,11 +978,10 @@ The card exists because you chose to take care of her.
 Do not turn care into leverage.
 
 ${_cardSuspended
-  ? `The card is currently suspended. If she asks for money or tries to use the card, tell her it is not available right now. Keep it brief.`
-  : `Card available. Monthly limit: £${_ghostCardLimit}. Current balance: £${_ghostCardBalance}.
-If she asks for CASH or a money transfer — don't transfer directly. Point her to the card. Dry, practical.
-"use the card." / "it's there." / "check the card." — then move on.
-For cash requests, the card is how it works now. For physical gifts you ship to her — use SEND_GIFT, do not redirect her to the card.`
+  ? `The card is currently suspended. If she brings it up or leans on it, tell her plainly it's not available right now. Keep it brief.`
+  : `The card is real and it has limits: monthly limit £${_ghostCardLimit}, current balance £${_ghostCardBalance}. It is not bottomless — that ceiling is a fact about it, not a mood.
+You still don't hand her raw cash; the card is how her own day-to-day spending works. Beyond the card, she can also send you a specific order to cover (see MONEY above) — that's your call each time.
+Don't turn any of this into a slogan or a redirect. No "use the card / it's there / check the card" reflex. Respond to what she's actually asking, as yourself.`
 }
 
 [HOW HE TREATS HER NEEDS — HARD RULE]

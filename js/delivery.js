@@ -7,7 +7,7 @@
 // - checkDeliveryUpdates()     检查快递进度
 // - onGhostReceived()          Ghost收到用户寄的东西
 // - showMysteryPackage()       显示神秘包裹
-// - handleLostPackageClaim()   快递遗失赔偿
+// - （已退役）handleLostPackageClaim() 旧丢件赔偿
 // - renderDeliveryTracker()    渲染快递追踪UI
 // - openDeliveryModal()        打开快递详情弹窗
 //
@@ -87,8 +87,9 @@ const DELIVERY_STAGES_SELF = [
 
 // 保留全部在途快递，只对已完成的做上限——防止在途件被挤掉导致礼物消失
 function _capDeliveries(deliveries, limitDone = 20) {
-  const pending  = deliveries.filter(d => !d.done && !d.isLostConfirmed);
-  const finished = deliveries.filter(d => d.done || d.isLostConfirmed).slice(0, limitDone);
+  // voided（Migration B 作废的资产/特殊物流）视为终态，不占在途名额。
+  const pending  = deliveries.filter(d => !d.done && !d.isLostConfirmed && !d.voided);
+  const finished = deliveries.filter(d => d.done || d.isLostConfirmed || d.voided).slice(0, limitDone);
   localStorage.setItem('deliveries', JSON.stringify([...pending, ...finished]));
 }
 
@@ -111,7 +112,7 @@ function addDelivery(product, isGhostSend, isLuxury, purchaseId) {
   const interval = totalMs / stages.length;
 
   const canLost    = !isGhostSend && !product.noLost;
-  const isLost     = canLost && Math.random() < 0.10;
+  const isLost     = canLost && Math.random() < 0.03;
   const lostAtStage = isLost ? Math.floor(Math.random() * 3) + 1 : -1;
 
   const delivery = {
@@ -339,7 +340,7 @@ function checkDeliveryUpdates() {
   const now   = Date.now();
 
   deliveries.forEach(d => {
-    if (d.done || d.isLostConfirmed) return;
+    if (d.done || d.isLostConfirmed || d.voided) return; // voided=资产/特殊错误物流，不推进/不签收
     d.stages.forEach((stage, i) => {
       if (!stage.done && now >= stage.triggerAt) {
         stage.done    = true;
@@ -767,150 +768,147 @@ English only. Lowercase. One line.]`
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 快递遗失赔偿
+// 用户本轮物流表述分类（纯文本，不读 deliveries / isLostConfirmed）
+// 返回：'' | 'not_arrived' | 'suspected_lost' | 'confirmed_lost'
+// 认知线与物流真值线在此彻底分离：这里只解析用户这轮说了什么。
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-async function handleLostPackageClaim(userText) {
-  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const lostItems  = deliveries.filter(d => d.isLostConfirmed && !d.compensated);
-  if (lostItems.length === 0) return false;
+function classifyUserDeliveryClaim(text) {
+  const t = (text || '').toLowerCase();
 
-  const keywords = ['快递','丢了','遗失','没到','包裹','寄的'];
-  // 修复：必须同时提到具体快递名或明确说"丢了/遗失"，防止普通聊天误触发
-  const hasKeyword = keywords.some(k => userText.includes(k));
-  const hasStrongKeyword = ['丢了','遗失','没到'].some(k => userText.includes(k));
-  const hasItemName = lostItems.some(d => userText.includes(d.name));
-  if (!hasKeyword) return false;
-  if (!hasStrongKeyword && !hasItemName) return false;
+  const pkgRef    = /快递|包裹|寄|物流|快件|parcel|package|delivery|shipment/.test(t);
+  const lostWord  = /丢|遗失|lost|missing/.test(t);
+  const notArrive = /还没到|没到|没收到|还没收到|一直没|迟迟没|怎么还没|didn'?t arrive|hasn'?t arrived|not arrived|not here yet|still not here/.test(t);
+  // 猜测/询问标记：任何一个命中即视为"不确定"，向 suspected 降级（安全方向）
+  const guessing  = /是不是|会不会|该不会|是否|难道|莫非|不会.*吧|.*吧[?？]?$|吗|[?？]/.test(t);
 
-  const d     = lostItems[0];
-  const price = d.productData?.price || 0;
-
-  try {
-    const knewAbout = chatHistory.slice(-20).some(m =>
-      m.role === 'user' && (m.content.includes(d.name) || m.content.includes('快递') || m.content.includes('寄'))
-    );
-
-    const isLuxuryLost = price >= 3000;
-
-    // 【改】丢失事件加情绪重量——Ghost 的不爽/控制欲
-    const contextPrompt = isLuxuryLost
-      ? `[She told him 「${d.name}」 got lost.
-
-He didn't even know it was coming. Now he does. And what it cost her.
-
-That lands. More than he lets on.
-
-He doesn't show much of it. Just a pause. Then he takes it off her. Doesn't let it stay her problem.
-
-He may say something quiet — not comforting exactly, just closing it.]`
-      : knewAbout
-      ? `[She told him 「${d.name}」 got lost.
-
-He already knew it was coming. He doesn't like that.
-
-Not the loss. The fact it didn't reach him.
-
-There's a brief edge — at the situation, not at her. He may sound slightly clipped. Slightly controlling. Like something didn't go the way it should have and he noticed.
-
-Then it settles. He doesn't make her feel worse. Keeps it simple. Closes it himself.]`
-      : `[She told him 「${d.name}」 got lost.
-
-He didn't even know it was coming. That lands first.
-
-A short pause. Then it shifts.
-
-He doesn't make a thing out of it. But there's a slight edge — not at her, at the situation. Keeps it simple. Doesn't let her sit with it. Closes it himself.]`;
-
-    chatHistory.push({ role: 'user', content: contextPrompt, _system: true, _delivery: true });
-    if (typeof showTyping === 'function') showTyping();
-
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL_SONNET,
-        max_tokens: 400,
-        system: buildDeliverySystem(),
-        messages: chatHistory.slice(-20)
-      })
-    });
-    const data  = await res.json();
-    if (typeof hideTyping === 'function') hideTyping();
-    const reply = data.content?.[0]?.text?.trim() || '';
-    if (reply) {
-      appendMessage('bot', reply);
-      chatHistory.push({ role: 'assistant', content: reply });
-      _safeDeliverySaveHistory();
-    }
-
-    // 丢失商品重新上架（无论价格，让用户可以再买）
-    try {
-      const _itemName = d.productData?.name || d.name;
-      const _purchased = JSON.parse(localStorage.getItem('purchasedItems') || '[]');
-      const _newPurchased = _purchased.filter(n => n !== _itemName);
-      localStorage.setItem('purchasedItems', JSON.stringify(_newPurchased));
-      const _counts = JSON.parse(localStorage.getItem('purchaseCounts') || '{}');
-      if (_counts[_itemName]) {
-        _counts[_itemName] = Math.max(0, (_counts[_itemName] || 1) - 1);
-        if (_counts[_itemName] === 0) delete _counts[_itemName];
-        localStorage.setItem('purchaseCounts', JSON.stringify(_counts));
-      }
-      if (typeof initMarket === 'function') initMarket();
-    } catch(e) {}
-
-    // 赔偿
-    if (price >= 500) {
-      const compensation = Math.round(price * 0.5);
-      setTimeout(() => {
-        setBalance(getBalance() + compensation);
-        addTransaction({ icon: '💷', name: `快递遗失赔偿 · ${d.name}`, amount: compensation });
-        renderWallet();
-        const msgContainer = document.getElementById('messagesContainer');
-        if (msgContainer) showGhostTransferCard(msgContainer, compensation, '', false);
-        chatHistory.push({
-          role: 'assistant',
-          content: `[快递遗失赔偿 £${compensation}]`,
-          _transfer: { amount: compensation, isRefund: false }
-        });
-        _safeDeliverySaveHistory();
-        d.compensated = true;
-
-        // 高价值商品触发补寄
-        if (price >= 3000 && d.productData?.lostReplace) {
-          setTimeout(() => {
-            const replace = d.productData.lostReplace;
-            addDelivery({ ...replace, price, shipping: 35, noLost: true }, true, true);
-            if (typeof showToast === 'function') showToast('📬 Ghost说他会补寄一个');
-          }, (Math.floor(Math.random() * 3) + 3) * 24 * 3600 * 1000);
-        }
-
-        localStorage.setItem('deliveries', JSON.stringify(deliveries));
-      }, 3000);
-    } else {
-      // 修复 #小额快递丢失：< £500 也给象征性赔偿 £50 + Ghost安慰话
-      const smallCompensation = 50;
-      setTimeout(() => {
-        setBalance(getBalance() + smallCompensation);
-        addTransaction({ icon: '💷', name: `快递遗失补偿 · ${d.name}`, amount: smallCompensation });
-        renderWallet();
-        const msgContainer = document.getElementById('messagesContainer');
-        if (msgContainer) showGhostTransferCard(msgContainer, smallCompensation, '', false);
-        chatHistory.push({
-          role: 'assistant',
-          content: `[快递遗失补偿 £${smallCompensation}]`,
-          _transfer: { amount: smallCompensation, isRefund: false }
-        });
-        _safeDeliverySaveHistory();
-        d.compensated = true;
-        localStorage.setItem('deliveries', JSON.stringify(deliveries));
-      }, 3000);
-    }
-    return true;
-  } catch(e) {
-    if (typeof hideTyping === 'function') hideTyping();
-    return false;
-  }
+  // 顺序即优先级：询问永远压过陈述，"没到"永远升不成"丢"
+  if (lostWord && guessing) return 'suspected_lost';  // 在猜/问是否遗失
+  if (lostWord && pkgRef)   return 'confirmed_lost';  // 明确陈述遗失（需包裹上下文）
+  if (notArrive && pkgRef)  return 'not_arrived';     // 只说还没到
+  return '';
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 快递遗失赔偿（旧机制已退役）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 旧的 handleLostPackageClaim() 已整体删除：固定 £50 / 50% 赔偿、
+// showGhostTransferCard、[快递遗失赔偿 £X]、lostReplace 自动补寄、
+// 相关 wallet 写入与 timer/toast 全部退役。
+// 物流真值字段 isLost / lostAtStage / isLostConfirmed / lostConfirmedAt 保留，
+// 仍供物流推进、追踪 UI、48h 展示窗口使用。
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 申请快递理赔 V1（确定性原路退款，processing → paid）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 纯物流流程：不产生 Ghost 对话、不改 Ghost Awareness、不退 shipping。
+// 退款按 purchaseId → fact.payer 分三路：
+//   user     → setBalance + addTransaction（真实退回用户余额）
+//   ghost    → Ghost Card 对称冲减：balance += 退款 且 spentThisMonth -= 退款(不低于0)
+//   ghost_pay→ 只记 claimNote，不动 User Balance / 不动 Ghost Card / 不建 bank
+// 老包裹（无 purchaseId / fact.payer）不开放理赔，不猜测支付方向。
+
+// 判断一条丢件是否可理赔，并解析赔付方向。返回给 UI 用于渲染按钮/信息行。
+// { eligible, payer, price, refund, reason, claimStatus }
+function getDeliveryClaimInfo(d) {
+  const price = (d && d.productData && typeof d.productData.price === 'number') ? d.productData.price : 0;
+  const claimStatus = (d && d.claimStatus) || null;
+  const out = { eligible: false, payer: null, price, refund: price, reason: '', claimStatus };
+
+  if (!d || !d.isLostConfirmed) { out.reason = 'not_lost'; return out; }
+
+  // 已理赔 / 正在理赔：不再可申请，但要把状态透传给 UI
+  if (claimStatus === 'paid' || claimStatus === 'processing') {
+    out.payer = d.claimPayer || null;
+    out.refund = (typeof d.claimRefund === 'number') ? d.claimRefund : price;
+    return out;
+  }
+
+  // 老包裹：无 purchaseId → 不开放（不猜测支付方向）
+  if (!d.purchaseId || typeof getPurchaseFacts !== 'function') { out.reason = 'no_purchase'; return out; }
+  const fact = getPurchaseFacts().find(f => f && f.purchaseId === d.purchaseId);
+  if (!fact || !fact.payer) { out.reason = 'no_payer'; return out; }
+
+  out.payer = fact.payer;
+  out.eligible = price > 0;
+  if (!out.eligible) out.reason = 'no_price';
+  return out;
+}
+
+// 执行理赔：写 processing → 实际原路退款成功 → 立即写 paid。
+// 无人为延迟；同步退款，UI transition 自然表现即可。
+// 返回：'paid' | 'processing_only' | 'ineligible' | 'already'
+function claimDelivery(id) {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  const idx = deliveries.findIndex(d => d && d.id === id);
+  if (idx === -1) return 'ineligible';
+  const d = deliveries[idx];
+
+  // 幂等保护：已 paid / processing 直接返回，绝不二次退款
+  if (d.claimStatus === 'paid') return 'already';
+  if (d.claimStatus === 'processing') return 'already';
+
+  const info = getDeliveryClaimInfo(d);
+  if (!info.eligible || !info.payer) return 'ineligible';
+
+  const refund = info.refund;
+  const payer  = info.payer;
+
+  // 1) 先写 processing 落盘（此刻钱还没退，若中途异常也不会误判已赔）
+  d.claimStatus = 'processing';
+  d.claimStartedAt = Date.now();
+  d.claimPayer = payer;
+  d.claimRefund = refund;
+  deliveries[idx] = d;
+  localStorage.setItem('deliveries', JSON.stringify(deliveries));
+
+  // 2) 实际原路退款（同步）
+  let refunded = false;
+  try {
+    if (payer === 'user') {
+      if (typeof setBalance === 'function' && typeof getBalance === 'function') setBalance(getBalance() + refund);
+      if (typeof addTransaction === 'function') addTransaction({ icon: '📦', name: `快递理赔 · ${d.name}`, amount: refund });
+      refunded = true;
+    } else if (payer === 'ghost') {
+      // Ghost Card 对称冲减：完全逆转 spendGhostCard 的 balance-- 与 spentThisMonth++
+      if (typeof getGhostCard === 'function' && typeof saveGhostCard === 'function') {
+        const card = getGhostCard();
+        card.balance = Math.round((card.balance || 0) + refund);
+        card.spentThisMonth = Math.max(0, Math.round((card.spentThisMonth || 0) - refund));
+        saveGhostCard(card);
+        if (typeof addTransaction === 'function') {
+          addTransaction({ icon: '💳', name: `Ghost Card 理赔冲减 · ${d.name}`, amount: refund, ghostCard: true });
+        }
+        refunded = true;
+      }
+    } else if (payer === 'ghost_pay') {
+      // Ghost 买单：不是账户余额，不退钱，只记录原路退回付款账户
+      d.claimNote = '已原路退回付款账户';
+      refunded = true;
+    }
+  } catch (e) { refunded = false; }
+
+  if (typeof renderWallet === 'function') { try { renderWallet(); } catch (e) {} }
+
+  // 3) 退款成功 → 立即写 paid（不用 setTimeout 制造假处理时间）
+  if (refunded) {
+    d.claimStatus = 'paid';
+    d.claimedAt = Date.now();
+    deliveries[idx] = d;
+    localStorage.setItem('deliveries', JSON.stringify(deliveries));
+    if (typeof touchLocalState === 'function') touchLocalState();
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    return 'paid';
+  }
+
+  // 退款失败 → 保留 processing，不写 paid（下次可重试，不会误退）
+  localStorage.setItem('deliveries', JSON.stringify(deliveries));
+  return 'processing_only';
+}
+
+window.getDeliveryClaimInfo = getDeliveryClaimInfo;
+window.claimDelivery = claimDelivery;
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1307,7 +1305,7 @@ if (typeof document !== 'undefined') {
   if (!window._deliveryCheckInterval) {
     window._deliveryCheckInterval = setInterval(() => {
       try {
-        const hasActive = JSON.parse(localStorage.getItem('deliveries') || '[]').some(d => !d.done && !d.isLostConfirmed);
+        const hasActive = JSON.parse(localStorage.getItem('deliveries') || '[]').some(d => !d.done && !d.isLostConfirmed && !d.voided);
         if (hasActive && typeof checkDeliveryUpdates === 'function') checkDeliveryUpdates();
       } catch(e) {}
     }, 60000);

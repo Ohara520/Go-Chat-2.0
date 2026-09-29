@@ -491,8 +491,6 @@ function buildKeeganSystemPrompt() {
   const location       = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locationReason = localStorage.getItem('currentLocationReason');
   const longTermMemory = localStorage.getItem('longTermMemory') || '';
-  const lastSalary     = localStorage.getItem('lastSalaryAmount');
-  const lastSalaryMonth= localStorage.getItem('lastSalaryMonth');
   const metInPerson    = localStorage.getItem('metInPerson') === 'true';
 
   const userBirthday = localStorage.getItem('userBirthday') || '';
@@ -636,7 +634,6 @@ ${(userBirthday || userZodiac || userMBTI || userFavFood || userFavMusic)
       userFavMusic ? `likes ${userFavMusic}` : '',
     ].filter(Boolean).join(' / ')}`
   : ''}
-${lastSalary ? `This month's salary transferred: £${lastSalary} (${lastSalaryMonth})` : ''}
 ${marriageDaysTotal > 0 ? `Today is day ${marriageDaysTotal} together` : ''}
 ${isBirthday ? `[Today is ${userName}'s birthday. Acknowledge it naturally.]` : ''}
 ${isAnniversary ? `[Today is the wedding anniversary. Acknowledge it.]` : ''}

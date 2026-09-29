@@ -50,11 +50,25 @@ function _mergePurchaseFacts(/* ...arrays */) {
         byKey.set(k, f);
         order.push(k);
       } else {
-        // enrich：仅当已存版本缺 deliveryId 而新版本有时，补上关联。
+        // enrich：同一 purchaseId 的两份记录合并关键字段。
         const cur = byKey.get(k);
-        if (cur.deliveryId == null && f.deliveryId != null) {
-          byKey.set(k, { ...cur, deliveryId: f.deliveryId });
+        let next = cur;
+        // deliveryId：非空补上空版本。
+        if (next.deliveryId == null && f.deliveryId != null) {
+          next = { ...next, deliveryId: f.deliveryId };
         }
+        // rolledBack 墓碑必须压过旧的未回滚版本：任一方 rolledBack 则合并结果 rolledBack，
+        // 否则本地已回滚的房产会被旧云端 union 复活。保留回滚元数据。
+        const _curRB = cur.rolledBack === true;
+        const _fRB   = f.rolledBack === true;
+        if (_fRB && !_curRB) {
+          next = { ...next, rolledBack: true,
+                   rollbackReason: f.rollbackReason || next.rollbackReason || 'ghost_pay_house_bug',
+                   rolledBackAt: f.rolledBackAt || next.rolledBackAt || Date.now() };
+        } else if (_curRB && next !== cur) {
+          next = { ...next, rolledBack: true };
+        }
+        if (next !== cur) byKey.set(k, next);
       }
     }
   }
@@ -654,6 +668,11 @@ async function loadFromCloud() {
           const idx = merged.findIndex(ld => ld.id === cd.id);
           if (idx === -1) {
             merged.push(cd);
+          } else if (merged[idx].voided || cd.voided) {
+            // voided 墓碑是终态，任一方作废则合并结果作废（压过旧云端 active）。
+            merged[idx] = { ...merged[idx], ...cd, voided: true,
+                            voidReason: merged[idx].voidReason || cd.voidReason || 'asset_reunion_no_delivery',
+                            voidedAt: merged[idx].voidedAt || cd.voidedAt || Date.now() };
           } else if (cd.currentStage > merged[idx].currentStage || cd.done) {
             merged[idx] = cd;
           }
