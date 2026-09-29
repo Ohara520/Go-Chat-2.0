@@ -260,7 +260,7 @@ const MARKET_PRODUCTS = {
       ] },
   ],
   lifecare: [
-    { id: 'product-025', emoji: '🧴', name: '雪松香氛洗护套装', nameEn: 'Cedarwood Shampoo & Conditioner Set', price: 38, shipping: 5,
+    { id: 'product-026', emoji: '🧴', name: '雪松香氛洗护套装', nameEn: 'Cedarwood Shampoo & Conditioner Set', price: 38, shipping: 5,
       desc: '雪松木质香调洗护套装，洗发露 300ml 搭配护发素 200ml。琥珀色压泵瓶与米色软管包装，雪松枝叶图案设计。',
       features: [
         { label: '组成', value: '洗发露 300ml + 护发素 200ml' },
@@ -268,7 +268,7 @@ const MARKET_PRODUCTS = {
         { label: '包装', value: '琥珀瓶 + 米色软管' },
         { label: '图案', value: '雪松枝叶印刷' },
       ] },
-    { id: 'product-026', emoji: '🪒', name: '剃须护理套装', nameEn: 'Shaving Care Set', price: 65, shipping: 5,
+    { id: 'product-025', emoji: '🪒', name: '剃须护理套装', nameEn: 'Shaving Care Set', price: 65, shipping: 5,
       desc: '剃须护理四件套，含剃须膏 100ml、须后水 100ml、獾毛刷、金属安全剃刀。剃须膏为软管包装，须后水为玻璃瓶，刷柄木质，剃刀金属网纹手柄。',
       features: [
         { label: '组成', value: '膏 + 水 + 刷 + 刀' },
@@ -276,7 +276,7 @@ const MARKET_PRODUCTS = {
         { label: '刷毛', value: '獾毛' },
         { label: '刀柄', value: '金属网纹' },
       ] },
-    { id: 'product-027', emoji: '🪥', name: '声波电动牙刷', nameEn: 'Sonic Electric Toothbrush', price: 85, shipping: 5,
+    { id: 'product-029', emoji: '🪥', name: '声波电动牙刷', nameEn: 'Sonic Electric Toothbrush', price: 85, shipping: 5,
       desc: '白色立式电动牙刷，机身标注 Clean / White / Sensitive / Massage 四档模式，配充电底座及两支替换刷头。刷头为蓝白双色刷毛。',
       features: [
         { label: '驱动', value: '声波震动' },
@@ -284,7 +284,7 @@ const MARKET_PRODUCTS = {
         { label: '配件', value: '充电座 + 2 刷头' },
         { label: '刷毛', value: '蓝白双色' },
       ] },
-    { id: 'product-028', emoji: '🤲', name: '无香护手霜', nameEn: 'Fragrance-Free Hand Cream', price: 9, shipping: 5,
+    { id: 'product-030', emoji: '🤲', name: '无香护手霜', nameEn: 'Fragrance-Free Hand Cream', price: 9, shipping: 5,
       desc: '米白色软管护手霜 75ml，Fragrance Free / Moisturizing / For Everyday Care 标注，黑色螺旋挤压盖。',
       features: [
         { label: '容量', value: '75ml' },
@@ -292,7 +292,7 @@ const MARKET_PRODUCTS = {
         { label: '质地', value: '霜状' },
         { label: '包装', value: '软管螺旋盖' },
       ] },
-    { id: 'product-029', emoji: '🩹', name: '急救护理包', nameEn: 'First Aid Kit', price: 28, shipping: 5,
+    { id: 'product-027', emoji: '🩹', name: '急救护理包', nameEn: 'First Aid Kit', price: 28, shipping: 5,
       desc: '米色帆布手提急救包，红色十字标识，内含创可贴、酒精棉片、医用胶布、不锈钢剪刀、镊子等基础应急物资。红色拉链提手设计。',
       features: [
         { label: '材质', value: '帆布外壳' },
@@ -300,7 +300,7 @@ const MARKET_PRODUCTS = {
         { label: '设计', value: '红十字标识' },
         { label: '提手', value: '红色拉链' },
       ] },
-    { id: 'product-030', emoji: '🥒', name: '黄瓜面膜', nameEn: 'Cucumber Face Mask', price: 12, shipping: 5,
+    { id: 'product-028', emoji: '🥒', name: '黄瓜面膜', nameEn: 'Cucumber Face Mask', price: 12, shipping: 5,
       desc: '黄瓜图案包装面膜，5 片装盒 + 单片独立包装。包装印有黄瓜切片与水珠视觉，包装标注 Hydrating / Soothing / Cooling。',
       features: [
         { label: '规格', value: '5 片装' },
@@ -316,7 +316,7 @@ const MARKET_PRODUCTS = {
         { label: '材质', value: '织物外层' },
         { label: '供电', value: 'USB 供电' },
       ] },
-    { id: 'product-032', emoji: '😴', name: '睡眠遮光眼罩', nameEn: 'Sleep Eye Mask', price: 18, shipping: 5,
+    { id: 'product-034', emoji: '😴', name: '睡眠遮光眼罩', nameEn: 'Sleep Eye Mask', price: 18, shipping: 5,
       desc: '深灰色丝绒眼罩，鼻梁贴合凹槽设计，可调节松紧带，配同色束口收纳袋。包装标注 Soft / Light Blocking / Comfortable Fit。',
       features: [
         { label: '材质', value: '丝绒面料' },
@@ -332,7 +332,7 @@ const MARKET_PRODUCTS = {
         { label: '瓶盖', value: '木质' },
         { label: '包装', value: '纸盒装' },
       ] },
-    { id: 'product-034', emoji: '💋', name: '草莓润唇膏', nameEn: 'Strawberry Lip Balm', price: 6, shipping: 5,
+    { id: 'product-035', emoji: '💋', name: '草莓润唇膏', nameEn: 'Strawberry Lip Balm', price: 6, shipping: 5,
       desc: '粉色旋转管润唇膏 4.5g，草莓图案外壳，膏体呈粉红色。标注 Moisturizing / Softening / Daily Care。',
       features: [
         { label: '容量', value: '4.5g' },
@@ -340,7 +340,7 @@ const MARKET_PRODUCTS = {
         { label: '香调', value: '草莓' },
         { label: '外壳', value: '草莓印花' },
       ] },
-    { id: 'product-035', emoji: '🔥', name: '便携式暖手宝', nameEn: 'Portable Hand Warmer', price: 25, shipping: 5,
+    { id: 'product-032', emoji: '🔥', name: '便携式暖手宝', nameEn: 'Portable Hand Warmer', price: 25, shipping: 5,
       desc: '米粉色鹅卵石造型充电暖手宝，正面三点电量指示灯，底部圆形开关键。包装标注 Fast Heating / Lightweight / Compact Size / Long Lasting Warmth。',
       features: [
         { label: '造型', value: '鹅卵石弧面' },
