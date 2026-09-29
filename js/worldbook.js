@@ -25,6 +25,33 @@ function _wbSave(arr) {
   if (typeof touchLocalState === 'function') touchLocalState();
 }
 
+// ===================================================
+// 删除墓碑（tombstone）：防止「删除后从云端复活」。
+// 只记录 auto 联动删除涉及的 id（wb + 对应 mem），仿 walletSettledIds 的最小防回流设计。
+// 结构：localStorage['linkTombstones'] = { wb:[wbId...], mem:[memId...] }
+// ===================================================
+function _wbLoadTombstones() {
+  try {
+    const t = JSON.parse(localStorage.getItem('linkTombstones') || '{}');
+    return { wb: Array.isArray(t.wb) ? t.wb : [], mem: Array.isArray(t.mem) ? t.mem : [] };
+  } catch (e) { return { wb: [], mem: [] }; }
+}
+
+function _wbSaveTombstones(t) {
+  // 上限保护：各留最近 500 个，够覆盖删除防回流，不无限增长
+  const wb = Array.from(new Set(t.wb || [])).slice(-500);
+  const mem = Array.from(new Set(t.mem || [])).slice(-500);
+  localStorage.setItem('linkTombstones', JSON.stringify({ wb, mem }));
+  if (typeof touchLocalState === 'function') touchLocalState();
+}
+
+function _wbAddTombstone({ wbId = null, memId = null }) {
+  const t = _wbLoadTombstones();
+  if (wbId) t.wb.push(wbId);
+  if (memId) t.mem.push(memId);
+  _wbSaveTombstones(t);
+}
+
 // 新增/更新一条世界书。keywords 可传数组或逗号分隔字符串。
 function addWorldBookEntry({ keywords, content, source = 'manual', id = null, locked = false }) {
   if (!content || !content.trim()) return null;
@@ -79,6 +106,82 @@ function setWorldBookEnabled(id, enabled) {
 
 function getWorldBookEntries() {
   return _wbLoad();
+}
+
+// Memory V2 UPDATE 联动：把被更新的 Memory 的新 content/tags 原地同步到对应 auto WorldBook。
+// 严格前置：wbId 命中、存在、source==='auto'、memId===memory.id。绝不新建 wb。
+// 保留 id / source / memId / enabled / created 等一切其它字段。
+function syncAutoWorldBookForMemory(memory) {
+  if (!memory || memory.wbId == null) return false;
+  const arr = _wbLoad();
+  const w = arr.find(x => x.id === memory.wbId);
+  if (!w) return false;                    // 关联对象不存在 → 不新建
+  if (w.source !== 'auto') return false;   // 不碰 manual
+  if (w.memId !== memory.id) return false; // 关联不一致 → 不动
+  w.content = memory.content;
+  if (Array.isArray(memory.tags)) {
+    const kw = memory.tags.map(k => String(k).trim().toLowerCase()).filter(Boolean);
+    if (kw.length) w.keywords = kw;        // 空则保留原关键词，避免召回失效
+  }
+  _wbSave(arr);
+  return true;
+}
+
+// ===================================================
+// Memory ↔ auto WorldBook 关联迁移（幂等，自愈 + 时间回填）
+// 只新增 wbId / memId 两个字段，绝不删改 content/tags/keywords/importance。
+// ===================================================
+function linkAutoWorldBookMemories() {
+  let mems, wb;
+  try { mems = JSON.parse(localStorage.getItem('longTermMemories') || '[]'); } catch (e) { mems = []; }
+  try { wb = JSON.parse(localStorage.getItem('worldBook') || '[]'); } catch (e) { wb = []; }
+  if (!Array.isArray(mems)) mems = [];
+  if (!Array.isArray(wb)) wb = [];
+  if (mems.length === 0 || wb.length === 0) return;
+
+  let dirtyMem = false, dirtyWb = false;
+  const memById = new Map(mems.map(m => [m.id, m]));
+  const wbById = new Map(wb.map(w => [w.id, w]));
+
+  // ── Pass A：自愈半绑定 ──────────────────────────────
+  // 一侧 ID 命中对侧真实存在对象 → 补齐空的那侧；对侧已指向别处 → 报冲突、不动。
+  for (const m of mems) {
+    if (m.wbId == null) continue;
+    const w = wbById.get(m.wbId);
+    if (!w) continue;                        // 指向不存在对象 → 不猜
+    if (w.source !== 'auto') continue;       // 指向 manual → 不自动关联
+    if (w.memId == null) { w.memId = m.id; dirtyWb = true; }
+    else if (w.memId !== m.id) console.warn('[link] conflict: memory.wbId', m.id, '→ wb', w.id, 'but wb.memId=', w.memId);
+  }
+  for (const w of wb) {
+    if (w.source !== 'auto' || w.memId == null) continue;
+    const m = memById.get(w.memId);
+    if (!m) continue;                        // 指向不存在对象 → 不猜
+    if (m.wbId == null) { m.wbId = w.id; dirtyMem = true; }
+    else if (m.wbId !== w.id) console.warn('[link] conflict: wb.memId', w.id, '→ memory', m.id, 'but memory.wbId=', m.wbId);
+  }
+
+  // ── Pass B：时间回填未绑定的（2000ms 窗口 + 双向唯一）──
+  const WINDOW = 2000;
+  const freeWb = wb.filter(w => w.source === 'auto' && w.memId == null && typeof w.created === 'number');
+  const freeMem = mems.filter(m => m.wbId == null && typeof m.timestamp === 'number');
+
+  for (const w of freeWb) {
+    // 该 wb 在窗口内命中的 Memory 候选
+    const memCands = freeMem.filter(m => Math.abs(w.created - m.timestamp) <= WINDOW);
+    if (memCands.length !== 1) continue;     // 0 或 ≥2 → 歧义，保持 unlinked
+    const m = memCands[0];
+    if (m.wbId != null) continue;            // 已在本轮被别的 wb 绑走
+    // 反向唯一：这条 Memory 在窗口内是否只被当前这条 wb 命中
+    const wbCands = freeWb.filter(x => x.memId == null && Math.abs(x.created - m.timestamp) <= WINDOW);
+    if (wbCands.length !== 1 || wbCands[0].id !== w.id) continue;
+    // 双向唯一成立 → 绑定（tags/content 只作辅助，不强制，缺失不否决）
+    w.memId = m.id; m.wbId = w.id;
+    dirtyWb = true; dirtyMem = true;
+  }
+
+  if (dirtyMem) { try { localStorage.setItem('longTermMemories', JSON.stringify(mems)); } catch (e) {} }
+  if (dirtyWb)  { try { localStorage.setItem('worldBook', JSON.stringify(wb)); } catch (e) {} }
 }
 
 // 核心：按用户消息检索命中的世界书条目，返回注入 prompt 的文本。
@@ -215,8 +318,14 @@ function saveWorldBookFromEditor() {
   const content = document.getElementById('wbEditContent').value;
   if (!content.trim()) { if (typeof showToast === 'function') showToast('写点内容吧'); return; }
   if (!keywords.trim()) { if (typeof showToast === 'function') showToast('至少写一个关键词'); return; }
+  // 注意：带 id 走更新分支时 addWorldBookEntry 只改 keywords/content，
+  // 不覆盖 source/memId，所以编辑 auto 条目后它仍是 auto、关联保留。
   const saved = addWorldBookEntry({ keywords, content, source: 'manual', id });
   if (!saved && !id) { if (typeof showToast === 'function') showToast('这条已经存在了'); return; }
+  // 编辑联动：auto 条目且有有效 memId → 把新 content 同步回对应 Memory（保留 id，不新建，不跑 DeepSeek）
+  if (saved && saved.source === 'auto' && saved.memId != null && typeof updateLongTermMemoryContent === 'function') {
+    try { updateLongTermMemoryContent(saved.memId, saved.content); } catch (e) {}
+  }
   closeWorldBookEditor();
   renderWorldBook();
   if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
@@ -225,7 +334,18 @@ function saveWorldBookFromEditor() {
 
 function deleteWorldBookEntry(id) {
   if (!confirm('删除这条记忆？')) return;
+  // 删除联动：auto 条目且 memId 命中真实存在的 Memory → 一起删，并写墓碑防云端复活。
+  // manual 或未绑定 → 只删 wb 本身（manual 行为完全不变，不写墓碑、不猜 Memory）。
+  const e = getWorldBookEntries().find(x => x.id === id);
+  let memRemoved = false;
+  if (e && e.source === 'auto' && e.memId != null && typeof removeLongTermMemoryById === 'function') {
+    memRemoved = removeLongTermMemoryById(e.memId);
+  }
   removeWorldBookEntry(id);
+  if (e && e.source === 'auto') {
+    // wb 一定写墓碑；对应 mem 仅在确实删到时写（memId 指向不存在对象则不写 mem 墓碑）
+    _wbAddTombstone({ wbId: id, memId: memRemoved ? e.memId : null });
+  }
   renderWorldBook();
   if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
 }

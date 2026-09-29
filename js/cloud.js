@@ -715,15 +715,37 @@ async function loadFromCloud() {
       mergeArrays('deliveryHistory', s.deliveryHistory, 50);
       mergeArrays('takeoutHistory', s.takeoutHistory, 50);
 
+      // 删除墓碑并集（本地 ∪ 云端）：任何一端删过的 auto wb/mem，都不再复活，并写回合并后的墓碑
+      const tomb = (() => {
+        let lt = {}; try { lt = JSON.parse(localStorage.getItem('linkTombstones') || '{}'); } catch (e) { lt = {}; }
+        const ct = (s.linkTombstones && typeof s.linkTombstones === 'object') ? s.linkTombstones : {};
+        const wbSet = new Set([...(Array.isArray(lt.wb) ? lt.wb : []), ...(Array.isArray(ct.wb) ? ct.wb : [])]);
+        const memSet = new Set([...(Array.isArray(lt.mem) ? lt.mem : []), ...(Array.isArray(ct.mem) ? ct.mem : [])]);
+        try {
+          localStorage.setItem('linkTombstones', JSON.stringify({
+            wb: Array.from(wbSet).slice(-500), mem: Array.from(memSet).slice(-500)
+          }));
+        } catch (e) {}
+        return { wbSet, memSet };
+      })();
+
       // 长期记忆（结构化数组）：按 id 合并去重，按 importance 排序，与 saveLongTermMemoryEntry 一致
       if (Array.isArray(s.longTermMemories) && s.longTermMemories.length > 0) {
         const localMems = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
         const merged = [...localMems];
         s.longTermMemories.forEach(cm => {
-          if (!merged.find(lm => lm.id === cm.id)) merged.push(cm);
+          if (tomb.memSet.has(cm.id)) return; // 已墓碑：云端别再塞回来
+          const local = merged.find(lm => lm.id === cm.id);
+          if (!local) { merged.push(cm); return; }
+          // 同 id：只补空的关联字段，其它字段一律不 merge（不做 last-write-wins）
+          if (local.wbId == null && cm.wbId != null) local.wbId = cm.wbId;
+          else if (local.wbId != null && cm.wbId != null && local.wbId !== cm.wbId)
+            console.warn('[link] memory.wbId conflict', cm.id, local.wbId, cm.wbId);
         });
-        merged.sort((a, b) => (b.importance || 0) - (a.importance || 0));
-        localStorage.setItem('longTermMemories', JSON.stringify(merged.slice(0, 50)));
+        // 本地若还残留已墓碑的记录（跨设备删除传播），一并清掉
+        const cleaned = merged.filter(m => !tomb.memSet.has(m.id));
+        cleaned.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+        localStorage.setItem('longTermMemories', JSON.stringify(cleaned.slice(0, 50)));
       }
 
       // 世界书（关键词记忆）：按 id 合并去重。上限 200，锁定的永不被裁掉。
@@ -731,12 +753,34 @@ async function loadFromCloud() {
         const localWb = JSON.parse(localStorage.getItem('worldBook') || '[]');
         const mergedWb = [...localWb];
         s.worldBook.forEach(cw => {
-          if (!mergedWb.find(lw => lw.id === cw.id)) mergedWb.push(cw);
+          if (tomb.wbSet.has(cw.id)) return; // 已墓碑：云端别再塞回来
+          const local = mergedWb.find(lw => lw.id === cw.id);
+          if (!local) { mergedWb.push(cw); return; }
+          // 同 id：只补空的关联字段，其它字段一律不 merge（不做 last-write-wins）
+          if (local.memId == null && cw.memId != null) local.memId = cw.memId;
+          else if (local.memId != null && cw.memId != null && local.memId !== cw.memId)
+            console.warn('[link] worldbook.memId conflict', cw.id, local.memId, cw.memId);
         });
-        const lockedWb = mergedWb.filter(e => e.locked);
-        const unlockedWb = mergedWb.filter(e => !e.locked);
+        // 本地残留已墓碑的 wb（跨设备删除传播）一并清掉
+        const survived = mergedWb.filter(e => !tomb.wbSet.has(e.id));
+        const lockedWb = survived.filter(e => e.locked);
+        const unlockedWb = survived.filter(e => !e.locked);
         const cappedWb = [...lockedWb, ...unlockedWb.slice(0, Math.max(0, 200 - lockedWb.length))];
         localStorage.setItem('worldBook', JSON.stringify(cappedWb));
+      }
+
+      // Relationship Understanding：按 id 合并去重。同 id 取 updatedAt 较新的版本，
+      // 这样 REVISE（原地更新、id 不变、updatedAt 变新）不会被简单 local-first 永远吞掉。
+      if (Array.isArray(s.relationshipUnderstandings) && s.relationshipUnderstandings.length > 0) {
+        const localRu = JSON.parse(localStorage.getItem('relationshipUnderstandings') || '[]');
+        const byId = new Map((Array.isArray(localRu) ? localRu : []).map(e => [e.id, e]));
+        s.relationshipUnderstandings.forEach(cr => {
+          if (!cr || !cr.id) return;
+          const local = byId.get(cr.id);
+          if (!local) { byId.set(cr.id, cr); return; }
+          if ((cr.updatedAt || 0) > (local.updatedAt || 0)) byId.set(cr.id, cr); // 云端更新 → 用云端
+        });
+        localStorage.setItem('relationshipUnderstandings', JSON.stringify(Array.from(byId.values()).slice(0, 30)));
       }
 
       // 外卖进行中订单：按id合并，本地有就用本地（进度更新）
@@ -1051,6 +1095,15 @@ async function saveToCloud() {
         const un = wb.filter(e => !e.locked);
         return [...lk, ...un.slice(0, Math.max(0, 200 - lk.length))];
       })(),
+      // 删除墓碑：auto 联动删除的 wb/mem id，上云让其它设备也不复活它们
+      linkTombstones: (() => {
+        try {
+          const t = JSON.parse(localStorage.getItem('linkTombstones') || '{}');
+          return { wb: Array.isArray(t.wb) ? t.wb.slice(-500) : [], mem: Array.isArray(t.mem) ? t.mem.slice(-500) : [] };
+        } catch (e) { return { wb: [], mem: [] }; }
+      })(),
+      // Relationship Understanding（独立系统）：随快照上云，换设备可拿到
+      relationshipUnderstandings: JSON.parse(localStorage.getItem('relationshipUnderstandings') || '[]').slice(0, 30),
       collections: JSON.parse(localStorage.getItem('collections') || '[]').slice(0, 400),
       dateMemories: JSON.parse(localStorage.getItem('dateMemories') || '[]').slice(0, 50),
       giftRecords: JSON.parse(localStorage.getItem('giftRecords') || '[]').slice(0, 100),

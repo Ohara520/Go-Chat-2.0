@@ -238,6 +238,11 @@ window.onload = async function() {
     // 已有用户兜底：Ghost 档案数据（与 startChat 共享逻辑）
     _ensureGhostProfileDefaults();
 
+    // Memory ↔ auto WorldBook 关联迁移（云端合并后跑一次，自愈半绑定 + 时间回填）
+    if (typeof linkAutoWorldBookMemories === 'function') {
+      try { linkAutoWorldBookMemories(); } catch (e) { console.warn('[link] migration failed', e); }
+    }
+
     // 恢复约会 session：如果有进行中的约会，直接恢复约会界面而不是主页
     const _activeDate = localStorage.getItem('activeDateSession');
     if (_activeDate) {

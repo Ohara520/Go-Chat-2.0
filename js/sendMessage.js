@@ -1653,6 +1653,10 @@ async function _processMergedMessage(text) {
         updateShortTermMemory(reply, text).catch(e => console.warn('短期记忆更新失败:', e));
         if (_currentTurn % 5 === 0) {
           updateLongTermMemory(reply, text).catch(e => console.warn('长期记忆更新失败:', e));
+          // Relationship Understanding：只在此跑轻量 Trigger，有信号才调 Judge（不是每5轮必判）
+          if (typeof maybeLearnRelationship === 'function') {
+            maybeLearnRelationship().catch(e => console.warn('关系理解学习失败:', e));
+          }
         }
       }, 2000);
     }

@@ -315,6 +315,13 @@ async function updateLongTermMemory(reply, text) {
       .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content}`)
       .join('\n');
 
+    // Memory V2：给 DeepSeek 少量与当前对话最相关的旧 Memory（最多 5 条），
+    // 让它判断这次内容是「全新的(add)」还是「在修正/完善已记住的某条(update)」。
+    const candidates = selectRelevantMemoriesForExtraction(conversationText, 5);
+    const candidateBlock = candidates.length
+      ? candidates.map(c => `  - id=${c.id} | tags=[${(c.tags || []).join(', ')}] | ${c.content}`).join('\n')
+      : '  (none)';
+
     const prompt = `Extract ONE important long-term memory from this conversation, ONLY if something is genuinely worth remembering long-term.
 Focus on:
 - Personal details she shared (preferences, fears, dreams, past events)
@@ -332,32 +339,120 @@ CRITICAL rules for "content":
   · 每个核心词尽量同时给「中文」和「对应英文」两种写法，方便用户之后用中文或英文都能召回同一条记忆。例：核心是"黑色大肥猫的故事"→ ["黑色大肥猫","黑猫","故事","black fat cat","black cat","story"]。若某词本来就是英文原词（如人名 Ghost、地名），中英一致时给一个即可。
   · 只要高信息量的词。绝对不要放 a / I / it / me / you / go / thing / love 这种过于宽泛或过短的英文词——它们会导致大量误召回。
   · 总量控制在 6 个以内，宁可少而准。
-- Only extract if it matters beyond this moment. Small talk, greetings, and passing remarks are NOT memories — for those return {"content": ""}.
+- Only extract if it matters beyond this moment. Small talk, greetings, and passing remarks are NOT memories — for those use action "none".
+
+You are also given a few EXISTING long-term memories that may be related to this conversation.
+Decide an "action":
+- "add": the content forms a genuinely NEW long-term memory, not the same as any existing one below.
+- "update": the new info clearly CORRECTS, REPLACES, or makes MORE ACCURATE/COMPLETE one of the existing memories below. Set "update_target" to that memory's exact id. 例：旧「她喜欢喝咖啡」+ 新对话「我现在不喝咖啡了，一喝就难受」→ update 成「她不喝咖啡」，不要再 add。又例：旧「她喜欢我逗她」+ 明确「但真正难过时不喜欢被开玩笑」→ update 成带条件的更准确版本，不要保留两条互相矛盾的记忆。
+- "none": nothing worth saving long-term; OR essentially the same as an existing memory; OR just a current mood/state; OR too vague; OR you cannot confirm which existing memory it corrects; OR mere repetition with no new meaning. 默认宁可 none，不要为了触发而硬造记忆。
+
+"update_target" MUST be one of the existing memory ids listed below. 绝不要编造不存在的 id。若拿不准是在修正哪条，用 "none"，不要乱填 id、也不要降级成 add。
+
+Existing related memories (candidates for update_target):
+${candidateBlock}
 
 Format: JSON only
 {
+  "action": "add|update|none",
+  "update_target": "mem_xxx or null",
   "type": "milestone|secret|preference|event",
   "content": "1-2句简体中文记忆，忠实于她实际说的话，人称遵守上面规则",
   "importance": 1-10,
   "tags": ["中文核心词", "对应英文", "..."]
 }
 
-If nothing important, return: {"content": ""}
+If nothing important, return: {"action":"none"}
 
 Recent conversation:
 ${conversationText}`;
 
     const raw = await callDeepSeek(prompt, 300);
     const memory = safeParseJSON(raw);
+    if (!memory) return;
+
+    // 兼容旧输出：缺 action 时按 add（保持旧行为）
+    const action = (memory.action || 'add').toLowerCase();
+
+    if (action === 'none') return; // 安静结束：不存、不建 wb、不改旧 Memory、不动 recall
 
     // 重要性门槛：DeepSeek 给的 importance 低于 4 的当作日常闲聊，不入库
     // （缺失 importance 时按 5 处理，保持旧行为不误杀）
-    const imp = typeof memory?.importance === 'number' ? memory.importance : 5;
-    if (memory && memory.content && memory.content.length > 5 && imp >= 4) {
+    const imp = typeof memory.importance === 'number' ? memory.importance : 5;
+    if (!(memory.content && memory.content.length > 5 && imp >= 4)) return;
+
+    if (action === 'update') {
+      // update_target 必须命中本次提供的候选 id；否则不降级成 add，直接放弃
+      const target = memory.update_target;
+      const validTarget = target && candidates.some(c => c.id === target);
+      if (!validTarget) {
+        console.warn('[memV2] update_target 无效或不在候选内，放弃本次更新:', target);
+        return;
+      }
+      updateLongTermMemoryEntry(target, memory);
+    } else {
+      // add 及任何未知 action → 走原有新增流程（新 id / 门槛 / sort / top50 / survived / 建 wb）
       saveLongTermMemoryEntry(memory);
     }
   } catch (e) {
     console.error('长期记忆提取失败:', e);
+  }
+}
+
+/**
+ * 从现有 longTermMemories 里挑最多 limit 条与本次对话最相关的旧 Memory，
+ * 复用 tags / content 字面匹配思路（不改 recall 本身），仅用于给 DeepSeek 做 add/update 判断。
+ */
+function selectRelevantMemoriesForExtraction(conversationText, limit = 5) {
+  let memories;
+  try { memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]'); } catch (e) { memories = []; }
+  if (!Array.isArray(memories) || memories.length === 0) return [];
+  const text = (conversationText || '').toLowerCase();
+  if (!text) return [];
+
+  const scored = memories.map(m => {
+    let score = 0;
+    if (Array.isArray(m.tags)) {
+      m.tags.forEach(tag => { if (tag && text.includes(String(tag).toLowerCase())) score += 5; });
+    }
+    (m.content || '').toLowerCase().split(/\s+/).forEach(w => {
+      if (w.length > 3 && text.includes(w)) score += 2;
+    });
+    return { m, score };
+  });
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(s => ({ id: s.m.id, content: s.m.content, tags: s.m.tags || [] }));
+}
+
+/**
+ * Memory V2 UPDATE：原地更新一条已有 Memory，保留 id / timestamp / wbId / lastRecalled，
+ * 更新 content / type / importance / tags，并写 updatedAt。不新建 Memory。
+ * 更新成功后同步对应 auto WorldBook（若关联有效），绝不新建 wb。
+ */
+function updateLongTermMemoryEntry(memId, memory) {
+  let memories;
+  try { memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]'); } catch (e) { memories = []; }
+  if (!Array.isArray(memories)) return;
+  const m = memories.find(x => x.id === memId);
+  if (!m) { console.warn('[memV2] update 目标已不存在，放弃:', memId); return; }
+
+  m.content = memory.content;
+  m.type = memory.type || m.type || 'event';
+  m.importance = typeof memory.importance === 'number' ? memory.importance : (m.importance || 5);
+  if (Array.isArray(memory.tags)) m.tags = memory.tags;
+  m.updatedAt = Date.now();
+  // 保留 id / timestamp / wbId / lastRecalled 等其它字段不动
+
+  memories.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+  localStorage.setItem('longTermMemories', JSON.stringify(memories.slice(0, 50)));
+  console.log('♻️ 更新长期记忆:', String(m.content).slice(0, 50));
+
+  // 同步已有 auto WorldBook（原地，不新建）；无 wbId 或关联无效则跳过，UPDATE 本身仍成功
+  if (typeof syncAutoWorldBookForMemory === 'function') {
+    try { syncAutoWorldBookForMemory(m); } catch (e) {}
   }
 }
 
@@ -368,9 +463,11 @@ function saveLongTermMemoryEntry(memory) {
   let memories;
   try { memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]'); } catch(e) { memories = []; }
   if (!Array.isArray(memories)) memories = [];
-  const isDuplicate = memories.some(m =>
-    m.content && m.content.toLowerCase().includes(memory.content.toLowerCase().slice(0, 30))
-  );
+  // 程序层只拦「规范化后完全相同」的 content（去空白+小写）。
+  // 语义上的重复 / 补充 / 修正 / 条件变化交给 DeepSeek 的 add/update/none 判断。
+  const _norm = s => String(s == null ? '' : s).toLowerCase().replace(/\s+/g, '');
+  const nc = _norm(memory.content);
+  const isDuplicate = memories.some(m => _norm(m.content) === nc);
   if (isDuplicate) return;
 
   const newMemory = {
@@ -390,9 +487,66 @@ function saveLongTermMemoryEntry(memory) {
   console.log('💾 保存长期记忆:', newMemory.content.slice(0, 50));
 
   // 同步进世界书：用 tags 作触发词，让 AI 抽到的记忆也能被关键词检索到
-  if (typeof addWorldBookEntry === 'function' && Array.isArray(newMemory.tags) && newMemory.tags.length) {
-    try { addWorldBookEntry({ keywords: newMemory.tags, content: newMemory.content, source: 'auto' }); } catch (e) {}
+  // 建 auto WorldBook 前先确认这条 Memory 没被 top50 淘汰，否则不建、不关联、不补救
+  // （避免 wb.memId 指向一个已不存在的 Memory）
+  const survived = trimmed.some(m => m.id === newMemory.id);
+  if (survived && typeof addWorldBookEntry === 'function' && Array.isArray(newMemory.tags) && newMemory.tags.length) {
+    try {
+      const wbEntry = addWorldBookEntry({ keywords: newMemory.tags, content: newMemory.content, source: 'auto' });
+      // wb 真正创建成功（非 null，非去重/无关键词）才建立双向关联
+      if (wbEntry && wbEntry.id) linkMemoryAndWorldBook(newMemory.id, wbEntry.id);
+    } catch (e) {}
   }
+}
+
+/**
+ * 建立 Long-Term Memory ↔ auto WorldBook 的双向关联。
+ * 各自独立读写：一侧失败不拖累另一侧，均不影响已保存的 Memory 本体。
+ */
+function linkMemoryAndWorldBook(memId, wbId) {
+  // 写 Memory.wbId
+  try {
+    const mems = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+    const m = Array.isArray(mems) ? mems.find(x => x.id === memId) : null;
+    if (m) { m.wbId = wbId; localStorage.setItem('longTermMemories', JSON.stringify(mems)); }
+  } catch (e) {}
+  // 写 WorldBook.memId（独立 try：一侧失败不拖累另一侧）
+  try {
+    const wb = JSON.parse(localStorage.getItem('worldBook') || '[]');
+    const w = Array.isArray(wb) ? wb.find(x => x.id === wbId) : null;
+    if (w) { w.memId = memId; localStorage.setItem('worldBook', JSON.stringify(wb)); }
+  } catch (e) {}
+}
+
+/**
+ * 按 id 删除一条 Long-Term Memory。返回是否真的删到。
+ * 用于 auto WorldBook 删除时联动删除对应 Memory；不跑提炼、不动其它字段。
+ */
+function removeLongTermMemoryById(memId) {
+  try {
+    const mems = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+    if (!Array.isArray(mems)) return false;
+    const next = mems.filter(m => m.id !== memId);
+    if (next.length === mems.length) return false;
+    localStorage.setItem('longTermMemories', JSON.stringify(next));
+    return true;
+  } catch (e) { return false; }
+}
+
+/**
+ * 同步更新一条 Long-Term Memory 的 content（保留 id / importance / tags / 时间等一切其它字段）。
+ * 用于编辑 auto WorldBook 时把新 content 回写对应 Memory；不新建、不跑 DeepSeek。
+ */
+function updateLongTermMemoryContent(memId, content) {
+  try {
+    const mems = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+    if (!Array.isArray(mems)) return false;
+    const m = mems.find(x => x.id === memId);
+    if (!m) return false;
+    m.content = content;
+    localStorage.setItem('longTermMemories', JSON.stringify(mems));
+    return true;
+  } catch (e) { return false; }
 }
 
 /**
@@ -408,8 +562,22 @@ function recallLongTermMemory(userMessage, limit = 3) {
 
   const userLower = userMessage.toLowerCase();
 
+  // 停用联动：对应 auto WorldBook.enabled===false 的 Memory 不参与召回。
+  // 只影响绑定了 auto WorldBook 的 Memory；未绑定 / manual 一律不受影响。
+  const mutedMemIds = new Set();
+  try {
+    const wb = JSON.parse(localStorage.getItem('worldBook') || '[]');
+    if (Array.isArray(wb)) {
+      wb.forEach(w => {
+        if (w && w.source === 'auto' && w.enabled === false && w.memId != null) mutedMemIds.add(w.memId);
+      });
+    }
+  } catch (e) {}
+  const candidates = mutedMemIds.size ? memories.filter(m => !mutedMemIds.has(m.id)) : memories;
+  if (candidates.length === 0) return '';
+
   // 计算相关性分数
-  const scored = memories.map(m => {
+  const scored = candidates.map(m => {
     let score = 0;
 
     // 标签匹配（tags 可能缺失或非数组，加守卫防止 forEach 抛错）
