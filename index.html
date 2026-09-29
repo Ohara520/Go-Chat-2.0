@@ -546,16 +546,33 @@
         <div class="hero-date" id="heroDate"></div>
         <div class="hero-weather" id="heroWeather"></div>
 
-        <!-- Ghost 主卡 -->
-        <div class="hero-ghost-card" onclick="openScreen('chatScreen')">
-          <img class="ghost-avatar-img hero-ghost-avatar" src="images/ghost-avatar.jpg">
-          <div class="hero-ghost-info">
-            <div class="hero-ghost-label">GHOST</div>
-            <div class="hero-ghost-name">Simon Riley</div>
-            <div class="hero-ghost-loc" id="heroGhostLoc"></div>
-            <div class="hero-ghost-meta" id="heroGhostMeta"></div>
+        <!-- Ghost 主卡 + Our Home 并排 -->
+        <div class="hero-entry-row">
+          <!-- Ghost 主卡（Chat） -->
+          <div class="hero-ghost-card" onclick="openScreen('chatScreen')">
+            <div class="hero-ghost-top">
+              <img class="ghost-avatar-img hero-ghost-avatar" src="images/ghost-avatar.jpg">
+              <div class="hero-ghost-info">
+                <div class="hero-ghost-label">GHOST</div>
+                <div class="hero-ghost-name">Simon Riley</div>
+                <div class="hero-ghost-loc" id="heroGhostLoc"></div>
+                <div class="hero-ghost-meta" id="heroGhostMeta"></div>
+              </div>
+            </div>
+            <div class="hero-chat-btn">Chat&nbsp;→</div>
           </div>
-          <div class="hero-chat-btn">Chat&nbsp;→</div>
+
+          <!-- Our Home 卡（Locked） -->
+          <div class="hero-home-card is-locked">
+            <div class="hero-home-info">
+              <div class="hero-home-name">Our Home</div>
+              <div class="hero-home-locked-row">
+                <span class="hero-home-locked-label">暂未开启</span>
+              </div>
+              <div class="hero-home-sub">等我们一起拥有一个家。</div>
+            </div>
+            <div class="hero-home-btn">Coming Soon</div>
+          </div>
         </div>
       </div>
     </div>
@@ -640,6 +657,13 @@
             <div class="photo-card-sub">WALLET</div>
           </div>
         </div>
+        <div class="card photo-card" onclick="if(typeof showToast==='function')showToast('贷款系统开发中，敬请期待～')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-mortgage.png" alt="">
+          <div class="photo-card-text">
+            <div class="photo-card-title">贷款</div>
+            <div class="photo-card-sub">MORTGAGE</div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -657,11 +681,11 @@
             <div class="photo-card-sub">CAREER</div>
           </div>
         </div>
-        <div class="card photo-card" id="shelfCard" onclick="openScreen('shelfScreen');setTimeout(()=>{if(typeof renderGiftShelf==='function')renderGiftShelf();},80);">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-voice.png" alt="">
+        <div class="card photo-card" onclick="if(typeof showToast==='function')showToast('出行系统开发中，敬请期待～')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-travel.png" alt="">
           <div class="photo-card-text">
-            <div class="photo-card-title">声之匣</div>
-            <div class="photo-card-sub">VOICE</div>
+            <div class="photo-card-title">出行</div>
+            <div class="photo-card-sub">TRAVEL</div>
           </div>
         </div>
       </div>

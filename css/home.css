@@ -91,47 +91,62 @@
     min-height: 16px;
 }
 
-/* Ghost 主卡：Hero 第二视觉层级，靠底、横向铺满、更大内部空间 */
-.hero-ghost-card {
-    position: relative;
+/* Chat / Our Home 并排容器：等宽、等高、共享靠底定位 */
+.hero-entry-row {
     margin-top: clamp(20px, 5vh, 44px);
     display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 14px 18px;
+    align-items: stretch;
+    gap: 14px;
+}
+.hero-entry-row > * {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Ghost 主卡：上区头像+信息并排，下区整宽按钮 */
+.hero-ghost-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 16px 14px;
     border-radius: 24px;
     cursor: pointer;
     transition: transform 0.2s ease;
 }
-/* 磨砂玻璃面板放到伪元素上，单独做右上角渐隐，内容(头像/文字/按钮)保持清晰 */
+/* 磨砂玻璃面板放到伪元素上，左上角渐隐（并排时朝外侧空角），内容保持清晰 */
 .hero-ghost-card::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: 24px;
-    background: rgba(250,248,242,0.22);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.4);
-    box-shadow: 0 4px 16px rgba(40,50,30,0.08);
-    /* 左下实、右上逐渐透明消失，融进背景 */
-    -webkit-mask-image: linear-gradient(to top right, #000 42%, rgba(0,0,0,0.55) 68%, transparent 90%);
-            mask-image: linear-gradient(to top right, #000 42%, rgba(0,0,0,0.55) 68%, transparent 90%);
+    background: rgba(250,248,242,0.42);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.45);
+    box-shadow: 0 4px 16px rgba(40,50,30,0.1);
+    /* 右下实、左上逐渐透明消失，融进背景（只吃外侧空角） */
+    -webkit-mask-image: linear-gradient(to top left, #000 62%, rgba(0,0,0,0.6) 82%, transparent 100%);
+            mask-image: linear-gradient(to top left, #000 62%, rgba(0,0,0,0.6) 82%, transparent 100%);
     pointer-events: none;
 }
 .hero-ghost-card:active {
     transform: scale(0.985);
 }
-.hero-ghost-card:active {
-    transform: scale(0.985);
-    box-shadow: 0 3px 12px rgba(40,50,30,0.1);
+.hero-ghost-top {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 .hero-ghost-avatar {
     position: relative;
     z-index: 1;
-    width: 72px;
-    height: 72px;
-    border-radius: 18px;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
     object-fit: cover;
     flex-shrink: 0;
     box-shadow: 0 3px 10px rgba(0,0,0,0.22);
@@ -150,29 +165,32 @@
 }
 .hero-ghost-name {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 500;
     color: #2a3020;
-    line-height: 1.08;
-    letter-spacing: 0.4px;
-    margin-bottom: 5px;
+    line-height: 1.12;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
 }
 .hero-ghost-loc {
     font-size: 12px;
     font-weight: 500;
     color: rgba(50,60,40,0.68);
+    line-height: 1.35;
 }
 .hero-ghost-meta {
     font-size: 12px;
     font-weight: 500;
     color: rgba(50,60,40,0.6);
-    margin-top: 1px;
+    margin-top: 2px;
+    line-height: 1.35;
 }
 .hero-chat-btn {
     position: relative;
     z-index: 1;
     flex-shrink: 0;
-    align-self: flex-end;
+    margin-top: 2px;
+    text-align: center;
     background: #4a6b3a;
     color: #fff;
     font-size: 14px;
@@ -183,6 +201,81 @@
     box-shadow: 0 3px 10px rgba(40,70,25,0.28);
 }
 
+/* ===== Our Home 卡（复用玻璃语言，右上角渐隐）===== */
+.hero-home-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 16px 14px;
+    border-radius: 24px;
+    transition: transform 0.2s ease;
+}
+.hero-home-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: rgba(250,248,242,0.42);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.45);
+    box-shadow: 0 4px 16px rgba(40,50,30,0.1);
+    /* 左下实、右上逐渐透明消失（只吃外侧空角） */
+    -webkit-mask-image: linear-gradient(to top right, #000 62%, rgba(0,0,0,0.6) 82%, transparent 100%);
+            mask-image: linear-gradient(to top right, #000 62%, rgba(0,0,0,0.6) 82%, transparent 100%);
+    pointer-events: none;
+}
+.hero-home-info {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+}
+.hero-home-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 21px;
+    font-weight: 500;
+    color: #2a3020;
+    line-height: 1.05;
+    letter-spacing: 0.3px;
+    margin-bottom: 8px;
+}
+.hero-home-locked-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+.hero-home-locked-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(50,60,40,0.7);
+}
+.hero-home-sub {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(50,60,40,0.55);
+}
+.hero-home-btn {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    margin-top: 2px;
+    text-align: center;
+    background: rgba(120,125,110,0.45);
+    color: rgba(255,255,255,0.9);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 11px 20px;
+    border-radius: 22px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(40,50,30,0.12);
+}
+.hero-home-card.is-locked {
+    cursor: default;
+}
+
 @media (max-width: 480px) {
     .home-hero {
         min-height: 52vh;
@@ -190,10 +283,12 @@
     }
     .hero-greeting { font-size: 23px; }
     .hero-name { font-size: 38px; }
-    .hero-ghost-name { font-size: 22px; }
-    .hero-ghost-avatar { width: 72px; height: 72px; }
+    .hero-ghost-name { font-size: 20px; }
+    .hero-ghost-avatar { width: 54px; height: 54px; }
     .hero-chat-btn { padding: 10px 16px; font-size: 13px; }
     .hero-ghost-card { gap: 14px; padding: 14px; }
+    .hero-entry-row { gap: 10px; }
+    .hero-home-name { font-size: 22px; }
 }
 
 /* ===== 基础卡片 ===== */
@@ -298,10 +393,10 @@
     line-height: 1.25;
 }
 
-/* LIFE 四卡横排：等宽 */
+/* LIFE 五卡横排：等宽紧凑，与 US 五卡一致 */
 .life-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 8px;
 }
 .life-row .card {
@@ -311,19 +406,19 @@
     border: none !important;
 }
 .life-row .photo-card .photo-card-img {
-    height: 78px;
+    height: 60px;
 }
 .life-row .photo-card .photo-card-text {
-    padding: 8px 8px 10px;
+    padding: 6px 6px 8px;
 }
 .life-row .photo-card .photo-card-title {
-    font-size: 13px;
+    font-size: 12px;
     margin-bottom: 1px;
     white-space: nowrap;
 }
 .life-row .photo-card .photo-card-sub {
-    font-size: 8px;
-    letter-spacing: 0.4px;
+    font-size: 7px;
+    letter-spacing: 0.3px;
     line-height: 1.25;
 }
 
