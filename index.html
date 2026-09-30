@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="css/chat.css">
 <link rel="stylesheet" href="css/voice.css">
 <link rel="stylesheet" href="css/delivery-v1.css">
+<link rel="stylesheet" href="css/assets-v1.css">
 <style>
 /* ===== 情侣空间封面重设计 ===== */
 .couple-petal-container { display: none !important; }
@@ -657,11 +658,11 @@
             <div class="photo-card-sub">WALLET</div>
           </div>
         </div>
-        <div class="card photo-card" onclick="if(typeof showToast==='function')showToast('贷款系统开发中，敬请期待～')">
+        <div class="card photo-card" onclick="openScreen('assetsScreen')">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-mortgage.png" alt="">
           <div class="photo-card-text">
-            <div class="photo-card-title">贷款</div>
-            <div class="photo-card-sub">MORTGAGE</div>
+            <div class="photo-card-title">资产</div>
+            <div class="photo-card-sub">ASSETS</div>
           </div>
         </div>
       </div>
@@ -1199,6 +1200,114 @@
       </div>
     </div>
     <div class="dlv-body" id="deliveryBody"></div>
+  </div>
+
+  <!-- ASSETS V1 — 资产首页 -->
+  <div class="screen" id="assetsScreen">
+    <div class="asset-hero">
+      <button class="asset-hero-back" onclick="openScreen('mainScreen')" aria-label="返回">‹</button>
+      <div class="asset-hero-copy">
+        <div class="asset-hero-eyebrow">a life we build together</div>
+        <h1 class="asset-hero-title">ASSETS</h1>
+        <div class="asset-hero-zh">我们的生活资产。</div>
+        <div class="asset-hero-tag">Not just a home — but the future we're walking toward.</div>
+        <div class="asset-hero-tag-zh">不仅是一个家，也是我们一起走向未来的计划。</div>
+      </div>
+    </div>
+    <div class="asset-body">
+      <!-- 住宅 / HOMES -->
+      <div class="asset-cat-card" onclick="openScreen('assetsHomesScreen')">
+        <img class="asset-cat-thumb" src="images/assets/assets-homes.png" alt="">
+        <div class="asset-cat-info">
+          <div class="asset-cat-heading">
+            <span class="asset-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg></span>
+            <div class="asset-cat-titles">
+              <div class="asset-cat-zh">住宅</div>
+              <div class="asset-cat-en">HOMES</div>
+            </div>
+            <span class="asset-cat-chevron">›</span>
+          </div>
+          <div class="asset-cat-desc">租房 / 购买<br>和他一起拥有一个家。</div>
+        </div>
+      </div>
+
+      <!-- 车辆 / VEHICLES -->
+      <div class="asset-cat-card" onclick="openScreen('assetsVehiclesScreen')">
+        <img class="asset-cat-thumb" src="images/assets/assets-vehicles.png" alt="">
+        <div class="asset-cat-info">
+          <div class="asset-cat-heading">
+            <span class="asset-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13.5 4.6 8.4A2 2 0 0 1 6.5 7h11a2 2 0 0 1 1.9 1.4L21 13.5"/><path d="M3 13.5h18V18a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1H6.5v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="16" r="0.6"/><circle cx="17" cy="16" r="0.6"/></svg></span>
+            <div class="asset-cat-titles">
+              <div class="asset-cat-zh">车辆</div>
+              <div class="asset-cat-en">VEHICLES</div>
+            </div>
+            <span class="asset-cat-chevron">›</span>
+          </div>
+          <div class="asset-cat-desc">全款 / 分期<br>一起去更远的地方。</div>
+        </div>
+      </div>
+
+      <!-- 我的资产 / MY ASSETS -->
+      <div class="asset-cat-card" onclick="openScreen('assetsOwnedScreen')">
+        <img class="asset-cat-thumb" src="images/assets/assets-owned.png" alt="">
+        <div class="asset-cat-info">
+          <div class="asset-cat-heading">
+            <span class="asset-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 10h16"/><path d="M9.5 13.5h5"/></svg></span>
+            <div class="asset-cat-titles">
+              <div class="asset-cat-zh">我的资产</div>
+              <div class="asset-cat-en">MY ASSETS</div>
+            </div>
+            <span class="asset-cat-chevron">›</span>
+          </div>
+          <div class="asset-cat-desc">查看我们目前拥有的家、车辆<br>以及相关的付款计划。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASSETS V1 — 住宅 HOMES（内页待建）-->
+  <div class="screen" id="assetsHomesScreen">
+    <div class="asset-inner-hero" style="background-image:url('images/assets/assets-homes.png');">
+      <button class="asset-hero-back" onclick="openScreen('assetsScreen')" aria-label="返回">‹</button>
+      <div class="asset-inner-hero-copy">
+        <h1 class="asset-hero-title">HOMES</h1>
+        <div class="asset-hero-zh">住宅</div>
+      </div>
+    </div>
+    <div class="asset-empty">
+      <div class="asset-empty-title">这里很快会有可以一起住的地方</div>
+      <div class="asset-empty-sub">租房与购买的住宅，正在整理中。</div>
+    </div>
+  </div>
+
+  <!-- ASSETS V1 — 车辆 VEHICLES（内页待建）-->
+  <div class="screen" id="assetsVehiclesScreen">
+    <div class="asset-inner-hero" style="background-image:url('images/assets/assets-vehicles.png');">
+      <button class="asset-hero-back" onclick="openScreen('assetsScreen')" aria-label="返回">‹</button>
+      <div class="asset-inner-hero-copy">
+        <h1 class="asset-hero-title">VEHICLES</h1>
+        <div class="asset-hero-zh">车辆</div>
+      </div>
+    </div>
+    <div class="asset-empty">
+      <div class="asset-empty-title">带我们去更远地方的车，还在路上</div>
+      <div class="asset-empty-sub">全款与分期的车辆，正在整理中。</div>
+    </div>
+  </div>
+
+  <!-- ASSETS V1 — 我的资产 MY ASSETS（内页待建）-->
+  <div class="screen" id="assetsOwnedScreen">
+    <div class="asset-inner-hero" style="background-image:url('images/assets/assets-owned.png');">
+      <button class="asset-hero-back" onclick="openScreen('assetsScreen')" aria-label="返回">‹</button>
+      <div class="asset-inner-hero-copy">
+        <h1 class="asset-hero-title">MY ASSETS</h1>
+        <div class="asset-hero-zh">我的资产</div>
+      </div>
+    </div>
+    <div class="asset-empty">
+      <div class="asset-empty-title">我们一起拥有的东西，会记在这里</div>
+      <div class="asset-empty-sub">已拥有的家、车辆与付款计划，即将上线。</div>
+    </div>
   </div>
 
   <!-- 外卖页 -->
@@ -3168,6 +3277,7 @@ window.openScreen = function(screenId) {
   if (!tb) return;
   const hideFor = ['chatScreen','profileScreen','coupleScreen','walletScreen',
     'careerScreen','diaryScreen','marketScreen','takeoutScreen','deliveryScreen',
+    'assetsScreen','assetsHomesScreen','assetsVehiclesScreen','assetsOwnedScreen',
     'achievementScreen','collectionScreen','calendarScreen','secretScreen','charFeedScreen'];
   if (screenId === 'mainScreen') {
     tb.style.display = 'flex';

@@ -1,0 +1,234 @@
+/* ═══════════════════════════════════════
+   ASSETS V1 — 资产首页
+   奶油白 / 鼠尾草绿 / 暖色生活摄影
+═══════════════════════════════════════ */
+
+#assetsScreen,
+#assetsHomesScreen,
+#assetsVehiclesScreen,
+#assetsOwnedScreen {
+    display: none;
+    background: #f4efe6;
+}
+#assetsScreen.active,
+#assetsHomesScreen.active,
+#assetsVehiclesScreen.active,
+#assetsOwnedScreen.active {
+    display: block !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ── Hero 顶部大图 ── */
+.asset-hero {
+    position: relative;
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0 22px 30px;
+    background-image: url('../images/assets/assets-hero.png');
+    background-size: cover;
+    background-position: center 26%;
+    background-repeat: no-repeat;
+    background-color: #f4efe6;
+    overflow: hidden;
+}
+/* 奶油白从底部向上淡出：文字区几乎压实、底部与正文同色无缝衔接，上方保留生活场景 */
+.asset-hero::after {
+    content: '';
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 78%;
+    background: linear-gradient(180deg,
+        rgba(244,239,230,0) 0%,
+        rgba(244,239,230,0.35) 30%,
+        rgba(244,239,230,0.82) 58%,
+        rgba(244,239,230,0.98) 80%,
+        #f4efe6 100%);
+    pointer-events: none;
+}
+.asset-hero-back {
+    position: absolute; top: 14px; left: 14px; z-index: 3;
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px;
+    padding: 0; margin: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(122,142,104,0.28);
+    background: rgba(255,255,255,0.62);
+    color: #4a5b3d;
+    font-size: 23px; line-height: 1;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: transform 0.15s;
+}
+.asset-hero-back:active { transform: scale(0.92); }
+.asset-hero-copy {
+    position: relative; z-index: 2;
+}
+/* 小号英文引导语：极宽字距，安静克制 */
+.asset-hero-eyebrow {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 11px; font-weight: 500;
+    font-style: italic;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(127,150,99,0.85);
+    margin-bottom: 6px;
+    padding-left: 3px;
+}
+.asset-hero-title {
+    margin: 0;
+    font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+    font-size: 52px; font-weight: 600;
+    letter-spacing: 6px;
+    color: #3d4d31;
+    line-height: 1;
+    text-indent: 6px;
+    text-shadow: 0 1px 18px rgba(244,239,230,0.9), 0 0 2px rgba(244,239,230,0.8);
+}
+.asset-hero-zh {
+    margin-top: 8px;
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 21px; font-weight: 600;
+    letter-spacing: 3px;
+    color: #37452d;
+    text-shadow: 0 1px 12px rgba(244,239,230,0.85);
+}
+.asset-hero-tag {
+    margin-top: 13px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 15px; font-weight: 500;
+    font-style: italic;
+    line-height: 1.6;
+    letter-spacing: 0.6px;
+    color: rgba(74,91,61,0.9);
+    text-shadow: 0 1px 10px rgba(244,239,230,0.8);
+}
+/* 中文小字副标（英文诗句下方）*/
+.asset-hero-tag-zh {
+    margin-top: 7px;
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 12px; font-weight: 400;
+    line-height: 1.7;
+    letter-spacing: 0.5px;
+    color: rgba(90,104,74,0.72);
+}
+
+/* ── 正文容器 ── */
+.asset-body {
+    padding: 18px 16px 44px;
+    background: #f4efe6;
+}
+
+/* ── 分类入口卡：横向图文 ── */
+.asset-cat-card {
+    display: flex; align-items: stretch;
+    width: 100%;
+    margin-bottom: 16px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.62);
+    border: 1px solid rgba(122,142,104,0.18);
+    box-shadow: 0 6px 20px rgba(90,104,74,0.08);
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    transition: transform 0.16s, box-shadow 0.16s;
+}
+.asset-cat-card:active {
+    transform: scale(0.985);
+    box-shadow: 0 3px 12px rgba(90,104,74,0.1);
+}
+.asset-cat-thumb {
+    flex-shrink: 0;
+    width: 128px;
+    align-self: stretch;
+    object-fit: cover;
+    object-position: center;
+    background: #e7e0d1;
+}
+.asset-cat-info {
+    flex: 1;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 18px 16px;
+    min-width: 0;
+}
+.asset-cat-heading {
+    display: flex; align-items: center; gap: 10px;
+}
+.asset-cat-icon {
+    width: 26px; height: 26px; flex-shrink: 0;
+    color: #7f9663;
+}
+.asset-cat-icon svg { width: 100%; height: 100%; display: block; }
+.asset-cat-titles { min-width: 0; }
+.asset-cat-zh {
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 18px; font-weight: 700;
+    letter-spacing: 1px;
+    color: #3f4d34;
+    line-height: 1.2;
+}
+.asset-cat-en {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 15px; font-weight: 600;
+    letter-spacing: 2px;
+    color: rgba(127,150,99,0.9);
+    margin-top: 1px;
+}
+.asset-cat-chevron {
+    margin-left: auto;
+    font-size: 22px;
+    color: rgba(127,150,99,0.7);
+    flex-shrink: 0;
+    padding-left: 8px;
+}
+.asset-cat-desc {
+    margin-top: 10px;
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 12.5px; font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0.3px;
+    color: rgba(90,104,74,0.78);
+}
+
+/* ── 内页占位（HOMES / VEHICLES / MY ASSETS 待建）── */
+.asset-inner-hero {
+    position: relative;
+    min-height: 200px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 0 22px 22px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #efe8da;
+    overflow: hidden;
+}
+.asset-inner-hero::after {
+    content: '';
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 70%;
+    background: linear-gradient(180deg, rgba(244,239,230,0) 0%, rgba(244,239,230,0.6) 45%, rgba(244,239,230,0.95) 100%);
+    pointer-events: none;
+}
+.asset-inner-hero .asset-hero-back { z-index: 3; }
+.asset-inner-hero-copy { position: relative; z-index: 2; }
+.asset-empty {
+    padding: 48px 30px;
+    text-align: center;
+}
+.asset-empty-title {
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-size: 15px; font-weight: 600;
+    color: #3f4d34;
+    letter-spacing: 1px;
+}
+.asset-empty-sub {
+    margin-top: 8px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 14px; font-style: italic;
+    color: rgba(127,150,99,0.85);
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+}

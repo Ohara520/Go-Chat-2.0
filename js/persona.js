@@ -611,7 +611,11 @@ They do not decide what walks through it.
 // 替换原版 buildSystemPrompt()
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function buildSystemPrompt() {
+function buildSystemPrompt(opts) {
+  // skipWorldBook：只需要 .fixed（[CURRENT STATE] 之前的固定层）的调用方传 true。
+  // 世界书召回结果落在 dynamic 部分（[CURRENT STATE] 之后），跳过它不改变 .fixed 内容，
+  // 但能避免 recallWorldBook 白跑一次、白更新 lastHit。见 Gemini 调情/日常接续路径。
+  const _skipWorldBook  = !!(opts && opts.skipWorldBook);
   const userName        = localStorage.getItem('userName') || '你';
   const location        = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locationReason  = localStorage.getItem('currentLocationReason');
@@ -621,7 +625,7 @@ function buildSystemPrompt() {
   // 🔧 获取用户最后一条消息，用于检索相关长期记忆
   const userLastMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
   const longTermMemory = recallLongTermMemory(userLastMsg, 3);
-  const worldBookRecall = (typeof recallWorldBook === 'function') ? recallWorldBook(userLastMsg, 4) : '';
+  const worldBookRecall = (!_skipWorldBook && typeof recallWorldBook === 'function') ? recallWorldBook(userLastMsg, 4) : '';
   const relationshipUnderstanding = (typeof recallRelationshipUnderstanding === 'function') ? recallRelationshipUnderstanding(userLastMsg, 3) : '';
   const shortTermMemory = localStorage.getItem('shortTermMemory') || '';
 
@@ -1047,8 +1051,10 @@ HARD RULE: Every message in the conversation history is real. Do not add fiction
 // 用于 prompt caching（固定层缓存）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function buildSystemPromptParts(full) {
-  if (!full) full = buildSystemPrompt();
+function buildSystemPromptParts(full, opts) {
+  // 只取 .fixed 的调用方可传 { skipWorldBook:true }，避免内部 buildSystemPrompt 白跑一次世界书召回。
+  // 传入现成 full 时该选项无意义（不会再构建）。
+  if (!full) full = buildSystemPrompt(opts);
   const splitMarker = '[CURRENT STATE]';
   const idx = full.indexOf(splitMarker);
   if (idx === -1) return { fixed: full, dynamic: '' };

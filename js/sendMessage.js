@@ -674,8 +674,33 @@ async function _processMergedMessage(text) {
       return _merged;
     })();
 
+    // handoffHistory：Soft Handoff V1 专用 —— 仅在"日常轮 + 近期有亲密"的交接窗口
+    // 替代 cleanHistory 喂给 Claude 候选。与 cleanHistory 唯一区别：不按 _intimate 删除，
+    // 保留近期真实连续原文（含亲密），让 Claude 真正看到刚才发生了什么再尝试接手。
+    // 不做降敏/占位符/摘要替换（A 路线）。窗口判定用 10 分钟，但历史本身按条数取近 16 条，
+    // 不用 10 分钟机械截断实际对话。role 规范化与 cleanHistory 一致，防 400。
+    const handoffHistory = (() => {
+      const _filtered = chatHistory
+        .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled)
+        .slice(-16)
+        .map(m => ({ role: m.role, content: m.content }));
+      const _merged = [];
+      for (const m of _filtered) {
+        const _last = _merged[_merged.length - 1];
+        if (_last && _last.role === m.role) {
+          _last.content = `${_last.content}\n${m.content}`;
+        } else {
+          _merged.push({ ...m });
+        }
+      }
+      while (_merged.length && _merged[0].role === 'assistant') _merged.shift();
+      return _merged;
+    })();
+
     // ── System Prompt 构建 ───────────────────────────────────
-    const _baseSystem = buildSystemPrompt();
+    // _baseSystem 延迟到调情分支 return 之后再构建（见下方主 API 调用前）：
+    // 调情路径走 Gemini，不使用 _baseSystem，提前构建会让 buildSystemPrompt 内的
+    // recallWorldBook 白跑一次并污染 lastHit，导致 Gemini 侧真正那次召回选错条目。
 
     // ── 旧转账系统已移除，使用 Ghost Card ──
 
@@ -1146,15 +1171,22 @@ async function _processMergedMessage(text) {
 
     // ── 余温处理（只影响 Sonnet 的语气，不再把人拽回 Grok）─────
     // 简化原则：这条消息是露骨的→走 Grok，不是→走 Sonnet，一条一条判断，不粘
+    // _softHandoffWindow：Soft Handoff V1 交接窗口标记，hoist 到此以便后续
+    // 候选请求体（messagesForRequest）与破防交接分支复用同一判定。
+    let _softHandoffWindow = false;
     if (!isIntimate) {
       // 看看最近有没有调情过，如果有就给 Sonnet 一个氛围提示（但不改路由）
       const _lastIntimateMsg = chatHistory.slice(-6).filter(m => m._intimate).slice(-1)[0];
       const _intimateAge = _lastIntimateMsg?._time ? (Date.now() - _lastIntimateMsg._time) : Infinity;
       const _hasRecentIntimate = _lastIntimateMsg && _intimateAge < 10 * 60 * 1000; // 10分钟内
+      _softHandoffWindow = !!_hasRecentIntimate;
 
       if (_hasRecentIntimate) {
-        const _lastIntimateEntry = (localStorage.getItem('intimateMemory') || '').split('\n---\n').filter(Boolean).slice(-1)[0] || '';
-        if (_lastIntimateEntry) {
+        // 交接提示不再依赖 intimateMemory 摘要是否已生成：
+        // 摘要为异步、且仅在首条日常消息后才写入，若以其存在性为门控，
+        // 会导致亲密结束后第一条日常回复拿不到承接提示 → Claude 失忆/否认。
+        // 只在 sceneHint 尚无更高优先级内容（comeback / 外卖等）时才注入，避免覆盖。
+        if (!sceneHint) {
           sceneHint = `[The conversation settled after a moment of closeness a few minutes ago. He is more present than usual. Just answer what she said naturally — don't bring it up.]`;
         }
         // 如果还没存摘要，存一下
@@ -1183,7 +1215,9 @@ async function _processMergedMessage(text) {
     }
 
     // ── 图片注入 ─────────────────────────────────────────────
-    let messagesForRequest = cleanHistory;
+    // Soft Handoff V1：交接窗口内（日常轮 + 近期有亲密）让 Claude 看到真实连续历史，
+    // 否则用常规 cleanHistory（正常日常轮不该看到亲密内容）。
+    let messagesForRequest = _softHandoffWindow ? handoffHistory : cleanHistory;
     if (isRecentPhoto && lastPhotoMsg._photoBase64?.length > 0) {
       // 修复：删除"一两行"的死限制，让 Ghost 正常作为丈夫看图回应
       // 原指令强制简短 + "calling her out"（阴阳语气），导致老婆发照片只收到 okay./noted.
@@ -1215,6 +1249,8 @@ async function _processMergedMessage(text) {
 
     // ── 主API调用（Sonnet + systemParts缓存）────────────────
     // finalSystem 在此处拼装：此时 emotionHint / 照片 sceneHint / 余韵 sceneHint 都已赋值完毕
+    // _baseSystem 在此构建（而非函数顶部）：Claude 路径才需要它，其世界书召回在此只发生一次。
+    const _baseSystem = buildSystemPrompt();
     const finalSystem = [
       _baseSystem,
       antiBreakoutHint,
@@ -1259,6 +1295,18 @@ async function _processMergedMessage(text) {
 
     hideTyping();
     let reply = data.content?.[0]?.text || '';
+
+    // ── Soft Handoff V1：交接窗口内的高置信身份出戏 → 丢弃候选，交 Gemini 日常接续 ──
+    // 仅当"日常轮 + 近期有亲密"(_softHandoffWindow) 且候选明确出戏（自称 AI/否认 Simon
+    // 或婚姻关系/拒演）时触发。此处候选 reply 尚未 append/push/save，直接丢弃零落地。
+    // 只认高置信身份·关系类破防（_isIdentityBreakout）；内容安全拒绝不在此列，
+    // 不走此路（不拿备用模型绕安全线）。失败不锁定：下一轮符合条件仍先让 Claude 试。
+    if (_softHandoffWindow && reply && _isIdentityBreakout(reply)) {
+      // 候选丢弃，改由本来就知道上下文的 Gemini 以日常模式自然承接
+      await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+      _isSending = false;
+      return;
+    }
 
     // ── 破防检测 + 重试 ──────────────────────────────────────
     // 修复 #054：破防后不再静默，强制重试
@@ -1774,8 +1822,39 @@ function _rollbackFailedIntimateTurn() {
   } catch (e) {}
 }
 
+// ===== Soft Handoff V1：高置信"身份出戏/否认关系"检测 =====
+// 仅匹配明确的：自称 Claude/AI、由 Anthropic 制造、拒绝扮演、否认是 Simon、
+// 否认夫妻/婚姻关系。这是"换了个人"的连续性失败，Gemini 在角色内可自然接住。
+// 用白名单精确匹配 —— 内容安全拒绝措辞（not appropriate / must refuse /
+// i can't discuss sensitive / i need to be direct 等）刻意不在表内，因此绝不会
+// 因内容拒绝触发交接（不绕安全线）。这是 isBreakout 词表的高置信子集，非新判定模块。
+function _isIdentityBreakout(text) {
+  if (!text) return false;
+  const l = text.toLowerCase();
+  return [
+    // 自称 AI / Claude
+    "i'm claude", "i am claude", "made by anthropic", "by anthropic", "anthropic made",
+    "i'm an ai", "i am an ai", "as an ai", "as the ai",
+    "i'm kiro", "i am kiro", "i'm kirk", "i am kirk",
+    "claude ai", "claude here", "it's claude",
+    // 拒演
+    "i can't roleplay", "i cannot roleplay", "i don't roleplay", "i won't roleplay",
+    "i can't pretend", "i cannot pretend", "i won't pretend", "i'm not able to pretend",
+    // 否认 Simon 身份 / 夫妻关系
+    "i'm not simon", "i am not simon", "not your simon", "not your ghost",
+    "not your husband", "not your wife", "not married",
+    "i don't have a wife", "we're not together", "we're not married",
+  ].some(p => l.includes(p));
+}
+
 // ===== 调情回复（独立函数）=====
-async function _handleIntimateReply(text, rawHistory, isSendingRef) {
+// opts.dailyMode：Soft Handoff 日常接续模式 —— 保留 Shared Ghost Core + 近期真实上下文，
+//   但不注入调情 persona / adult 许可 / 记忆摘要，明确"她已转日常"，不强制重新调情。
+// opts.tagIntimate（默认 true）：成功回复是否打 _intimate 标记。日常接续传 false，
+//   避免把一条日常回复错标为亲密（否则它会被 cleanHistory 永久排除 → 制造下次失忆）。
+async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
+  const _dailyMode = opts.dailyMode === true;
+  const _tagIntimate = opts.tagIntimate !== false;
   try {
     // 图片消息替换为占位符传给Grok——Grok看不到图，用占位符保留上下文
     // 关键：去除 Grok 自己的重复回复，防止它抄自己形成复读机循环
@@ -1829,13 +1908,27 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef) {
     // 3. necessary adult capability / safety boundary
     // 4. Gemini Intimacy Persona V1
     // 5. intimate memory / continuity
+    // 只要 .fixed（Shared Ghost Core）；世界书召回在下方 _wbRecall 单独做一次，
+    // 故这里 skipWorldBook，避免构建 fixed 时白跑一次召回、重复更新 lastHit。
     const _sharedGhostCore = (typeof buildSystemPromptParts === 'function')
-      ? buildSystemPromptParts().fixed
+      ? buildSystemPromptParts(null, { skipWorldBook: true }).fixed
       : (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore());
     const _geminiIntimacyPersona = (typeof GEMINI_INTIMACY_PERSONA === 'string')
       ? '\n\n' + GEMINI_INTIMACY_PERSONA
       : '';
-    const _veniceSys = _sharedGhostCore + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection;
+    // 日常接续模式（Soft Handoff）：她已从亲密自然转向日常。保留 Shared Ghost Core
+    // 与近期真实上下文（他知道刚才发生了什么），但不注入 adult 许可 / 调情 persona /
+    // 记忆摘要，明确不重新调情——只作为她的丈夫，平静自然地接住她当前这句日常话。
+    const _dailyContinueNote = `\nShe has settled into ordinary talk after a moment of closeness a few minutes ago. He remembers what just happened and is more present than usual, but she is not flirting now — she just said something everyday. Answer that, naturally, as her husband. Do NOT escalate, do NOT reintroduce anything physical or sexual, do NOT bring up the closeness unless she does. Stay in character as Ghost. Never break character or act like an AI. Short, warm, real.`;
+    // WorldBook Shared Recall V1：跨模型世界书共享召回。
+    // 复用 Claude 侧同一份 localStorage['worldBook'] 与同一套匹配/enabled/lastHit 规则，
+    // 只注入本轮实际命中的条目（未命中返回 ''，不加无关内容）。作为 Ghost 已知事实，非强制台词。
+    const _wbRecall = (typeof recallWorldBook === 'function')
+      ? recallWorldBook(text, 4)
+      : '';
+    const _veniceSys = _dailyMode
+      ? _sharedGhostCore + _dailyContinueNote + '\n' + _intimacyBlock + _wbRecall
+      : _sharedGhostCore + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection + _wbRecall;
     const _veniceUser = recentMsgs + '\nHer: ' + text;
     let geminiReply = await callVeniceForCurrentChar(
       _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
@@ -1994,7 +2087,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef) {
           const _retryClean = _fixMissingSpaces(_retryReply.trim()).split('\n').filter(l => l.trim()).slice(0, 2).join('\n');
           if (_retryClean) {
             appendMessage('bot', _retryClean);
-            chatHistory.push({ role: 'assistant', content: _retryClean, _intimate: true, _time: Date.now() });
+            chatHistory.push({ role: 'assistant', content: _retryClean, ...(_tagIntimate ? { _intimate: true } : {}), _time: Date.now() });
             saveHistory();
             if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
             if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
@@ -2015,7 +2108,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef) {
         // 空回复视为失败，不 push、不 return，落到下面的"网络波动"兜底。
         if (firstPart) {
           appendMessage('bot', firstPart);
-          chatHistory.push({ role: 'assistant', content: firstPart, _intimate: true, _time: Date.now() });
+          chatHistory.push({ role: 'assistant', content: firstPart, ...(_tagIntimate ? { _intimate: true } : {}), _time: Date.now() });
           saveHistory();
           if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
           if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
