@@ -443,16 +443,31 @@ function _homesNamedIn(text) {
     return hits;
 }
 
-// 同意语义：明确「费用分担」承诺（须绑定成本/租金语境，裸 half 不算）
+// 同意语义：明确「共同承担当前房源费用」的意愿（须绑定成本/租金/押金语境）。
+//   规则调整：不再要求严格 fifty-fifty；只要 Ghost 明确表示愿与她共同承担费用即可。
+//   仍排除：纯赞美房子、仅同意租房、单纯关心她经济状况——这些不是付款授权。
 function _replyAgreesAA(reply) {
     const r = String(reply || '');
-    // 否定护栏：被否定的分担语（如 "I do not want to split it" / "不想一起分"）不算同意
-    const negatedEn = /(not|n'?t|never|no longer|rather not|do not|does not|will not|won'?t|wo n'?t)\b[^.!?\n]{0,20}(split|halve|go halves|halves|fifty[- ]?fifty|50\/50)/i;
-    const negatedZh = /不[^。！？\n]{0,4}(一半|平摊|均摊|一起分|对半|一起承担|共同承担)/;
+    // 否定护栏 1：分担语被前置否定（"I do not want to split it" / "不想一起分"）
+    const negatedEn = /(not|\w*n['']t|never|no longer|rather not|do not|does not|will not|wo n['']t)\b[^.!?\n]{0,20}(split|halve|go halves|halves|fifty[- ]?fifty|50\/50|share|chip in|go in on|cover)/i;
+    const negatedZh = /不[^。！？\n]{0,4}(一半|平摊|均摊|一起分|对半|一起承担|共同承担|一起付|一起出)/;
     if (negatedEn.test(r) || negatedZh.test(r)) return false;
-    const en = /(split|halve|go halves|going halves|fifty[- ]?fifty|50\/50)\b[^.!?\n]{0,40}(rent|it|the place|cost|deposit|bill)|(rent|cost|deposit|it)\b[^.!?\n]{0,20}(split|halved|fifty[- ]?fifty|down the middle)|i'?ll (cover|pay|take|get) (my )?half|half (each|is on me|on me)|cover my (half|share|part)/i;
-    const zh = /(一人一半|各付一半|各出一半|各半|五五分|平摊|均摊|一起分|一起承担|共同承担|我出一半|我付一半|我出我那一半|我承担一半|对半分)/;
-    return en.test(r) || zh.test(r);
+    // 否定护栏 2：分担语后置否定（"deposit and fifty-fifty though no." / "…but no"）
+    // 仅在其后紧跟 though/but/actually + 裸 no/nope/nah 时触发，避免误伤 "no problem" 等
+    const trailingNo = /(split|halve|halves|fifty[- ]?fifty|50\/50|share|go halves)\b[^.!?\n]{0,30}\b(though|but|actually|however)\b[^.!?\n]{0,6}\bno(pe|t really)?\b(?!\s+(problem|worries|issue|biggie))/i;
+    if (trailingNo.test(r)) return false;
+    // 否定护栏 3：只同意押金、但明确拒绝/尚未同意后续月租 → 不解锁整份租约
+    //   例 "I'll split the deposit, but I'm not agreeing to the monthly rent yet."
+    //   仅在租金/月供被显式否定或推迟时触发（拒绝/未答应/以后再说），不误伤"一起分房租"。
+    const rentWithheldEn = /(not|\w*n['']t|never|no longer|rather not|do not|does not|will not|wo n['']t)\b[^.!?\n]{0,25}(agree|commit|sign|on board|say yes)[^.!?\n]{0,20}(monthly\s+)?rent|(monthly\s+)?rent[^.!?\n]{0,20}(later|not yet|another time|down the line|figure (that|it) out later)|not (yet )?(agreeing|committing|sure|ready)\b[^.!?\n]{0,20}(the )?(monthly\s+)?rent|(not|\w*n['']t|won['']t|will not|do not)\b[^.!?\n]{0,15}(cover|pay|take on|handle)\s(the\s)?(monthly\s+)?rent\b/i;
+    const rentWithheldZh = /(月租|房租|租金|月供)[^。！？\n]{0,8}(还没|尚未|先不|暂不|以后再|之后再|再说|没答应|不答应|不承担|不同意|另说)|(还没|尚未|先不|暂不|不)[^。！？\n]{0,6}(答应|同意|承担|确定)[^。！？\n]{0,6}(月租|房租|租金|月供)/;
+    if (rentWithheldEn.test(r) || rentWithheldZh.test(r)) return false;
+    // 明确 50/50 / 平摊承诺
+    const enSplit = /(split|halve|go halves|going halves|fifty[- ]?fifty|50\/50)\b[^.!?\n]{0,40}(rent|it|the place|cost|deposit|bill)|(rent|cost|deposit|it)\b[^.!?\n]{0,20}(split|halved|fifty[- ]?fifty|down the middle)|i'?ll (cover|pay|take|get) (my )?half|half (each|is on me|on me)|cover my (half|share|part)/i;
+    // 泛化「共同承担当前房源费用」意愿：须绑定住房成本语境（rent/deposit/cost/place/it）
+    const enJoint = /\b(we|us|let'?s|i'?ll|i will|i can|we can|we'?ll)\b[^.!?\n]{0,30}(share|cover|split|chip in|go in on|pay for|handle|take on|be in on)[^.!?\n]{0,30}(rent|deposit|cost|place|it|this|the flat|the house|payments?)|(share|split|cover)[^.!?\n]{0,20}(the )?(rent|deposit|cost|payments?)[^.!?\n]{0,20}(together|with you|between us)|(in this|do this) together[^.!?\n]{0,20}(rent|deposit|cost|pay)/i;
+    const zh = /(一人一半|各付一半|各出一半|各半|五五分|平摊|均摊|一起分|一起承担|共同承担|我出一半|我付一半|我出我那一半|我承担一半|对半分|一起付(房租|押金|钱|租金)|一起出(房租|押金|钱|租金)|我(来|出)(一部分|我那份)|(房租|押金|租金|费用)(咱|我们|一起)(一起)?(分|摊|承担|付)|(咱|我们)(一起|共同)(分|摊|承担|付)(房租|押金|租金|费用))/;
+    return enSplit.test(r) || enJoint.test(r) || zh.test(r);
 }
 
 // 撤销语义：明确取消共同承担 / 放弃本次租赁决定（价格评价不算）
@@ -473,8 +488,10 @@ function _replyHedges(reply) {
 
 // 锚定当前协商的房源。返回 { id } / { ambiguous:true } / null（无锚）
 //   1) 当前轮（用户本轮消息 + Ghost 本轮回复）点名：唯一→锚定；多套且无法定夺→ambiguous
-//   2) 回溯最近 8 条消息里最后一次房源指向（点名或分享卡 _house.id）
-//   3) 都没有 → null
+//   2) 普通文字提及房源：回溯最近 8 条消息里最后一次房源点名
+//   3) 正式分享卡 _house.id：独立回溯最近 30 条消息里最后一次分享卡
+//   4) 两者都有时取时间上更近的一次；仍无法定夺 → ambiguous；都没有 → null
+// 注：从不使用当前浏览的详情页 / 租赁弹窗（currentHomeId）作为授权依据。
 function _resolveHomeAnchor(reply) {
     const hist = (typeof chatHistory !== 'undefined' && Array.isArray(chatHistory)) ? chatHistory : [];
     // 找到本轮用户消息（reply 已 push 为最后一条 assistant，往前找最近的 user）
@@ -482,21 +499,37 @@ function _resolveHomeAnchor(reply) {
     for (let i = hist.length - 1; i >= 0; i--) {
         if (hist[i] && hist[i].role === 'user') { lastUserText = hist[i].content || ''; break; }
     }
-    // 第 1 步：当前轮点名（用户本轮消息 + Ghost 回复）
+    // 第 1 步：当前轮点名（用户本轮消息 + Ghost 回复）优先
     const curNamed = Array.from(new Set([..._homesNamedIn(lastUserText), ..._homesNamedIn(reply)]));
     if (curNamed.length === 1) return { id: curNamed[0] };
     if (curNamed.length > 1) return { ambiguous: true };
 
-    // 第 2 步：回溯窗口 ≤ 8 条，取最近一次房源指向
-    const win = hist.slice(-8);
-    for (let i = win.length - 1; i >= 0; i--) {
-        const m = win[i];
+    const n = hist.length;
+    // 第 2 步：普通文字提及 → 最近 8 条窗口内最后一次点名（记录其绝对下标）
+    let textHit = null; // { id } | { ambiguous:true }
+    let textIdx = -1;
+    for (let i = n - 1; i >= Math.max(0, n - 8); i--) {
+        const m = hist[i];
         if (!m) continue;
-        if (m._house && m._house.id && HOME_DATA[m._house.id]) return { id: m._house.id };
         const named = _homesNamedIn(m.content || '');
-        if (named.length === 1) return { id: named[0] };
-        if (named.length > 1) return { ambiguous: true };
+        if (named.length === 1) { textHit = { id: named[0] }; textIdx = i; break; }
+        if (named.length > 1) { textHit = { ambiguous: true }; textIdx = i; break; }
     }
+    // 第 3 步：正式分享卡 → 独立回溯最近 30 条窗口内最后一次 _house.id
+    let cardHit = null; // { id }
+    let cardIdx = -1;
+    for (let i = n - 1; i >= Math.max(0, n - 30); i--) {
+        const m = hist[i];
+        if (!m) continue;
+        if (m._house && m._house.id && HOME_DATA[m._house.id]) { cardHit = { id: m._house.id }; cardIdx = i; break; }
+    }
+    // 第 4 步：取时间上更近的那次指向
+    if (textHit && cardHit) {
+        const near = textIdx >= cardIdx ? textHit : cardHit;
+        return near;
+    }
+    if (textHit) return textHit;
+    if (cardHit) return cardHit;
     return null;
 }
 
@@ -520,6 +553,17 @@ function checkHomeAADeal(reply) {
         if (agree) _setHomeAA(anchor.id, true);
         else if (revoke) _setHomeAA(anchor.id, false);
     } catch (e) { /* AA 判断绝不能影响聊天流程 */ }
+}
+
+// 住房财务硬限制：Ghost 对任何住房交易（租赁/购房，含押金）的承担上限永远是 50%。
+//   这是系统级不可变事实，独立于人设 Prompt 与正则判定——聊天里无论 Ghost 怎么答应，
+//   系统计算永远只会让他出至多一半，禁止 60/40、70/30、全款。
+const GHOST_MAX_HOUSING_SHARE = 0.5;
+// 返回 Ghost 在共同支付下实际承担的金额（对总费用做硬夹紧，永不超过 50%）。
+function ghostHousingShare(totalCost) {
+    const t = Number(totalCost) || 0;
+    if (t <= 0) return 0;
+    return Math.round(t * GHOST_MAX_HOUSING_SHARE);
 }
 
 function _getHomeAgreements() {
@@ -678,9 +722,12 @@ function _refreshRentalAAOption() {
     const agreed = getHomeAAAgreed(currentHomeId);
     if (aaOpt) {
         aaOpt.style.display = agreed ? 'flex' : 'none';
-        const half = Math.round((data.rent + data.deposit) / 2);
+        // Ghost 承担额走硬限制（≤50%），用户承担余下部分；系统层保证比例不可被聊天改变
+        const total = data.rent + data.deposit;
+        const ghostPart = ghostHousingShare(total);
+        const userPart = total - ghostPart;
         const amtEl = aaOpt.querySelector('.rs-pay-amt');
-        if (amtEl) amtEl.textContent = '各 £' + fmtGBP(half);
+        if (amtEl) amtEl.textContent = '各 £' + fmtGBP(ghostPart === userPart ? ghostPart : userPart);
         // 若之前选了 AA 但授权被撤销，重置选择
         if (!agreed && _selectedRentalPay === 'aa') {
             _selectedRentalPay = null;
