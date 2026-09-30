@@ -359,6 +359,8 @@ const HOME_DATA = {
         desc: 'Hartley Court 位于曼彻斯特一处安静的住宅街区，属于典型的英式老式砖楼。公寓为一居室设计，客厅、厨房和卧室空间紧凑但实用，保留着建筑原有的木地板、老式窗户与暖气。家具和装修虽已有些年头，但基础设施齐全，整体氛围温馨而有生活气息，适合日常居住。',
         rent: 1000,
         deposit: 1000,
+        cardLayout: '1室1厅1卫',
+        thumb: 'images/share/exterior-1.png',
         images: [
             { src: 'images/assets/homes/hartley-court/living-room.png', alt: '客厅' },
             { src: 'images/assets/homes/hartley-court/exterior.png', alt: '外观' }
@@ -375,6 +377,8 @@ const HOME_DATA = {
         desc: 'Willow Court 位于曼彻斯特一处普通住宅社区，是一套空间舒适的现代两居室公寓。室内采用简洁的现代装修，拥有独立厨房、卫浴及阳台，基础家具齐全。相比传统的一居室，提供了更充裕的日常生活与个人活动空间。',
         rent: 1958,
         deposit: 1958,
+        cardLayout: '2室1厅1卫',
+        thumb: 'images/share/exterior-2.png',
         images: [
             { src: 'images/assets/homes/willow-court/living-room.png', alt: '客厅' },
             { src: 'images/assets/homes/willow-court/exterior.png', alt: '外观' },
@@ -392,6 +396,8 @@ const HOME_DATA = {
         desc: 'The Meridian Residences 位于曼彻斯特高层住宅建筑内，拥有开阔的城市景观。室内采用现代暖色系装修，开放式客餐厅与厨房相连，落地窗为公共生活区域带来充足采光。主卧配有独立衣帽间，另外设有一间可以根据家庭需求自由规划的房间，可用作书房、宠物房或未来的婴儿房，为不同阶段的生活保留空间。',
         rent: 2850,
         deposit: 2850,
+        cardLayout: '3室2卫',
+        thumb: 'images/share/exterior-3.png',
         images: [
             { src: 'images/assets/homes/meridian-residences/living-room.png', alt: '客厅' },
             { src: 'images/assets/homes/meridian-residences/exterior.png', alt: '外观' },
@@ -405,6 +411,143 @@ let currentHomeId = null;
 
 function fmtGBP(n) {
     return n.toLocaleString('en-GB');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ASSETS 租赁 AA V1 — 纯本地判断，零额外 API 调用
+// homeAgreements = 当前租赁协商的授权状态（非永久付款承诺）
+//   结构：{ [homeId]: { aaAgreed: bool, ts } }
+// 判定输入：仅 Ghost 真实回复（同意/撤销）；房源锚定可参考用户本轮消息里的房源名。
+//   用户单方面宣称 Ghost 已同意，绝不触发状态变化。
+// ═══════════════════════════════════════════════════════════════
+
+function _homeAliases(id) {
+    const d = HOME_DATA[id];
+    if (!d) return [];
+    const out = [id];
+    if (d.titleEn) { out.push(d.titleEn.toLowerCase()); const w = d.titleEn.replace(/^the\s+/i, '').split(/\s+/)[0]; if (w) out.push(w.toLowerCase()); }
+    if (d.titleZh) out.push(d.titleZh);
+    return out;
+}
+
+// 在一段文本里找出被点名的房源 id（去重）。用于锚定，不用于同意判断。
+function _homesNamedIn(text) {
+    if (!text) return [];
+    const low = String(text).toLowerCase();
+    const hits = [];
+    Object.keys(HOME_DATA).forEach(id => {
+        const idHit = new RegExp('房源ID:\\s*' + id, 'i').test(text);
+        const aliasHit = _homeAliases(id).some(a => a && (a === id ? idHit : low.includes(a.toLowerCase())));
+        if (idHit || aliasHit) hits.push(id);
+    });
+    return hits;
+}
+
+// 同意语义：明确「费用分担」承诺（须绑定成本/租金语境，裸 half 不算）
+function _replyAgreesAA(reply) {
+    const r = String(reply || '');
+    // 否定护栏：被否定的分担语（如 "I do not want to split it" / "不想一起分"）不算同意
+    const negatedEn = /(not|n'?t|never|no longer|rather not|do not|does not|will not|won'?t|wo n'?t)\b[^.!?\n]{0,20}(split|halve|go halves|halves|fifty[- ]?fifty|50\/50)/i;
+    const negatedZh = /不[^。！？\n]{0,4}(一半|平摊|均摊|一起分|对半|一起承担|共同承担)/;
+    if (negatedEn.test(r) || negatedZh.test(r)) return false;
+    const en = /(split|halve|go halves|going halves|fifty[- ]?fifty|50\/50)\b[^.!?\n]{0,40}(rent|it|the place|cost|deposit|bill)|(rent|cost|deposit|it)\b[^.!?\n]{0,20}(split|halved|fifty[- ]?fifty|down the middle)|i'?ll (cover|pay|take|get) (my )?half|half (each|is on me|on me)|cover my (half|share|part)/i;
+    const zh = /(一人一半|各付一半|各出一半|各半|五五分|平摊|均摊|一起分|一起承担|共同承担|我出一半|我付一半|我出我那一半|我承担一半|对半分)/;
+    return en.test(r) || zh.test(r);
+}
+
+// 撤销语义：明确取消共同承担 / 放弃本次租赁决定（价格评价不算）
+function _replyRevokesAA(reply) {
+    const r = String(reply || '');
+    const en = /(let'?s not|let us not|we'?re not|we are not|i'?m not|i am not|do ?n'?t|do not|wo ?n'?t|will not|no longer|rather not)\b[^.!?\n]{0,30}(split|share|go halves|halves)|i\s?(?:'?ll|will)\s[^.!?\n]{0,25}(pay|cover|handle|get)[^.!?\n]{0,25}(myself|on my own|it all|the whole|everything)|(cancel|call off|drop|forget)\s[^.!?\n]{0,15}(rental|lease|rent|place)|on second thought/i;
+    const zh = /(不(一起|共同)?(分|承担|摊)|别(一起)?(租|分|承担)|取消(一起|共同|这次)?(承担|租赁|租)|不租(了|这套)|放弃(这套|这次|租赁)|还是我(一个人|自己)(付|承担|来)|我(自己|一个人)(付|承担|来)(就行|吧)|不(想|要)(一起|共同)(租|承担))/;
+    return en.test(r) || zh.test(r);
+}
+
+// 疑问 / 条件 / 犹豫护栏：命中则同意作废（宁可漏判不误判）
+function _replyHedges(reply) {
+    const r = String(reply || '');
+    const en = /\b(how much|maybe|perhaps|we could|if we|i'?ll think|let me think|not sure|considering|what if|should we|shall we|do you want|wanna)\b/i;
+    const zh = /(要不要|要不|可以考虑|考虑一下|我看看|再想想|再说|多少钱|贵不贵|如果|会不会|是不是|该不该|好不好|行不行)/;
+    return en.test(r) || zh.test(r) || /[?？]/.test(r);
+}
+
+// 锚定当前协商的房源。返回 { id } / { ambiguous:true } / null（无锚）
+//   1) 当前轮（用户本轮消息 + Ghost 本轮回复）点名：唯一→锚定；多套且无法定夺→ambiguous
+//   2) 回溯最近 8 条消息里最后一次房源指向（点名或分享卡 _house.id）
+//   3) 都没有 → null
+function _resolveHomeAnchor(reply) {
+    const hist = (typeof chatHistory !== 'undefined' && Array.isArray(chatHistory)) ? chatHistory : [];
+    // 找到本轮用户消息（reply 已 push 为最后一条 assistant，往前找最近的 user）
+    let lastUserText = '';
+    for (let i = hist.length - 1; i >= 0; i--) {
+        if (hist[i] && hist[i].role === 'user') { lastUserText = hist[i].content || ''; break; }
+    }
+    // 第 1 步：当前轮点名（用户本轮消息 + Ghost 回复）
+    const curNamed = Array.from(new Set([..._homesNamedIn(lastUserText), ..._homesNamedIn(reply)]));
+    if (curNamed.length === 1) return { id: curNamed[0] };
+    if (curNamed.length > 1) return { ambiguous: true };
+
+    // 第 2 步：回溯窗口 ≤ 8 条，取最近一次房源指向
+    const win = hist.slice(-8);
+    for (let i = win.length - 1; i >= 0; i--) {
+        const m = win[i];
+        if (!m) continue;
+        if (m._house && m._house.id && HOME_DATA[m._house.id]) return { id: m._house.id };
+        const named = _homesNamedIn(m.content || '');
+        if (named.length === 1) return { id: named[0] };
+        if (named.length > 1) return { ambiguous: true };
+    }
+    return null;
+}
+
+// 主入口：接 Claude / Gemini 真实回复。仅读 reply 判定同意/撤销。
+function checkHomeAADeal(reply) {
+    try {
+        if (!reply || typeof HOME_DATA === 'undefined') return;
+        const rawAgree = _replyAgreesAA(reply);
+        const rawRevoke = _replyRevokesAA(reply);
+
+        // 同一条同时含正反信号，无法定夺 → 保持原状
+        if (rawAgree && rawRevoke) return;
+
+        const agree = rawAgree && !_replyHedges(reply); // 疑问/条件护栏只作用于同意
+        const revoke = rawRevoke;
+        if (!agree && !revoke) return; // 前置闸门：没有明确信号，直接结束
+
+        const anchor = _resolveHomeAnchor(reply);
+        if (!anchor || anchor.ambiguous || !anchor.id) return; // 无锚 / 歧义 → 不改状态
+
+        if (agree) _setHomeAA(anchor.id, true);
+        else if (revoke) _setHomeAA(anchor.id, false);
+    } catch (e) { /* AA 判断绝不能影响聊天流程 */ }
+}
+
+function _getHomeAgreements() {
+    try { return JSON.parse(localStorage.getItem('homeAgreements') || '{}') || {}; }
+    catch (e) { return {}; }
+}
+
+function getHomeAAAgreed(id) {
+    const m = _getHomeAgreements();
+    return !!(m[id] && m[id].aaAgreed);
+}
+
+function _setHomeAA(id, agreed) {
+    if (!id) return;
+    const m = _getHomeAgreements();
+    if (agreed) {
+        if (m[id] && m[id].aaAgreed) return; // 已是该状态，避免无谓写入
+        m[id] = { aaAgreed: true, ts: Date.now() };
+    } else {
+        if (!m[id] || !m[id].aaAgreed) return;
+        m[id] = { aaAgreed: false, ts: Date.now() };
+    }
+    localStorage.setItem('homeAgreements', JSON.stringify(m));
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    // 弹窗正开着同一套房时，实时刷新 AA 选项显隐
+    if (typeof currentHomeId !== 'undefined' && currentHomeId === id && typeof _refreshRentalAAOption === 'function') {
+        _refreshRentalAAOption();
+    }
 }
 
 function openHomeDetail(id) {
@@ -475,4 +618,91 @@ function switchHomeImg(index, el) {
     if (el && !el.classList.contains('active')) {
         el.classList.add('active');
     }
+}
+
+// 住宅「发给他看」→ 生成 house 类型分享卡进聊天主链（复用商品分享机制，不触发租赁/AA/付款）
+function shareCurrentHome() {
+    if (!currentHomeId) return;
+    const data = HOME_DATA[currentHomeId];
+    if (!data) return;
+    const house = {
+        id: currentHomeId,
+        titleEn: data.titleEn,
+        titleZh: data.titleZh,
+        loc: data.loc,
+        layout: data.cardLayout || data.layout,
+        area: data.area,
+        rent: data.rent,
+        thumb: data.thumb
+    };
+    if (typeof shareHouseToChat === 'function') shareHouseToChat(house);
+}
+
+// 确认租赁 Bottom Sheet（三套住宅共用；本轮仅展示，不扣款/不建租赁记录）
+function openRentalSheet() {
+    const data = HOME_DATA[currentHomeId];
+    if (!data) return;
+
+    const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.textContent = val; };
+    const thumb = document.getElementById('rsThumb');
+    if (thumb) { thumb.src = data.thumb; thumb.alt = data.titleZh; }
+    set('rsNameEn', data.titleEn);
+    set('rsNameZh', data.titleZh);
+    set('rsLoc', data.loc + ' · 曼彻斯特');
+    set('rsLayout', data.cardLayout || data.layout);
+    set('rsArea', data.area);
+    set('rsRent', '£' + fmtGBP(data.rent));
+    set('rsDeposit', '£' + fmtGBP(data.deposit));
+    set('rsTotal', '£' + fmtGBP(data.rent + data.deposit));
+
+    // 每次打开都清空选择：自行支付 / 夫妻共同承担 均不默认选中
+    _selectedRentalPay = null;
+    document.querySelectorAll('#rentalSheetOverlay .rs-pay-opt').forEach(el => el.classList.remove('selected'));
+    _refreshRentalAAOption();
+
+    const overlay = document.getElementById('rentalSheetOverlay');
+    if (overlay) {
+        overlay.classList.add('show');
+        const body = overlay.querySelector('.rental-sheet-body');
+        if (body) body.scrollTop = 0;
+    }
+}
+
+let _selectedRentalPay = null; // 'self' | 'aa' | null
+
+// 根据授权状态显隐 AA 选项：未同意 → 只展示自行支付，AA 选项完全不可见/不可点
+function _refreshRentalAAOption() {
+    const data = HOME_DATA[currentHomeId];
+    if (!data) return;
+    const aaOpt = document.getElementById('rsPayAA');
+    const agreed = getHomeAAAgreed(currentHomeId);
+    if (aaOpt) {
+        aaOpt.style.display = agreed ? 'flex' : 'none';
+        const half = Math.round((data.rent + data.deposit) / 2);
+        const amtEl = aaOpt.querySelector('.rs-pay-amt');
+        if (amtEl) amtEl.textContent = '各 £' + fmtGBP(half);
+        // 若之前选了 AA 但授权被撤销，重置选择
+        if (!agreed && _selectedRentalPay === 'aa') {
+            _selectedRentalPay = null;
+            aaOpt.classList.remove('selected');
+        }
+    }
+}
+
+function selectRentalPay(method) {
+    if (method === 'aa' && !getHomeAAAgreed(currentHomeId)) return; // 未授权不可选 AA
+    _selectedRentalPay = method;
+    document.querySelectorAll('#rentalSheetOverlay .rs-pay-opt').forEach(el => {
+        el.classList.toggle('selected', el.dataset.pay === method);
+    });
+}
+
+function closeRentalSheet() {
+    const overlay = document.getElementById('rentalSheetOverlay');
+    if (overlay) overlay.classList.remove('show');
+}
+
+// 占位：本轮不扣款、不创建租赁记录、不改状态
+function confirmRentalPlaceholder() {
+    closeRentalSheet();
 }

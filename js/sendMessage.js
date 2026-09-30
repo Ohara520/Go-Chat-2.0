@@ -1629,6 +1629,9 @@ async function _processMergedMessage(text) {
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
     _syncRenderedCount();
 
+    // ── 租赁 AA 判断（纯本地，仅读 Ghost 真实回复）──────────────
+    if (typeof checkHomeAADeal === 'function') checkHomeAADeal(reply);
+
     // ── 承诺检测 ─────────────────────────────────────────────
     try {
       const commitPatterns = [
@@ -2089,6 +2092,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
             appendMessage('bot', _retryClean);
             chatHistory.push({ role: 'assistant', content: _retryClean, ...(_tagIntimate ? { _intimate: true } : {}), _time: Date.now() });
             saveHistory();
+            if (typeof checkHomeAADeal === 'function') checkHomeAADeal(_retryClean);
             if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
             if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
             incrementTodayCount();
@@ -2110,6 +2114,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
           appendMessage('bot', firstPart);
           chatHistory.push({ role: 'assistant', content: firstPart, ...(_tagIntimate ? { _intimate: true } : {}), _time: Date.now() });
           saveHistory();
+          if (typeof checkHomeAADeal === 'function') checkHomeAADeal(firstPart);
           if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
           if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
           incrementTodayCount();

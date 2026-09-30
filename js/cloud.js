@@ -895,7 +895,10 @@ async function saveChatHistoryNow() {
       .slice(-300)
       .map(m => ({ role: m.role, content: m.content,
         ...(m._transfer ? { _transfer: m._transfer } : {}),
-        ...(m._userTransfer ? { _userTransfer: m._userTransfer } : {}) }));
+        ...(m._userTransfer ? { _userTransfer: m._userTransfer } : {}),
+        ...(m._payCard ? { _payCard: m._payCard } : {}),
+        ...(m._product ? { _product: m._product } : {}),
+        ...(m._house ? { _house: m._house } : {}) }));
     if (chatHistoryData.length === 0) return;
 
     const now = new Date().toISOString();
@@ -1078,7 +1081,7 @@ async function saveToCloud() {
       ? JSON.parse(chatHistoryRaw)
           .filter(m => !m._system && !m._recalled)
           .slice(-300)
-          .map(m => ({ role: m.role, content: m.content, ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}) }))
+          .map(m => ({ role: m.role, content: m.content, ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}), ...(m._payCard ? {_payCard: m._payCard} : {}), ...(m._product ? {_product: m._product} : {}), ...(m._house ? {_house: m._house} : {}) }))
       : [];
     const stateSnapshot = {
       trustHeat: getTrustHeat(),

@@ -903,6 +903,8 @@ const GHOST_REVERSE_POOL = {
 let currentCategory = 'clothing';
 let pendingProduct = null;
 let pendingCategory = null;
+// Checkout 批量结算时置真：_finishPurchase 跳过逐件 showToast，改由结算流程统一弹一次「下单成功」。
+let _suppressPurchaseToast = false;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 自愈：修复"买了但快递对象从没创建"导致的礼物消失（历史遗留 + 兜底）
@@ -1737,6 +1739,59 @@ function _checkoutSelectPay(pay) {
   renderCheckout();
 }
 
+// 结算成功后把本轮商品移出购物车（只删本次结算的 productId，不整车清空——
+// "立即购买"可能带一件不在车里的商品，整车 wipe 会误删用户还想留着的东西）。
+function _clearCheckedOutFromCart(orderItems) {
+  if (!orderItems || !orderItems.length) return;
+  const ids = new Set(orderItems.map(it => String(it.productId)));
+  saveNoaCart(getNoaCart().filter(r => !ids.has(String(r.id))));
+  if (typeof updateCartBadge === 'function') updateCartBadge();
+}
+
+// 下单成功确认卡：一单只弹一次（替代批量结算时互相覆盖的逐件 toast）。
+// 纯文字、商场同款奶油/衬线/墨绿质感，无 emoji/图标。点任意处或 3.2s 后淡出。
+function showOrderConfirm(lines, total, payer) {
+  const count = (lines || []).reduce((s, ln) => s + (ln.qty || 1), 0);
+  const shipCount = (lines || []).reduce((s, ln) => {
+    const p = ln.p || {};
+    return s + ((!p.isHomeItem && !p.isReunion) ? (ln.qty || 1) : 0);
+  }, 0);
+
+  let payLine;
+  if (payer === 'ghost_pay') payLine = '已由他代付';
+  else if (payer === 'ghost') payLine = '已用 Ghost Card 结算';
+  else payLine = '已从余额结算';
+  const amt = total ? ` · £${total}` : '';
+
+  const shipLine = shipCount > 0
+    ? `${shipCount} 件已发出，可在物流追踪查看`
+    : '已记入你的收藏';
+
+  const old = document.getElementById('orderConfirmOverlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'orderConfirmOverlay';
+  overlay.className = 'order-confirm-overlay';
+  overlay.innerHTML =
+    '<div class="order-confirm-card">' +
+      '<div class="order-confirm-rule"></div>' +
+      '<div class="order-confirm-label">ORDER CONFIRMED</div>' +
+      '<div class="order-confirm-title">下单成功</div>' +
+      '<div class="order-confirm-meta">共 ' + count + ' 件 · ' + payLine + amt + '</div>' +
+      '<div class="order-confirm-sub">' + shipLine + '</div>' +
+    '</div>';
+
+  const dismiss = () => {
+    overlay.classList.remove('show');
+    setTimeout(() => overlay.remove(), 320);
+  };
+  overlay.addEventListener('click', dismiss);
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  setTimeout(dismiss, 3200);
+}
+
 // 确认购买：本轮只接通 user / ghost 两种现有支付方式，ghost_pay 保持占位。
 // 支付成功后一律汇入唯一的 _finishPurchase()，不重建 Purchase / Delivery。
 function _checkoutConfirm() {
@@ -1757,7 +1812,7 @@ function _checkoutConfirm() {
     const ship = _careerFree ? 0 : (p.shipping !== undefined ? p.shipping : (isLuxury ? 45 : 28));
     const lineTotal = price * it.quantity + ship;
     total += lineTotal;
-    lines.push({ p, cat, isLuxury, lineTotal });
+    lines.push({ p, cat, isLuxury, qty: it.quantity, lineTotal });
   }
   if (!lines.length || total <= 0) return;
 
@@ -1775,12 +1830,21 @@ function _checkoutConfirm() {
   }
 
   // 汇入唯一的 _finishPurchase：逐件建 Purchase / Delivery，用各自 lineTotal 与类别。
+  // 结算前先把本轮商品/数量记下，供收尾统一确认卡使用；随后清出购物车。
+  const _orderItems = _checkoutItems.slice();
   closeCheckout();
   const _payer = _checkoutPay;
-  for (const ln of lines) {
-    pendingCategory = ln.cat;
-    _finishPurchase(ln.p, false, ln.isLuxury, ln.lineTotal, _payer);
+  _suppressPurchaseToast = true;
+  try {
+    for (const ln of lines) {
+      pendingCategory = ln.cat;
+      _finishPurchase(ln.p, false, ln.isLuxury, ln.lineTotal, _payer);
+    }
+  } finally {
+    _suppressPurchaseToast = false;
   }
+  _clearCheckedOutFromCart(_orderItems);
+  showOrderConfirm(lines, total, _payer);
 }
 
 // ===== ghost_pay 接线：把现有 Checkout / decidePayOrder / _finishPurchase 串起来 =====
@@ -1947,10 +2011,19 @@ async function _checkoutConfirmGhostPay() {
     // 避免"卡片已付 + 又说一遍我来付"的重复感。
     _updatePayCardStatus(requestId, 'approved');
     // 不扣用户余额、不调用 spendGhostCard。逐件进现有 _finishPurchase(..., 'ghost_pay')。
-    for (const ln of lines) {
-      pendingCategory = ln.cat;
-      _finishPurchase(ln.p, false, ln.isLuxury, ln.lineTotal, 'ghost_pay');
+    // 结算前记下本轮商品，收尾统一清购物车 + 弹一次确认卡（代付东西也别留在车里）。
+    const _orderItems = _checkoutItems.slice();
+    _suppressPurchaseToast = true;
+    try {
+      for (const ln of lines) {
+        pendingCategory = ln.cat;
+        _finishPurchase(ln.p, false, ln.isLuxury, ln.lineTotal, 'ghost_pay');
+      }
+    } finally {
+      _suppressPurchaseToast = false;
     }
+    _clearCheckedOutFromCart(_orderItems);
+    showOrderConfirm(lines, total, 'ghost_pay');
     _recordPayHistory({ timestamp: Date.now(), name: _payOrderBriefName(frozenItems), total, decision: 'approve' });
     _payInFlight = false;
     return;
@@ -2209,6 +2282,22 @@ function shareProductToChat(product) {
   if (typeof _processMergedMessage === 'function') _processMergedMessage(content);
 }
 
+// 住宅分享卡：复用商品分享主链，只增加独立 house 类型。携带稳定房源 ID，不触发租赁/AA/付款。
+function shareHouseToChat(house) {
+  if (!house || !house.id) return;
+  const name = house.titleZh || house.titleEn || '';
+  const rentStr = (typeof house.rent === 'number') ? `£${house.rent.toLocaleString()}/月` : (house.rent || '');
+  const parts = [house.layout, house.area].filter(Boolean).join(' · ');
+  const content = `[分享了一套住宅给你看] 🏠 ${house.titleEn || ''}${name ? ` ${name}` : ''}｜${house.loc || 'Manchester, UK'}${parts ? `｜${parts}` : ''}${rentStr ? `｜${rentStr}` : ''} (房源ID: ${house.id})`.trim();
+
+  chatHistory.push({ role: 'user', content, _house: house });
+  if (typeof saveHistory === 'function') saveHistory();
+
+  if (typeof openScreen === 'function') openScreen('chatScreen');
+
+  if (typeof _processMergedMessage === 'function') _processMergedMessage(content);
+}
+
 function confirmPurchase() {
   if (!pendingProduct) return;
   const p = pendingProduct;
@@ -2321,14 +2410,18 @@ function _finishPurchase(p, isWishlist, isLuxury, total, payer) {
   const _shippable = !p.isHomeItem && !p.isReunion;
 
   // 修复：加上扣款金额，防止用户看不到扣款反馈以为没成功而重复购买
+  // 批量结算（_suppressPurchaseToast）时跳过逐件 toast——多件会互相覆盖，
+  // 改由结算流程收尾统一弹一次「下单成功」确认卡（showOrderConfirm）。
   const _amtStr = total ? ` · 已扣款 £${total}` : '';
-  if (p.isHomeItem) showToast('🏠 已拥有' + _amtStr);
-  else if (p.isReunion) showToast('✓ 已获得' + _amtStr);
-  else if (isWishlist) showToast('💝 已加入心愿单！');
-  else if (p.isUserItem) {
-    showToast('🛍️ 购买成功' + _amtStr);
+  if (!_suppressPurchaseToast) {
+    if (p.isHomeItem) showToast('🏠 已拥有' + _amtStr);
+    else if (p.isReunion) showToast('✓ 已获得' + _amtStr);
+    else if (isWishlist) showToast('💝 已加入心愿单！');
+    else if (p.isUserItem) {
+      showToast('🛍️ 购买成功' + _amtStr);
+    }
+    else showToast('📦 已寄出！Ghost 会收到的～' + _amtStr);
   }
-  else showToast('📦 已寄出！Ghost 会收到的～' + _amtStr);
 
   // 资产 / 特殊商品不进入 Delivery domain：只有可寄送的普通实物才建快递。
   if (!isWishlist && _shippable) {

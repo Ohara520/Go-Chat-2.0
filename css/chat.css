@@ -2614,6 +2614,50 @@
 }
 .checkout-confirm-btn:active { transform: scale(0.97); }
 
+/* 下单成功确认卡：一单一次，纯文字、商场同款奶油/衬线/墨绿质感，无 emoji/图标 */
+.order-confirm-overlay {
+    position: fixed; inset: 0; z-index: 4200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(46,48,38,0.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.32s ease;
+}
+.order-confirm-overlay.show { opacity: 1; pointer-events: auto; }
+.order-confirm-card {
+    min-width: 232px; max-width: 78%;
+    padding: 30px 34px 26px;
+    background: #fffdf8;
+    border: 1px solid rgba(150,138,120,0.30);
+    border-radius: 6px;
+    box-shadow: 0 18px 48px rgba(70,78,50,0.22);
+    text-align: center;
+    transform: translateY(10px) scale(0.98);
+    transition: transform 0.32s cubic-bezier(0.2,0.8,0.3,1);
+}
+.order-confirm-overlay.show .order-confirm-card { transform: translateY(0) scale(1); }
+.order-confirm-rule {
+    width: 30px; height: 1px; margin: 0 auto 16px;
+    background: #7d9268;
+}
+.order-confirm-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 3px;
+    color: #8a7f68;
+}
+.order-confirm-title {
+    margin-top: 8px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 27px; font-weight: 600; letter-spacing: 3px;
+    color: #384a2c;
+}
+.order-confirm-meta {
+    margin-top: 12px;
+    font-size: 13px; color: #4a4436; letter-spacing: 0.4px;
+}
+.order-confirm-sub {
+    margin-top: 5px;
+    font-size: 12px; color: #8a7f68; letter-spacing: 0.4px;
+}
+
 /* 聊天里分享的商品小票卡 */
 .share-card {
     width: 250px; max-width: 78%;
@@ -2657,6 +2701,59 @@
 .share-card-foot {
     font-size: 9px; font-weight: 500; letter-spacing: 1.5px;
     color: rgba(120,108,92,0.55);
+}
+
+/* 住宅分享卡（横向紧凑：左封面缩略图 + 右信息 + 箭头） */
+.house-card {
+    width: 300px; max-width: 82%;
+    display: flex; align-items: stretch; gap: 12px;
+    padding: 12px;
+    background: #faf7f1;
+    border: 1px solid rgba(150,138,120,0.28);
+    border-radius: 12px;
+    box-shadow: 0 1px 5px rgba(120,105,85,0.07);
+    text-align: left;
+    position: relative;
+}
+.house-card-img {
+    width: 92px; height: 92px; flex-shrink: 0;
+    object-fit: cover; border-radius: 8px;
+    background: #f0ebe2;
+    align-self: center;
+}
+.house-card-img--empty { background: #f0ebe2; }
+.house-card-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.house-card-brand {
+    font-size: 8.5px; font-weight: 600; letter-spacing: 1.2px;
+    color: rgba(120,108,92,0.7); margin-bottom: 2px;
+}
+.house-card-title {
+    font-size: 15px; font-weight: 700; color: #34302a; line-height: 1.2;
+    font-family: Georgia, 'Times New Roman', serif;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.house-card-title-zh { font-size: 12px; font-weight: 500; color: #57503f; line-height: 1.35; margin-bottom: 4px; }
+.house-card-loc {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 11px; color: rgba(95,88,74,0.85); margin-bottom: 4px;
+}
+.house-card-loc svg { color: #7d8a5f; flex-shrink: 0; }
+.house-card-specs { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; }
+.house-card-spec {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: rgba(95,88,74,0.85);
+}
+.house-card-spec svg { color: rgba(120,108,92,0.7); flex-shrink: 0; }
+.house-card-price {
+    font-size: 17px; font-weight: 700; color: #5a6e50;
+    font-family: Georgia, 'Times New Roman', serif; margin-top: auto;
+}
+.house-card-price-unit { font-size: 11px; font-weight: 500; color: rgba(95,88,74,0.75); }
+.house-card-arrow {
+    position: absolute; top: 12px; right: 12px;
+    width: 26px; height: 26px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(150,138,120,0.12); color: rgba(90,82,68,0.7);
 }
 
 /* 代付请求卡（沿用分享小票视觉，信息稍多） */

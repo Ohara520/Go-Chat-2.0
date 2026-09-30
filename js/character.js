@@ -85,6 +85,8 @@ const CHARACTER_KEYS = [
   'marketTriggered', 'purchasedItems', 'purchaseCounts',
   'purchaseFacts',
   'intimateTriggered',
+  // 租赁 AA 授权状态（按房源，非永久付款承诺）
+  'homeAgreements',
   // 心声
   'lastInnerThought', 'lastInnerThoughtAt',
   // 工资
@@ -169,6 +171,11 @@ async function switchCharacter(newCharId) {
         .map(m => ({ role: m.role, content: m.content,
           ...(m._system ? { _system: true } : {}),
           ...(m._intimate ? { _intimate: true } : {}),
+          ...(m._transfer ? { _transfer: m._transfer } : {}),
+          ...(m._userTransfer ? { _userTransfer: m._userTransfer } : {}),
+          ...(m._payCard ? { _payCard: m._payCard } : {}),
+          ...(m._product ? { _product: m._product } : {}),
+          ...(m._house ? { _house: m._house } : {}),
         }));
       localStorage.setItem('chatHistory', JSON.stringify(toSave));
     } catch(e) {}

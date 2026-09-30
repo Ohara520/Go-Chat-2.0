@@ -414,6 +414,37 @@ function renderChatProductCard(p) {
   </div>`;
 }
 
+// 住宅分享卡（横向紧凑卡：左封面缩略图，右文字信息）——分享入口 + 历史恢复共用
+function renderChatHouseCard(h) {
+  const titleEn = (h.titleEn || '').replace(/</g, '&lt;');
+  const titleZh = (h.titleZh || '').replace(/</g, '&lt;');
+  const loc = (h.loc || 'Manchester, UK').replace(/</g, '&lt;');
+  const layout = (h.layout || '').replace(/</g, '&lt;');
+  const area = (h.area || '').replace(/</g, '&lt;');
+  const rent = (typeof h.rent === 'number') ? `£${h.rent.toLocaleString()}` : (h.rent || '');
+  let visual = `<div class="house-card-img house-card-img--empty"></div>`;
+  if (h.thumb) {
+    const src = String(h.thumb).replace(/"/g, '&quot;');
+    const fallback = '<div class=&quot;house-card-img house-card-img--empty&quot;></div>';
+    visual = `<img class="house-card-img" src="${src}" alt="${titleEn.replace(/"/g, '&quot;')}" loading="lazy" onerror="this.outerHTML='${fallback}'">`;
+  }
+  return `<div class="house-card">
+    ${visual}
+    <div class="house-card-info">
+      <div class="house-card-brand">NOA ASSETS · HOMES</div>
+      <div class="house-card-title">${titleEn}</div>
+      ${titleZh ? `<div class="house-card-title-zh">${titleZh}</div>` : ''}
+      <div class="house-card-loc"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.6"/></svg>${loc}</div>
+      <div class="house-card-specs">
+        ${layout ? `<span class="house-card-spec"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/></svg>${layout}</span>` : ''}
+        ${area ? `<span class="house-card-spec"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4h4"/><path d="M20 8V4h-4"/><path d="M4 16v4h4"/><path d="M20 16v4h-4"/></svg>${area}</span>` : ''}
+      </div>
+      ${rent ? `<div class="house-card-price">${rent}<span class="house-card-price-unit"> / 月</span></div>` : ''}
+    </div>
+    <div class="house-card-arrow"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></div>
+  </div>`;
+}
+
 // 代付请求卡（静态展示，沿用分享小票视觉；三种状态切同一个 status 区）
 // order = { items:[{id,name,nameEn,price,qty}], shipping, status:'waiting'|'approved'|'declined' }
 function _payCardMoney(n) { return `£${(n || 0).toLocaleString()}`; }
@@ -563,6 +594,16 @@ function renderChatHistory(chatHistory) {
         div.className = 'message user';
         div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
         div.innerHTML = renderChatProductCard(msg._product);
+        container.appendChild(div);
+        return;
+      }
+
+      // 用户分享到聊天的住宅卡片
+      if (msg._house) {
+        const div = document.createElement('div');
+        div.className = 'message user';
+        div.style.cssText = 'display:flex;justify-content:flex-end;margin:4px 0;';
+        div.innerHTML = renderChatHouseCard(msg._house);
         container.appendChild(div);
         return;
       }

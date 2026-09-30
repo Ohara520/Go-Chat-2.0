@@ -1457,16 +1457,95 @@
 
         <!-- 两个按钮：左右并排 -->
         <div class="hd-actions">
-          <button class="hd-btn hd-btn-ghost">
+          <button class="hd-btn hd-btn-ghost" onclick="shareCurrentHome()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 0 1-.9-3.9A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg>
             发给他看
           </button>
-          <button class="hd-btn hd-btn-solid">
+          <button class="hd-btn hd-btn-solid" onclick="openRentalSheet()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7a4 4 0 1 0-4 4"/><path d="m11 11 7 7 3-3-4-4"/></svg>
             立即租赁
           </button>
         </div>
       </aside>
+    </div>
+  </div>
+
+  <!-- ASSETS V1 — 确认租赁 Bottom Sheet（三套住宅共用）-->
+  <div class="rental-sheet-overlay" id="rentalSheetOverlay" onclick="if(event.target===this)closeRentalSheet()">
+    <div class="rental-sheet" role="dialog" aria-modal="true" aria-labelledby="rsTitle">
+      <div class="rental-sheet-grip"></div>
+      <div class="rental-sheet-head">
+        <div class="rental-sheet-titles">
+          <div class="rental-sheet-title-zh" id="rsTitle">确认租赁</div>
+          <div class="rental-sheet-title-en">CONFIRM RENTAL</div>
+        </div>
+        <button class="rental-sheet-close" onclick="closeRentalSheet()" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="rental-sheet-body">
+        <!-- 房源摘要 -->
+        <div class="rs-summary">
+          <div class="rs-thumb"><img id="rsThumb" src="" alt=""></div>
+          <div class="rs-info">
+            <div class="rs-name-en" id="rsNameEn">Hartley Court</div>
+            <div class="rs-name-zh" id="rsNameZh">哈特利公寓</div>
+            <div class="rs-loc">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              <span id="rsLoc">Manchester, UK · 曼彻斯特</span>
+            </div>
+            <div class="rs-specs">
+              <span class="rs-spec">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>
+                <span id="rsLayout">1室1厅1卫</span>
+              </span>
+              <span class="rs-spec-sep"></span>
+              <span class="rs-spec">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h4M4 15h4M16 4v4M16 16v4"/></svg>
+                <span id="rsArea">约 50 ㎡</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 金额明细 -->
+        <div class="rs-rows">
+          <div class="rs-row"><span>首月租金</span><span id="rsRent">£1,000</span></div>
+          <div class="rs-row"><span>一次性押金</span><span id="rsDeposit">£1,000</span></div>
+        </div>
+        <div class="rs-total">
+          <div class="rs-total-labels">
+            <div class="rs-total-zh">首次应付</div>
+            <div class="rs-total-en">TOTAL DUE NOW</div>
+          </div>
+          <div class="rs-total-amount" id="rsTotal">£2,000</div>
+        </div>
+
+        <!-- 付款方式（自行支付 / 夫妻共同承担；均不默认选中，需主动选择）-->
+        <div class="rs-pay-label">选择付款方式</div>
+        <div class="rs-pay-opts">
+          <div class="rs-pay-opt" data-pay="self" id="rsPaySelf" onclick="selectRentalPay('self')">
+            <div class="rs-pay-check"></div>
+            <div class="rs-pay-info">
+              <div class="rs-pay-title">自行支付</div>
+              <div class="rs-pay-desc">由你独自承担全部首付款</div>
+            </div>
+            <div class="rs-pay-amt">全额</div>
+          </div>
+          <div class="rs-pay-opt" data-pay="aa" id="rsPayAA" onclick="selectRentalPay('aa')" style="display:none;">
+            <div class="rs-pay-check"></div>
+            <div class="rs-pay-info">
+              <div class="rs-pay-title">夫妻共同承担</div>
+              <div class="rs-pay-desc">与 Ghost 各承担一半（50/50）</div>
+            </div>
+            <div class="rs-pay-amt">各 £0</div>
+          </div>
+        </div>
+
+        <!-- 确认按钮 -->
+        <button class="rs-confirm" onclick="confirmRentalPlaceholder()">确认租赁</button>
+      </div>
     </div>
   </div>
 
