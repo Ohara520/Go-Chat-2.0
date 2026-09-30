@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/assets-v1.css">
+<style>body{margin:0;background:#333;} .screen{display:none;} .screen.active{display:flex;} #assetsHomesScreen{max-width:420px;margin:0 auto;height:100vh;}</style>
+</head>
+<body>
+<div class="screen" id="assetsHomesScreen">
+    <div class="homes-topbar">
+      <button class="homes-back" onclick="openScreen('assetsScreen')" aria-label="返回">‹</button>
+      <div class="homes-topbar-title">住宅</div>
+      <div class="homes-topbar-spacer"></div>
+    </div>
+    <div class="homes-tabs">
+      <button class="homes-tab active" data-homes-tab="rent" onclick="switchHomesTab('rent')">租房</button>
+      <button class="homes-tab" data-homes-tab="buy" onclick="switchHomesTab('buy')">购房</button>
+    </div>
+
+    <div class="homes-list" id="homesListRent">
+      <!-- 01 Hartley Court -->
+      <div class="home-card">
+        <div class="home-card-cover" onclick="openHomeDetail('hartley-court')">
+          <img src="images/assets/homes/hartley-court/exterior.png" alt="Hartley Court">
+          <span class="home-badge">租房</span>
+        </div>
+        <div class="home-card-body">
+          <div class="home-card-name">
+            <span class="home-name-en">Hartley Court</span>
+            <span class="home-name-zh">哈特利公寓</span>
+          </div>
+          <div class="home-card-loc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg>
+            <span>Manchester, UK</span>
+          </div>
+          <div class="home-card-desc">位于曼彻斯特的老式砖楼内，一居室公寓，基础生活设施齐全。</div>
+          <div class="home-card-spec">
+            <span class="home-spec-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>1室1厅1卫</span>
+            <span class="home-spec-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h4M4 15h4M16 4v4M16 16v4"/></svg>约 50 ㎡</span>
+          </div>
+          <div class="home-card-foot">
+            <div class="home-card-price"><span class="home-price-cur">£</span><span class="home-price-num">1,000</span><span class="home-price-unit">/ 月</span></div>
+            <button class="home-detail-btn" onclick="openHomeDetail('hartley-court')">查看详情</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 02 Willow Court -->
+      <div class="home-card">
+        <div class="home-card-cover" onclick="openHomeDetail('willow-court')">
+          <img src="images/assets/homes/willow-court/exterior.png" alt="Willow Court">
+          <span class="home-badge">租房</span>
+        </div>
+        <div class="home-card-body">
+          <div class="home-card-name">
+            <span class="home-name-en">Willow Court</span>
+            <span class="home-name-zh">维洛公寓</span>
+          </div>
+          <div class="home-card-loc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg>
+            <span>Manchester, UK</span>
+          </div>
+          <div class="home-card-desc">位于曼彻斯特普通住宅街区的两居室公寓，配有独立阳台。</div>
+          <div class="home-card-spec">
+            <span class="home-spec-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>2室1厅1卫</span>
+            <span class="home-spec-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h4M4 15h4M16 4v4M16 16v4"/></svg>约 85 ㎡</span>
+          </div>
+          <div class="home-card-foot">
+            <div class="home-card-price"><span class="home-price-cur">£</span><span class="home-price-num">1,958</span><span class="home-price-unit">/ 月</span></div>
+            <button class="home-detail-btn" onclick="openHomeDetail('willow-court')">查看详情</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 03 The Meridian Residences -->
+      <div class="home-card">
+        <div class="home-card-cover" onclick="openHomeDetail('meridian-residences')">
+          <img src="images/assets/homes/meridian-residences/exterior.png" alt="The Meridian Residences">
+          <span class="home-badge">租房</span>
+        </div>
+        <div class="home-card-body">
+          <div class="home-card-name">
+            <span class="home-name-en">The Meridian Residences</span>
+            <span class="home-name-zh">云际公寓</span>
+          </div>
+          <div class="home-card-loc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg>
+            <span>Manchester, UK</span>
+          </div>
+          <div class="home-card-desc">曼彻斯特高层城市景观公寓，配有独立衣帽间及自由规划房间。</div>
+          <div class="home-card-spec">
+            <span class="home-spec-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>3室2卫·开放式客餐厅</span>
+            <span class="home-spec-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h4M4 15h4M16 4v4M16 16v4"/></svg>约 125 ㎡</span>
+          </div>
+          <div class="home-card-foot">
+            <div class="home-card-price"><span class="home-price-cur">£</span><span class="home-price-num">2,850</span><span class="home-price-unit">/ 月</span></div>
+            <button class="home-detail-btn" onclick="openHomeDetail('meridian-residences')">查看详情</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="homes-list" id="homesListBuy" style="display:none;">
+      <div class="homes-empty">
+        <div class="homes-empty-title">暂无在售房源</div>
+        <div class="homes-empty-sub">Coming soon — 正式出售房源整理中。</div>
+      </div>
+    </div>
+  </div>
+<script>
+function openScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); const t=document.getElementById(id); t.classList.add('active'); }
+function showToast(m){ const d=document.createElement('div'); d.textContent=m; d.style.cssText='position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#4a5b3d;color:#fff;padding:10px 18px;border-radius:12px;z-index:99'; document.body.appendChild(d); setTimeout(()=>d.remove(),1800); }
+function switchHomesTab(tab){ document.querySelectorAll('.homes-tab').forEach(b=>b.classList.toggle('active', b.dataset.homesTab===tab)); const r=document.getElementById('homesListRent'), b=document.getElementById('homesListBuy'); if(r)r.style.display=tab==='rent'?'block':'none'; if(b)b.style.display=tab==='buy'?'block':'none'; }
+function openHomeDetail(id){ showToast('住宅详情页即将上线'); }
+openScreen('assetsHomesScreen');
+</script>
+</body>
+</html>

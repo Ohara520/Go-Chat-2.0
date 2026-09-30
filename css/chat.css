@@ -1974,10 +1974,10 @@
 
 /* 心愿单 */
 .wishlist-card {
-    border: 1px solid rgba(100,180,75,0.3) !important;
-    background: linear-gradient(145deg, rgba(255,255,255,0.78), rgba(228,248,215,0.65)) !important;
+    border: 1px solid rgba(122,142,104,0.12) !important;
+    background: #fdfbf5 !important;
 }
-.wishlist-price { color: #2d7a20 !important; font-weight: 800; }
+.wishlist-price { color: #3f4a37 !important; font-weight: 600; }
 .wishlist-buy-btn {
     background: transparent !important;
     border: none !important;

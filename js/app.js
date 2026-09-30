@@ -334,3 +334,145 @@ function showToast(msg, duration = 2500) {
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), duration);
 }
+
+// ===== ASSETS · HOMES 住宅列表 =====
+function switchHomesTab(tab) {
+    document.querySelectorAll('.homes-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.homesTab === tab);
+    });
+    const rent = document.getElementById('homesListRent');
+    const buy  = document.getElementById('homesListBuy');
+    if (rent) rent.style.display = tab === 'rent' ? 'block' : 'none';
+    if (buy)  buy.style.display  = tab === 'buy'  ? 'block' : 'none';
+}
+
+// 详情页数据驱动（同一套模板，按房源切换内容）
+const HOME_DATA = {
+    'hartley-court': {
+        titleEn: 'Hartley Court',
+        titleZh: '哈特利公寓',
+        loc: 'Manchester, UK',
+        lead: '位于曼彻斯特一栋老式砖楼内的一居室公寓。客厅、厨房和卧室空间紧凑，但基础生活设施齐全，适合日常居住。',
+        layout: '1室1厅1卫',
+        area: '约 50 ㎡',
+        feats: ['老式砖楼', '一居室', '基础家具', '独立厨房', '独立卫浴', '木地板 & 老式窗户'],
+        desc: 'Hartley Court 位于曼彻斯特一处安静的住宅街区，属于典型的英式老式砖楼。公寓为一居室设计，客厅、厨房和卧室空间紧凑但实用，保留着建筑原有的木地板、老式窗户与暖气。家具和装修虽已有些年头，但基础设施齐全，整体氛围温馨而有生活气息，适合日常居住。',
+        rent: 1000,
+        deposit: 1000,
+        images: [
+            { src: 'images/assets/homes/hartley-court/living-room.png', alt: '客厅' },
+            { src: 'images/assets/homes/hartley-court/exterior.png', alt: '外观' }
+        ]
+    },
+    'willow-court': {
+        titleEn: 'Willow Court',
+        titleZh: '维洛公寓',
+        loc: 'Manchester, UK',
+        lead: 'Willow Court 位于曼彻斯特一处普通住宅社区，是一套空间舒适的现代两居室公寓。室内采用简洁的现代装修，拥有独立厨房、卫浴及阳台，基础家具齐全。',
+        layout: '2室1厅1卫',
+        area: '约 85 ㎡',
+        feats: ['普通住宅社区', '两居室', '独立阳台', '基础现代装修', '独立厨房', '独立卫浴'],
+        desc: 'Willow Court 位于曼彻斯特一处普通住宅社区，是一套空间舒适的现代两居室公寓。室内采用简洁的现代装修，拥有独立厨房、卫浴及阳台，基础家具齐全。相比传统的一居室，提供了更充裕的日常生活与个人活动空间。',
+        rent: 1958,
+        deposit: 1958,
+        images: [
+            { src: 'images/assets/homes/willow-court/living-room.png', alt: '客厅' },
+            { src: 'images/assets/homes/willow-court/exterior.png', alt: '外观' },
+            { src: 'images/assets/homes/willow-court/bedroom.png', alt: '卧室' }
+        ]
+    },
+    'meridian-residences': {
+        titleEn: 'The Meridian Residences',
+        titleZh: '云际公寓',
+        loc: 'Manchester, UK',
+        lead: '位于曼彻斯特的高层城市景观公寓。室内空间宽敞，采用现代暖色系精装修，配有全景落地窗、独立衣帽间及一间可自由规划的房间，适合不同阶段的家庭生活需求。',
+        layout: '3室2卫·开放式客餐厅',
+        area: '约 125 ㎡',
+        feats: ['高层城市景观', '全景落地窗', '独立衣帽间', '自由规划房间', '开放式厨房', '现代精装修'],
+        desc: 'The Meridian Residences 位于曼彻斯特高层住宅建筑内，拥有开阔的城市景观。室内采用现代暖色系装修，开放式客餐厅与厨房相连，落地窗为公共生活区域带来充足采光。主卧配有独立衣帽间，另外设有一间可以根据家庭需求自由规划的房间，可用作书房、宠物房或未来的婴儿房，为不同阶段的生活保留空间。',
+        rent: 2850,
+        deposit: 2850,
+        images: [
+            { src: 'images/assets/homes/meridian-residences/living-room.png', alt: '客厅' },
+            { src: 'images/assets/homes/meridian-residences/exterior.png', alt: '外观' },
+            { src: 'images/assets/homes/meridian-residences/master-bedroom.png', alt: '主卧' },
+            { src: 'images/assets/homes/meridian-residences/flex-room.png', alt: '自由规划房间' }
+        ]
+    }
+};
+
+let currentHomeId = null;
+
+function fmtGBP(n) {
+    return n.toLocaleString('en-GB');
+}
+
+function openHomeDetail(id) {
+    const data = HOME_DATA[id];
+    if (!data) {
+        showToast('住宅详情页即将上线');
+        return;
+    }
+    currentHomeId = id;
+
+    const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.textContent = val; };
+    set('hdTitleEn', data.titleEn);
+    set('hdTitleZh', data.titleZh);
+    set('hdLoc', data.loc);
+    set('hdLead', data.lead);
+    set('hdSpecLayout', data.layout);
+    set('hdSpecArea', data.area);
+    set('hdDesc', data.desc);
+    set('hdPcNum', fmtGBP(data.rent));
+    set('hdPcRent', '£ ' + fmtGBP(data.rent));
+    set('hdPcDeposit', '£ ' + fmtGBP(data.deposit));
+    set('hdPcTotal', '£ ' + fmtGBP(data.rent + data.deposit));
+
+    const feats = document.getElementById('hdFeats');
+    if (feats) {
+        feats.innerHTML = '';
+        data.feats.forEach(f => {
+            const span = document.createElement('span');
+            span.className = 'hd-feat';
+            span.textContent = f;
+            feats.appendChild(span);
+        });
+    }
+
+    const thumbs = document.getElementById('hdThumbs');
+    if (thumbs) {
+        thumbs.innerHTML = '';
+        data.images.forEach((img, i) => {
+            const t = document.createElement('div');
+            t.className = 'hd-thumb' + (i === 0 ? ' active' : '');
+            t.onclick = function () { switchHomeImg(i, this); };
+            const im = document.createElement('img');
+            im.src = img.src;
+            im.alt = img.alt;
+            t.appendChild(im);
+            thumbs.appendChild(t);
+        });
+    }
+
+    switchHomeImg(0);
+    openScreen('homeDetailScreen');
+    const screen = document.getElementById('homeDetailScreen');
+    if (screen) screen.scrollTop = 0;
+}
+
+// 主图 / 缩略图切换
+function switchHomeImg(index, el) {
+    const data = HOME_DATA[currentHomeId];
+    if (!data) return;
+    const imgs = data.images;
+    if (!imgs || !imgs[index]) return;
+    const main = document.getElementById('hdMainImg');
+    if (main) main.src = imgs[index].src;
+    const count = document.getElementById('hdCount');
+    if (count) count.textContent = (index + 1) + ' / ' + imgs.length;
+    const thumbs = document.querySelectorAll('#hdThumbs .hd-thumb');
+    thumbs.forEach((t, i) => t.classList.toggle('active', i === index));
+    if (el && !el.classList.contains('active')) {
+        el.classList.add('active');
+    }
+}

@@ -1171,8 +1171,7 @@ function renderMarket(categoryId) {
           + '</div>'
           + '<div>'
             + '<div style="font-size:9px;letter-spacing:2px;color:#8a7f68;font-weight:600;">UNLOCKS</div>'
-            + '<div style="font-size:14px;color:#4a4436;font-weight:600;margin-top:2px;">声之匣 ·《面基》</div>'
-            + '<div style="font-size:11px;color:#9a917c;margin-top:2px;">集齐三件套，解锁独家音频剧场《面基》</div>'
+            + '<div style="font-size:14px;color:#4a4436;font-weight:600;margin-top:2px;">集齐三件套，解锁共同生活的门槛</div>'
           + '</div>'
         + '</div>';
 
