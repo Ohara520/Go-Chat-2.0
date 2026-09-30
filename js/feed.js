@@ -240,10 +240,16 @@ function _bustAvatarCache(url) {
   const stamp = localStorage.getItem('ghostAvatarUpdatedAt') || '';
   return stamp ? `${url}${url.includes('?') ? '&' : '?'}t=${stamp}` : url;
 }
-// Ghost 头像 HTML（永远读最新 ghostAvatarUrl）
+// Ghost 头像 HTML（永远读最新头像）
+// 优先正式 URL；上传未完成/失败时读 base64 备份，跟封面和资料页一致，避免朋友圈还显示旧头像
 function _ghostAvatarHTML() {
-  const url = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
-  return `<img src="${_bustAvatarCache(url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  const url = localStorage.getItem('ghostAvatarUrl');
+  if (url && !url.startsWith('data:')) {
+    return `<img src="${_bustAvatarCache(url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  }
+  const b64 = localStorage.getItem('ghostAvatarBase64');
+  const src = url || (b64 ? _toDataUri(b64) : 'images/ghost-avatar.jpg');
+  return `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
 }
 // 取某作者的头像渲染内容（Ghost=图，NPC=emoji，user=用户头像）
 // IndexedDB 里存的是裸 base64（无 data: 前缀），渲染前补上
