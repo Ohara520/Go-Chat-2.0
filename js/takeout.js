@@ -388,9 +388,7 @@ function _renderShopTab(body, city) {
   });
   const cats  = { main: '正餐', side: '小食', drink: '饮品' };
 
-  const banner = coldWar
-    ? `<div style="background:#fff0f0;border:1px solid #f0b0b0;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#b02020;text-align:center;">❄️ 冷战期间无法点外卖</div>`
-    : count >= 3
+  const banner = count >= 3
     ? `<div style="background:#fff8e8;border:1px solid #e8d060;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#a07020;text-align:center;">今天已点了 ${count} 次，明天再来吧</div>`
     : hasActive
     ? `<div style="background:#fff8e8;border:1px solid #e8d060;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#a07020;text-align:center;">🛵 外卖配送中，送达后才能再点</div>`

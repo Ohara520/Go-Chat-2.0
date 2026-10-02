@@ -847,29 +847,23 @@ function getGhostResponseState() {
   if (trust >= 80 && affection >= 70)                           warmth += 1;
   if (trust >= 75 && affection >= 65 && mode === 'established') availability = 'open';
 
-  if (!coldWar) {
-    if (trust >= 65) initiative += 1;
-    if (mode === 'slowBurn') initiative = Math.max(0, initiative - 1);
+  if (trust >= 65) initiative += 1;
+  if (mode === 'slowBurn') initiative = Math.max(0, initiative - 1);
+
+  if (mode === 'slowBurn') {
+    if (trust >= 60) intimacy = 1;
+    if (trust >= 70) intimacy = 2;
+  } else {
+    if (trust >= 50) intimacy = 1;
+    if (trust >= 60) intimacy = 2;
+    if (trust >= 72) intimacy = 3;
+    if (trust >= 82 && affection >= 80) intimacy = 4;
   }
 
-  if (!coldWar) {
-    if (mode === 'slowBurn') {
-      if (trust >= 60) intimacy = 1;
-      if (trust >= 70) intimacy = 2;
-    } else {
-      if (trust >= 50) intimacy = 1;
-      if (trust >= 60) intimacy = 2;
-      if (trust >= 72) intimacy = 3;
-      if (trust >= 82 && affection >= 80) intimacy = 4;
-    }
-  }
-
-  if (!coldWar) {
-    if (trust >= 45) moneyEase = 1;
-    if (trust >= 65) moneyEase = 2;
-    if (trust >= 82) moneyEase = 3;
-    if (mode === 'slowBurn') moneyEase = Math.max(0, moneyEase - 1);
-  }
+  if (trust >= 45) moneyEase = 1;
+  if (trust >= 65) moneyEase = 2;
+  if (trust >= 82) moneyEase = 3;
+  if (mode === 'slowBurn') moneyEase = Math.max(0, moneyEase - 1);
 
   return {
     availability,
