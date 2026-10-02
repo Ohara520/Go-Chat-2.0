@@ -1,16 +1,30 @@
 // ============================================================
-// activity.js — 时序状态层（Phase 1 地基）
+// activity.js — 用户现实事实层（Reality Cleanup V1）
 //
-// 职责：
-//   1. Ghost 连续活动状态（不再整个 session 冻结一个随机状态）
-//   2. 用户活动状态（从消息里识别"去上班/去洗澡…"，带时间戳）
+// 这个文件现在管什么（只管用户侧的真实事实）：
+//   1. User Activity Fact（用户活动事实）
+//      = 用户自己明确告诉 Simon 她去做什么（"我去洗澡/我要工作了/我去睡了"）。
+//        从消息里识别关键词，带时间戳存下来。
+//   2. User Silence Fact（用户沉默事实）
+//      = 距离用户上一条真实消息过去了多久。
 //   3. getActivityStatus() 纯计算：active / probably_finished / expired
 //
-// 存储的是"事实"（做了什么 + 何时开始 + 预计多久），
-// "现在是什么状态"永远是现算的，不落库。
+// 核心原则：
+//   这些都只是"事实"。它们不决定 Simon 应该有什么情绪、
+//   也不替 Simon 决定该怎么回应。系统只报事实，演法交给模型。
 //
-// 依赖：profile.js（getGhostStatesByTime）
-// 被用于：persona.js（注入 prompt）、sendMessage.js（识别用户活动）
+// 这个文件不管什么：
+//   - 不替 Simon 随机决定他正在干嘛（旧 Ghost 随机活动调度已移除，见下）。
+//   - 不解释她的沉默意味着什么（生没生气/睡没睡着/该不该想她）。
+//   - 不写"这个点只能说什么/不能说什么"的时间行为剧本。
+//
+// 什么 Bug 来这里找：
+//   - 她明确说过"我去洗澡"却没被记住 → classifyUserActivity / saveUserActivity
+//   - 沉默时长算错 → noteUserReturn / getUserSilenceHint
+//   - 系统又开始替 Simon 编造"他正在睡觉/训练" → 说明旧随机调度被谁加回来了
+//
+// 依赖：无（旧 profile.js 的 getGhostStatesByTime 依赖已随随机调度移除）
+// 被用于：persona.js（注入 prompt）、sendMessage.js（识别用户活动 / 记沉默）
 // ============================================================
 
 // 各类活动的默认持续时间（ms）
@@ -70,43 +84,12 @@ function _humanElapsed(ms) {
 }
 
 // ─────────────────────────────────────────
-// Ghost 连续活动状态
-// 未过期 → 继续用同一个；过期 → 按当前时段重抽，接着往下走
-// 存 localStorage，跨刷新/跨时段存活，形成一条连续时间线
+// 旧 Ghost 随机活动调度已移除（Reality Cleanup V1）：
+// 系统不再替 Simon 随机决定他正在做什么（睡觉/训练/值勤/吃饭…）。
+// 原 getGhostActivity() / getGhostActivityState() 会从时段池里抽一个状态，
+// 再把它当成事实告诉模型——那是行为导演，不是现实事实，已删除。
+// Simon 现在在干嘛，交给模型根据人设 + 真实时间 + 当前对话自己判断。
 // ─────────────────────────────────────────
-function getGhostActivity() {
-  let obj = null;
-  try { obj = JSON.parse(localStorage.getItem('ghostActivity') || 'null'); } catch(e) { obj = null; }
-
-  const now = Date.now();
-  const st = obj ? getActivityStatus(obj, now) : null;
-
-  // 有且未过期（active 或 probably_finished）→ 继续用，不重抽，保证连续
-  if (obj && st && st.status !== 'expired') return obj;
-
-  // 没有 / 已过期 → 按当前时段抽一个新的，接上时间线
-  const pool = (typeof getGhostStatesByTime === 'function')
-    ? getGhostStatesByTime()
-    : (typeof GHOST_STATES !== 'undefined' ? GHOST_STATES : []);
-  if (!pool || !pool.length) return obj; // 池子都没有，只能沿用旧的
-
-  let next = pool[Math.floor(Math.random() * pool.length)];
-  // 尽量别和上一个撞
-  if (obj && obj.activity === next && pool.length > 1) {
-    next = pool[Math.floor(Math.random() * pool.length)];
-  }
-  // 每个状态自然持续 60~120 分钟，到点再换下一个
-  const dur = (60 + Math.floor(Math.random() * 60)) * 60 * 1000;
-  const fresh = { activity: next, startedAt: now, expectedDuration: dur, source: 'time_pool' };
-  try { localStorage.setItem('ghostActivity', JSON.stringify(fresh)); } catch(e) {}
-  return fresh;
-}
-
-// 给 persona.js 用：Ghost 当前状态的中文字符串（沿用旧 GHOST_STATES 池的措辞）
-function getGhostActivityState() {
-  const a = getGhostActivity();
-  return a ? a.activity : '';
-}
 
 // ─────────────────────────────────────────
 // 用户活动识别 + 保存
@@ -156,8 +139,10 @@ function trackUserActivityFromMessage(text) {
   return null;
 }
 
-// 给 persona.js 用：拼出"她现在大概在干嘛"的英文提示，模型只管说话不算时间
-// expired 的活动直接不提（她早该做完了，系统不再假设她还在做）
+// User Activity Fact（用户活动事实）给 persona.js 用。
+// 只报两件真实的事：① 她自己说过要去做什么 ② 那是多久以前说的。
+// 不替她断定她"现在还在不在做"——那是推测，不是事实，交给模型自己判断。
+// expired 的活动直接不提（隔了太久，连"她说过"都已不再是本轮相关事实）。
 function getUserActivityHint() {
   let obj = null;
   try { obj = JSON.parse(localStorage.getItem('userActivity') || 'null'); } catch(e) { obj = null; }
@@ -166,10 +151,8 @@ function getUserActivityHint() {
   if (!st || st.status === 'expired') return '';
 
   const ago = _humanElapsed(st.elapsedMs);
-  const tail = st.status === 'active'
-    ? 'probably still doing that'
-    : 'probably done by now';
-  return `She said she's ${obj.label} — started ${ago}, ${tail}. (System inference from what she told you, not certainty — don't state it as fact, just don't contradict it.)`;
+  // 纯事实：她说过的话 + 过了多久。不加"probably still/done"这类系统推测。
+  return `She told you she's ${obj.label} (${ago}). That is what she said — not a confirmation of what she's doing right now. Don't contradict it; make nothing else of it.`;
 }
 
 // ─────────────────────────────────────────
@@ -195,8 +178,10 @@ function noteUserReturn() {
   } catch(e) {}
 }
 
-// 给 persona.js 用：她刚从长时间沉默里回来的提示
-// 她明确说过在干嘛（去上班等）→ activity hint 已解释时间流逝，这里不重复
+// User Silence Fact（用户沉默事实）给 persona.js 用。
+// 只报一件真实的事：距离她上一条消息过了多久。
+// 不解释这意味着什么（生没生气/睡没睡着），也不建议 Simon 该不该在意、该怎么回。
+// 她明确说过去干嘛（去上班等）→ activity fact 已覆盖这段时间流逝，这里不重复。
 function getUserSilenceHint() {
   if (typeof getUserActivityHint === 'function' && getUserActivityHint()) return '';
 
@@ -218,13 +203,12 @@ function getUserSilenceHint() {
   else if (hours < 48) phrase = `since yesterday`;
   else                 phrase = `a couple of days`;
 
-  return `She went quiet for ${phrase} and just came back — she didn't say where she went. He noticed the gap. He does NOT interrogate her about it; he just registers it — a dry acknowledgement, mild curiosity, or picking back up with a slight edge, whatever fits his mood. (System inference from timing, not certainty — don't state the exact hours as fact.)`;
+  // 纯事实：隔了多久 + 她没说去哪。不给情绪解读，不给行为建议。
+  return `Her last message was ${phrase} ago; she didn't say where she'd been. That's the only fact here — what it means, and whether to say anything about it, is yours to read.`;
 }
 
 if (typeof window !== 'undefined') {
   window.getActivityStatus = getActivityStatus;
-  window.getGhostActivity = getGhostActivity;
-  window.getGhostActivityState = getGhostActivityState;
   window.classifyUserActivity = classifyUserActivity;
   window.saveUserActivity = saveUserActivity;
   window.trackUserActivityFromMessage = trackUserActivityFromMessage;

@@ -364,9 +364,8 @@ function _renderShopTab(body, city) {
   const fee     = getTakeoutFee();
   const bal     = getBalance();
   const count   = getTodayTakeoutCount();
-  const coldWar = localStorage.getItem('coldWarMode') === 'true';
   const hasActive = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').some(o => !o.done);
-  const canOrder  = !coldWar && count < 3 && !hasActive;
+  const canOrder  = count < 3 && !hasActive;
 
   if (!city) {
     body.innerHTML = `
@@ -937,8 +936,7 @@ async function onGhostReceivedTakeout(order, force = false) {
       // 修复(#23)：从 pendingTakeoutReactions 回放时 force=true，绕过调情判断，
       // 否则 checkPendingTakeoutReactions 又调本函数、又因 _isFlirting 为 true 重新
       // 存回 pending，无限推迟，签收回复永远不出现（外卖显示签收但聊天没反应）。
-      const _isFlirting = !force && (sessionStorage.getItem('loveOverride') === 'true'
-        || (chatHistory || []).slice(-4).some(m => m._intimate));
+      const _isFlirting = !force && (chatHistory || []).slice(-4).some(m => m._intimate);
       if (_isFlirting) {
         // 调情中不打断：留在待表达队列，释放表达锁，等下次真正进 Chat 时 force 重放
         _addPendingTakeout(order);
@@ -1109,9 +1107,6 @@ function getMealHint() {
   // 已有外卖在配送中 → 不显示用餐提示（已经点了）
   const hasActive = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').some(o => !o.done);
   if (hasActive) return null;
-
-  // 冷战期间不提示
-  if (localStorage.getItem('coldWarMode') === 'true') return null;
 
   const status = _detectMealStatus();
   if (status === 'ate')    return null;           // 他吃了，不提示

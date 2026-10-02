@@ -181,13 +181,6 @@ async function handlePostReplyActions(text, reply, intent, pendingEvent) {
     if (typeof handlePostReplyEvents === 'function' && pendingEvent) {
       handlePostReplyEvents(text, reply, pendingEvent).catch(e => console.warn('事件处理出错:', e));
     }
-    // 表达风格轴：每 4 轮用 DeepSeek 评一次最近互动倾向，不阻塞主回复
-    try {
-      const _turn = (typeof getGlobalTurnCount === 'function') ? getGlobalTurnCount() : 0;
-      if (_turn > 0 && _turn % 4 === 0 && typeof evaluateBanterSignal === 'function') {
-        setTimeout(() => { evaluateBanterSignal().catch(() => {}); }, 3000);
-      }
-    } catch(e) {}
     // Ghost Card 累积消费 pending：等她聊到钱/消费/近况的合适时机再浮出
     if (typeof checkGhostCardPending === 'function') checkGhostCardPending(text).catch(() => {});
   } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
@@ -279,8 +272,9 @@ function parseAssistantTags(reply) {
     .replace(/```\s*/g, '')
     .trim();
   let giveMoney = null;
-  let coldWarStart = false;
   let sendGift = null;
+  let conflictStartCause = null;
+  let conflictResolve = false;
 
   // 清理 unlock tag 残留
   cleanedReply = cleanedReply.replace(/\{\s*["']?unlock["']?\s*:\s*null\s*\}/g, '').trim();
@@ -292,12 +286,6 @@ function parseAssistantTags(reply) {
 
   // GIVE_MONEY tag 已移除
 
-  // COLD_WAR_START
-  if (/COLD_WAR_START/i.test(cleanedReply)) {
-    coldWarStart = true;
-    cleanedReply = cleanedReply.replace(/COLD_WAR_START/ig, '').trim();
-  }
-
   // SEND_GIFT:描述:模式
   const giftMatch = cleanedReply.match(/SEND_GIFT:([^:\n]+)(?::(\w+))?/i);
   if (giftMatch) {
@@ -308,7 +296,20 @@ function parseAssistantTags(reply) {
     cleanedReply = cleanedReply.replace(/SEND_GIFT:[^\n]*/ig, '').trim();
   }
 
-  return { cleanedReply, giveMoney, coldWarStart, sendGift };
+  // CONFLICT_START:原因
+  const conflictStartMatch = cleanedReply.match(/\[CONFLICT_START:([^\]]+)\]/i);
+  if (conflictStartMatch) {
+    conflictStartCause = conflictStartMatch[1].trim();
+    cleanedReply = cleanedReply.replace(/\[CONFLICT_START:[^\]]+\]/ig, '').trim();
+  }
+
+  // CONFLICT_RESOLVE
+  if (/\[CONFLICT_RESOLVE\]/i.test(cleanedReply)) {
+    conflictResolve = true;
+    cleanedReply = cleanedReply.replace(/\[CONFLICT_RESOLVE\]/ig, '').trim();
+  }
+
+  return { cleanedReply, giveMoney, sendGift, conflictStartCause, conflictResolve };
 }
 
 // autoUnlockFromReply — REMOVED (旧 unlock 系统已移除)
@@ -453,7 +454,7 @@ async function _processMergedMessage(text) {
     }
   }
 
-  resetSilenceTimer();
+  // Legacy silence timer removed (Phase 3K-1A)
 
   // ── 用户回来检测（离开超过2小时）────────────────────────
   const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
@@ -461,29 +462,22 @@ async function _processMergedMessage(text) {
   if (_comebackMins >= 120 && !sessionStorage.getItem('comebackReacted')) {
     sessionStorage.setItem('comebackReacted', '1');
     const _affection = getAffection();
-    const _moodNow = getMoodLevel();
-    const _coldWarNow = localStorage.getItem('coldWarMode') === 'true';
 
     const _baseProb = _comebackMins < 240 ? 0.35
       : _comebackMins < 720 ? 0.55
       : _comebackMins < 1440 ? 0.75
       : 0.90;
-    const _prob = _coldWarNow ? Math.min(1, _baseProb + 0.2) : _baseProb;
 
-    if (Math.random() < _prob) {
+    if (Math.random() < _baseProb) {
       const _hours = Math.round(_comebackMins / 60);
       const _days = _comebackMins >= 1440 ? Math.round(_comebackMins / 1440) : 0;
       const _timeDesc = _days > 0 ? `${_days} day${_days > 1 ? 's' : ''}` : `${_hours} hour${_hours > 1 ? 's' : ''}`;
 
-      const _style = _coldWarNow ? 'cold'
-        : _moodNow <= 4 ? 'flat'
-        : _affection >= 70 ? 'dry_warm'
+      const _style = _affection >= 70 ? 'dry_warm'
         : _affection >= 45 ? 'dry'
         : 'distant';
 
       const _styleGuide = {
-        cold:     'Cold war is still on. One short cold line — not hostile, just shut. Does not ask why she was gone.',
-        flat:     "Bad mood. One flat line. Minimal. Not welcoming, not cold. Just there.",
         dry_warm: "Noticed she was gone but won't say it directly. One dry line with a quiet acknowledgment.",
         dry:      "Noticed she was gone. One dry line. Not upset, just noting it. No dramatics.",
         distant:  "She's been gone a while. One neutral line — present, that's all.",
@@ -534,9 +528,8 @@ async function _processMergedMessage(text) {
   _isSending = true;
   _currentAbortController = new AbortController();
 
-  // 爱意抗拒值更新 + 剧情检测
+  // 爱意抗拒值更新
   updateLoveResistance(text);
-  checkLoveUnlockConditions();
 
   // 用户主动要求Ghost发朋友圈 —— 两层 action 检测
   //  第一层 fast path：命中固定关键词 → 直接发帖，零额外 API。
@@ -605,10 +598,8 @@ async function _processMergedMessage(text) {
 
   // ── 已读延迟（嘴硬场景，收窄条件）────────────────────────
   // 修复 #073: 只在撒娇+心情差组合下触发，去掉kiss/miss等泛化词
-  const _moodForDelay = getMoodLevel ? getMoodLevel() : 5;
-  const _coldWarForDelay = localStorage.getItem('coldWarMode') === 'true';
   const _delayScenes = /撒娇|哄我|吃醋|jealous/i.test(text); // 收窄：去掉hug/baby/miss等
-  const ghostReadDelay = !_coldWarForDelay && _delayScenes && _moodForDelay <= 4 && Math.random() < 0.20
+  const ghostReadDelay = _delayScenes && Math.random() < 0.20
     ? (Math.floor(Math.random() * 10) + 6) * 1000  // 6-15秒（旧版8-20）
     : 0;
 
@@ -624,13 +615,21 @@ async function _processMergedMessage(text) {
     if (typeof tickTurn === 'function') tickTurn();
     updateStateFromUserInput(text);
 
-    // 吃醋检测（500ms窗口，超时跳过）
-    try {
-      await Promise.race([
-        checkJealousyTrigger(text),
-        new Promise(resolve => setTimeout(resolve, 500))
-      ]);
-    } catch(e) {}
+    /*
+     * Jealousy Director（旧嫉妒导演）已退出主聊天。
+     *
+     * 以前这里会扫描用户的话、计算嫉妒等级，
+     * 再规定 Simon 应该变冷、变短或更直接。
+     *
+     * 现在不再这样做。
+     *
+     * Simon 看到正常对话和关系事实以后，
+     * 自己决定是否在意以及如何回应。
+     *
+     * 什么 Bug 来这里找：
+     * 如果以后又出现"提到某个男人就固定触发一种吃醋演法"，
+     * 检查是否重新接入了 checkJealousyTrigger 或 jealousy 等级。
+     */
 
     // ── Step 2: 检查延迟事件 ─────────────────────────────────
     const pendingEvent = pickReadyPendingEvent();
@@ -750,8 +749,6 @@ async function _processMergedMessage(text) {
     } else if (/今天|干嘛|在做|在忙|最近|怎么样|how.*day|what.*up|what.*doing|been up to/.test(t)) {
       const detail = sessionStorage.getItem('todayDetail') || '';
       if (detail) sceneHint = `[He may naturally mention: ${detail} — only if it fits, never forced.]`;
-    } else if (/吃醋|jealous|谁|who is|who was|你认识|you know her|you know him/.test(t)) {
-      sceneHint = "[Possible jealousy trigger — react immediately, don't calculate. Sharper tone, more direct.]";
     } else if (/难过|伤心|哭|委屈|不开心|hurt|sad|crying|upset|awful/.test(t)) {
       sceneHint = "[She is hurting — show up, even clumsily. One dry line of comfort beats a speech. Don't disappear.]";
     } else if (/生气|烦|讨厌|去死|滚|angry|annoyed|hate|pissed/.test(t)) {
@@ -767,34 +764,27 @@ async function _processMergedMessage(text) {
     }
 
     // 回应模式
-    const _moodMain = getMoodLevel ? getMoodLevel() : 7;
-    const _isColdWarMain = localStorage.getItem('coldWarMode') === 'true';
     let responseMode = '';
-    if (!_isColdWarMain) {
-      const _isAffectionate = /哄|撒娇|抱抱|亲亲|宝贝|miss you|想你|hug|baby/.test(t);
-      const _isHurting = /难过|伤心|哭|委屈|hurt|sad|crying|upset/.test(t);
-      const _isRoutine = /早安|晚安|吃饭|睡觉|good morning|good night/.test(t);
-      if (_isAffectionate) {
-        // 她朝你靠 — 接住她，不是推开她
-        const r = Math.random();
-        if (r < 0.45) responseMode = "[Response mode: receive it, let it land. Quiet but present — she should feel you stayed.]";
-        else if (r < 0.80) responseMode = "[Response mode: meet her where she is. Restrained, but the warmth comes through. Don't make her work for it.]";
-        else responseMode = "[Response mode: push back lightly — but she should feel it landed harder than it pushed.]";
-      } else if (_isHurting) {
-        // 在场比说话重要 — 但要让她知道你读到了
-        responseMode = Math.random() < 0.5
-          ? "[Response mode: show up plainly. One steady line is worth more than a string of qualified ones. Don't perform comfort.]"
-          : "[Response mode: stay with her. Pick up something specific from what she said — show you read it, not just heard it.]";
-      } else if (_isRoutine) {
-        // 早晚安/吃饭 — 这是注意到她的窗口，不是收尾的窗口
-        const r = Math.random();
-        if (r < 0.55) responseMode = '[Response mode: notice one thing — roughly what part of her day it is, what she might be doing, something specific. Attentive without announcing it. Never state a clock time for her side.]';
-        else if (r < 0.85) responseMode = '[Response mode: meet it in kind. You are awake too / eating too / it is late your side too. Small, real, not flagged.]';
-        // 15% 留空 — 让 buildPacingBlock 自然控制
-      } else if (_moodMain <= 4) {
-        // 他自己心情低 — 收着但不疏远
-        responseMode = '[Response mode: contained — mood is low. Stay present, but more reserved than usual. Do not fake warmth, but do not pull back either.]';
-      }
+    const _isAffectionate = /哄|撒娇|抱抱|亲亲|宝贝|miss you|想你|hug|baby/.test(t);
+    const _isHurting = /难过|伤心|哭|委屈|hurt|sad|crying|upset/.test(t);
+    const _isRoutine = /早安|晚安|吃饭|睡觉|good morning|good night/.test(t);
+    if (_isAffectionate) {
+      // 她朝你靠 — 接住她，不是推开她
+      const r = Math.random();
+      if (r < 0.45) responseMode = "[Response mode: receive it, let it land. Quiet but present — she should feel you stayed.]";
+      else if (r < 0.80) responseMode = "[Response mode: meet her where she is. Restrained, but the warmth comes through. Don't make her work for it.]";
+      else responseMode = "[Response mode: push back lightly — but she should feel it landed harder than it pushed.]";
+    } else if (_isHurting) {
+      // 在场比说话重要 — 但要让她知道你读到了
+      responseMode = Math.random() < 0.5
+        ? "[Response mode: show up plainly. One steady line is worth more than a string of qualified ones. Don't perform comfort.]"
+        : "[Response mode: stay with her. Pick up something specific from what she said — show you read it, not just heard it.]";
+    } else if (_isRoutine) {
+      // 早晚安/吃饭 — 这是注意到她的窗口，不是收尾的窗口
+      const r = Math.random();
+      if (r < 0.55) responseMode = '[Response mode: notice one thing — roughly what part of her day it is, what she might be doing, something specific. Attentive without announcing it. Never state a clock time for her side.]';
+      else if (r < 0.85) responseMode = '[Response mode: meet it in kind. You are awake too / eating too / it is late your side too. Small, real, not flagged.]';
+      // 15% 留空 — 让 buildPacingBlock 自然控制
     }
 
     // 时间流逝感知
@@ -979,11 +969,6 @@ async function _processMergedMessage(text) {
     // 使用 intimacy.js 的 intent 系统决定是否调情
     const _intimateIntent = typeof detectIntimateIntent === 'function'
       ? detectIntimateIntent(text) : 'none';
-    // 每条消息都更新进度，不管有没有进 intimate 路径
-    if (_intimateIntent !== 'none' && typeof getCurrentIntimacyStep === 'function') {
-      getCurrentIntimacyStep(text);
-    }
-    const _flirtProgress = typeof getFlirtProgress === 'function' ? getFlirtProgress() : 0;
     // 修复：affection 也直接进 Venice，不再设进度门槛
     // 让 Venice 自己从冷到热地升温，外面不帮它过滤
     // 暗示性的话、语境性的调情，Venice 接住比 Sonnet 强得多
@@ -1138,11 +1123,9 @@ async function _processMergedMessage(text) {
               } else if (_ms === 'flirty') {
                 // flirty → 概率机制：关系深/心情好时更容易给
                 const _aff = getAffection();
-                const _mood = getMoodLevel ? getMoodLevel() : 7;
                 const _giveChance = Math.min(0.5,
                   0.2
                   + (_aff >= 70 ? 0.15 : _aff >= 50 ? 0.08 : 0)
-                  + (_mood >= 8 ? 0.1 : _mood >= 6 ? 0.05 : 0)
                 );
                 if (Math.random() > _giveChance) {
                   sessionStorage.setItem('haikuBlocksMoney', '1');
@@ -1163,7 +1146,13 @@ async function _processMergedMessage(text) {
                 emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
               }
             }
-            if (combinedResult.isWarm && getJealousyLevelCapped() === 'mild') decayJealousy();
+            /*
+             * Jealousy 状态残余已移除。
+             *
+             * 以前这里会根据用户回复改变 Simon 的嫉妒等级。
+             * 现在正常关系互动直接交给模型理解，
+             * 不再维护后台“吃醋数值”。
+             */
           }
         }
       } catch(e) {}
@@ -1390,7 +1379,7 @@ async function _processMergedMessage(text) {
     }
 
     // ── Step 4: 解析模型tag ──────────────────────────────────
-    const { cleanedReply, giveMoney: parsedMoney, coldWarStart, sendGift } = parseAssistantTags(reply);
+    const { cleanedReply, giveMoney: parsedMoney, sendGift, conflictStartCause, conflictResolve } = parseAssistantTags(reply);
     reply = cleanedReply;
 
     if (!reply || !reply.trim()) {
@@ -1399,39 +1388,7 @@ async function _processMergedMessage(text) {
       return;
     }
 
-    // ── Step 4.5: 第三者审查（吃醋触发时）──────────────────
-    try {
-      const jealousyJustTriggered = sessionStorage.getItem('jealousyJustTriggered') === '1' ||
-        (parseInt(localStorage.getItem('lastJealousyAt') || '0') > Date.now() - 60000);
-      const hasThirdPartyWords = /\b(he|him|his|someone|somebody|another person|another guy|other guy|other man)\b/i.test(reply);
-
-      if (hasThirdPartyWords && jealousyJustTriggered) {
-        const recentText = cleanHistory.slice(-6).map(m => m.content || '').join('\n');
-        const recentLower = recentText.toLowerCase();
-        const hasEnReferent = /\b(ex|boyfriend|boss|coworker|colleague|classmate|friend|doctor|price|soap|gaz|dad|father|brother)\b/i.test(recentLower);
-        const hasZhReferent = /他|她|那个人|有个人|同事|老板|朋友|前任|陪玩|队友|室友|同学|男生|男的/.test(recentText);
-        const isWorkCtx = /加班|overtime|stayed late|got called in/.test(recentLower);
-        const hasClearReferent = (hasEnReferent || hasZhReferent) && !isWorkCtx;
-
-        const rivalryCheck = await fetchDeepSeek(
-          'Does this reply invent a rival or "replaced/discarded" narrative that was NOT based on anything the user said? Answer only: YES or NO.',
-          `Recent chat:\n${recentText.slice(-300)}\n\nReply: "${reply.slice(0, 200)}"`,
-          20
-        );
-        const hasInventedRivalry = rivalryCheck.trim().toUpperCase().startsWith('YES');
-
-        if (!hasClearReferent || hasInventedRivalry) {
-          const regenRaw = await fetchDeepSeek(
-            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n[REWRITE RULE] The previous reply invented a third party who was never mentioned by the user. Rewrite expressing the same emotion aimed at the SITUATION not a person. Use "so that takes priority?" / "guess that matters more." / "alright. noted." — NOT "he/him/lucky him". English only.',
-            `Recent chat:\n${recentText.slice(-200)}\n\nReply to rewrite: "${reply.slice(0, 200)}"`,
-            150
-          );
-          if (regenRaw && !isBreakout(regenRaw) && regenRaw.trim().length > 3) {
-            reply = regenRaw.trim();
-          }
-        }
-      }
-    } catch(e) {}
+    // ── Step 4.5 第三者审查已移除：原依赖 jealousyJustTriggered 旧嫉妒触发标记，现已随 Jealousy Director 下线 ──
 
     // ── Step 5: 文本清理 ───────────────────────────────────
     reply = reply.replace(/\s*—\s*/g, '\n').trim();
@@ -1539,10 +1496,6 @@ async function _processMergedMessage(text) {
     // 触发条件：调情余温期 / 他说了比较重的话 / 情绪高张场景
     const _replyText = reply || '';
     const _recallHasReason = (
-      getJealousyLevelCapped() === 'severe' ||    // 严重吃醋，说重了
-      getJealousyLevelCapped() === 'medium' ||    // 中度吃醋
-      getMoodLevel() >= 8 ||                      // 心情很好，说漏嘴了
-      getMoodLevel() <= 3 ||                      // 心情很差，说重了
       _replyText.length > 120                     // 说太多了，不像他
     );
     if (false) { // 撤回功能已关闭
@@ -1595,17 +1548,7 @@ async function _processMergedMessage(text) {
 
     // ── 旧转账系统已移除 ──
 
-    // ── 冷战检测 ─────────────────────────────────────────────
-    if (localStorage.getItem('coldWarMode') === 'true') {
-      fetchDeepSeek(
-        '判断用户消息是否在向Ghost道歉或者想修复关系。只返回JSON：{"apology": true} 或 {"apology": false}\n必须是明确针对Ghost的道歉或求和，不是对别人道歉。',
-        `用户说：${text}`, 40
-      ).then(raw => {
-        const result = safeParseJSON(raw);
-        if (result?.apology) { endColdWar(true); changeMood(2, true); }
-      }).catch(() => {});
-    }
-    if (coldWarStart) startColdWar();
+    // Phase 3H-1B: 用户道歉不再自动 endColdWar。
 
     // ── 好感度更新（已移至 updateStateFromUserInput 统一处理，此处不再重复）──
     // 仅保留 updateStateFromUserInput 未覆盖的逻辑：连续登录奖励
@@ -1652,8 +1595,22 @@ async function _processMergedMessage(text) {
       });
     } catch(e) {}
 
+    // ── Conflict fact transitions (Phase 3H-3N) ──────────────
+    // Model-authorized state changes — only when Simon decides
+    if (conflictStartCause && conflictResolve) {
+      // Both tags in same reply is contradictory — ignore both, preserve existing state
+      console.warn('[conflict] START and RESOLVE in same reply, ignoring both');
+    } else if (conflictStartCause) {
+      if (typeof setUnresolvedConflict === 'function') {
+        setUnresolvedConflict(conflictStartCause);
+      }
+    } else if (conflictResolve) {
+      if (typeof resolveUnresolvedConflict === 'function') {
+        resolveUnresolvedConflict();
+      }
+    }
+
     // ── 副作用（fire-and-forget）────────────────────────────
-    consumeLoveOverride();
     const mainReplyHasCareAction = !!sendGift;
     if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
@@ -2029,10 +1986,9 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
         .trim();
-      // 修复：调情路径也要清理控制标签，否则 SEND_GIFT/COLD_WAR_START/【】 会泄露进气泡
+      // 修复：调情路径也要清理控制标签，否则 SEND_GIFT/【】 会泄露进气泡
       cleanedReply = cleanedReply
         .replace(/SEND_GIFT:[^\n]*/ig, '')
-        .replace(/COLD_WAR_START/ig, '')
         .replace(/GIVE_MONEY:[^\n]*/ig, '')
         .replace(/【[^】]{3,}】/g, '')
         .replace(/\n{3,}/g, '\n')
@@ -2094,7 +2050,6 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
             saveHistory();
             if (typeof checkHomeAADeal === 'function') checkHomeAADeal(_retryClean);
             if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-            if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
             incrementTodayCount();
             if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
             _syncRenderedCount();
@@ -2116,7 +2071,6 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
           saveHistory();
           if (typeof checkHomeAADeal === 'function') checkHomeAADeal(firstPart);
           if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-          if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
           incrementTodayCount();
           if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
           _syncRenderedCount();

@@ -110,7 +110,6 @@ async function sendSticker(id) {
 
     // ===== 多状态回复hint =====
     const affection = getAffection ? getAffection() : 60;
-    const coldWar = localStorage.getItem('coldWarMode') === 'true';
     const ukHour = new Date(new Date().getTime() + 0 * 3600000).getUTCHours();
     const isLateNight = ukHour >= 23 || ukHour < 5;
 
@@ -121,8 +120,6 @@ async function sendSticker(id) {
       stateHint = `Her mood is rising. Respond more carefully.`;
     } else if (isSeekingAttention) {
       stateHint = `She's leaning in. You can respond slightly warmer.`;
-    } else if (coldWar) {
-      stateHint = `Cold war is on. Keep it short, minimal. Still present, not hostile.`;
     } else if (affection >= 70) {
       stateHint = `High affection. He can be a little warmer here — still dry, but closer.`;
     } else if (affection < 40) {

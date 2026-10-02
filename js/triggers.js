@@ -98,9 +98,8 @@ emotion强度：轻/中/重`,
     if (!result) return;
 
     // ── 1. mood变化 ───────────────────────────────────────
-    if (result.mood_change && result.mood_change !== 0) {
-      changeMood(result.mood_change);
-    }
+    // Phase 3G-1：已停止每轮 AI 自动生产 Simon mood。
+    // result.mood_change 仍由分类器返回，但不再消费（死字段，待后续清理）。
 
     // ── 2. 商城高亮触发 ───────────────────────────────────
     if (result.market?.triggered) {

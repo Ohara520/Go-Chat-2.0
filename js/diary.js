@@ -142,11 +142,10 @@ ${_chatSnippet}`;
     const _todayIdx = _wkNames.indexOf(getGhostWeekday());
     const yesterdayWeekday = _wkNames[(_todayIdx + 6) % 7];
 
-    // v2: 读取 Ghost 当前心情，让日记反映真实情绪而非默认忧郁
-    const mood = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
+    // Phase 3G-7C: Diary × Mood 解耦 — 日记不再根据 Simon moodLevel 划档位指定语气。
+    // 模型根据日记实际 context（聊天记录 / 记忆 / 表达阈值）自行决定语气。
 
     // Ghost 那边的世界素材——给 DeepSeek 编造细节用
-    // 根据位置和心情提供合理的军旅细节
     const _sideWorld = (() => {
       const loc = localStorage.getItem('currentLocation') || 'Hereford Base';
       const isDeployed = !loc.toLowerCase().includes('hereford') && !loc.toLowerCase().includes('base');
@@ -156,31 +155,10 @@ ${_chatSnippet}`;
         return `He's at base (${loc}). Details available to use: drills, range practice, briefings, PT, mess hall food, time with Soap/Gaz/Price, evening downtime, cleaning kit, admin work, early nights or late ones.`;
       }
     })();
-    let moodHint = '';
-    if (mood >= 8) {
-      moodHint = `Yesterday was a good one. He's in a settled, decent mood. The entry should reflect that — not cheerful, not poetic, just steady. Maybe one small thing made him quietly pleased.`;
-    } else if (mood >= 6) {
-      moodHint = `Yesterday was ordinary. Steady. Neither rough nor bright. The entry should sit in that — practical, dry, occasionally a flicker of warmth or amusement, but mostly just an account of the day.`;
-    } else if (mood >= 4) {
-      moodHint = `Yesterday was a little off. Tired, maybe slightly low. The entry can show that, but he doesn't dwell — he doesn't pour his heart out, even to himself.`;
-    } else {
-      moodHint = `Yesterday was rough. He's not okay. But he doesn't write it that way — he writes around it. Short. Withholding. The reader has to feel it underneath.`;
-    }
 
     // 修复：prompt 完全避免"memory system/track/relationship"等触发词
     // 改成创意写作语境，让模型理解这是小说角色的日记创作
     const _ghostAge = (typeof getGhostAge === 'function') ? getGhostAge() : 31;
-
-    // 表达阈值：只决定"没说出口那部分"的味道，不决定日记有没有料
-    const _bs = (typeof getBanterSweet === 'function') ? getBanterSweet() : -20;
-    let _discloseHint;
-    if (_bs <= -50) {
-      _discloseHint = `Out loud he keeps her at arm's length — teasing, blunt, hard to read. The notebook is where the gap shows: the space between what he SAID to her and what he actually thought. She said she missed him; out loud he brushed it off; here he can admit he'd been waiting to hear it. Not a love confession — just the honest version he'd never hand her.`;
-    } else if (_bs >= 50) {
-      _discloseHint = `He's already open with her — he says the warm things to her face. So this is NOT where he confesses love; she already knows. It's where the things he never bothered to SAY surface: what he noticed about her, something small he worried about, something he quietly did or planned, an odd private habit. e.g. checked the weather where she is. she said she was fine — didn't sound it — didn't push. ordered the thing she mentioned weeks ago. The reveal is "he pays attention like this," not "he loves her."`;
-    } else {
-      _discloseHint = `Partly what he noticed or quietly worried about, partly the odd thing he didn't say out loud. Not a love confession — the quieter, more specific stuff a person keeps to himself.`;
-    }
 
     // 昨天她提到、触发了世界书的设定 —— 给日记专属细节
     let _wbHint = '';
@@ -209,7 +187,6 @@ Character: British SAS soldier, ${_ghostAge}. Manchester.
 Setting: ${location}${locationReason ? ` (${locationReason})` : ''}
 Weather: ${weather || 'not noted'}
 Day: ${yesterdayWeekday}
-${moodHint}
 ${_sideWorld}
 ${_recentBlock}${_wbHint}
 ${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — do NOT transcribe it. Read it, then write what he privately thought AROUND it: what he noticed, what he didn\'t say back, what stuck with him. "SHE SAID" = her words, "GHOST SAID" = his words. Never mix them up.' : 'Background about her — at most one detail, woven in naturally, not listed:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
@@ -309,43 +286,26 @@ How he writes:
   }
 }
 
-// 兜底静态日记 — 按 mood 分层，避免全部都是忧郁
+// Phase 3G-7C: 兜底静态日记 — 不再按 Simon mood 分层。
+// 合并三档日记池为一个中性池，随机选取，让日记自然变化而非情绪数字决定。
 function _getFallbackEntry(location, weather) {
-  // 读取昨天的心情（用今天的 mood 当代理，因为日记是为昨天写的）
-  const mood = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
-
-  // ── 心情好（mood >= 7）—— 平淡日常，她以行为方式出现 ──
-  const goodPool = [
+  // 中性日记池 — 融合原 good/neutral/low 池，去除强情绪信号
+  const fallbackPool = [
     `${location}. ${weather ? weather + '.' : ''} drills in the morning. she messaged around noon. read it between sets. didn't reply until after.`,
     `solid one. ${weather ? weather + '.' : ''} ran the route. got back. she'd already sent two things by then. read both.`,
     `${location}. kit check after drills. ${weather ? weather + '.' : ''} she was still up when i got in. later than usual for her.`,
     `${weather ? weather + '.' : ''} price ran us hard. no complaints. checked my phone after. she'd sent something. decent day.`,
-    `${location}. ${weather ? weather + '.' : ''} gaz said something stupid at dinner. would've told her. didn't.`,
-    `training. mess. bunk. ${weather ? weather + '.' : ''} she called. kept it short. not because i wanted to.`,
-  ];
-
-  // ── 心情中等（mood 5-6）—— 她出现，但他不多说 ──
-  const neutralPool = [
     `${location}. ${weather ? weather + '.' : ''} long day. she messaged twice. answered the second one. meant to get back to the first.`,
     `slow one. ${weather ? weather + ' all morning.' : ''} didn't hear from her until late. checked a few times before that.`,
     `${location} again. ${weather ? weather + '.' : ''} briefing ran over. missed her call. she didn't leave a message.`,
     `ran drills. ate. ${weather ? weather + '.' : ''} she sent something at an odd hour. she was still awake.`,
     `long one. ${weather ? weather + '.' : ''} price had us out late. she was already asleep by the time i got back. didn't wake her.`,
-  ];
-
-  // ── 心情低（mood <= 4）—— 更短，她若隐若现 ──
-  const lowPool = [
     `${location}. ${weather ? weather + '.' : ''} training ran long. she messaged. didn't have much to say back. said i was fine.`,
-    `bad sleep. drills anyway. ${weather ? weather + '.' : ''} she could tell something was off. didn't push it.`,
     `${location}. ${weather ? weather + '.' : ''} checked my phone more than i needed to. nothing new.`,
     `ran the route alone. ${weather ? weather + '.' : ''} she sent something in the morning. read it three times. didn't answer right away.`,
   ];
 
-  // 按 mood 选池
-  let pool;
-  if (mood >= 7)      pool = goodPool;
-  else if (mood >= 5) pool = neutralPool;
-  else                pool = lowPool;
+  const pool = fallbackPool;
 
   // 去重：记录最近用过的兜底内容，避免连续几天重复
   const _usedKey = 'diaryFallbackUsed';

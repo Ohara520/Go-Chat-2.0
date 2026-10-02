@@ -1270,8 +1270,6 @@ async function generatePhoneMemo() {
 
   const location   = localStorage.getItem('currentLocation') || 'Hereford Base';
   const locType    = localStorage.getItem('currentLocationType') || 'base';
-  const coldWar    = localStorage.getItem('coldWarMode') === 'true';
-  const mood       = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
   const ltm        = localStorage.getItem('longTermMemory') || '';
 
   // 从 longTermMemory 里找有没有她相关的有意义片段（过滤系统笔记）
@@ -1281,9 +1279,7 @@ async function generatePhoneMemo() {
     return !_sysP.some(p => p.test(l));
   }).slice(0, 3).join('; ');
 
-  const stateHint = coldWar
-    ? 'Things are tense between them right now.'
-    : ltmHints
+  const stateHint = ltmHints
     ? `Some context about her: ${ltmHints}`
     : '';
 

@@ -376,8 +376,7 @@ function renderGhostCardWallet() {
   }
 
   const card           = (typeof getGhostCard === 'function') ? getGhostCard() : null;
-  const coldWar        = localStorage.getItem('coldWarMode') === 'true';
-  const suspended      = coldWar || !card || card.monthlyLimit === 0;
+  const suspended      = !card || card.monthlyLimit === 0;
   const available      = card ? Math.max(0, card.balance) : 0;
   const monthlyLimit   = card ? card.monthlyLimit : 0;
   // 显示对齐：花钱时余额和已花金额是一起变的，但有些恢复补丁(capFix/月初重置)会把
@@ -391,7 +390,7 @@ function renderGhostCardWallet() {
     el.innerHTML = `
       <div class="wallet-ghost-card wallet-ghost-card--suspended">
         <div class="wgc-label">GHOST CARD</div>
-        <div class="wgc-suspended-text">${coldWar ? 'Card suspended' : 'Not available'}</div>
+        <div class="wgc-suspended-text">Not available</div>
         <div class="wgc-chip">◈</div>
       </div>`;
     return;

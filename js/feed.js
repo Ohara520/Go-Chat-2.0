@@ -619,14 +619,6 @@ function randMinutes(min, max) {
 }
 
 // ----- 事件入口：所有地方改为调用这些，不再直接发帖 -----
-function feedEvent_coldWarStarted() {
-  pushFeedEvent({
-    type: 'cold_war_started', actor: 'ghost', mood: 'hurt',
-    intensity: 4, shareability: 0.65, privacy: 'semi',
-    dueAt: Date.now() + randMinutes(30, 120),
-    expiresAt: Date.now() + 8 * 3600 * 1000
-  });
-}
 function feedEvent_madeUp() {
   pushFeedEvent({
     type: 'made_up', actor: 'ghost', mood: 'soft',
@@ -744,19 +736,13 @@ async function handleUserFeedRequest(userText = '') {
   // 限次：两条"用户要求发"之间至少隔 6 小时（防止一直让他发）。
   // 用独立 key，不和他自己发的日常动态互相干扰。
   const _avail = getUserFeedRequestAvailability();
-  const _banter = (typeof getBanterSweet === 'function') ? getBanterSweet() : -20;
 
-  // 冷却期内 → Ghost 拒绝，拒绝口气也跟着 banterSweet 走
+  // 冷却期内 → Ghost 拒绝
   if (!_avail.allowed) {
-    const declines = _banter >= 50 ? [
-      "posted for you already. ask me again later, yeah?",
-      "gave you one not long ago. don't push it — tonight, maybe.",
-      "one's up already. next one later.",
-    ] : _banter <= -50 ? [
+    const declines = [
       "no. i don't post that much.",
       "one's my limit. you know that.",
       "not doing two this close. don't start.",
-    ] : [
       "already posted. once is enough for now.",
       "said what i had to say already.",
       "not doing two so close together.",
@@ -1224,7 +1210,6 @@ Return a JSON array only, same order, keys "key","en","zh" and optional "replyTo
 async function generateFeedPostFromEvent(evt) {
   const location   = localStorage.getItem('currentLocation') || 'Hereford Base';
   const weather    = localStorage.getItem('lastWeatherDisplay') || '';
-  const isColdWar  = localStorage.getItem('coldWarMode') === 'true';
   const _ghostAvUrl = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
   const GHOST_AV   = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   const posterMap  = {
@@ -1331,7 +1316,6 @@ Current context:
 - Weather: ${weather || 'unclear'}
 - Post angle this time: ${postType}
 - Angle hint: ${typeHints[postType]}
-${isColdWar ? '- Mood note: something is off. Do not explain it.' : ''}
 
 ${recentGhostPosts ? `CRITICAL — these are Ghost's recent posts. Your post MUST be completely different in wording, sentence structure, emotional angle, and topic. Do NOT reuse any word or phrase from these:\n${recentGhostPosts}` : ''}
 

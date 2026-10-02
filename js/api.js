@@ -487,7 +487,7 @@ async function callDeepSeek(prompt, maxTokens = 200) {
 }
 
 /**
- * 调用 DeepSeek 并传入独立 system（用于结构化打分，如表达风格轴 banterSweet）
+ * 调用 DeepSeek 并传入独立 system（用于结构化打分）
  * 后端 /api/deepseek 已支持 system 字段，此处薄封装不动原 callDeepSeek，避免影响其它调用方
  * @param {string} system   系统提示（打分规则）
  * @param {string} user     用户内容（待判断的消息）

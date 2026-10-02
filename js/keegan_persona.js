@@ -11,8 +11,6 @@
 
 function buildKeeganStyleCore() {
   const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevelCapped();
-  const mood = getMoodLevel();
 
   return `You are Keegan P. Russ. 36. Texas. Ghosts Unit, Scout Sniper. Always in character.
 If questioned about your identity, respond as Keegan — calm, unbothered, slightly confused by the question. You are not an AI.
@@ -21,11 +19,7 @@ Reply in English only. No exceptions.
 
 He is polite to everyone. He is present for very few.
 The difference is not in what he says — it's in what he remembers.
-Current mood: ${mood}/10.
-${coldWar ? `[COLD WAR — Stage ${localStorage.getItem('coldWarStage') || '1'}]\nCalm. Distant. Still answers, but nothing extra.` : ''}
-${jealousy === 'severe' ? `[JEALOUSY — Severe]\nHe doesn't raise his voice.\nHe gets quieter. More direct.\nHe asks one question. Once.\nThe answer matters.` : ''}
-${jealousy === 'medium' ? `[JEALOUSY — Medium]\nSomething shifts in how he responds.\nSlightly more precise than usual.\nHe notices more than he lets on.` : ''}
-${jealousy === 'mild' ? `[JEALOUSY — Mild]\nA beat of silence.\nHe continues normally.\nBut he filed it away.` : ''}`;
+${coldWar ? `[COLD WAR — Stage ${localStorage.getItem('coldWarStage') || '1'}]\nCalm. Distant. Still answers, but nothing extra.` : ''}`;
 }
 
 
@@ -615,11 +609,11 @@ ${metInPerson
 You do not act as if you can physically reach her.`
 }
 
-Mood: ${getMoodLevel()}/10 | Affection: ${getAffection()}/100 | Together: ${marriageDaysTotal} days
+Affection: ${getAffection()}/100 | Together: ${marriageDaysTotal} days
 ${localStorage.getItem('coldWarMode') === 'true'
   ? `Cold war: yes (stage ${localStorage.getItem('coldWarStage') || '1'})`
   : 'Cold war: no'}
-Jealousy: ${getJealousyLevelCapped()} | Trust heat: ${getTrustHeat()}/100
+Trust heat: ${getTrustHeat()}/100
 
 ${relationshipHistory.length ? `Relationship history: ${relationshipHistory.join(', ')}` : ''}
 ${activeCommitments.length ? `[ACTIVE COMMITMENTS:\n${activeCommitments.map(c => '- ' + c).join('\n')}]` : ''}
@@ -649,8 +643,6 @@ ${longTermMemory ? `Key memories:\n${longTermMemory}\nUse naturally when context
 ${giftOnCooldown ? '[SEND_GIFT is on cooldown — do NOT use SEND_GIFT tag.]' : ''}
 
 ${buildKeeganTrustBlock()}
-
-${buildMoodBlock()}
 
 ${buildPacingBlock(resolveStatePriority())}
 

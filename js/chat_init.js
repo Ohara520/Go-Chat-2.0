@@ -2,213 +2,16 @@
 // chat_init.js — 聊天页初始化 & 后台系统
 //
 // 职责：
-//   initChat        — 聊天页初始化（历史加载、状态初始化、定时器启动）
+//   initChat        — 聊天页初始化（历史加载、状态初始化）
 //   refreshChatScreen — 从其他页回到聊天页时的轻量刷新
-//   沉默计时器       — Ghost 主动发话（silence timer）
-//   主动发消息       — scheduleProactiveMessage / maybeProactiveMessage
 //   iOS键盘处理
 //
 // 依赖：api.js、ui.js、persona.js、state.js、events.js、
 //       money.js、delivery.js、cloud.js
 // ============================================================
 
-// ===== 沉默计时器 =====
-let _silenceTimer = null;
-const SILENCE_THRESHOLD_MS = 20 * 60 * 1000; // 20分钟无消息触发
-
-function resetSilenceTimer() {
-  if (_silenceTimer) clearTimeout(_silenceTimer);
-  _silenceTimer = setTimeout(onSilenceTimeout, SILENCE_THRESHOLD_MS);
-}
-
-async function onSilenceTimeout() {
-  if (_isSending) { resetSilenceTimer(); return; }
-  const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  if (coldWar) return;
-  const chatScreen = document.getElementById('chatScreen');
-  if (!chatScreen || !chatScreen.classList.contains('active')) return;
-
-  // 深夜不打扰（23:00 - 07:00 本地时间）
-  const _hour = new Date().getHours();
-  if (_hour >= 23 || _hour < 7) {
-    _silenceTimer = setTimeout(onSilenceTimeout, 60 * 60 * 1000); // 1小时后再检查
-    return;
-  }
-
-  // 触发一次 Ghost 主动 check_in
-  // 但如果最后2条都是 Ghost 的（自言自语），不要继续
-  const _recentRealMsgs = (typeof chatHistory !== 'undefined' ? chatHistory : [])
-    .filter(m => !m._system && !m._recalled).slice(-2);
-  if (_recentRealMsgs.length >= 2 && _recentRealMsgs.every(m => m.role === 'assistant')) {
-    _silenceTimer = setTimeout(onSilenceTimeout, 40 * 60 * 1000);
-    return;
-  }
-  try {
-    await emitGhostEvent('check_in');
-  } catch(e) {}
-  // 触发后重置，但间隔拉长到40分钟防止连续刷屏
-  _silenceTimer = setTimeout(onSilenceTimeout, 40 * 60 * 1000);
-}
-
-// ===== 主动发消息系统 =====
-let _proactiveTimer = null;
-
-function scheduleProactiveMessage() {
-  if (_proactiveTimer) clearTimeout(_proactiveTimer);
-  const delay = (2 + Math.random() * 2) * 60 * 60 * 1000; // 2-4小时
-  _proactiveTimer = setTimeout(maybeProactiveMessage, delay);
-}
-
-// ── 机会 → 理由 → 行动/none ──
-// 读时序状态层 + 世界书，凑不出理由就返回 null（= 安静，不发）
-// trust/mood 只作"愿不愿开口"的倾向，不是唯一开关
-function _buildProactiveOpportunity() {
-  const candidates = [];
-
-  // 理由1：她之前说去做某事，现在大概做完了 → ask（关心式追问，不是问候）
-  let userAct = null;
-  try { userAct = JSON.parse(localStorage.getItem('userActivity') || 'null'); } catch(e) {}
-  if (userAct && typeof getActivityStatus === 'function') {
-    const st = getActivityStatus(userAct, Date.now());
-    if (st && st.status === 'probably_finished') {
-      candidates.push({
-        reason: 'ask', weight: 3,
-        hint: `Earlier she said she was ${userAct.label}. Enough time has passed that she's probably done now. A dry, short follow-up — is she back, did it go alright. Not soft, not a ritual. He just clocked that she went quiet doing that thing.`
-      });
-    }
-  }
-
-  // 理由2：世界书里有跟她有关的事 → noticed（看到什么想起她，不解释触发点）
-  let wbEntry = null;
-  try {
-    const wb = (typeof getWorldBookEntries === 'function')
-      ? getWorldBookEntries().filter(e => e && e.enabled !== false && e.content) : [];
-    if (wb.length) wbEntry = wb[Math.floor(Math.random() * wb.length)];
-  } catch(e) {}
-  if (wbEntry) {
-    candidates.push({
-      reason: 'noticed', weight: 2,
-      hint: `Something in his day made him think of this about her: "${(wbEntry.content||'').slice(0,120)}". He does NOT quote it back or explain what triggered it — he just sends the thought it produced. Oblique. Not sentimental.`
-    });
-  }
-
-  // 理由3：他自己当前的状态/事 → complain(偏负面) 或 share
-  const ghostState = (typeof getGhostActivityState === 'function')
-    ? getGhostActivityState() : (sessionStorage.getItem('ghostState') || '');
-  if (ghostState) {
-    const negative = /烦|差|疼|伤|冷|坏|取消|延误|睡不着|不好|紧|酸|难受|问题|叫停|等/.test(ghostState);
-    candidates.push({
-      reason: negative ? 'complain' : 'share', weight: 2,
-      hint: negative
-        ? `His current state: ${ghostState}. He's not fishing for sympathy — he just says the thing, flat, the way you grumble to the one person you don't perform for.`
-        : `His current state: ${ghostState}. Something small from his side he'd actually bother telling her — an observation or a fragment. Not a bulletin, not "reaching out".`
-    });
-  }
-
-  // 理由4：今日细节 → share（弱信号）
-  const todayDetail = sessionStorage.getItem('todayDetail') || '';
-  if (todayDetail) {
-    candidates.push({
-      reason: 'share', weight: 1,
-      hint: `Today's context: ${todayDetail}. If it gives him something real to say, say it. If not, ignore it.`
-    });
-  }
-
-  if (!candidates.length) return null; // 没材料 → 安静
-
-  // trust/mood → 开口倾向：高则更愿意发，低则更可能忍着（有材料也不一定发）
-  const trust = (typeof getTrustHeat === 'function') ? getTrustHeat() : 60;
-  const mood  = (typeof getMoodLevel === 'function') ? getMoodLevel() : 7;
-  const tendency = ((trust + mood * 10) / 2) / 100;      // 0~1
-  const actChance = 0.4 + tendency * 0.45;               // ~0.4 到 ~0.85
-  if (Math.random() > actChance) return null;            // → none，这次忍住
-
-  // 加权抽一个理由
-  const total = candidates.reduce((s, c) => s + c.weight, 0);
-  let roll = Math.random() * total;
-  let chosen = candidates[0];
-  for (const c of candidates) { roll -= c.weight; if (roll < 0) { chosen = c; break; } }
-  return chosen;
-}
-
-async function maybeProactiveMessage() {
-  const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  if (coldWar) { scheduleProactiveMessage(); return; }
-
-  const chatScreen = document.getElementById('chatScreen');
-  if (!chatScreen || !chatScreen.classList.contains('active')) {
-    scheduleProactiveMessage(); return;
-  }
-
-  // 深夜不打扰（23:00 - 07:00 本地时间）
-  const _hour = new Date().getHours();
-  if (_hour >= 23 || _hour < 7) {
-    scheduleProactiveMessage(); return;
-  }
-
-  // 今天已触发过2次就停
-  const todayKey = 'proactiveCount_' + new Date().toDateString();
-  const todayCount = parseInt(localStorage.getItem(todayKey) || '0');
-  if (todayCount >= 2) { scheduleProactiveMessage(); return; }
-
-  // 最近5分钟有消息，不打扰
-  const lastMsg = chatHistory.filter(m => m.role === 'assistant').slice(-1)[0];
-  if (lastMsg && lastMsg._time && Date.now() - lastMsg._time < 5 * 60 * 1000) {
-    scheduleProactiveMessage(); return;
-  }
-
-  // Ghost 连续发了2条以上没有用户回复 → 不要继续自言自语
-  const _recentRealMsgs = chatHistory.filter(m => !m._system && !m._recalled).slice(-2);
-  if (_recentRealMsgs.length >= 2 && _recentRealMsgs.every(m => m.role === 'assistant')) {
-    scheduleProactiveMessage(); return;
-  }
-
-  // 机会 → 理由：凑不出理由（或这次选择忍住）就安静，不占用今日额度
-  const opportunity = _buildProactiveOpportunity();
-  if (!opportunity) { scheduleProactiveMessage(); return; }
-
-  // 到这一步才算真要发，扣今日额度
-  localStorage.setItem(todayKey, todayCount + 1);
-
-  // 防重复池
-  const _proPool = (() => { try { return JSON.parse(localStorage.getItem('proactiveReplyPool') || '[]'); } catch(e) { return []; } })();
-  const _proNoRepeat = _proPool.length > 0
-    ? `\nDo not reuse phrasing from these recent lines: ${_proPool.map(l => `"${l}"`).join(', ')}. Change angle entirely.`
-    : '';
-
-  const systemNote = `[PROACTIVE — he breaks the silence because of ONE specific reason, below. Not a check-in, not "hey", not "how are you". No greeting. One short line, self-contained, lowercase, English only. It should read like a thought he actually had, not a message he decided to send.\n\nReason he's reaching out: ${opportunity.hint}${_proNoRepeat}]`;
-
-  try {
-    showTyping();
-    const recentCtx = chatHistory.filter(m => !m._system && !m._recalled).slice(-6)
-      .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 80)}`).join('\n');
-    const reply = await callGrokWithSystem(
-      buildGhostStyleCore(),
-      recentCtx ? `Recent chat:\n${recentCtx}\n\n${systemNote}` : systemNote,
-      80
-    );
-    hideTyping();
-
-    const cleaned = (reply || '').replace(/\n?(REFUND|(?<![a-zA-Z])KEEP(?![a-zA-Z])|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
-    // ask 理由本来就是要问一句，允许问句；其它理由挡掉"how are you / what are you up to"这类空问候
-    const _looksGeneric = opportunity.reason === 'ask'
-      ? /^(how are you|what('| a)re you (up to|doing)|你好吗|在(干嘛|吗))/i.test(cleaned)
-      : /^(did|do|are|have|is|can|will|你|她|how|what|when|where|why)\b/i.test(cleaned);
-    if (!cleaned || _looksGeneric) {
-      scheduleProactiveMessage(); return;
-    }
-    // 存入防重复池
-    _proPool.push(cleaned); localStorage.setItem('proactiveReplyPool', JSON.stringify(_proPool.slice(-8)));
-    appendMessage('bot', cleaned);
-    chatHistory.push({ role: 'assistant', content: cleaned, _time: Date.now() });
-    saveHistory();
-    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-  } catch(e) {
-    hideTyping();
-  }
-
-  scheduleProactiveMessage();
-}
+// ===== Legacy Silence / Proactive directors removed (Phase 3K-1A) =====
+// Future Autonomy V1 will handle Ghost-initiated behavior.
 
 // ===== 工资系统 · 已退役（2026-10）=====
 // Ghost 每月底自动向用户钱包上交工资的机制已退役。
@@ -218,9 +21,7 @@ async function maybeProactiveMessage() {
 
 // ===== 聊天页初始化 =====
 async function initChat() {
-  // 清除所有残留定时器，防止多实例
-  if (_silenceTimer) { clearTimeout(_silenceTimer); _silenceTimer = null; }
-  if (_proactiveTimer) { clearTimeout(_proactiveTimer); _proactiveTimer = null; }
+  // Legacy timers removed (Phase 3K-1A)
   // 破防历史清理：暂时关闭，isBreakout 词表过于激进会误删正常回复
   // if (typeof cleanBreakoutHistory === 'function') cleanBreakoutHistory();
   // if (typeof isBreakout === 'function' && typeof chatHistory !== 'undefined') {
@@ -292,16 +93,6 @@ async function initChat() {
   if (localStorage.getItem('pendingSeriousTalk') === 'true') {
     setTimeout(() => { if (typeof triggerSeriousTalk === 'function') triggerSeriousTalk(); }, 2000);
   }
-  if (localStorage.getItem('pendingMakeupMoney') === 'true') {
-    setTimeout(() => { if (typeof ghostSendMakeupMoney === 'function') ghostSendMakeupMoney(); }, 5 * 60 * 1000);
-  }
-  if (localStorage.getItem('pendingColdWarEndStory') === 'true') {
-    setTimeout(() => { if (typeof checkStoryOnColdWarEnd === 'function') checkStoryOnColdWarEnd(); }, 3000);
-  }
-  if (localStorage.getItem('pendingGhostApology') === 'true') {
-    localStorage.removeItem('pendingGhostApology');
-    setTimeout(() => { if (typeof ghostApologize === 'function') ghostApologize(); }, 3000);
-  }
 
   // 朋友圈新动态提示恢复
   if (localStorage.getItem('feedHasNew') === '1') {
@@ -317,25 +108,13 @@ async function initChat() {
   // 剧情解锁检查（sessionStart类型）
   setTimeout(() => { if (typeof checkStoryOnSessionStart === 'function') checkStoryOnSessionStart(); }, 1500);
 
-  // 冷战计时器恢复
-  if (localStorage.getItem('coldWarMode') === 'true') {
-    const coldStart = parseInt(localStorage.getItem('coldWarStart') || Date.now());
-    const remaining = 3 * 60 * 60 * 1000 - (Date.now() - coldStart);
-    if (typeof coldWarTimer !== 'undefined' && coldWarTimer) clearTimeout(coldWarTimer);
-    if (remaining > 0) {
-      setTimeout(() => { if (typeof ghostApologize === 'function') ghostApologize(); }, remaining);
-    } else {
-      if (typeof ghostApologize === 'function') ghostApologize();
-    }
-  }
-
-  // 地点 / 天气 / 时间 / 心情
+  // 地点 / 天气 / 时间
   if (typeof initLocation === 'function') {
     const loc = initLocation();
     if (typeof updateWeather === 'function') updateWeather(loc.weatherCity);
   }
   if (typeof updateUKTime === 'function') updateUKTime();
-  if (typeof initMood === 'function') initMood();
+  // Phase 3G-8A: Simon 不再初始化 moodLevel。Mood Core 保留供 Keegan 兼容。
 
   // 英国时间每分钟刷新
   if (window._ukTimeInterval) clearInterval(window._ukTimeInterval);
@@ -376,10 +155,6 @@ async function initChat() {
       setTimeout(() => scrollToBottom(), 800);
     });
   }
-
-  // 启动定时器
-  scheduleProactiveMessage();
-  resetSilenceTimer();
 }
 
 // ===== 从其他页回聊天页的轻量刷新 =====
@@ -406,7 +181,6 @@ function refreshChatScreen() {
 
   // 刷新状态UI
   if (typeof updateUKTime === 'function') updateUKTime();
-  if (typeof refreshStatusEmoji === 'function') refreshStatusEmoji();
 
   // 检查是否有未触发的外卖/快递反应（用户从外卖页切回聊天时触发）
   setTimeout(() => {

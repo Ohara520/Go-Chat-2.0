@@ -1,5 +1,10 @@
 // ===== Ghost 档案默认值（共享函数，startChat 和 window.onload 共用）=====
 function _ensureGhostProfileDefaults() {
+  // Phase 3H-3F: Cold War legacy migration
+  if (typeof migrateColdWarToUnresolvedConflict === 'function') {
+    migrateColdWarToUnresolvedConflict();
+  }
+
   if (!localStorage.getItem('ghostBirthday')) {
     const _months = [31,28,31,30,31,30,31,31,30,31,30,31];
     const _m = Math.floor(Math.random() * 12) + 1;
@@ -157,14 +162,7 @@ async function startChat() {
 
 // ===== 初始化 =====
 window.onload = async function() {
-    // 检查冷战是否超时（页面关闭后重新打开）
-    if (localStorage.getItem('coldWarMode') === 'true') {
-        const coldStart = parseInt(localStorage.getItem('coldWarStart') || Date.now());
-        const elapsed = Date.now() - coldStart;
-        if (elapsed >= 3 * 60 * 60 * 1000) {
-            localStorage.setItem('pendingGhostApology', 'true');
-        }
-    }
+    // Phase 3H-1A: Auto-apology removed (Cold War lifecycle deleted).
 
     document.querySelectorAll('.screen').forEach(s => {
         s.classList.remove('active');

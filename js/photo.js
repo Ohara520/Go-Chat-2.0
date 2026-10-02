@@ -564,7 +564,6 @@ English only. No translation. No AVATAR_SET tag.]`;
     });
 
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-    if (typeof resetSilenceTimer === 'function') resetSilenceTimer();
 
   } catch(e) {
     if (typeof hideTyping === 'function') hideTyping();

@@ -34,8 +34,7 @@ const LIFE_PING_SCENES = [
 ];
 
 function pickLifePingScene() {
-  const mood    = getMoodLevel();
-  const coldWar = localStorage.getItem('coldWarMode') === 'true';
+  // Phase 3G-5A：Events × Mood 解耦——Life Ping 场景不再由 Simon moodLevel 加权。
 
   // 最近2次场景去重
   const recentKeys = (() => {
@@ -45,20 +44,6 @@ function pickLifePingScene() {
 
   const weighted = LIFE_PING_SCENES.map(s => {
     let w = s.weight;
-
-    // mood调整
-    if (mood <= 3) {
-      if (['quiet','sleep','team','paperwork'].includes(s.key)) w *= 1.5;
-      if (['run','tea'].includes(s.key)) w *= 0.5;
-    } else if (mood >= 7) {
-      if (['run','tea','food'].includes(s.key)) w *= 1.4;
-    }
-
-    // 冷战调整
-    if (coldWar) {
-      if (['tea','quiet','food'].includes(s.key)) w *= 0.4;
-      if (['paperwork','equipment','range'].includes(s.key)) w *= 1.5;
-    }
 
     // 去重降权
     const recentIdx = recentKeys.indexOf(s.key);
@@ -85,16 +70,10 @@ function pickLifePingScene() {
 }
 
 function buildLifePingPrompt(scene) {
-  const mood = getMoodLevel();
-  const moodHint =
-    mood <= 3 ? 'He is tired or low.' :
-    mood >= 8 ? 'He is in a decent mood.' :
-    '';
-
+  // Phase 3G-5A：Events × Mood 解耦——Life Ping prompt 不再注入 Simon moodLevel 心理状态。
   return `Send one short Ghost-style message about his day.
 
 Scene: ${scene.hint}
-${moodHint}
 
 Rules:
 - One or two short lines maximum
@@ -214,20 +193,19 @@ function markEventTriggered(eventType) {
 // ── emitGhostEvent 主入口 ────────────────────────
 
 async function emitGhostEvent(eventType, payload = {}) {
-  const coldWar  = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevelCapped();
-  const mood     = getMoodLevel();
+  // Phase 3G-5A：Events × Mood 解耦——不再因 Simon moodLevel<=2 禁止主动事件。
 
-  if (eventType !== 'confront' && eventType !== 'cold_war' &&
-      (coldWar || jealousy === 'severe' || mood <= 2)) {
-    return false;
-  }
-
-  // 吃醋刚触发第一轮：只改语气，不触发物质行为
-  const _jealousyJustNow = sessionStorage.getItem('jealousyJustTriggered') === '1' &&
-    Date.now() - parseInt(sessionStorage.getItem('jealousyJustTriggeredAt') || '0') < 60000;
-  if (_jealousyJustNow && (eventType === 'money' || eventType === 'reverse_package')) return false;
-  if (_jealousyJustNow) sessionStorage.removeItem('jealousyJustTriggered');
+  /*
+   * Jealousy 状态不再参与事件调度。
+   *
+   * 事件系统只记录/提供发生了什么，
+   * 不替 Simon 判断自己有多吃醋，
+   * 也不根据嫉妒等级规定他的行为。
+   *
+   * 什么 Bug 来这里找：
+   * 如果以后某个事件又因为"嫉妒等级"改变触发或演法，
+   * 检查 events.js 是否重新读取了 jealousy 状态。
+   */
 
   let line = '';
   let systemTag    = null;
@@ -243,87 +221,8 @@ async function emitGhostEvent(eventType, payload = {}) {
     }
 
     case 'check_in': {
-      // 读最近聊天 + 检测离开信号
-      const _recentForCI = (typeof chatHistory !== 'undefined')
-        ? chatHistory.filter(m => !m._system && !m._recalled).slice(-8)
-            .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${(m.content || '').slice(0, 100)}`).join('\n')
-        : '';
-      const _lastUserMsg = (typeof chatHistory !== 'undefined')
-        ? (chatHistory.filter(m => m.role === 'user' && !m._system).slice(-1)[0]?.content || '')
-        : '';
-      const _leftSignal = /去吃|去洗|去睡|去忙|先去|回来|好了吗|吃了吗|洗完|睡着|eating|shower|bath|sleep|brb|back|done|finished|busy now/i.test(_lastUserMsg);
-
-      // 防重复池
-      const _ciPool = (() => { try { return JSON.parse(localStorage.getItem('checkInReplyPool') || '[]'); } catch(e) { return []; } })();
-      const _ciNoRepeat = _ciPool.length > 0
-        ? `\n\nDo not reuse or echo these recent lines: ${_ciPool.map(l => `"${l}"`).join(', ')}. Vary completely.`
-        : '';
-
-      try {
-        const mood = getMoodLevel();
-        const moodHint =
-          mood <= 3 ? 'Lean more toward observe than care.'
-          : mood >= 7 ? 'Care can surface a little more, but still restrained.'
-          : '';
-        const _followUpHint = _leftSignal
-          ? `\n\nIMPORTANT: She mentioned leaving or doing something. This is a natural follow-up — ask if she is back / done / ate / okay. Keep it short and dry, not warm.`
-          : '';
-        const _contextBlock = _recentForCI
-          ? `\n\nRecent conversation:\n${_recentForCI}\n\nUse this context. If she mentioned leaving, follow up. If the conversation had a specific topic, let that subtly color what he sends.`
-          : '';
-        const t = await callGrokWithCtx(
-          buildGhostStyleCore() + `
-Send ONE short check-in line to his wife.
-Choose ONE intent internally (do not label it):
-- check: brief, slightly controlling, like he is keeping track
-- care: practical concern, understated, not soft
-- observe: noticing a shift in her behavior, low-key
-
-How to write:
-- Often drop the subject
-- Keep it short — 1–4 words preferred
-- Can be a fragment, not a full sentence
-- Slightly blunt is fine
-
-Avoid:
-- full polite questions
-- emotional reassurance
-- sweetness or romantic tone
-- anything careful, soft, or chatty
-- repeating the same wording as recent messages
-
-Rules:
-- English only
-- Feels like he sent it without thinking
-- Dry. Casual. Real.
-${moodHint}${_followUpHint}${_contextBlock}${_ciNoRepeat}`,
-          `Write his check-in.`
-        );
-        if (t && t.trim()) {
-          line = t.trim().split('\n').slice(0, 2).join('\n');
-          _ciPool.push(line); localStorage.setItem('checkInReplyPool', JSON.stringify(_ciPool.slice(-6)));
-          sideEffect = () => {
-            const cnt = parseInt(localStorage.getItem('checkInCount') || '0');
-            localStorage.setItem('checkInCount', cnt + 1);
-          };
-          break;
-        }
-      } catch(e) {}
-      // fallback：更多样化，过滤用过的
-      const _ciAllOpts = [
-        "still up.", "ate yet.", "where'd you go.", "quiet again.",
-        "back yet.", "all good.", "done?", "still there.",
-        "how long.", "eating?", "you okay.", "check in.",
-      ];
-      const _unusedOpts = _ciAllOpts.filter(o => !_ciPool.includes(o));
-      const _ciOpts = _unusedOpts.length > 0 ? _unusedOpts : _ciAllOpts;
-      line = _leftSignal ? "back yet." : _ciOpts[Math.floor(Math.random() * _ciOpts.length)];
-      _ciPool.push(line); localStorage.setItem('checkInReplyPool', JSON.stringify(_ciPool.slice(-6)));
-      sideEffect = () => {
-        const cnt = parseInt(localStorage.getItem('checkInCount') || '0');
-        localStorage.setItem('checkInCount', cnt + 1);
-      };
-      break;
+      // Legacy check_in removed (Phase 3K-1A)
+      return false;
     }
 
     case 'reverse_package': {
@@ -460,9 +359,6 @@ No explanation. English only.`,
 
     case 'cold_war': {
       systemTag = 'COLD_WAR_START';
-      sideEffect = () => {
-        if (typeof startColdWar === 'function') startColdWar();
-      };
       try {
         const t = await callGrokWithCtx(
           buildGhostStyleCore() + `
@@ -505,11 +401,6 @@ No explanation. English only.`,
 
 async function emitGhostNarrativeEvent(text, options = {}) {
   if (!text) return;
-  const coldWar  = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevelCapped();
-
-  if (coldWar && !options.forceColdWar) return;
-  if (jealousy === 'severe' && !options.forceJealousy) return;
 
   const delayMs = options.delayMs !== undefined ? options.delayMs : 1500;
 
@@ -557,8 +448,7 @@ async function handlePostReplyEvents(userText, reply, intent) {
     }
 
     case 'check_in':
-      if (Math.random() < 0.3) await emitGhostEvent('life_ping', {});
-      else if (Math.random() < 0.4) await emitGhostEvent('check_in');
+      // Legacy check_in removed (Phase 3K-1A)
       break;
 
     default:
@@ -828,7 +718,7 @@ function getStoryContext() {
     flags,
     affection:   getAffection(),
     trust:       getTrustHeat(),
-    mood:        getMoodLevel(),
+    // Phase 3G-5A：Events × Mood 解耦——移除 ctx.mood（STORY_EVENTS 无活消费者）。
     streak:      parseInt(localStorage.getItem('visitStreak') || '0'),
     marriageDays: (() => {
       const d = localStorage.getItem('marriageDate');
@@ -894,22 +784,6 @@ const STORY_EVENTS = [
   },
 
   // ━━━ 照顾与察觉 ━━━
-
-  {
-    id: 'first_check_in',
-    icon: '👁️',
-    title: '留意于你',
-    desc: '他第一次主动问你在哪，在做什么——不是顺口，是注意到了。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const count = parseInt(localStorage.getItem('checkInCount') || '0');
-      return count >= 1 && ctx.trust >= 55 && !ctx.triggered('first_check_in');
-    },
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你第一次主动找她，问她在干嘛或者有没有吃饭。不是顺口，是真的注意到了。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
 
   {
     id: 'first_notice_mood',
@@ -1049,53 +923,6 @@ const STORY_EVENTS = [
     condition: (ctx) => ctx.trust >= 65 && !ctx.triggered('first_protective'),
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她遇到了一些让她委屈或不公平的事。你明显站在她这边——不是中立，不是讲道理，是偏向她。用你的方式表态，简短，但清楚。]`, 6);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  // ━━━ 冲突与修复 ━━━
-
-  {
-    id: 'cold_war_repair',
-    icon: '🌤️',
-    title: '冰释之后',
-    desc: '和好那天，他说出了从未说过的话。',
-    triggerOn: 'coldWarEnd',
-    condition: (ctx) => !ctx.triggered('cold_war_repair'),
-    execute: async () => {
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：冷战刚刚结束，她回来了。你们之前从没经历过这种和好。]` }]);
-      if (res) await emitGhostNarrativeEvent(res);
-      setRelationshipFlag('coldWarRepaired');
-      // 记录和好时间——供 '先行一步' 节点判断是否在3天内
-      localStorage.setItem('coldWarRepairedAt', Date.now());
-      changeTrustHeat(15);
-
-      // 时间线：记录冷战结束
-      if (typeof addTimelineEvent === 'function') {
-        const coldWarStart = parseInt(localStorage.getItem('coldWarStart') || '0');
-        const duration = coldWarStart ? Math.floor((Date.now() - coldWarStart) / 86400000) : 0;
-        addTimelineEvent({
-          type: 'cold_war_end',
-          relatedData: { duration }
-        });
-      }
-    }
-  },
-
-  {
-    id: 'post_conflict_initiative',
-    icon: '🚶',
-    title: '先行一步',
-    desc: '这一次，是他先往前走了一步。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const repaired = ctx.flags.coldWarRepaired;
-      const repairedAt = parseInt(localStorage.getItem('coldWarRepairedAt') || '0');
-      const daysSince = (Date.now() - repairedAt) / 86400000;
-      return repaired && daysSince <= 3 && ctx.trust >= 70 && !ctx.triggered('post_conflict_initiative');
-    },
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：冷战结束了，这次是你先开口靠近——不是等她来，是你先动了。用你的方式，主动一点点，但不要解释。]`, 4);
       if (res) await emitGhostNarrativeEvent(res);
     }
   },
@@ -1448,7 +1275,6 @@ function _loveLetterOccasionToday() {
     if (days >= 365) occasion = "anniversary";
   }
   if (!occasion) return null;
-  if (localStorage.getItem("coldWarMode") === "true") return null;
   const lockKey = "loveLetter_" + occasion + "_" + now.getFullYear();
   if (localStorage.getItem(lockKey)) return null;
   localStorage.setItem(lockKey, "1");
@@ -1574,11 +1400,6 @@ function checkStoryOnMessage(userText) {
   }
 }
 
-function checkStoryOnColdWarEnd() {
-  const ctx = getStoryContext();
-  const event = STORY_EVENTS.find(e => e.triggerOn === 'coldWarEnd' && e.condition(ctx));
-  if (event) setTimeout(() => _triggerStory(event), 8000);
-}
 
 function renderStoryBook() {
   const container = document.getElementById('storyBookList');
@@ -1665,7 +1486,7 @@ function triggerSeriousTalk() {
       if (typeof saveHistory === 'function') saveHistory();
     }
     if (typeof setAffection === 'function') setAffection(70);
-    if (typeof changeMood   === 'function') changeMood(1);
+    // Phase 3G-4：Mood 生产入口退休——认真对话不再附带 moodLevel +1。
   }).catch(() => {
     if (typeof hideTyping === 'function') hideTyping();
   });

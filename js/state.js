@@ -1,6 +1,6 @@
 // ===================================================
 // state.js — 状态管理系统 v2
-// 包含：mood / trust / jealousy / affection /
+// 包含：mood / trust / affection /
 //       attachment / resistance / relationship flags /
 //       relationship modifiers / cold war /
 //       表达桶冷却 / pattern detection
@@ -103,113 +103,11 @@ function clearBucket(bucketName) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 心情系统
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-const MOOD_EMOJI = {
-  range: [
-    { min: 8, max: 10, emoji: '☀️', label: '状态好' },
-    { min: 6, max: 7,  emoji: '🌤️', label: '平稳' },
-    { min: 4, max: 5,  emoji: '☁️', label: '一般' },
-    { min: 1, max: 3,  emoji: '🌧️', label: '状态差' },
-  ]
-};
-
-function getMoodOffsetByUKTime() {
-  const hour = parseInt(new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London',
-    hour: 'numeric',
-    hour12: false
-  }).format(new Date()));
-  if (hour >= 6  && hour < 9)  return -1;
-  if (hour >= 9  && hour < 13) return  1;
-  if (hour >= 13 && hour < 17) return -1;
-  if (hour >= 17 && hour < 21) return  0;
-  if (hour >= 21 && hour < 24) return  1;
-  return -2;
-}
-
-function getMoodLevel() {
-  return parseInt(localStorage.getItem('moodLevel') || '7');
-}
-
-function setMoodLevel(val) {
-  val = Math.max(1, Math.min(10, Math.round(val)));
-  localStorage.setItem('moodLevel', val);
-  _touch();
-  const entry = getGhostStatusEmoji();
-  const el = document.getElementById('botMood');
-  if (el) el.textContent = entry.emoji;
-  localStorage.setItem('currentMood', entry.label);
-  return val;
-}
-
-function changeMood(delta, force = false) {
-  const d = force ? delta : Math.max(-1, Math.min(1, delta));
-  setMoodLevel(getMoodLevel() + d);
-}
-
-function refreshStatusEmoji() {
-  const entry = getGhostStatusEmoji();
-  const el = document.getElementById('botMood');
-  if (el) el.textContent = entry.emoji;
-  localStorage.setItem('currentMood', entry.label);
-}
-
-function getGhostStatusEmoji() {
-  const mood     = getMoodLevel();
-  const coldWar  = localStorage.getItem('coldWarMode') === 'true';
-  const jealousy = getJealousyLevelCapped();
-
-  if (coldWar) {
-    const stage = parseInt(localStorage.getItem('coldWarStage') || '1');
-    if (stage <= 1) return { emoji: '❄️', label: '冷战中' };
-    if (stage === 2) return { emoji: '🌫️', label: '有点松动' };
-    return { emoji: '😑', label: '快好了' };
-  }
-  if (jealousy === 'severe') return { emoji: '😠', label: '吃醋了' };
-  if (jealousy === 'medium') return { emoji: '😤', label: '在吃醋' };
-  if (jealousy === 'mild')   return { emoji: '😒', label: '有点吃醋' };
-
-  const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London', hour: 'numeric', hour12: false
-  }).format(new Date()));
-  const lateNight = ukHour >= 22 || ukHour < 6;
-
-  if (lateNight) {
-    if ((ukHour >= 0 && ukHour < 6) && mood < 4) return { emoji: '💤', label: '可能睡了' };
-    if (mood >= 7) return { emoji: '🌙😌', label: '深夜' };
-    if (mood >= 4) return { emoji: '🌙😐', label: '深夜' };
-    return { emoji: '🌙😶', label: '深夜' };
-  }
-
-  if (mood >= 9) return { emoji: '😊', label: '心情很好' };
-  if (mood >= 7) return { emoji: '😌', label: '心情好' };
-  if (mood >= 5) return { emoji: '😐', label: '心情平' };
-  if (mood >= 3) return { emoji: '😔', label: '心情差' };
-  return { emoji: '😑', label: '心情很差' };
-}
-
-// 时间偏移每6小时才漂移一次，不每次进页面都跑
-function initMood() {
-  if (!localStorage.getItem('moodLevel')) localStorage.setItem('moodLevel', '7');
-
-  const coldWar = localStorage.getItem('coldWarMode') === 'true';
-  if (coldWar) { setMoodLevel(Math.min(getMoodLevel(), 3)); return; }
-
-  const lastDriftAt = parseInt(localStorage.getItem('moodDriftAt') || '0');
-  if (Date.now() - lastDriftAt < 6 * 3600 * 1000) {
-    setMoodLevel(getMoodLevel()); // 只触发UI更新
-    return;
-  }
-
-  localStorage.setItem('moodDriftAt', Date.now());
-  const offset  = getMoodOffsetByUKTime();
-  const current = getMoodLevel();
-  const target  = current + offset;
-  if (current < target)          setMoodLevel(current + 1);
-  else if (current > target + 1) setMoodLevel(current - 1);
-  else                           setMoodLevel(current);
-}
-
+// Phase 3G-8B: Simon Mood Core 已删除。
+// getMoodLevel / setMoodLevel / changeMood / initMood 不再存在。
+// 状态栏情绪 Emoji 已整体退休：Simon 的状态通过语言/行为/连续生活体现，
+// 不再由系统在 UI 贴 NPC 情绪标签。
+function refreshStatusEmoji() { /* retired: no longer computes or shows mood emoji */ }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Trust Heat（慢变量）
@@ -261,12 +159,6 @@ function updateVisitStreakTrustBonus() {
   }
 }
 
-function applyColdWarRepairTrustBonus() {
-  const key = 'coldWarRepairTrust_' + getTodayDateStr();
-  if (localStorage.getItem(key)) return;
-  changeTrustHeat(15);
-  localStorage.setItem(key, '1');
-}
 
 function applyTrustMilestone(delta = 8, key = '') {
   const milestoneKey = key ? `trustMilestone_${key}` : '';
@@ -649,122 +541,6 @@ function changeAttachmentPull(delta) {
 }
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Jealousy（短期/事件驱动）
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getJealousyLevel() {
-  return localStorage.getItem('jealousyLevel') || 'none';
-}
-
-function getJealousyLevelCapped() {
-  const trust = getTrustHeat();
-  const raw   = getJealousyLevel();
-  const order = ['none', 'mild', 'medium', 'severe'];
-  if (trust < 60) return 'none';
-  if (trust < 70) return order[Math.min(order.indexOf(raw), 1)];
-  if (trust < 80) return order[Math.min(order.indexOf(raw), 2)];
-  return raw;
-}
-
-function setJealousyLevel(val) {
-  localStorage.setItem('jealousyLevel', val);
-  if (val !== 'none') localStorage.setItem('lastJealousyAt', Date.now());
-  _touch();
-  refreshStatusEmoji();
-}
-
-function escalateJealousy() {
-  const map = { none: 'mild', mild: 'medium', medium: 'severe', severe: 'severe' };
-  setJealousyLevel(map[getJealousyLevel()] || 'mild');
-}
-
-function decayJealousy() {
-  const map = { severe: 'medium', medium: 'mild', mild: 'none', none: 'none' };
-  setJealousyLevel(map[getJealousyLevel()] || 'none');
-}
-
-function checkJealousyTimeDecay() {
-  const current = getJealousyLevelCapped();
-  if (current === 'none') return;
-  const lastAt = parseInt(localStorage.getItem('lastJealousyAt') || '0');
-  const age    = Date.now() - lastAt;
-  const thresholds = { severe: 3 * 3600 * 1000, medium: 90 * 60 * 1000, mild: 40 * 60 * 1000 };
-  if (age > (thresholds[current] || 0)) decayJealousy();
-}
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 表达风格轴 banterSweet
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// "绕着表达 ←→ 直接表达"，不是"冷 ←→ 爱"。爱的深度由 trust/affection/mood 管，
-// 这条轴只管表层怎么说出来。长期互动慢慢长成，每个用户聊出独一无二的 Ghost。
-// 范围 -100~+100，默认 -20（契合 restrained/dry 底子，注入时只译成"略偏含蓄"）。
-
-function getBanterSweet() {
-  const v = localStorage.getItem('banterSweet');
-  return v === null ? -20 : parseFloat(v);
-}
-
-// 单次漂移步长：low 忽略，medium ±1，high ±2；越极端越难再推（阻尼）
-function _banterStep(signal, confidence) {
-  if (confidence === 'low' || !signal) return 0;
-  const base = confidence === 'high' ? 2 : 1;
-  const cur = Math.abs(getBanterSweet());
-  const damp = cur < 50 ? 1 : cur < 80 ? 0.5 : 0.25;
-  return signal * base * damp;
-}
-
-function applyBanterSignal(signal, confidence, reason) {
-  const before = getBanterSweet();
-  const delta = _banterStep(signal, confidence);
-  if (delta === 0) { _recordBanterHistory(before, before, signal, confidence, reason, true); return before; }
-  const after = Math.max(-100, Math.min(100, before + delta));
-  localStorage.setItem('banterSweet', after);
-  _touch();
-  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-  _recordBanterHistory(before, after, signal, confidence, reason, false);
-  return after;
-}
-
-// 开发者调试用：最近 10 次漂移历史（纯本地，不同步云端）
-function _recordBanterHistory(before, after, signal, confidence, reason, ignored) {
-  let h = []; try { h = JSON.parse(localStorage.getItem('banterHistory') || '[]'); } catch(e) {}
-  h.unshift({ t: Date.now(), before: +before.toFixed(1), after: +after.toFixed(1),
-              signal, confidence, reason: reason || '', ignored });
-  localStorage.setItem('banterHistory', JSON.stringify(h.slice(0, 10)));
-}
-
-// 用 DeepSeek 判断最近 4 条用户消息的整体互动倾向 → 结构化 JSON 漂移
-// 关键：判断"她对 Ghost 的互动方式"，不是情绪正负；看整体基调，不看单句
-async function evaluateBanterSignal() {
-  if (typeof chatHistory === 'undefined' || !Array.isArray(chatHistory)) return;
-  const userMsgs = chatHistory.filter(m => m.role === 'user' && !m._system)
-    .slice(-4).map(m => m.content).filter(Boolean);
-  if (userMsgs.length < 4) return;
-
-  const sys = `You judge HOW a wife interacts with her husband over text — her expression style, NOT her mood or whether she is positive/negative.
-
-Axis: BANTER (playful teasing, mock-annoyance, poking, roughhousing, "你好烦" as flirtation) vs SWEET (direct affection, missing him, softness, open warmth).
-
-Rules:
-- Judge the OVERALL pattern across ALL messages, never a single word.
-- "讨厌死了 😭" chasing him = sweet/playful. "讨厌死了，别烦我" pushing away = neither, likely genuine.
-- If she is genuinely hurt, serious, or setting a boundary → signal 0 (do NOT let it move her long-term style).
-- Sarcasm/reverse-talk is common; weigh context.
-- confidence: high only when the pattern is clear and consistent; low when ambiguous or mixed.
-
-Return ONLY compact JSON: {"signal":-1|0|1,"confidence":"low"|"medium"|"high","reason":"<=8 words"}
-signal -1 = banter-leaning, +1 = sweet-leaning, 0 = neutral/serious.`;
-
-  const user = userMsgs.map((m, i) => `${i + 1}. ${m}`).join('\n');
-  if (typeof callDeepSeekWithSystem !== 'function') return;
-  const raw = await callDeepSeekWithSystem(sys, user, 60);
-  if (!raw) return;
-  let parsed; try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); } catch(e) { return; }
-  if (!parsed || typeof parsed.signal !== 'number') return;
-  applyBanterSignal(parsed.signal, parsed.confidence || 'low', parsed.reason);
-}
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -837,12 +613,6 @@ function applyAffectionAcceptanceBonus(delta = 1, source = 'gift') {
   localStorage.setItem(key, '1');
 }
 
-function applyColdWarRepairAffectionBonus(delta = 3) {
-  const key = 'coldWarRepairAffection_' + getTodayDateStr();
-  if (localStorage.getItem(key)) return;
-  changeAffection(delta);
-  localStorage.setItem(key, '1');
-}
 
 // checkDailyTalkAffection 已移除
 // 原逻辑"聊满10条+1"属于可刷机制，后续做高质量互动检测时再补
@@ -953,51 +723,19 @@ function getMinLockedLevel() {
 
 function getLovePermission() {
   const trust      = getTrustHeat();
-  const mood       = getMoodLevel();
-  const coldWar    = localStorage.getItem('coldWarMode') === 'true';
   const resistance = getLoveResistance();
-  const override   = sessionStorage.getItem('loveOverride') === 'true';
-
-  if (override) return 5;
-  if (coldWar)  return 0;
 
   const minLocked = getMinLockedLevel();
   if (resistance > 40) return Math.max(minLocked, trust >= 70 ? 2 : 1);
   if (resistance > 20) return Math.max(minLocked, Math.min(2, trust >= 70 ? 2 : 1));
 
-  if (trust < 50)             return Math.max(minLocked, 0);
-  if (trust < 60)             return Math.max(minLocked, 1);
-  if (trust < 70 || mood < 5) return Math.max(minLocked, 2);
-  if (trust < 80 || mood < 6) return Math.max(minLocked, 3);
-  if (trust < 88 || mood < 7) return Math.max(minLocked, 4);
+  if (trust < 50) return Math.max(minLocked, 0);
+  if (trust < 60) return Math.max(minLocked, 1);
+  if (trust < 70) return Math.max(minLocked, 2);
+  if (trust < 80) return Math.max(minLocked, 3);
+  if (trust < 88) return Math.max(minLocked, 4);
   return 5;
 }
-
-function allowLoveOnce() { sessionStorage.setItem('loveOverride', 'true'); }
-function consumeLoveOverride() { sessionStorage.removeItem('loveOverride'); }
-
-function checkLoveUnlockConditions() {
-  const trust = getTrustHeat();
-  const mood  = getMoodLevel();
-  const flags = getRelationshipFlags();
-  const key   = 'loveUnlockUsed_' + getTodayDateStr();
-  if (localStorage.getItem(key) === 'true') return;
-
-  if (flags.coldWarRepaired && trust > 85 && mood >= 7) {
-    allowLoveOnce(); localStorage.setItem(key, 'true'); return;
-  }
-  const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London', hour: 'numeric', hour12: false
-  }).format(new Date()));
-  if ((ukHour >= 22 || ukHour <= 2) && mood >= 8 && trust > 80) {
-    allowLoveOnce(); localStorage.setItem(key, 'true'); return;
-  }
-  const streak = parseInt(localStorage.getItem('visitStreak') || '0');
-  if (streak >= 7 && trust >= 90 && mood >= 8) {
-    allowLoveOnce(); localStorage.setItem(key, 'true');
-  }
-}
-
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 关系标记系统
@@ -1038,7 +776,7 @@ function getRelationshipModifiers() {
   return {
     reversePackageBonus:  flags.firstReverseShip ? 8 : 0,
     metInPersonBonus:     flags.reunionReady      ? 5 : 0,
-    trustHeatCap:         flags.coldWarRepaired   ? 110 : 100,
+    trustHeatCap:         100,
     moneyEaseBonus:       flags.firstSalary       ? 10 : 0,
     emotionalMemoryDepth: flags.sheCried          ? 1 : 0,
     emotionOpenness:      flags.saidILoveYou      ? 1 : 0,
@@ -1094,14 +832,9 @@ function resolvePendingReversePackages() {} // 兼容旧调用
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function getGhostResponseState() {
-  const coldWar      = localStorage.getItem('coldWarMode') === 'true';
-  const coldWarStage = parseInt(localStorage.getItem('coldWarStage') || '1');
-  const jealousy     = getJealousyLevelCapped();
-  const mood         = getMoodLevel();
   const trust        = getTrustHeat();
   const affection    = getAffection();
   const mode         = localStorage.getItem('marriageType') || 'established';
-  const override     = sessionStorage.getItem('loveOverride') === 'true';
 
   let availability = 'normal';
   let warmth       = 0;
@@ -1110,52 +843,32 @@ function getGhostResponseState() {
   let intimacy     = 0;
   let moneyEase    = 0;
 
-  if (coldWar) {
-    availability = coldWarStage <= 2 ? 'closed' : 'guarded';
-    sharpness += 1;
-  } else if (override) {
-    availability = 'guarded';
-    sharpness += 2;
-    initiative += 1;
-  }
-
-  if (jealousy === 'mild')   { sharpness += 1; }
-  if (jealousy === 'medium') { sharpness += 2; warmth = Math.max(0, warmth - 1); }
-  if (jealousy === 'severe') { sharpness += 3; if (availability === 'normal') availability = 'guarded'; }
+  if (trust >= 60)                                              warmth += 1;
+  if (trust >= 80 && affection >= 70)                           warmth += 1;
+  if (trust >= 75 && affection >= 65 && mode === 'established') availability = 'open';
 
   if (!coldWar) {
-    if (trust >= 60)                                              warmth += 1;
-    if (trust >= 80 && affection >= 70)                           warmth += 1;
-    if (mood >= 7)                                                warmth += 1;
-    if (mood <= 3)                                                warmth = Math.max(0, warmth - 1);
-    if (trust >= 75 && affection >= 65 && mode === 'established') availability = 'open';
-  }
-
-  if (!coldWar) {
-    if (trust >= 65)                  initiative += 1;
-    if (mood >= 7 && affection >= 70) initiative += 1;
-    if (mode === 'slowBurn')          initiative = Math.max(0, initiative - 1);
+    if (trust >= 65) initiative += 1;
+    if (mode === 'slowBurn') initiative = Math.max(0, initiative - 1);
   }
 
   if (!coldWar) {
     if (mode === 'slowBurn') {
-      if (trust >= 60 && mood >= 5) intimacy = 1;
-      if (trust >= 70 && mood >= 7) intimacy = 2;
+      if (trust >= 60) intimacy = 1;
+      if (trust >= 70) intimacy = 2;
     } else {
-      if (trust >= 50 && mood >= 4) intimacy = 1;
-      if (trust >= 60 && mood >= 5) intimacy = 2;
-      if (trust >= 72 && mood >= 6) intimacy = 3;
-      if (trust >= 82 && affection >= 80 && mood >= 7) intimacy = 4;
+      if (trust >= 50) intimacy = 1;
+      if (trust >= 60) intimacy = 2;
+      if (trust >= 72) intimacy = 3;
+      if (trust >= 82 && affection >= 80) intimacy = 4;
     }
-    if (jealousy === 'medium' || jealousy === 'severe') intimacy = Math.min(intimacy, 1);
   }
 
   if (!coldWar) {
     if (trust >= 45) moneyEase = 1;
     if (trust >= 65) moneyEase = 2;
     if (trust >= 82) moneyEase = 3;
-    if (mode === 'slowBurn')   moneyEase = Math.max(0, moneyEase - 1);
-    if (jealousy === 'severe') moneyEase = Math.max(0, moneyEase - 1);
+    if (mode === 'slowBurn') moneyEase = Math.max(0, moneyEase - 1);
   }
 
   return {
@@ -1184,25 +897,11 @@ Money ease: ${s.moneyEase}/3`;
 // 冷战系统
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-let coldWarTimer = null;
+// Phase 3H-1A: coldWarTimer removed (auto-lifecycle deleted).
 
-function getColdWarStage() {
-  return parseInt(localStorage.getItem('coldWarStage') || '1');
-}
 
-function setColdWarStage(stage) {
-  localStorage.setItem('coldWarStage', stage);
-  _touch();
-}
-
-function setColdWarCause(cause) {
-  localStorage.setItem('coldWarCause', cause || 'unknown');
-  _touch();
-}
-
-function getColdWarCause() {
-  return localStorage.getItem('coldWarCause') || 'unknown';
-}
+// Phase 3H-1A: Auto-lifecycle removed. checkColdWarApologyCondition, ghostApologize, ghostSendMakeupMoney deleted.
+// Phase 3H-3F: startColdWar / endColdWar / setColdWarCause / getColdWarCause removed. Replaced by unresolvedConflict fact system.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1223,89 +922,10 @@ If you point it out, keep it to one dry line.`;
 }
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 心情回温逻辑
-// mood 有降的入口，这里补回温的入口
-// 原则：小幅、有冷却、冷战初期/resistance锁住时不生效
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function updateMoodFromUserInput(userText) {
-  const input = (userText || '').toLowerCase();
-
-  const coldWar      = localStorage.getItem('coldWarMode') === 'true';
-  const coldWarStage = getColdWarStage();
-  const resistanceLocked = isResistanceLocked();
-
-  // 冷战 Stage 1（刚进冷战）/ resistance 锁住时，不让一句话立刻回温
-  if ((coldWar && coldWarStage <= 1) || resistanceLocked) return false;
-
-  // 安抚型——她在靠近，在稳定
-  const sootheTriggers = [
-    '别生气', '抱抱', '辛苦了', '没事了', '我在', '乖', '不气', '你别不开心',
-    "it's okay", "i'm here", "come here", "easy", "you're alright",
-  ];
-
-  // 修复型——她在认错，在解释，更值
-  const repairTriggers = [
-    '对不起', '我错了', '是我不好', '不是那个意思', '没有要逼你', '只是担心你',
-    "i'm sorry", "i was wrong", "that was my fault", "i didn't mean that",
-    "i'm not pushing", "i was worried",
-  ];
-
-  const hasSoothe = sootheTriggers.some(t => input.includes(t));
-  const hasRepair = repairTriggers.some(t => input.includes(t));
-
-  if (!hasSoothe && !hasRepair) return false;
-
-  // 30分钟内只触发一次，防止被刷
-  const key = 'moodRecover_' + Math.floor(Date.now() / (30 * 60 * 1000));
-  if (localStorage.getItem(key)) return false;
-
-  changeMood(1);
-  localStorage.setItem(key, '1');
-  // 标记"被用户哄好"——供 Story System 的 '心归你处' 节点使用
-  if (getMoodLevel() >= 5) localStorage.setItem('moodRecoveredByUser', 'true');
-  return true;
-}
+// Phase 3G-8B: updateMoodFromUserInput() 已删除（Simon Mood Core 完全退役）。
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// mood → 语气张力
-// mood 是修饰器，不是主宰者
-// 影响：说话松紧 / 语气温度 / 主动性
-// 不影响：核心关系行为 / 转账 / 吃醋
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function buildMoodBlock() {
-  const mood = getMoodLevel();
-
-  if (mood <= 3) {
-    return `[MOOD]
-You are low.
-Keep it flatter than usual.
-Shorter. Less patient.
-Do not add warmth unless something genuinely gets through.`;
-  }
-
-  if (mood <= 6) {
-    return `[MOOD]
-You are steady, but not especially open.
-Keep it controlled.
-No extra softness.`;
-  }
-
-  if (mood <= 8) {
-    return `[MOOD]
-You are in a decent mood.
-Slightly easier than usual.
-You may leave one little bit more than necessary.`;
-  }
-
-  return `[MOOD]
-You are lighter than usual.
-Still yourself.
-But less guarded at the edges.`;
-}
+// Phase 3G-8B: buildMoodBlock() 已删除（Keegan 不启用）。
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1315,9 +935,8 @@ But less guarded at the edges.`;
 function updateRelationshipStatsFromUserInput(userText) {
   updateTrustFromBehavior();
   const { patternDetected } = updateAffectionFromExpression(userText);
-  updateMoodFromUserInput(userText);
+  // Phase 3G-8B: updateMoodFromUserInput() 调用已删除。
   checkAffectionDecay();
-  checkJealousyTimeDecay();
   localStorage.setItem('lastOnlineTime', Date.now());
 
   // 检测重复小习惯——供 Story System '日久有迹' 节点使用
@@ -1359,187 +978,69 @@ function updateStateFromUserInput(userText) {
 // startColdWar / endColdWar /
 // checkColdWarApologyCondition /
 // ghostApologize / ghostSendMakeupMoney
+// Phase 3H-1A: Auto-lifecycle removed. checkColdWarApologyCondition, ghostApologize, ghostSendMakeupMoney deleted.
+// Phase 3H-3F: startColdWar / endColdWar removed. Replaced by unresolvedConflict fact system.
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Unresolved Conflict Fact (Phase 3H-3E)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function startColdWar() {
-  localStorage.setItem('coldWarMode', 'true');
-  localStorage.setItem('coldWarStart', Date.now());
-  setColdWarStage(1);
-  _touch();
-  changeMood(-3, true);
-  changeAffection(-4);
-  setMoodLevel(Math.min(getMoodLevel(), 2));
-  if (coldWarTimer) clearTimeout(coldWarTimer);
-  coldWarTimer = setInterval(() => checkColdWarApologyCondition(), 20 * 60 * 1000);
-  if (typeof feedEvent_coldWarStarted === 'function') feedEvent_coldWarStarted();
-  refreshStatusEmoji();
-
-  // 时间线：记录冷战开始
-  if (typeof addTimelineEvent === 'function') {
-    addTimelineEvent({
-      type: 'cold_war_start'
-    });
-  }
+function getUnresolvedConflict() {
+  const flags = getRelationshipFlags();
+  return flags.unresolvedConflict || null;
 }
 
-function endColdWar(userApologized = false) {
-  localStorage.setItem('coldWarMode', 'false');
+function setUnresolvedConflict(cause) {
+  const flags = getRelationshipFlags();
+  const existing = flags.unresolvedConflict;
+
+  if (existing && typeof existing === 'object' && existing.startedAt) {
+    flags.unresolvedConflict = {
+      cause: cause || '',
+      startedAt: existing.startedAt
+    };
+  } else {
+    flags.unresolvedConflict = {
+      cause: cause || '',
+      startedAt: Date.now()
+    };
+  }
+
+  localStorage.setItem('relationshipFlags', JSON.stringify(flags));
+  _touch();
+}
+
+function resolveUnresolvedConflict() {
+  const flags = getRelationshipFlags();
+  delete flags.unresolvedConflict;
+  localStorage.setItem('relationshipFlags', JSON.stringify(flags));
+  _touch();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Legacy Cold War Migration (Phase 3H-3F)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function migrateColdWarToUnresolvedConflict() {
+  const coldWarMode = localStorage.getItem('coldWarMode');
+  if (coldWarMode !== 'true') return;
+
+  const flags = getRelationshipFlags();
+  if (flags.unresolvedConflict) return;
+
+  const cause = localStorage.getItem('coldWarCause') || '';
+  const startTs = parseInt(localStorage.getItem('coldWarStart') || '0');
+  const startedAt = (startTs > 0) ? startTs : Date.now();
+
+  flags.unresolvedConflict = { cause, startedAt };
+  localStorage.setItem('relationshipFlags', JSON.stringify(flags));
+
+  localStorage.removeItem('coldWarMode');
+  localStorage.removeItem('coldWarCause');
+  localStorage.removeItem('coldWarStart');
   localStorage.removeItem('coldWarStage');
-  // Bug fix: 写入冷战结束时间，供 buildIntimateStateBriefing 检测"刚和好的余温"
-  localStorage.setItem('coldWarEndedAt', Date.now().toString());
+  localStorage.removeItem('coldWarEndedAt');
+
   _touch();
-  refreshStatusEmoji();
-  if (coldWarTimer) { clearTimeout(coldWarTimer); coldWarTimer = null; }
-  if (userApologized) { changeAffection(3); changeMood(2, true); }
-  else { changeAffection(1); changeMood(1); }
-  if (Math.random() < 0.3) {
-    localStorage.setItem('pendingMakeupMoney', 'true');
-    setTimeout(() => ghostSendMakeupMoney(), 5 * 60 * 1000);
-  }
-  localStorage.setItem('pendingColdWarEndStory', 'true');
-  setTimeout(() => { if (typeof checkStoryOnColdWarEnd === 'function') checkStoryOnColdWarEnd(); }, 8000);
-  if (typeof feedEvent_madeUp === 'function') feedEvent_madeUp();
-  // 旧版"和好后弹草稿让用户选文案发布"机制已退役，不再主动弹窗。
 }
-
-function checkColdWarApologyCondition() {
-  if (localStorage.getItem('coldWarMode') !== 'true') {
-    if (coldWarTimer) { clearInterval(coldWarTimer); coldWarTimer = null; }
-    return;
-  }
-  const coldStart = parseInt(localStorage.getItem('coldWarStart') || '0');
-  const elapsed   = Date.now() - coldStart;
-  const mood      = getMoodLevel();
-  const silentFor = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
-  const stage     = getColdWarStage();
-
-  if      (stage === 1 && elapsed > 40  * 60 * 1000) setColdWarStage(2);
-  else if (stage === 2 && elapsed > 90  * 60 * 1000) setColdWarStage(3);
-  else if (stage === 3 && elapsed > 150 * 60 * 1000) setColdWarStage(4);
-
-  if ((elapsed > 60 * 60 * 1000 && mood <= 3) ||
-      (elapsed > 60 * 60 * 1000 && silentFor > 30 * 60 * 1000) ||
-       elapsed > 5 * 60 * 60 * 1000) {
-    if (coldWarTimer) { clearInterval(coldWarTimer); coldWarTimer = null; }
-    ghostApologize();
-  }
-}
-
-async function ghostApologize() {
-  if (localStorage.getItem('coldWarMode') !== 'true') return;
-  const prompt = '[System: The cold war has gone on too long. Ghost breaks the silence in his own way — not a formal apology, just a gesture. Dry. Brief. Present.]';
-  let _apologyMarker = null;
-  if (typeof chatHistory !== 'undefined') {
-    _apologyMarker = { role: 'user', content: prompt, _system: true };
-    chatHistory.push(_apologyMarker);
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-  if (typeof showTyping === 'function') showTyping();
-  try {
-    const sys = typeof buildSystemPrompt === 'function' ? buildSystemPrompt() : '';
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: getMainModel(),
-        max_tokens: 500,
-        system: sys,
-        messages: typeof chatHistory !== 'undefined'
-          ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => ({ role: m.role, content: m.content }))
-          : []
-      })
-    });
-    const data = await res.json();
-    if (typeof hideTyping === 'function') hideTyping();
-    const reply = data.content?.[0]?.text || '...';
-    // BUG-9 FIX: 破防检测
-    if (isBreakout(reply)) { endColdWar(false); return; }
-    if (typeof emitGhostNarrativeEvent === 'function') {
-      await emitGhostNarrativeEvent(reply.trim(), { storyId: 'cold_war_apology', delayMs: 0 });
-    }
-    endColdWar(false);
-  } catch(e) {
-    if (typeof hideTyping === 'function') hideTyping();
-    // 修复冷战卡死：道歉请求失败时，调用方已清掉计时器且 coldWarMode 仍是 true，
-    // 若不处理则冷战永远出不来（直到刷新页面）。这里回滚孤立的 _system 标记消息，
-    // 并重新武装计时器，让 20 分钟后再试一次，保证冷战最终能结束。
-    if (_apologyMarker && typeof chatHistory !== 'undefined') {
-      const _idx = chatHistory.indexOf(_apologyMarker);
-      if (_idx !== -1) {
-        chatHistory.splice(_idx, 1);
-        if (typeof saveHistory === 'function') saveHistory();
-      }
-    }
-    if (localStorage.getItem('coldWarMode') === 'true') {
-      if (coldWarTimer) { clearInterval(coldWarTimer); coldWarTimer = null; }
-      coldWarTimer = setInterval(() => checkColdWarApologyCondition(), 20 * 60 * 1000);
-    }
-  }
-}
-
-async function ghostSendMakeupMoney() {
-  localStorage.removeItem('pendingMakeupMoney');
-  const amount = (Math.floor(Math.random() * 3) + 1) * 10;
-  const prompt = `[System: After the cold war ended, you quietly send her £${amount}. You don't explain. One short line — like nothing happened.]`;
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'user', content: prompt, _system: true });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-  if (typeof showTyping === 'function') showTyping();
-  try {
-    const sys = typeof buildSystemPrompt === 'function' ? buildSystemPrompt() : '';
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: getMainModel(),
-        max_tokens: 300,
-        system: sys,
-        messages: typeof chatHistory !== 'undefined'
-          ? chatHistory.filter(m => !m._system && !m._recalled).slice(-20).map(m => ({ role: m.role, content: m.content }))
-          : []
-      })
-    });
-    const data = await res.json();
-    if (typeof hideTyping === 'function') hideTyping();
-    const reply = data.content?.[0]?.text || '...';
-    if (typeof applyMoneyEffect === 'function') {
-      applyMoneyEffect(amount, {
-        label: 'Ghost 悄悄转账',
-        bypassCooldown: true,
-        bypassSessionLimit: true,
-        bypassRefundCooldown: true
-      });
-    }
-    if (typeof emitGhostNarrativeEvent === 'function') {
-      await emitGhostNarrativeEvent(reply, {
-        storyId: 'cold_war_makeup_money',
-        delayMs: 0,
-        transfer: { amount, isRefund: false }
-      });
-    }
-    setTimeout(() => {
-      const c = document.getElementById('messagesContainer');
-      if (c && typeof showGhostTransferCard === 'function') showGhostTransferCard(c, amount, '', false);
-    }, 600);
-  } catch(e) {
-    if (typeof hideTyping === 'function') hideTyping();
-  }
-}
-
-
-// ── 开发者调试：表达风格轴读数 ──
-// banterSweet 是每设备本地值，admin 页走服务端 DB 不匹配，故用 console 命令。
-// 用法：DevTools 里敲 __banterDebug()
-window.__banterDebug = function() {
-  const v = getBanterSweet();
-  let h = []; try { h = JSON.parse(localStorage.getItem('banterHistory') || '[]'); } catch(e) {}
-  console.log(`[banterSweet] 当前: ${v.toFixed(1)}  (${v <= -50 ? '含蓄块' : v >= 50 ? '直接块' : '中性-无注入'})`);
-  console.table(h.map(r => ({
-    时间: new Date(r.t).toLocaleString('zh-CN'),
-    变化: `${r.before} → ${r.after}`,
-    信号: r.signal, 置信: r.confidence,
-    忽略: r.ignored ? '是' : '', 原因: r.reason
-  })));
-  return v;
-};

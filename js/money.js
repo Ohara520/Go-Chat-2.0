@@ -30,9 +30,6 @@ function getMoneyComfortLevel() {
   // slowBurn压一级——关系还在建立
   if (mode === 'slowBurn') level = Math.max(0, level - 1);
 
-  // 冷战修复：关系结构性升级，放宽一级
-  if (flags.coldWarRepaired) level = Math.min(3, level + 1);
-
   return level;
 }
 
@@ -123,11 +120,21 @@ async function ghostSendInitMessage(offlineHours) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function getGhostCardMonthlyLimit() {
-  const coldWar   = localStorage.getItem('coldWarMode') === 'true';
-  if (coldWar) return 0;
-
-  const jealousy  = typeof getJealousyLevelCapped === 'function' ? getJealousyLevelCapped() : 'none';
-  const mood      = typeof getMoodLevel === 'function' ? getMoodLevel() : 7;
+  /*
+   * Jealousy 状态不再影响 Ghost Card / 钱 / 消费行为。
+   *
+   * 嫉妒不是经济事实。
+   * 系统不能因为后台判断 Simon “有多吃醋”，
+   * 就改变卡片权限、额度、消费或物质行为。
+   *
+   * 什么 Bug 来这里找：
+   * 如果以后又出现“Simon 一吃醋卡就变了 / 钱就变了”，
+   * 检查 money.js 是否重新读取了 jealousy 状态。
+   */
+  // Simon 的 moodLevel 不再影响 Ghost Card / 额度 / 消费行为。
+  // Money 不该知道 Simon “今天心情几分”，心情不是经济事实。
+  // 什么 Bug 来这里找：如果以后又出现“Simon 心情一变额度就变”，
+  // 检查 money.js 是否重新读取了 moodLevel。
   const trust     = typeof getTrustHeat === 'function' ? getTrustHeat() : 50;
   const affection = typeof getAffection === 'function' ? getAffection() : 50;
   const s         = typeof getGhostResponseState === 'function' ? getGhostResponseState() : { moneyEase: 1, availability: 'normal' };
@@ -137,14 +144,9 @@ function getGhostCardMonthlyLimit() {
   let limit = limitMap[s.moneyEase] || 0;
 
   // 关系特别顺时小幅上调
-  if (trust >= 80 && affection >= 75 && mood >= 7 && jealousy === 'none' && s.availability === 'open') {
+  if (trust >= 80 && affection >= 75 && s.availability === 'open') {
     limit += 400;
   }
-
-  // 状态压制
-  if (mood <= 3)               limit = Math.min(limit, 1000);
-  if (jealousy === 'medium')   limit = Math.min(limit, 1400);
-  if (jealousy === 'severe')   limit = Math.min(limit, 800);
 
   // 金融师职业福利：Ghost Card 上限加成
   if (typeof getCareerGhostCardBonus === 'function') {

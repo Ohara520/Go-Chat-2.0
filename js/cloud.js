@@ -239,8 +239,6 @@ async function loadFromCloud() {
       if (p.coupleCoverBase64 && !localStorage.getItem('coupleCoverBase64')) {
         localStorage.setItem('coupleCoverBase64', p.coupleCoverBase64);
       }
-      // 冷战状态：取最新
-      if (p.coldWarMode != null && cloudIsNewer) localStorage.setItem('coldWarMode', String(p.coldWarMode));
       // 婚姻模式和Ghost档案
       setIfMissing('marriageType', p.marriageType);
       // Ghost头像URL：云端有值就用云端（换设备必须恢复），本地有值且云端没有就保留本地
@@ -331,14 +329,15 @@ async function loadFromCloud() {
       }
     }
 
-    // ── 3. 情绪/关系：云端更新才覆盖，本地操作优先 ────────────
+    // ── 3. 关系：云端更新才覆盖，本地操作优先 ────────────
+    // Phase 3G-8A: Simon 不再从云端加载 moodLevel。
+    // data.mood 仍可能存在（旧云端数据），但不恢复到 localStorage。
+    // Keegan 兼容：moodLevel 留在 CHARACTER_KEYS，Keegan 切换时仍能加载自己保存的 mood。
     if (cloudIsNewer) {
-      if (data.mood != null) localStorage.setItem('moodLevel', data.mood);
       if (data.affection != null) localStorage.setItem('affection', data.affection);
       if (data.long_term_memory != null) localStorage.setItem('longTermMemory', data.long_term_memory);
     } else {
       // 云端较旧：只恢复本地没有的
-      if (data.mood != null && !localStorage.getItem('moodLevel')) localStorage.setItem('moodLevel', data.mood);
       if (data.affection != null && !localStorage.getItem('affection')) localStorage.setItem('affection', data.affection);
       if (data.long_term_memory != null && !localStorage.getItem('longTermMemory')) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
@@ -459,17 +458,12 @@ async function loadFromCloud() {
           localStorage.setItem('trustHeat', Math.max(_localTrust, _cloudTrust));
         }
         if (s.attachmentPull != null) localStorage.setItem('attachmentPull', s.attachmentPull);
-        if (s.jealousyLevel != null) localStorage.setItem('jealousyLevel', s.jealousyLevel);
-        if (s.banterSweet != null) localStorage.setItem('banterSweet', s.banterSweet);
         if (s.globalTurnCount != null) { _globalTurnCount = s.globalTurnCount; localStorage.setItem('globalTurnCount', s.globalTurnCount); }
         if (Array.isArray(s.pendingReversePackages)) savePendingReversePackages(s.pendingReversePackages, { markChanged: false });
         if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
         if (s.lastReversePackageTurn != null) localStorage.setItem('lastReversePackageTurn', s.lastReversePackageTurn);
         if (s.relationshipFlags != null) localStorage.setItem('relationshipFlags', JSON.stringify(s.relationshipFlags));
-        if (s.coldWarStart != null) localStorage.setItem('coldWarStart', s.coldWarStart);
-        if (s.pendingGhostApology != null) localStorage.setItem('pendingGhostApology', String(s.pendingGhostApology));
         if (s.pendingSeriousTalk != null) localStorage.setItem('pendingSeriousTalk', String(s.pendingSeriousTalk));
-        if (s.pendingMakeupMoney != null) localStorage.setItem('pendingMakeupMoney', String(s.pendingMakeupMoney));
         if (s.pendingColdWarEndStory != null) localStorage.setItem('pendingColdWarEndStory', String(s.pendingColdWarEndStory));
         if (s.loveResistance != null) localStorage.setItem('loveResistance', String(s.loveResistance));
         if (s.loveResistanceLastDecay != null) localStorage.setItem('loveResistanceLastDecay', s.loveResistanceLastDecay);
@@ -507,7 +501,6 @@ async function loadFromCloud() {
         const restoreIfMissing = (key, val) => { if (val != null && !localStorage.getItem(key)) localStorage.setItem(key, String(val)); };
         restoreIfMissing('trustHeat', s.trustHeat);
         restoreIfMissing('attachmentPull', s.attachmentPull);
-        restoreIfMissing('jealousyLevel', s.jealousyLevel);
         restoreIfMissing('emotionalHurt', s.emotionalHurt);
         restoreIfMissing('relationshipFlags', s.relationshipFlags ? JSON.stringify(s.relationshipFlags) : null);
         restoreIfMissing('loveResistance', s.loveResistance);
@@ -993,7 +986,6 @@ async function saveToCloud() {
       ghostBirthday: localStorage.getItem('ghostBirthday') || '',
       ghostZodiac: localStorage.getItem('ghostZodiac') || '',
       ghostZodiacEn: localStorage.getItem('ghostZodiacEn') || '',
-      coldWarMode: localStorage.getItem('coldWarMode') || 'false',
       metInPerson: localStorage.getItem('metInPerson') || 'false',
       meetType: localStorage.getItem('meetType') || '',
       botNickname: localStorage.getItem('botNickname') || '',
@@ -1086,8 +1078,6 @@ async function saveToCloud() {
     const stateSnapshot = {
       trustHeat: getTrustHeat(),
       attachmentPull: getAttachmentPull(),
-      jealousyLevel: getJealousyLevel(),
-      banterSweet: getBanterSweet(),
       globalTurnCount: _globalTurnCount,
       pendingReversePackages: getPendingReversePackages(),
       emotionalHurt: parseInt(localStorage.getItem('emotionalHurt') || '0'),
@@ -1144,10 +1134,7 @@ async function saveToCloud() {
       purchaseCounts: JSON.parse(localStorage.getItem('purchaseCounts') || '{}'),
       intimateTriggered: JSON.parse(localStorage.getItem('intimateTriggered') || '{}'),
       // 状态标记
-      coldWarStart: localStorage.getItem('coldWarStart') || '',
-      pendingGhostApology: localStorage.getItem('pendingGhostApology') || '',
       pendingSeriousTalk: localStorage.getItem('pendingSeriousTalk') || '',
-      pendingMakeupMoney: localStorage.getItem('pendingMakeupMoney') || '',
       pendingColdWarEndStory: localStorage.getItem('pendingColdWarEndStory') || '',
       loveResistance: localStorage.getItem('loveResistance') || '0',
       loveResistanceLastDecay: localStorage.getItem('loveResistanceLastDecay') || '',
@@ -1189,14 +1176,13 @@ async function saveToCloud() {
     if (_profileHasCore) {
       upsertData.profile = profile;
       upsertData.state_snapshot = stateSnapshot;
-      // mood/affection/long_term_memory 也必须走同一守卫：
-      // 换设备/本地未加载时 profile 为空，这三个字段若裸写会用默认值('7'/'50'/'')
-      // 覆盖云端真实值——这正是 8-31 掉档 bug 的漏网字段。
-      upsertData.mood = parseInt(localStorage.getItem('moodLevel') || '7');
+      // Phase 3G-8A: Simon 不再上传 moodLevel 到云端。
+      // affection/long_term_memory 仍需守卫（防止空快照覆盖云端）。
+      // 旧云端 mood 字段保留不删除，但不再主动更新。
       upsertData.affection = parseInt(localStorage.getItem('affection') || '50');
       upsertData.long_term_memory = localStorage.getItem('longTermMemory') || '';
     } else {
-      console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/mood/affection/long_term_memory 字段写入，防止覆盖云端');
+      console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/affection/long_term_memory 字段写入，防止覆盖云端');
     }
     // 只在有内容时才存，防止空值覆盖云端已有数据
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;

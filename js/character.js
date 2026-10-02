@@ -51,19 +51,18 @@ const CHARACTER_KEYS = [
   // 聊天
   'chatHistory',
   // 关系状态
-  'affection', 'moodLevel', 'trustHeat', 'attachmentPull',
+  // Phase 3G-8B: 'moodLevel' 已从 CHARACTER_KEYS 删除（Keegan 不启用）。
+  'affection', 'trustHeat', 'attachmentPull',
   'jealousyLevel', 'loveResistance', 'loveResistanceLastDecay',
   'globalTurnCount', 'relationshipFlags', 'emotionalHurt',
   'moneyRefuseCount', 'userDislikesMoney', 'sassyPost',
-  // 冷战
-  'coldWarMode', 'coldWarStart', 'coldWarStage', 'coldWarCause',
   // 记忆
   'longTermMemory', 'intimateMemory',
   // 剧情
   'storyBook', 'collections',
   'pendingReversePackages', 'lastReversePackageTurn',
-  'pendingGhostApology', 'pendingSeriousTalk',
-  'pendingMakeupMoney', 'pendingColdWarEndStory',
+  'pendingSeriousTalk',
+  'pendingColdWarEndStory',
   // 快递 / 外卖
   'deliveries', 'deliveryHistory', 'deliveryNotices',
   'takeoutOrders', 'takeoutHistory',
@@ -234,7 +233,7 @@ async function switchCharacter(newCharId) {
   // 不主动调用 refreshChatScreen，等用户进入聊天页时自动触发 initChat
   // 这样避免在主页时就渲染聊天内容导致重复
   if (typeof renderWallet === 'function') renderWallet();
-  if (typeof initMood === 'function') initMood();
+  // Phase 3G-8B: initMood() 已删除。
 
   // 9. 更新聊天 header 名字 + 头像
   const _chatNameEl = document.getElementById('chatBotName');

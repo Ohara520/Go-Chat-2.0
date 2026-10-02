@@ -3,7 +3,6 @@
 // 负责：心声触发判断、生成、UI展示、队列管理
 // 依赖：api.js（callSonnet、callGrok、fetchDeepSeek、isBreakout）
 //       ui.js（appendMessage）
-//       state.js（getJealousyLevelCapped）
 //       persona.js（buildGhostStyleCore）
 // 外部依赖（HTML/其他JS定义）：chatHistory、_isSending、saveHistory
 // ============================================================
@@ -92,11 +91,10 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   const skipPatterns = /^(translation app|google translate|i looked it up|soap taught me|copy that\.?)$/i;
   if (skipPatterns.test(replyText.trim())) return;
 
-  // 跳过：无第三者referent时，不生成竞争叙事类心声
+  // 跳过：竞争叙事类心声（"另一个男人"/"我看到他"之类）不自动生成。
+  // 这不是嫉妒等级判断，只是过滤掉系统替 Simon 写出来的第三者独白。
   const _rivalryInner = /owns your time|what my place is|he talks|my place here|another man|i saw him/i;
-  const _hasReferentNow = sessionStorage.getItem('jealousyReferent') &&
-    (Date.now() - parseInt(sessionStorage.getItem('jealousyReferentAt') || '0')) < 30 * 60 * 1000;
-  if (_rivalryInner.test(replyText) && !_hasReferentNow) return;
+  if (_rivalryInner.test(replyText)) return;
 
   // ── 场景检测 ─────────────────────────────────────────────
   const replyLower = replyText.toLowerCase();
@@ -115,22 +113,25 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
   // 场景3：做了照顾但没承认（转账/寄礼）
   const justCared = sessionStorage.getItem('thisRoundCareAction') === '1';
 
-  // 场景4：吃醋但没说破
-  const jealousyHidden = getJealousyLevelCapped() !== 'none' &&
-    !/jealous|who|him|he/.test(replyLower);
+  /*
+   * Jealousy 状态不再决定 Simon 的 inner thought。
+   *
+   * 这里可以使用真实发生的事情作为上下文，
+   * 但不能根据后台"嫉妒等级"替 Simon 写内心。
+   *
+   * 什么 Bug 来这里找：
+   * 如果以后又出现"系统因为 jealousy level
+   * 自动规定 Simon 在想什么"，检查这里。
+   */
 
-  // 场景5：冷战裂缝
-  const coldWarCracking = localStorage.getItem('coldWarMode') === 'true' &&
-    parseInt(localStorage.getItem('coldWarStage') || '0') >= 2;
-
-  // 场景6：隐藏的关心——说了关心的话但很克制
+  // 场景5：隐藏的关心——说了关心的话但很克制
   const hiddenCare = /careful|eat|sleep|rest|tired|cold|warm|safe|okay\?|alright\?|you good|how are you/.test(replyLower)
     && replyLower.length < 60;
 
-  // 场景7：他注意到了细节（收紧条件：reply极短、user有实质内容、且不属于其他已命中场景）
+  // 场景6：他注意到了细节（收紧条件：reply极短、user有实质内容、且不属于其他已命中场景）
   const noticedDetail = replyLower.length < 50
     && lastUserMsg.length > 40
-    && !isStubborn && !missedCue && !justCared && !jealousyHidden && !coldWarCracking && !hiddenCare
+    && !isStubborn && !missedCue && !justCared && !hiddenCare
     && chatHistory.filter(m => m.role === 'user' && !m._system).length > 5;
 
   // 场景8：他想多说但没说
@@ -149,8 +150,8 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
 
   const inCooldown = msSinceLast < COOLDOWN_MS;
 
-  // 冷却期内：只有 justCared / coldWarCracking 可以插队
-  if (inCooldown && !justCared && !coldWarCracking) return;
+  // 冷却期内：只有 justCared 可以插队
+  if (inCooldown && !justCared) return;
 
   // ── 氛围感知：温柔氛围额外加概率 ────────────────────────
   const _recentCtx = chatHistory
@@ -167,7 +168,6 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
 
   if (justCared)           { thoughtType = 'behavior';  triggerChance = 0.80; }
   else if (coldWarCracking){ thoughtType = 'crack';     triggerChance = 0.80; }
-  else if (jealousyHidden) { thoughtType = 'jealousy';  triggerChance = 0.68; }
   else if (missedCue)      { thoughtType = 'delayed';   triggerChance = 0.62; }
   else if (isStubborn)     { thoughtType = 'contrast';  triggerChance = 0.32; }
   else if (hiddenCare)     { thoughtType = 'behavior';  triggerChance = 0.52; }
@@ -204,7 +204,6 @@ async function generateInnerThought(replyText, innerThoughtEl, retryCount = 0, t
   const userSnippet = lastUserMsg.slice(0, 60).trim();
   const sceneHints = {
     contrast:  `You just said: "${replySnippet}" — dry, clipped, deflecting. There was more you didn't say. The thought you swallowed, right now.`,
-    jealousy:  `You just said: "${replySnippet}" — but something bothered you that you didn't name. What you noticed and swallowed.`,
     delayed:   `She just said: "${userSnippet}" — you answered, but missed the real thing she was giving you. The small realization that hit a beat too late.`,
     behavior:  `You just did something for her — your reply shows it. You won't explain why. The real reason, the one you don't say.`,
     crack:     `Cold war. You just said: "${replySnippet}" — still stiff, but something shifted in you. The thing that moved that you won't admit.`,
@@ -347,7 +346,6 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
   if (!en) {
     const fallbacks = {
       contrast: 'noticed.',
-      jealousy: "didn't like that.",
       delayed:  'missed it.',
       behavior: 'just easier this way.',
       crack:    'maybe.',
