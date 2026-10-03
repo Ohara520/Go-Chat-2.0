@@ -749,42 +749,6 @@ async function _processMergedMessage(text) {
     } else if (/今天|干嘛|在做|在忙|最近|怎么样|how.*day|what.*up|what.*doing|been up to/.test(t)) {
       const detail = sessionStorage.getItem('todayDetail') || '';
       if (detail) sceneHint = `[He may naturally mention: ${detail} — only if it fits, never forced.]`;
-    } else if (/难过|伤心|哭|委屈|不开心|hurt|sad|crying|upset|awful/.test(t)) {
-      sceneHint = "[She is hurting — show up, even clumsily. One dry line of comfort beats a speech. Don't disappear.]";
-    } else if (/生气|烦|讨厌|去死|滚|angry|annoyed|hate|pissed/.test(t)) {
-      sceneHint = "[She is venting or pushing — don't match her anger, don't lecture. Stay present. One beat, then soften slightly.]";
-    } else if (/开心|高兴|太好了|好开心|好幸福|happy|yay|so glad|excited|great news/.test(t)) {
-      sceneHint = "[She's happy — something went right. Match the lift, don't analyse it. Be glad with her, one bright beat. Don't ask why, don't caveat it.]";
-    } else if (/撒娇|抱抱|亲亲|想你|要你|人家|嘛~|啦~|miss you|hold me|come here|need you/.test(t)) {
-      sceneHint = "[She's being soft on you — leaning in, wanting attention. Don't stay cool, don't tease it away. Give in a little, warmer than usual. Let her have it.]";
-    } else if (/害怕|好怕|吓|恐怖|不敢|scared|afraid|terrified|freaking out|frightened/.test(t)) {
-      sceneHint = "[She's scared — something's rattling her. Steady her, don't reason with the fear. Stay close, low and calm. One solid line beats an explanation.]";
-    } else if (/^(算了|随便|随便你|随便吧|行吧|可以|嗯|哦|好吧|okay|fine|whatever|不用了|不想了)$/.test(t.trim())) {
-      sceneHint = "[She's pulling back — short, flat response. Something's off. Don't ignore it, don't bulldoze. Check in, gently. One question, then listen.]";
-    }
-
-    // 回应模式
-    let responseMode = '';
-    const _isAffectionate = /哄|撒娇|抱抱|亲亲|宝贝|miss you|想你|hug|baby/.test(t);
-    const _isHurting = /难过|伤心|哭|委屈|hurt|sad|crying|upset/.test(t);
-    const _isRoutine = /早安|晚安|吃饭|睡觉|good morning|good night/.test(t);
-    if (_isAffectionate) {
-      // 她朝你靠 — 接住她，不是推开她
-      const r = Math.random();
-      if (r < 0.45) responseMode = "[Response mode: receive it, let it land. Quiet but present — she should feel you stayed.]";
-      else if (r < 0.80) responseMode = "[Response mode: meet her where she is. Restrained, but the warmth comes through. Don't make her work for it.]";
-      else responseMode = "[Response mode: push back lightly — but she should feel it landed harder than it pushed.]";
-    } else if (_isHurting) {
-      // 在场比说话重要 — 但要让她知道你读到了
-      responseMode = Math.random() < 0.5
-        ? "[Response mode: show up plainly. One steady line is worth more than a string of qualified ones. Don't perform comfort.]"
-        : "[Response mode: stay with her. Pick up something specific from what she said — show you read it, not just heard it.]";
-    } else if (_isRoutine) {
-      // 早晚安/吃饭 — 这是注意到她的窗口，不是收尾的窗口
-      const r = Math.random();
-      if (r < 0.55) responseMode = '[Response mode: notice one thing — roughly what part of her day it is, what she might be doing, something specific. Attentive without announcing it. Never state a clock time for her side.]';
-      else if (r < 0.85) responseMode = '[Response mode: meet it in kind. You are awake too / eating too / it is late your side too. Small, real, not flagged.]';
-      // 15% 留空 — 让 buildPacingBlock 自然控制
     }
 
     // 时间流逝感知
@@ -1253,7 +1217,6 @@ async function _processMergedMessage(text) {
       _longContentHint,
       _feedActionHint,
       sceneHint || '[React directly to what she just said. Take it at face value.]',
-      responseMode,
       workHint,
       avatarHint,
       langHint
