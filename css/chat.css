@@ -1116,53 +1116,209 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
+/* 钱包容器 */
 .wallet-container {
     padding: 0 16px calc(40px + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 18px;
+    background: #F7F6F0;
 }
-.wallet-card {
-    background: linear-gradient(135deg, rgba(90,154,70,0.75) 0%, rgba(70,130,55,0.65) 50%, rgba(100,165,70,0.6) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 22px;
-    padding: 24px 24px 20px;
-    box-shadow: 0 8px 30px rgba(60,120,40,0.18);
-    border: 1px solid rgba(255,255,255,0.38);
+
+/* 实体钱包+卡片层 */
+.wallet-physical {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    margin: 20px auto 0;
+    aspect-ratio: 1.6 / 1;
+}
+
+.wallet-base {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+}
+
+.wallet-base img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 12px 28px rgba(80, 100, 70, 0.2));
+}
+
+/* 银行卡通用样式 */
+.wallet-card-item {
+    position: absolute;
+    width: 75%;
+    left: 12.5%;
+    aspect-ratio: 1.586 / 1;
+    cursor: pointer;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s 0s;
+    will-change: transform;
+}
+
+.wallet-card-item .card-bg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+/* 卡面余额叠加层 */
+.card-balance-overlay {
+    position: absolute;
+    top: 38%;
+    left: 25%;
+    font-size: 11vw;
+    max-font-size: 42px;
+    font-weight: 300;
+    font-family: Georgia, serif;
+    line-height: 1;
+    pointer-events: none;
+    letter-spacing: -0.02em;
+}
+
+/* Ghost Card 黑卡 - 初始插在后面 */
+.wallet-card-ghost {
+    top: 8%;
+    z-index: 2;
+}
+
+.wallet-card-ghost .card-balance-overlay {
+    color: #c9a84c;
+}
+
+/* My Card 白卡 - 初始插在前面 */
+.wallet-card-my {
+    top: 20%;
+    z-index: 3;
+}
+
+.wallet-card-my .card-balance-overlay {
+    color: #5a5a50;
+}
+
+/* 白卡底部遮挡层 - 自然融合遮住"limit £2000" */
+.card-limit-mask {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 15%;
+    background: linear-gradient(to top,
+        rgba(247, 246, 240, 1) 0%,
+        rgba(247, 246, 240, 0.95) 30%,
+        rgba(247, 246, 240, 0.7) 60%,
+        rgba(247, 246, 240, 0) 100%
+    );
+    pointer-events: none;
+    border-radius: 0 0 16px 16px;
+}
+
+/* 抽卡状态 - Ghost Card 被选中 */
+.wallet-card-ghost.pulled {
+    transform: translateY(-80px) scale(1.05);
+    z-index: 10;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s 0s;
+}
+
+/* 当 Ghost Card 抽出时，My Card 后退 */
+.wallet-card-my.tucked {
+    transform: translateY(10px);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 抽卡状态 - My Card 被选中 */
+.wallet-card-my.pulled {
+    transform: translateY(-70px) scale(1.03);
+    z-index: 10;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s 0s;
+}
+
+/* 当 My Card 抽出时，Ghost Card 后退 */
+.wallet-card-ghost.tucked {
+    transform: translateY(12px);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 卡片切换按钮 */
+.card-tabs {
+    display: flex;
+    gap: 8px;
+    max-width: 360px;
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.card-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(80, 100, 70, 0.6);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.card-tab.active {
+    background: rgba(80, 100, 70, 0.85);
     color: white;
 }
-.wallet-card-label {
-    font-size: 13px;
-    opacity: 0.82;
-    margin-bottom: 8px;
-    letter-spacing: 0.3px;
+
+/* 卡片详情面板 */
+.card-details-panel {
+    background: rgba(255, 255, 255, 0.75);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 4px 16px rgba(80, 100, 70, 0.08);
 }
-.balance-display {
-    font-size: 40px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    margin-bottom: 20px;
-    font-family: 'Playfair Display', Georgia, serif;
-}
-.wallet-stats {
+
+.card-details {
     display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    background: rgba(255,255,255,0.12);
-    border-radius: 14px;
-    padding: 12px 20px;
-    gap: 0;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(140, 160, 130, 0.12);
 }
-.wallet-stat { flex: 1; text-align: center; }
-.wallet-stat-divider {
-    width: 1px;
-    height: 32px;
-    background: rgba(255,255,255,0.25);
+
+.detail-row:last-child {
+    border-bottom: none;
 }
-.wallet-stat-label { font-size: 11px; opacity: 0.75; margin-bottom: 4px; }
-.wallet-stat-value { font-size: 16px; font-weight: 700; }
-.wallet-stat-value.income { color: rgba(255,255,255,0.95); }
-.wallet-stat-value.expense { color: rgba(220,255,210,0.9); }
+
+.detail-label {
+    font-size: 13px;
+    color: rgba(60, 80, 60, 0.65);
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d5a30;
+}
+
+.detail-value.income {
+    color: #3B6D11;
+}
+
+.detail-value.expense {
+    color: #712B13;
+}
 
 /* 交易记录 */
 .transaction-section {
@@ -1184,24 +1340,15 @@
 .transaction-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
+    gap: 12px;
+    padding: 12px 16px;
     border-bottom: 0.5px solid rgba(100,160,80,0.1);
 }
 .transaction-item:last-child { border-bottom: none; }
-.transaction-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px;
-    flex-shrink: 0;
-}
-.transaction-icon.in  { background: rgba(99,153,34,0.10); }
-.transaction-icon.out { background: rgba(216,90,48,0.08); }
 .transaction-info { flex: 1; min-width: 0; }
-.transaction-name { font-size: 13px; color: #2d5a30; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.transaction-time { font-size: 11px; color: rgba(50,100,45,0.45); margin-top: 1px; }
-.transaction-amount { font-size: 13px; font-weight: 600; flex-shrink: 0; padding-right: 2px; }
+.transaction-name { font-size: 13px; color: #2d5a30; font-weight: 500; }
+.transaction-time { font-size: 11px; color: rgba(50,100,45,0.45); margin-top: 2px; }
+.transaction-amount { font-size: 14px; font-weight: 600; flex-shrink: 0; }
 .transaction-amount.in  { color: #3B6D11; }
 .transaction-amount.out { color: #712B13; }
 .transaction-toggle {

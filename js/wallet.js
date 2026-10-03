@@ -289,14 +289,54 @@ function formatTxTime(timeStr) {
 
 let txExpanded = false;
 const TX_PREVIEW = 5;
+let activeCard = 'ghost';
+
+function selectCard(cardType) {
+  activeCard = cardType;
+
+  const ghostCard = document.getElementById('ghostCardSlot');
+  const myCard = document.getElementById('myCardSlot');
+
+  if (cardType === 'ghost') {
+    if (ghostCard) ghostCard.classList.add('pulled');
+    if (myCard) {
+      myCard.classList.remove('pulled');
+      myCard.classList.add('tucked');
+    }
+  } else {
+    if (ghostCard) {
+      ghostCard.classList.remove('pulled');
+      ghostCard.classList.add('tucked');
+    }
+    if (myCard) {
+      myCard.classList.remove('tucked');
+      myCard.classList.add('pulled');
+    }
+  }
+
+  const tabGhost = document.getElementById('tabGhost');
+  const tabMy = document.getElementById('tabMy');
+  if (tabGhost) tabGhost.classList.toggle('active', cardType === 'ghost');
+  if (tabMy) tabMy.classList.toggle('active', cardType === 'my');
+
+  const detailsGhost = document.getElementById('detailsGhost');
+  const detailsMy = document.getElementById('detailsMy');
+  if (detailsGhost) detailsGhost.style.display = cardType === 'ghost' ? 'block' : 'none';
+  if (detailsMy) detailsMy.style.display = cardType === 'my' ? 'block' : 'none';
+
+  renderTransactionList();
+}
 
 function renderWallet() {
-  const bal = getBalance();
-  const walletBalEl = document.getElementById('walletBalance');
-  if (walletBalEl) walletBalEl.textContent = '£' + bal.toFixed(2);
+  const myBal = getBalance();
+  const myBalEl = document.getElementById('myCardBalance');
+  if (myBalEl) myBalEl.textContent = '£' + myBal.toFixed(0);
 
-  // 过滤掉黑卡交易：Ghost Card 扣款在黑卡进度条里展示，不放用户钱包列表
-  // 否则用户看到红色 -£[amount] 会误以为自己的钱被扣了
+  const card = (typeof getGhostCard === 'function') ? getGhostCard() : null;
+  const ghostAvailable = card ? Math.max(0, card.balance) : 0;
+  const ghostBalEl = document.getElementById('ghostCardBalance');
+  if (ghostBalEl) ghostBalEl.textContent = '£' + ghostAvailable.toFixed(0);
+
   const txList = getTransactions().filter(t => !t.ghostCard);
   const now = new Date();
   const monthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
@@ -304,14 +344,34 @@ function renderWallet() {
   txList.forEach(tx => {
     if (tx.time && tx.time.startsWith(monthKey)) {
       if (tx.amount > 0) monthIn += tx.amount;
-      else if (!tx.ghostCard) monthOut += Math.abs(tx.amount);
+      else monthOut += Math.abs(tx.amount);
     }
   });
-  const inEl = document.getElementById('monthIncome');
-  const outEl = document.getElementById('monthExpense');
+
+  const myBalanceEl = document.getElementById('myBalance');
+  const inEl = document.getElementById('myIncome');
+  const outEl = document.getElementById('myExpense');
+  if (myBalanceEl) myBalanceEl.textContent = '£' + myBal.toFixed(2);
   if (inEl) inEl.textContent = '+£' + monthIn.toFixed(0);
   if (outEl) outEl.textContent = '-£' + monthOut.toFixed(0);
 
+  const monthlyLimit = card ? card.monthlyLimit : 0;
+  const _rawSpent = card ? (card.spentThisMonth || 0) : 0;
+  const spentThisMonth = ghostAvailable >= monthlyLimit ? 0 : Math.min(_rawSpent, Math.max(0, monthlyLimit - ghostAvailable));
+
+  const ghostAvailEl = document.getElementById('ghostAvailable');
+  const ghostSpentEl = document.getElementById('ghostSpent');
+  const ghostLimitEl = document.getElementById('ghostLimit');
+  if (ghostAvailEl) ghostAvailEl.textContent = '£' + ghostAvailable.toFixed(2);
+  if (ghostSpentEl) ghostSpentEl.textContent = '£' + spentThisMonth.toFixed(0);
+  if (ghostLimitEl) ghostLimitEl.textContent = '£' + monthlyLimit.toFixed(0);
+
+  selectCard(activeCard);
+  renderTransactionList();
+}
+
+function renderTransactionList() {
+  const txList = getTransactions().filter(t => !t.ghostCard);
   const container = document.getElementById('transactionList');
   const toggleBtn = document.getElementById('transactionToggle');
   if (!container) return;
@@ -327,13 +387,12 @@ function renderWallet() {
     const isIn = tx.amount > 0;
     return `
     <div class="transaction-item">
-      <div class="transaction-icon ${isIn ? 'in' : 'out'}">${tx.icon || '💰'}</div>
       <div class="transaction-info">
         <div class="transaction-name">${tx.name}</div>
         <div class="transaction-time">${formatTxTime(tx.time)}</div>
       </div>
       <div class="transaction-amount ${isIn ? 'in' : 'out'}">
-        ${isIn ? '+' : '-'}£${Math.abs(tx.amount).toFixed(0)}
+        ${isIn ? '+' : ''}£${tx.amount.toFixed(0)}
       </div>
     </div>`;
   }).join('');
@@ -350,12 +409,11 @@ function renderWallet() {
       toggleBtn.style.display = 'none';
     }
   }
-  renderGhostCardWallet();
 }
 
 function toggleTransactions() {
   txExpanded = !txExpanded;
-  renderWallet();
+  renderTransactionList();
 }
 
 

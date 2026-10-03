@@ -1111,27 +1111,71 @@
       <div class="screen-title">我的钱包</div>
     </div>
     <div class="wallet-container">
-      <!-- 余额卡片 -->
-      <div class="wallet-card">
-        <div class="wallet-card-label">💳 当前余额</div>
-        <div class="balance-display" id="walletBalance">£0</div>
-        <div class="wallet-stats">
-          <div class="wallet-stat">
-            <div class="wallet-stat-label">本月收入</div>
-            <div class="wallet-stat-value income" id="monthIncome">+£0</div>
+      <!-- 实体钱包+双卡 -->
+      <div class="wallet-physical">
+        <!-- 钱包底座 -->
+        <div class="wallet-base">
+          <img src="images/wallet/wallet-base.png" alt="Wallet">
+        </div>
+
+        <!-- Ghost Card (黑卡, 后层) -->
+        <div class="wallet-card-item wallet-card-ghost" id="ghostCardSlot" onclick="selectCard('ghost')">
+          <img src="images/wallet/ghost-card.png" alt="Ghost Card" class="card-bg">
+          <div class="card-balance-overlay" id="ghostCardBalance">£0</div>
+        </div>
+
+        <!-- My Card (白卡, 前层) -->
+        <div class="wallet-card-item wallet-card-my" id="myCardSlot" onclick="selectCard('my')">
+          <img src="images/wallet/my-card.png" alt="My Card" class="card-bg">
+          <div class="card-balance-overlay" id="myCardBalance">£0</div>
+          <div class="card-limit-mask"></div>
+        </div>
+      </div>
+
+      <!-- 卡片切换按钮 -->
+      <div class="card-tabs">
+        <button class="card-tab" id="tabGhost" onclick="selectCard('ghost')">Ghost Card</button>
+        <button class="card-tab" id="tabMy" onclick="selectCard('my')">My Card</button>
+      </div>
+
+      <!-- 卡片详情面板 -->
+      <div class="card-details-panel">
+        <!-- Ghost Card 详情 -->
+        <div class="card-details" id="detailsGhost" style="display:none;">
+          <div class="detail-row">
+            <div class="detail-label">可用余额</div>
+            <div class="detail-value" id="ghostAvailable">£0</div>
           </div>
-          <div class="wallet-stat-divider"></div>
-          <div class="wallet-stat">
-            <div class="wallet-stat-label">本月支出</div>
-            <div class="wallet-stat-value expense" id="monthExpense">-£0</div>
+          <div class="detail-row">
+            <div class="detail-label">已使用</div>
+            <div class="detail-value" id="ghostSpent">£0</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">额度上限</div>
+            <div class="detail-value" id="ghostLimit">£0</div>
+          </div>
+        </div>
+
+        <!-- My Card 详情 -->
+        <div class="card-details" id="detailsMy" style="display:none;">
+          <div class="detail-row">
+            <div class="detail-label">当前余额</div>
+            <div class="detail-value" id="myBalance">£0</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">本月收入</div>
+            <div class="detail-value income" id="myIncome">+£0</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">本月支出</div>
+            <div class="detail-value expense" id="myExpense">-£0</div>
           </div>
         </div>
       </div>
 
-
       <!-- 交易记录 -->
       <div class="transaction-section">
-        <div class="transaction-header">📋 交易记录</div>
+        <div class="transaction-header">交易记录</div>
         <div id="transactionList"></div>
         <div id="transactionToggle" class="transaction-toggle" onclick="toggleTransactions()" style="display:none">
           <span class="toggle-text">展开全部 </span><span id="transactionToggleCount"></span><span class="toggle-arrow">▾</span>

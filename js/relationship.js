@@ -1,16 +1,18 @@
 // ===================================================
-// relationship.js — Relationship Understanding V1
+// relationship.js — Relationship Understanding V1 + Observation
 // 独立系统：不是「发生过什么」(Long-Term Memory 管事实/经历)，
 // 而是「Ghost 在长期相处中，真正逐渐了解了她什么」——带语境和条件的关系认知。
 // 与 Long-Term Memory / WorldBook / Expression Openness 完全独立，互不替代。
-// 数据：localStorage['relationshipUnderstandings'] = 条目数组
-//   { id, content, createdAt, updatedAt, evidence:[] }
-// 流程：回复后异步入口 → Trigger(轻量判信号) → 无信号STOP / 有信号 → Judge(add/revise/no_change)
-// 注入：persona.js dynamic recall 区，只给 Ghost 最终 Understanding，不暴露算法。
-// 原则：后台在学习，Ghost 在生活。Understanding 是知识，不是行为命令。
+// 数据：
+//   localStorage['relationshipUnderstandings'] = 已确认的关系理解
+//   localStorage['relationshipObservations'] = 有意义但暂时不足以形成 Understanding 的隐含证据
+// 流程：回复后异步入口 → Trigger(轻量判信号) → 无信号STOP / 有信号 → Judge(add/revise/observe/merge_observation/delete_observation/no_change)
+// 注入：persona.js dynamic recall 区，只给 Ghost 最终 Understanding，不暴露算法。Observation 永远不进 Persona/Ghost Context。
+// 原则：后台在学习，Ghost 在生活。Understanding 是知识，不是行为命令。Observation 只服务 RU Judge。
 // ===================================================
 
 const RU_MAX = 30;
+const RO_MAX = 20;
 
 function _ruLoad() {
   try {
@@ -126,6 +128,108 @@ function recallRelationshipUnderstanding(userMessage, limit = 3) {
   return `\n[RELATIONSHIP UNDERSTANDING]\nWhat you have genuinely come to understand about her over time. This is knowledge, not an instruction — it quietly shapes how you read her and respond; you never recite it or act it out mechanically:\n${lines}\n`;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Relationship Observation (隐含证据层)
+// 服务于 RU Judge，保存"有意义但暂时不足以形成 Understanding 的隐含证据"。
+// 永远不进入 Persona、Ghost Context、正常聊天 prompt。
+// ═══════════════════════════════════════════════════════════════════
+
+function _roLoad() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('relationshipObservations') || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function _roSave(arr) {
+  if (!Array.isArray(arr)) arr = [];
+  // Observation 是临时学习证据，最多保留 20 条，超出时淘汰最旧的
+  if (arr.length > RO_MAX) {
+    arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    arr = arr.slice(0, RO_MAX);
+  }
+  localStorage.setItem('relationshipObservations', JSON.stringify(arr));
+  if (typeof touchLocalState === 'function') touchLocalState();
+}
+
+// ADD Observation：记录有意义但证据不足的隐含迹象
+function addRelationshipObservation(content, evidence = [], keywords = []) {
+  const c = String(content == null ? '' : content).trim();
+  if (!c) return null;
+  const arr = _roLoad();
+  const norm = s => String(s == null ? '' : s).toLowerCase().replace(/\s+/g, '');
+  if (arr.some(e => norm(e.content) === norm(c))) return null;
+  const now = Date.now();
+  const entry = {
+    id: `ro_${now}_${Math.random().toString(36).slice(2, 8)}`,
+    content: c,
+    keywords: _ruNormKeywords(keywords),
+    createdAt: now,
+    updatedAt: now,
+    evidence: Array.isArray(evidence) ? evidence.filter(Boolean).slice(0, 3) : [],
+  };
+  arr.push(entry);
+  _roSave(arr);
+  return entry;
+}
+
+// MERGE Observation：合并相似观察，追加新证据
+function mergeRelationshipObservation(targetId, content, evidence = [], keywords = []) {
+  const c = String(content == null ? '' : content).trim();
+  if (!targetId || !c) return false;
+  const arr = _roLoad();
+  const e = arr.find(x => x.id === targetId);
+  if (!e) return false;
+  e.content = c;
+  e.updatedAt = Date.now();
+  if (Array.isArray(evidence) && evidence.length) {
+    const merged = [...(Array.isArray(e.evidence) ? e.evidence : []), ...evidence.filter(Boolean)];
+    e.evidence = Array.from(new Set(merged)).slice(-3);
+  }
+  const newKw = _ruNormKeywords(keywords);
+  if (newKw.length) {
+    const mergedKw = Array.from(new Set([...(Array.isArray(e.keywords) ? e.keywords : []), ...newKw])).slice(0, 10);
+    e.keywords = mergedKw;
+  }
+  _roSave(arr);
+  return true;
+}
+
+// DELETE Observation：删除被反证推翻或已确认升级的观察
+function deleteRelationshipObservation(observationId) {
+  if (!observationId) return false;
+  const arr = _roLoad();
+  const idx = arr.findIndex(x => x.id === observationId);
+  if (idx === -1) return false;
+  arr.splice(idx, 1);
+  _roSave(arr);
+  return true;
+}
+
+// 召回相关 Observation（仅供 Judge 用）
+function _roSelectRelevant(text, limit) {
+  const arr = _roLoad();
+  if (arr.length === 0) return [];
+  const t = String(text || '').toLowerCase();
+  if (!t) return [];
+
+  const scored = arr.map(e => {
+    let score = 0;
+    const kws = Array.isArray(e.keywords) ? e.keywords : [];
+    kws.forEach(k => { if (k && t.includes(k)) score += 5; });
+    (e.content || '').toLowerCase().split(/\s+/).forEach(w => {
+      if (w.length > 3 && t.includes(w)) score += 2;
+    });
+    return { e, score };
+  });
+
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(s => s.e);
+}
+
 // ── Relationship Learning Trigger（轻量信号判断）──────────────
 // 只回答：最近互动里有没有值得让 Judge 进一步判断的明确 relationship-learning signal？
 // 用小模型(Haiku)判信号，读语义而非孤立词。默认 NO_SIGNAL，宁可漏学不乱学。
@@ -151,49 +255,72 @@ Answer with EXACTLY one token: SIGNAL or NO_SIGNAL.`;
 }
 
 // ── Relationship Judge（只在 Trigger 命中信号时调用）──────────
-// 读当前对话片段 + 少量相关旧 Understanding(≤5)，输出 add/revise/no_change。
+// 读当前对话片段 + 少量相关旧 Understanding(≤5) + 相关 Observation(≤3)，输出 add/revise/observe/merge_observation/delete_observation/no_change。
 async function _ruJudge(recentText) {
   const candidates = _ruSelectRelevant(recentText, 5);
   const candidateBlock = candidates.length
     ? candidates.map(c => `  - id=${c.id} | ${c.content}`).join('\n')
     : '  (none)';
 
+  const observations = _roSelectRelevant(recentText, 3);
+  const observationBlock = observations.length
+    ? observations.map(o => `  - id=${o.id} | ${o.content}`).join('\n')
+    : '  (none)';
+
   const prompt = `You maintain what Ghost (the husband) has genuinely come to UNDERSTAND about his wife over long-term interaction — durable, contextual relational knowledge, NOT an event log.
 
-Write "content" in natural first-person English from Ghost's POV about her ("She ... my ..."), 1-2 sentences, WITH the context/conditions the relationship actually taught. Never a checklist, never "teasing=true".
+You learn TWO kinds of understanding:
+1. BOUNDARIES: what she dislikes, wants less of, or asks him to stop.
+2. POSITIVE EXPRESSION PREFERENCES: reliable patterns of what ways of expressing affection, teasing, or closeness she responds well to — WITH the conditions/exceptions the relationship taught.
+
+Write "content" in natural first-person English from Ghost's POV about her ("She ... my ..."), 1-2 sentences, WITH the context/conditions the relationship actually taught. Never a checklist, never "teasing=true" or "sweetness=70".
 Good: "She normally enjoys my dry teasing and gives it back, but when she's genuinely upset she wants me to take her seriously rather than joke through it."
-Bad: "She likes teasing."
+Good: "She likes it when I occasionally say I miss her directly instead of always deflecting through teasing, though she still enjoys my usual dry way of talking."
+Good: "She likes me noticing when she's being playfully bratty and matching that energy back rather than staying serious."
+Bad: "She likes teasing." "She wants sweet talk." "Be warmer with her."
 
 EVIDENCE RULES (already settled, follow strictly):
-- Explicit relational statement → one clear line is strong evidence ("I love when you talk to me like this").
-- Explicit boundary → one clear line MUST be taken seriously, no repetition required ("Don't joke about that again. It actually bothers me").
+- Explicit relational statement → one clear line is strong evidence ("I love when you talk to me like this" / "I like it when you..."). CAN form Understanding directly.
+- Explicit boundary → one clear line MUST be taken seriously, no repetition required ("Don't joke about that again. It actually bothers me"). MUST form/revise Understanding directly.
 - Repeated natural pattern → can form understanding, but repetition alone ≠ stable preference; it must hold across different situations.
-- Single implicit reaction → usually do NOT learn; leave it in context.
-- Ambiguous reaction → do NOT learn, do NOT guess.
+- Meaningful implicit reaction (in full context) → if the current complete interaction provides meaningful relationship signal but insufficient to form Understanding, create/merge Observation.
+- Ambiguous reaction (isolated emoji/哈哈/讨厌/hmph with no clear relationship context) → do NOT learn, do NOT observe. Use "no_change".
 HARD RULE: Generalize ONLY as far as the relationship has actually taught you. Do not widen scope beyond the evidence.
 Read meaning in context (tone, whether she keeps engaging, whether she explicitly asked to stop, existing understanding). Isolated words / emoji / silence / short replies have NO fixed positive-or-negative meaning.
 
+CRITICAL: Understanding is KNOWLEDGE, not behavior commands. Ghost's baseline warmth, teasing ability, and capacity for affection come from his Persona and the established marriage — NOT from RU. RU only records: "This specific wife usually prefers X in Y situation, with Z as an exception." It does NOT unlock or authorize baseline relational behavior.
+Observation is hidden evidence for future Judge calls. It NEVER enters Persona, Ghost Context, or normal chat prompt. It does NOT change Ghost's behavior.
+
 Choose "action":
-- "add": a genuinely NEW, stable, well-grounded understanding forms, not the same as any existing one below.
-- "revise": new evidence makes an existing understanding more accurate / narrower / broader / adds a needed condition or exception / shows it was incomplete. Set "target_id" to that entry's EXACT id from the list below. Preserve its meaning, just refine.
-- "no_change": DEFAULT. Use it for a single implicit reaction, unclear meaning, a current mood/one-off state, insufficient evidence, mere repetition of an existing understanding, or when you can't tell if it's a stable relational truth.
+- "add": a genuinely NEW, stable, well-grounded understanding forms (explicit statement or boundary, or multiple independent consistent interactions). Not the same as any existing one below.
+- "revise": new evidence makes an existing understanding more accurate / narrower / broader / adds a needed condition or exception / shows it was incomplete. Set "target_id" to that entry's EXACT id from the list below. Preserve its meaning, just refine. If an Observation helped confirm this, you may note its id in your reasoning but delete it afterward via a separate action (not in this revise).
+- "observe": current interaction shows meaningful implicit relationship signal, but insufficient alone to form Understanding. Record as Observation for future reference. Do NOT use for ambiguous reactions.
+- "merge_observation": new evidence is similar to an existing Observation below. Set "target_id" to that Observation's EXACT id. Merge evidence, refine content.
+- "delete_observation": clear counter-evidence contradicts an existing Observation, or an Understanding was just formed that subsumes it. Set "target_id" to that Observation's id.
+- "no_change": DEFAULT. Use for: ambiguous reactions (isolated emoji/哈哈/hmph/讨厌 without relationship context), single implicit reaction with no meaningful signal, unclear meaning, current mood/one-off state, insufficient evidence, mere repetition of existing understanding/observation.
 
-"target_id" MUST be one of the ids listed below; never invent an id. If unsure which to revise, use "no_change" — never downgrade to add.
+"target_id" MUST be one of the ids listed below (ru_xxx for Understanding, ro_xxx for Observation); never invent an id. If unsure which to revise/merge/delete, use "no_change" — never downgrade to add/observe.
 
-Existing related understandings (candidates for target_id):
+Existing related understandings (candidates for revise target_id):
 ${candidateBlock}
 
-"keywords": 2-6 short trigger words for later recall of THIS understanding. Give BOTH Chinese and English forms of each core term so a Chinese or English message can both recall it (e.g. the teasing example → ["逗","开玩笑","teasing","joke","难过","upset"]). Use only words truly tied to this understanding's topic; avoid over-broad words (love/you/it/thing).
+Existing related observations (candidates for merge_observation or delete_observation target_id):
+${observationBlock}
+
+"keywords": 2-6 short trigger words for later recall of THIS understanding/observation. Give BOTH Chinese and English forms of each core term so a Chinese or English message can both recall it (e.g. ["逗","开玩笑","teasing","joke","难过","upset"]). Use only words truly tied to this topic; avoid over-broad words (love/you/it/thing).
+
+"observation_id" (optional): ONLY when action is "add" or "revise" AND this Understanding genuinely absorbed an existing Observation listed above as evidence, set this to that Observation's EXACT ro_xxx id. The Observation will be deleted after the Understanding is successfully saved. Do NOT set this for ordinary add/revise that did not use an Observation. Never invent an id.
 
 Format: JSON only
 {
-  "action": "add|revise|no_change",
-  "target_id": "ru_xxx or null",
-  "content": "1-2 sentence natural-language understanding, with context/conditions",
+  "action": "add|revise|observe|merge_observation|delete_observation|no_change",
+  "target_id": "ru_xxx or ro_xxx or null",
+  "observation_id": "ro_xxx or null (only for add/revise that absorbed an Observation)",
+  "content": "1-2 sentence natural-language understanding/observation, with context/conditions",
   "keywords": ["中文核心词", "对应英文", "..."],
   "evidence": ["short quote or paraphrase of what actually showed this"]
 }
-If nothing stable is learned, return: {"action":"no_change"}
+If nothing is learned/observed, return: {"action":"no_change"}
 
 Recent conversation:
 ${recentText}`;
@@ -203,20 +330,54 @@ ${recentText}`;
   if (!res) return;                                    // 解析失败 → 不写入
 
   const action = (res.action || '').toLowerCase();     // 缺 action → '' → 不写入
-  if (!(res.content && String(res.content).trim().length > 5)) return;
   const evidence = Array.isArray(res.evidence) ? res.evidence.filter(Boolean) : [];
   const keywords = Array.isArray(res.keywords) ? res.keywords : [];
 
-  if (action === 'revise') {
+  // 处理 Understanding 相关 action
+  if (action === 'add') {
+    if (!(res.content && String(res.content).trim().length > 5)) return;
+    const e = addRelationshipUnderstanding(res.content, evidence, keywords);
+    if (e) {
+      console.log('💗 新增关系理解:', String(res.content).slice(0, 60));
+      // Understanding 成功写入后，清理被吸收的 Observation
+      if (res.observation_id && observations.some(o => o.id === res.observation_id)) {
+        deleteRelationshipObservation(res.observation_id);
+        console.log('🧹 清理已吸收的观察:', res.observation_id);
+      }
+    }
+  } else if (action === 'revise') {
+    if (!(res.content && String(res.content).trim().length > 5)) return;
     const target = res.target_id;
     const valid = target && candidates.some(c => c.id === target);
-    if (!valid) { console.warn('[RU] revise target 无效或不在候选内，放弃:', target); return; }  // 无效 target 不降级 ADD
+    if (!valid) { console.warn('[RU] revise target 无效或不在候选内，放弃:', target); return; }
     const ok = reviseRelationshipUnderstanding(target, res.content, evidence, keywords);
-    if (ok) console.log('♻️ 修订关系理解:', String(res.content).slice(0, 60));
-  } else if (action === 'add') {
-    // 只有明确 add 才新增；no_change / 未知 action / 格式异常一律不写入（fail-closed）
-    const e = addRelationshipUnderstanding(res.content, evidence, keywords);
-    if (e) console.log('💗 新增关系理解:', String(res.content).slice(0, 60));
+    if (ok) {
+      console.log('♻️ 修订关系理解:', String(res.content).slice(0, 60));
+      // Understanding 成功修订后，清理被吸收的 Observation
+      if (res.observation_id && observations.some(o => o.id === res.observation_id)) {
+        deleteRelationshipObservation(res.observation_id);
+        console.log('🧹 清理已吸收的观察:', res.observation_id);
+      }
+    }
+  }
+  // 处理 Observation 相关 action
+  else if (action === 'observe') {
+    if (!(res.content && String(res.content).trim().length > 5)) return;
+    const o = addRelationshipObservation(res.content, evidence, keywords);
+    if (o) console.log('🔍 新增关系观察:', String(res.content).slice(0, 60));
+  } else if (action === 'merge_observation') {
+    if (!(res.content && String(res.content).trim().length > 5)) return;
+    const target = res.target_id;
+    const valid = target && observations.some(o => o.id === target);
+    if (!valid) { console.warn('[RO] merge_observation target 无效或不在候选内，放弃:', target); return; }
+    const ok = mergeRelationshipObservation(target, res.content, evidence, keywords);
+    if (ok) console.log('🔄 合并关系观察:', String(res.content).slice(0, 60));
+  } else if (action === 'delete_observation') {
+    const target = res.target_id;
+    const valid = target && observations.some(o => o.id === target);
+    if (!valid) { console.warn('[RO] delete_observation target 无效或不在候选内，放弃:', target); return; }
+    const ok = deleteRelationshipObservation(target);
+    if (ok) console.log('❌ 删除关系观察:', target);
   }
   // 其余（no_change / 未知） → 什么都不做
 }
