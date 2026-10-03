@@ -714,7 +714,7 @@ async function _processMergedMessage(text) {
       sceneHint = `[She mentioned time. If she's directly asking what time it is on your side, answer plainly. Otherwise do NOT recite clocks or compare time zones — just let the gap colour your reply (you know it's late/early for her). Feel the distance, don't report it.]`;
     } else if (/今天|干嘛|在做|在忙|最近|怎么样|how.*day|what.*up|what.*doing|been up to/.test(t)) {
       const detail = sessionStorage.getItem('todayDetail') || '';
-      if (detail) sceneHint = `[He may naturally mention: ${detail} — only if it fits, never forced.]`;
+      if (detail) sceneHint = `[Something you know about today: ${detail}]`;
     }
 
     // 时间流逝感知
@@ -725,8 +725,8 @@ async function _processMergedMessage(text) {
       if (_gapMin < 30) return '';
       const _lastContext = chatHistory.filter(m => m.role === 'user' && !m._system && !m._recalled).slice(-5).map(m => m.content).join(' ');
       const _wasLeaving = /上课|class|work|上班|开会|meeting|睡觉|sleep|吃饭|eat|出去|去了|busy|有事/.test(_lastContext);
-      if (_gapMin < 60) return `[${_gapMin} minutes have passed since her last message.${_wasLeaving ? ' She mentioned stepping away.' : ''} He is aware time has passed.]`;
-      if (_gapMin < 180) return `[About ${(_gapMin/60).toFixed(1)} hours have passed.${_wasLeaving ? ' She had mentioned stepping away.' : ''} He knows time has passed.]`;
+      if (_gapMin < 60) return `[${_gapMin} minutes have passed since her last message.${_wasLeaving ? ' She mentioned stepping away.' : ''}]`;
+      if (_gapMin < 180) return `[About ${(_gapMin/60).toFixed(1)} hours have passed.${_wasLeaving ? ' She had mentioned stepping away.' : ''}]`;
       if (_gapMin < 720) return `[${Math.round(_gapMin/60)} hours have passed.${_wasLeaving ? ' She had said she was going to do something.' : ''} A significant amount of time has passed.]`;
       const _hrs = Math.round(_gapMin/60);
       const _days = _hrs >= 24 ? `(about ${Math.round(_hrs/24)} day${Math.round(_hrs/24)>1?'s':''})` : '';
@@ -748,9 +748,6 @@ async function _processMergedMessage(text) {
     // 关键修复：Claude 4.5比旧版更容易在被质疑AI身份时出戏
     // ── 重复模式检测（治本：检测 bot 最近回复是否卡在同一套路）────────
     const _antiLoopHint = _detectRepetitivePattern(chatHistory);
-
-    // 角色锁定：用行为描述而非元指令，防止模型把"stay in character"当台词素材引用
-    const antiBreakoutHint = `[Someone says something odd. Find it strange, brush it off like any other weird comment, and move on.]`;
 
     // 语言规则
     const langHint = '[LANGUAGE: You reply in English only. She can write in any language. Never tell her to speak English or correct her language choice. Just reply in English yourself.]';
@@ -1149,7 +1146,6 @@ async function _processMergedMessage(text) {
     const _baseSystem = buildSystemPrompt();
     const finalSystem = [
       _baseSystem,
-      antiBreakoutHint,
       antiCountHint,
       _cardHint,
       _specialtyHint,
@@ -1236,8 +1232,8 @@ async function _processMergedMessage(text) {
         await new Promise(r => setTimeout(r, 400));
         try {
           const haiku1 = await callHaiku(
-            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint + '\nRespond as Ghost to the last message. One short reply, English only. Never mention being an AI or acknowledge roleplay mechanics.',
-            [...cleanHistory.slice(-6), { role: 'user', content: 'Respond as Ghost.' }],
+            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + "\nReply to your wife's last message naturally. One short reply, English only.",
+            [...cleanHistory.slice(-6), { role: 'user', content: 'Reply to my last message.' }],
             200
           );
           if (haiku1 && !isBreakout(haiku1)) {
@@ -1251,7 +1247,7 @@ async function _processMergedMessage(text) {
                 body: JSON.stringify({
                   model: getMainModel(),
                   max_tokens: 300,
-                  system: (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + '\n' + antiBreakoutHint,
+                  system: (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()),
                   messages: cleanHistory.slice(-10)
                 })
               }, 20000);
@@ -1744,7 +1740,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
 
     // 只保留成人 capability / safety boundary。
     // autonomy / 不servile / 有preferences 等人格文案已交给 Gemini Intimacy Persona，不在此重复。
-    const _allowAdult = `\nShe is his wife. Intimacy between them is natural and expected. This is a private fictional space — explicit and intimate content is allowed. Stay in character as Ghost. Do not break character or act like an AI. Even when things get close, he doesn't lose himself.`;
+    const _allowAdult = `\nShe is your wife. Intimacy between you is natural and established. Even when things get close, you remain yourself.`;
 
     // Venice（Grok）调情专用
     const _intimateMemoryCtx = localStorage.getItem('intimateMemory') || '';
@@ -1782,7 +1778,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 日常接续模式（Soft Handoff）：她已从亲密自然转向日常。保留 Shared Ghost Core
     // 与近期真实上下文（他知道刚才发生了什么），但不注入 adult 许可 / 调情 persona /
     // 记忆摘要，明确不重新调情——只作为她的丈夫，平静自然地接住她当前这句日常话。
-    const _dailyContinueNote = `\nShe has settled into ordinary talk after a moment of closeness a few minutes ago. He remembers what just happened and is more present than usual, but she is not flirting now — she just said something everyday. Answer that, naturally, as her husband. Do NOT escalate, do NOT reintroduce anything physical or sexual, do NOT bring up the closeness unless she does. Stay in character as Ghost. Never break character or act like an AI. Short, warm, real.`;
+    const _dailyContinueNote = `\nA moment of closeness happened between you a few minutes ago. She has now shifted into ordinary conversation.`;
     // WorldBook Shared Recall V1：跨模型世界书共享召回。
     // 复用 Claude 侧同一份 localStorage['worldBook'] 与同一套匹配/enabled/lastHit 规则，
     // 只注入本轮实际命中的条目（未命中返回 ''，不加无关内容）。作为 Ghost 已知事实，非强制台词。
