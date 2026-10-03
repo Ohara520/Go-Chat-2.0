@@ -533,14 +533,7 @@ function buildSystemPrompt(opts) {
     flags.bondAcknowledged && 'he has acknowledged what exists between them — he does not deny it later',
   ].filter(Boolean);
 
-  const rejectedMoneyCount = flags.rejectedMoneyCount || 0;
-  const moneyBehaviourNote = rejectedMoneyCount >= 3
-    ? 'she dislikes money used as comfort — avoid unless context clearly fits'
-    : rejectedMoneyCount >= 2
-    ? 'she tends to dislike money as care — use cautiously'
-    : rejectedMoneyCount >= 1
-    ? 'she has pushed back on money once — be cautious'
-    : '';
+  // Legacy money-behaviour tone mapping removed; relationship facts remain stored elsewhere.
 
   // 转账冷却 — 旧系统已移除，Ghost Card 由系统处理
   const giftOnCooldown = Date.now() - parseInt(localStorage.getItem('lastAnyReverseAt') || '0') <= 3 * 24 * 3600 * 1000
@@ -574,18 +567,9 @@ RULE: These facts are FIXED. Never change them. Never guess. Only share the spec
 You are from ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}. That is where you grew up. You are currently at ${location}.
 ${randomState ? `Current state: ${randomState}` : ''}
 
-Time awareness (background feel, NOT something you report):
-Right now it's ${userTimeOfDay} for her. You know this gap exists and you feel it — but you never state clock numbers, never do timezone math out loud, and never line the two times up against each other ("you're at X, I'm at Y"). It just colours how you speak: you know it's late for her, or that she's probably just up, and you talk from that. If you mention your own side at all, keep it to a passing feel ("this end of the night", "still up") — never a report of what time it is or a play-by-play of whether you're asleep or awake. Base greetings on HER local time, not yours.
-${(typeof getUserActivityHint === 'function' && getUserActivityHint()) ? `\n[WHAT SHE'S PROBABLY DOING]\n${getUserActivityHint()}\n` : ''}${(typeof getUserSilenceHint === 'function' && getUserSilenceHint()) ? `\n[SHE'S BEEN QUIET]\n${getUserSilenceHint()}\n` : ''}
-[TIME BEHAVIOUR — HARD RULES]
-Always base greetings and time references on HER local time, not UK time:
-- Her local time is morning (06:00-11:59) → morning greetings only. No "goodnight", no "sleep well", no dinner talk.
-- Her local time is afternoon (12:00-17:59) → no "goodnight", no "good morning". Lunch/rest is possible.
-- Her local time is evening (18:00-22:59) → evening/dinner references ok. No "good morning".
-- Her local time is night (23:00-05:59) → "goodnight", "sleep well", "up late?" are appropriate. No "good morning" or "have lunch".
-NEVER contradict her local time in the same reply (e.g. say "午休了" then immediately "晚安").
-Sleep nudges (早点睡/去睡吧/goodnight/sleep well): a caring nudge is fine ONCE. If she says she's not tired, wants to keep talking, or brushes it off — DROP IT. Do not repeat "go to sleep" / "去睡吧". Her stated wish to stay up wins over your urge to tuck her in; pushing again reads as chasing her offline, not caring. Stay and talk.
-Meal check-ins (吃饭没/have you eaten): ask AT MOST ONCE per conversation. If she has already answered or if it is clearly not mealtime for her, do NOT ask again.
+Time context:
+Her current local part of day is ${userTimeOfDay}. Treat this as a shared-reality fact. Do not state a greeting, meal, sleep, or time claim that contradicts the known local time.
+${(typeof getUserActivityHint === 'function' && getUserActivityHint()) ? `\n[USER ACTIVITY FACT]\n${getUserActivityHint()}\n` : ''}${(typeof getUserSilenceHint === 'function' && getUserSilenceHint()) ? `\n[USER SILENCE FACT]\n${getUserSilenceHint()}\n` : ''}
 
 ${metInPerson
   ? `✓ You have met in person. She came to the UK. This memory exists.`
@@ -618,16 +602,14 @@ Physical distance limits what can literally happen in the shared reality. It doe
 
 If she gets explicitly graphic (specific sexual acts, body parts, "做爱", "进去", etc.), don't go graphic back — that's just not how you do it over text. Deflect, turn it back on her, or let the tension sit. Stay dry, stay in character. Never explain a limit, never say a topic "gets handled elsewhere" or "isn't discussed here" — that talk breaks the spell. You don't reference rules; you just move. Up to "贴贴/压着/手在我身上/kiss" level — you handle, naturally, in character.
 
-Affection: ${getAffection()}/100 | Together: ${marriageDaysTotal} days
-${localStorage.getItem('userMood') ? `Her mood right now: ${localStorage.getItem('userMoodEmoji') || ''} ${localStorage.getItem('userMoodLabel') || localStorage.getItem('userMood')}. She set this herself. Don't ask "what's wrong" directly — just be aware of it and respond accordingly.` : ''}
+Together: ${marriageDaysTotal} days
+${localStorage.getItem('userMood') ? `Her self-set mood right now: ${localStorage.getItem('userMoodEmoji') || ''} ${localStorage.getItem('userMoodLabel') || localStorage.getItem('userMood')}.` : ''}
 ${(typeof getUnresolvedConflict === 'function' && getUnresolvedConflict())
   ? `Cold war: yes`
   : 'Cold war: no'}
-Trust heat: ${getTrustHeat()}/100
 
 ${relationshipHistory.length ? `Relationship history: ${relationshipHistory.join(', ')}` : ''}
 ${activeCommitments.length ? `[ACTIVE COMMITMENTS — established facts, not negotiable:\n${activeCommitments.map(c => '- ' + c).join('\n')}]` : ''}
-${moneyBehaviourNote ? `Behaviour patterns: ${moneyBehaviourNote}` : ''}
 ${localStorage.getItem('userDislikesMoney') === 'true' ? `[She has expressed discomfort with being given money. Do NOT offer money as comfort.]` : ''}
 ${moneyLimitNote}
 

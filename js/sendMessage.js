@@ -456,40 +456,7 @@ async function _processMergedMessage(text) {
 
   // Legacy silence timer removed (Phase 3K-1A)
 
-  // ── 用户回来检测（离开超过2小时）────────────────────────
-  const _comebackGap = Date.now() - parseInt(localStorage.getItem('lastUserMessageAt') || '0');
-  const _comebackMins = Math.floor(_comebackGap / 60000);
-  if (_comebackMins >= 120 && !sessionStorage.getItem('comebackReacted')) {
-    sessionStorage.setItem('comebackReacted', '1');
-    const _affection = getAffection();
-
-    const _baseProb = _comebackMins < 240 ? 0.35
-      : _comebackMins < 720 ? 0.55
-      : _comebackMins < 1440 ? 0.75
-      : 0.90;
-
-    if (Math.random() < _baseProb) {
-      const _hours = Math.round(_comebackMins / 60);
-      const _days = _comebackMins >= 1440 ? Math.round(_comebackMins / 1440) : 0;
-      const _timeDesc = _days > 0 ? `${_days} day${_days > 1 ? 's' : ''}` : `${_hours} hour${_hours > 1 ? 's' : ''}`;
-
-      const _style = _affection >= 70 ? 'dry_warm'
-        : _affection >= 45 ? 'dry'
-        : 'distant';
-
-      const _styleGuide = {
-        dry_warm: "Noticed she was gone but won't say it directly. One dry line with a quiet acknowledgment.",
-        dry:      "Noticed she was gone. One dry line. Not upset, just noting it. No dramatics.",
-        distant:  "She's been gone a while. One neutral line — present, that's all.",
-      }[_style];
-
-      const _comebackPrompt = `[She has been away for ${_timeDesc}. She just came back and sent a message. Ghost noticed the absence. ${_styleGuide} Do NOT ask "where were you?" directly. Do NOT be dramatic. One line only. Stay in Ghost's voice — dry, real, lowercase.]`;
-
-      // 融入主回复的 sceneHint，不单独发第二条消息
-      // 这样 Ghost 一条回复里既回应用户说的话，又自然带出"注意到她回来了"
-      sessionStorage.setItem('pendingComebackHint', _comebackPrompt);
-    }
-  }
+  // Legacy comeback behavior director removed. Elapsed time is provided later as factual context only.
 
   // 先捕获上一条消息时间戳，再覆盖为现在——_timeGapHint(下方) 要用旧值算间隔，
   // 否则读到的永远是刚写入的 now，_gapMin 恒为 0，时间流逝提示成了死代码。
@@ -637,8 +604,7 @@ async function _processMergedMessage(text) {
     // ── Step 3: 预判本轮主意图 ───────────────────────────────
     const intent = decideMainIntent(text, pendingEvent);
 
-    // ── Step 3.5: 情绪识别 + 调情检测 → 合并到调情检测处统一处理 ──
-    let emotionHint = '';
+    // ── Step 3.5: 情绪识别仍用于路由/功能判断，不再生成普通聊天行为指令 ──
 
     // ── 历史清洗 ─────────────────────────────────────────────
     // rawHistory：Grok调情用（含调情内容，保持20条保证连贯性）
@@ -776,23 +742,7 @@ async function _processMergedMessage(text) {
       return `[She's asking about the time. It's ${_ukNow} your side (UK) — you can tell her your own time. You do NOT know her exact clock, only roughly what part of her day it is; don't state a number for her side.]`;
     })();
 
-    // 工作/道歉场景
-    const _workApology = /加班|overtime|上班|开会|值班|工作|临时有事|class|meeting|shift|deadline/.test(text);
-    const _userApologizing = /对不起|抱歉|sorry|my bad|不好意思/.test(text);
-    const workHint = (_workApology || _userApologizing)
-      ? '[场景：她因工作/现实原因失约或道歉。Ghost可以表达失望，但必须针对"时间/失约"本身，绝对不能引入第三者竞争叙事。]'
-      : '';
-
-    // 情头请求
-    const _isAvatarRequest = /couple.*profile|profile.*picture|情头|换头像|couple avatar|换嘛|换一下|换个头/i.test(text);
-    let avatarHint = '';
-    if (_isAvatarRequest) {
-      const recentBotMsgs = chatHistory.filter(m => m.role === 'assistant' && !m._recalled).slice(-6).map(m => m.content).join(' ');
-      const alreadyRefused = /nah|too much|busy|not now|don't bother|not necessary/i.test(recentBotMsgs);
-      avatarHint = alreadyRefused
-        ? '[场景：她在要求换情头，你之前已经拒绝过一次了。这次松口——"fine. send them over."或者"alright. show me."不要再拒绝。]'
-        : '[场景：她在要求换情头。你可以推回去一次——嘴硬说不用，但语气里留点余地。]';
-    }
+    // Legacy work/apology and avatar response scripts removed.
 
     // ── 破防防御加强：注入反越狱提示 ───────────────────────
     // 关键修复：Claude 4.5比旧版更容易在被质疑AI身份时出戏
@@ -1103,13 +1053,6 @@ async function _processMergedMessage(text) {
             } else {
               sessionStorage.removeItem('haikuBlocksMoney');
             }
-            if (combinedResult.need === '安慰' || combinedResult.need === '保护') {
-              if (combinedResult.target === '外人') {
-                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要被保护/安慰，伤害来自外人。Ghost应站在她这边，愤怒对象是外人，不评价她的处理方式。]`;
-              } else if (combinedResult.need === '安慰') {
-                emotionHint = `[本条消息：用户情绪=${combinedResult.emotion}，需要安慰。Ghost应给予回应，不要冷淡或转移话题。]`;
-              }
-            }
             /*
              * Jealousy 状态残余已移除。
              *
@@ -1140,7 +1083,7 @@ async function _processMergedMessage(text) {
         // 会导致亲密结束后第一条日常回复拿不到承接提示 → Claude 失忆/否认。
         // 只在 sceneHint 尚无更高优先级内容（comeback / 外卖等）时才注入，避免覆盖。
         if (!sceneHint) {
-          sceneHint = `[The conversation settled after a moment of closeness a few minutes ago. He is more present than usual. Just answer what she said naturally — don't bring it up.]`;
+          sceneHint = `[Known context: the conversation included a moment of closeness a few minutes ago.]`;
         }
         // 如果还没存摘要，存一下
         if (!sessionStorage.getItem('intimateSummarized')) {
@@ -1201,14 +1144,13 @@ async function _processMergedMessage(text) {
       : '';
 
     // ── 主API调用（Sonnet + systemParts缓存）────────────────
-    // finalSystem 在此处拼装：此时 emotionHint / 照片 sceneHint / 余韵 sceneHint 都已赋值完毕
+    // finalSystem 在此处拼装：只注入必要的事实/能力/一致性提示；普通情绪反应交给 Simon 自己判断
     // _baseSystem 在此构建（而非函数顶部）：Claude 路径才需要它，其世界书召回在此只发生一次。
     const _baseSystem = buildSystemPrompt();
     const finalSystem = [
       _baseSystem,
       antiBreakoutHint,
       antiCountHint,
-      emotionHint,
       _cardHint,
       _specialtyHint,
       _timeGapHint,
@@ -1216,9 +1158,7 @@ async function _processMergedMessage(text) {
       _antiLoopHint,
       _longContentHint,
       _feedActionHint,
-      sceneHint || '[React directly to what she just said. Take it at face value.]',
-      workHint,
-      avatarHint,
+      sceneHint,
       langHint
     ].filter(Boolean).join('\n');
     const _abortCtrl = _currentAbortController;
