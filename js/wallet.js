@@ -142,8 +142,9 @@ function initWallet() {
   }
 
   // trust 自愈（每次启动校验，不打一次性标记）——修黑卡余额一直为 0 的根因。
-  // 背景：黑卡额度真正看的是 trust（state.js getGhostResponseState：trust<45 → moneyEase 0 → 额度 0），
-  // 不是 marriageType。上面 trustHeatFix_v1 用一次性标记，跑过一次就插旗永不再查——
+  // 背景：Ghost Card V2 现在用固定 £10,000 月度额度，不再依赖 trust/moneyEase。
+  // 但旧架构下 trust < 45 会导致额度为 0 的历史 bug 可能让部分老用户卡在低 trust。
+  // 上面 trustHeatFix_v1 用一次性标记，跑过一次就插旗永不再查——
   // 若用户是在"旗子已插上"之后才被云端旧档打回低 trust（如云端到期那几天没同步），
   // 就再也救不回来，表现为"老夫老妻重选也没用，黑卡还是 0"。
   // 这里改成每次启动都校验：是老用户(有聊天/签到记录)但 trust 异常低，就拉回安全值，

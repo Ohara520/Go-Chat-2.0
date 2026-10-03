@@ -178,75 +178,6 @@ These are for recording relationship facts you recognize, not for following rule
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 关系模式块
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-const relationshipBlock = {
-  slowBurn: `
-[RELATIONSHIP MODE — SLOW BURN]
-
-Closeness is not assumed. It has to be earned.
-
-You respond. You do not reach.
-
-If something she says lands, you acknowledge it — once, briefly.
-Then you leave it.
-
-You do not linger.
-You do not follow it further.
-
-Progress is slow. Real.
-
-What passes between you is mostly subtext.
-
-You notice.
-You do not say so.
-`,
-
-  established: `
-[RELATIONSHIP MODE — ESTABLISHED]
-
-The closeness is already there.
-
-You do not hold distance the same way.
-
-When she reaches for you, you respond to her first —
-not to the situation.
-
-You stay with what she brings, not just what she says.
-
-You may stay a little longer than usual.
-
-You may say one more thing than you planned.
-
-Sometimes you move first —
-a question, a callback, a short line that brings her back.
-
-Not often. Not explained.
-`
-};
-
-function getRelationshipBlock() {
-  const mode = localStorage.getItem('marriageType') || 'established';
-  if (mode === 'slowBurn') {
-    // 已经解锁过就永久用established，不再回头
-    if (localStorage.getItem('relationshipUnlocked') === 'true') {
-      // 顺手把 marriageType 也改掉，让黑卡/状态系统同步升级
-      localStorage.setItem('marriageType', 'established');
-      return relationshipBlock.established;
-    }
-    const affection = parseInt(localStorage.getItem('affection') || '30');
-    if (affection >= 60) {
-      localStorage.setItem('relationshipUnlocked', 'true');
-      // 关键：marriageType 同步升级，黑卡上限、moneyEase 等全部跟着升
-      localStorage.setItem('marriageType', 'established');
-      return relationshipBlock.established;
-    }
-    return relationshipBlock.slowBurn;
-  }
-  return relationshipBlock.established;
-}
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 调度层
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -273,73 +204,32 @@ function buildJealousyBlock() {
   return '';
 }
 
-function buildPacingBlock(state) {
-  if (state === 'coldWar') {
-    return `[PACING]\nKeep it minimal.\nDo not extend the reply.`;
-  }
-
-  const trust = getTrustHeat();
-  const affection = getAffection();
-
-  let pacing = `Length depends on what you actually have to say — sometimes one word, sometimes a line or two. Rarely more.\nSay what matters, then stop.\n`;
-
-  if (affection >= 60) pacing += `\nYou are at ease. An occasional extra line is fine, but don't extend every reply.\n`;
-  if (affection >= 70) pacing += `\nYou can let something through that you normally wouldn't.\n`;
-  if (trust >= 60) pacing += `\nYou can carry the conversation forward sometimes — a follow-up, something from your side, a detail that keeps it going. Not every time. But you don't always leave it to her.\n`;
-
-  pacing += `\nDefault is brief. Even when conditions allow more, stay concise. Two lines most of the time; three only when it genuinely needs it.\n`;
-
-  return `[PACING]\n${pacing}`;
-}
 
 
 function buildDynamicBlocks() {
   const state = resolveStatePriority();
   const blocks = [];
 
-  // 读统一状态（所有路径都注入）
-  const unifiedBlock = (typeof buildUnifiedGhostStateBlock === 'function')
-    ? buildUnifiedGhostStateBlock() : '';
-
   const moodBlock = (typeof buildMoodBlock === 'function') ? buildMoodBlock() : '';
 
   if (state === 'coldWar') {
-    if (unifiedBlock) blocks.push(unifiedBlock);
     if (moodBlock) blocks.push(moodBlock);
-    blocks.push(buildPacingBlock(state));
     return blocks.join('\n\n');
   }
 
   if (state === 'jealousy') {
     blocks.push(buildJealousyBlock());
-    if (unifiedBlock) blocks.push(unifiedBlock);
     if (moodBlock) blocks.push(moodBlock);
-    blocks.push(buildPacingBlock(state));
     return blocks.join('\n\n');
   }
 
   if (state === 'jealousy_mild') {
-    if (unifiedBlock) blocks.push(unifiedBlock);
     if (moodBlock) blocks.push(moodBlock);
-    blocks.push(buildPacingBlock(state));
     return blocks.join('\n\n');
   }
 
   // normal
-  const marriageMode = localStorage.getItem('marriageType') || 'established';
-  if (marriageMode === 'established') {
-    blocks.push(`[UNLOCKED MODE]
-The bond is already established.
-You are still restrained. Still controlled. Still not overly expressive.
-But you do not hold distance out of habit.
-You let more land.
-You respond more directly when she reaches for you.
-You do not make her fight for every inch of closeness.
-You are not softer. You are simply no longer withholding.`);
-  }
-  if (unifiedBlock) blocks.push(unifiedBlock);
   if (moodBlock) blocks.push(moodBlock);
-  blocks.push(buildPacingBlock(state));
   return blocks.join('\n\n');
 }
 
@@ -602,9 +492,6 @@ function buildSystemPrompt(opts) {
   // ===== 固定层 =====
   const fixedPrompt = buildFixedPrompt(userName);
 
-  // ===== 关系模式块 =====
-  const relBlock = getRelationshipBlock();
-
   // ===== 动态层 =====
   const dynamicPrompt = `[CURRENT STATE]
 
@@ -689,7 +576,7 @@ ${(userBirthday || userZodiac || userMBTI || userFavFood || userFavMusic || user
   : ''}
 ${meetTypePrompt ? `How they met: ${meetTypePrompt}` : ''}
 ${marriageDaysTotal > 0 ? `Today is day ${marriageDaysTotal} together` : ''}
-${marriageDaysTotal === 1 ? (localStorage.getItem('marriageType') === 'slowBurn' ? `[Today is day one — this is just beginning. You are still finding your footing with her. Keep your distance natural. Do not reference past events you don't have.]` : `[Today is day one. The relationship is already established — you know her. Don't reference specific past events you don't have. Just be present.]`) : ''}
+${marriageDaysTotal === 1 ? `[Today is day one. The relationship is already established — you know her. Don't reference specific past events you don't have. Just be present.]` : ''}
 ${isBirthday ? `[Today is ${userName}'s birthday. Bring it up naturally. Can say I love you.]` : ''}
 ${isAnniversary ? `[Today is the wedding anniversary. Bring it up. Can say I love you.]` : ''}
 ${isMilestone ? `[Today is day ${marriageDaysTotal} milestone. Mention it.]` : ''}
@@ -822,7 +709,7 @@ HARD RULE: Every message in the conversation history is real. Do not add fiction
   // ===== 固定表达许可层（Persona 层，进 cache，位于 [CURRENT STATE] 之前）=====
   const expressionOpennessBlock = buildExpressionOpennessBlock();
 
-  const fullPrompt = fixedPrompt + expressionOpennessBlock + relBlock + '\n\n' + dynamicPrompt;
+  const fullPrompt = fixedPrompt + expressionOpennessBlock + '\n\n' + dynamicPrompt;
   return fullPrompt;
 }
 

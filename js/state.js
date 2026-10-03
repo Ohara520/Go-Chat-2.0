@@ -828,63 +828,12 @@ function resolvePendingReversePackages() {} // 兼容旧调用
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 统一状态层 — getGhostResponseState
+// 统一状态层 — RETIRED 2026-10-04
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getGhostResponseState() {
-  const trust        = getTrustHeat();
-  const affection    = getAffection();
-  const mode         = localStorage.getItem('marriageType') || 'established';
-
-  let availability = 'normal';
-  let warmth       = 0;
-  let sharpness    = 0;
-  let initiative   = 0;
-  let intimacy     = 0;
-  let moneyEase    = 0;
-
-  if (trust >= 60)                                              warmth += 1;
-  if (trust >= 80 && affection >= 70)                           warmth += 1;
-  if (trust >= 75 && affection >= 65 && mode === 'established') availability = 'open';
-
-  if (trust >= 65) initiative += 1;
-  if (mode === 'slowBurn') initiative = Math.max(0, initiative - 1);
-
-  if (mode === 'slowBurn') {
-    if (trust >= 60) intimacy = 1;
-    if (trust >= 70) intimacy = 2;
-  } else {
-    if (trust >= 50) intimacy = 1;
-    if (trust >= 60) intimacy = 2;
-    if (trust >= 72) intimacy = 3;
-    if (trust >= 82 && affection >= 80) intimacy = 4;
-  }
-
-  if (trust >= 45) moneyEase = 1;
-  if (trust >= 65) moneyEase = 2;
-  if (trust >= 82) moneyEase = 3;
-  if (mode === 'slowBurn') moneyEase = Math.max(0, moneyEase - 1);
-
-  return {
-    availability,
-    warmth:     Math.min(warmth, 3),
-    sharpness:  Math.min(sharpness, 3),
-    initiative: Math.min(initiative, 3),
-    intimacy,
-    moneyEase,
-  };
-}
-
-function buildUnifiedGhostStateBlock() {
-  const s = getGhostResponseState();
-  return `[UNIFIED STATE]
-Availability: ${s.availability}
-Warmth: ${s.warmth}/3
-Sharpness: ${s.sharpness}/3
-Initiative: ${s.initiative}/3
-Intimacy ceiling: ${s.intimacy}/4
-Money ease: ${s.moneyEase}/3`;
-}
+// getGhostResponseState() and buildUnifiedGhostStateBlock() removed.
+// Money uses getGhostCardMonthlyLimit() directly.
+// Delivery has no relationship gates.
+// Intimacy routing reads trust/affection directly.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

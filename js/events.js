@@ -502,21 +502,6 @@ async function checkLocationSpecialTrigger(userText) {
     const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
     if (lastSent && Date.now() - lastSent < 2 * 24 * 3600 * 1000) return;
 
-    // ── 关系门槛检查 ─────────────────────────────
-    const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
-    const attach    = typeof getAttachmentPull === 'function' ? getAttachmentPull() : 45;
-    const affection = typeof getAffection      === 'function' ? getAffection()      : 60;
-    const mode      = localStorage.getItem('marriageType') || 'established';
-    // slowBurn 阶段不触发对话版（克制期不主动寄东西）
-    if (mode === 'slowBurn') return;
-
-    // pending 信号加成:有 pending 时关系门槛降低
-    const _pendingSignals = (typeof getPendingSpecialtySignals === 'function') ? getPendingSpecialtySignals() : [];
-    const _hasPending = _pendingSignals.length > 0;
-    const _trustMin     = _hasPending ? 40 : 50;
-    const _affectionMin = _hasPending ? 50 : 60;
-    if (trust < _trustMin || affection < _affectionMin) return;
-
     // ── 关键词前筛（改为 OR，命中其一即可）────────
     const input = (userText || '').toLowerCase();
 
@@ -642,14 +627,6 @@ function checkLocationSpecialAutoTrigger() {
     const sentKey  = 'locationSpecialSent_' + locationKey;
     const lastSent = parseInt(localStorage.getItem(sentKey) || '0');
     if (lastSent && Date.now() - lastSent < 2 * 24 * 3600 * 1000) return;
-
-    // 关系门槛（主动寄比对话触发更亲密，门槛更高）
-    const trust     = typeof getTrustHeat      === 'function' ? getTrustHeat()      : 60;
-    const affection = typeof getAffection      === 'function' ? getAffection()      : 60;
-    const mode      = localStorage.getItem('marriageType') || 'established';
-    // slowBurn 阶段绝对不主动寄，太出戏
-    if (mode === 'slowBurn') return;
-    if (trust < 65 || affection < 70) return;
 
     // Ghost在此地点待够3天才主动触发
     const arrivedKey = 'locationArrivedAt_' + locationKey;

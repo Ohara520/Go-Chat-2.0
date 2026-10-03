@@ -234,16 +234,6 @@ function addGhostReverseDelivery(item, emotionType) {
     if (Date.now() - lastAnyReverse < 7 * 24 * 3600 * 1000) return false;
   }
 
-  // 读统一状态
-  const gs = (typeof getGhostResponseState === 'function') ? getGhostResponseState() : null;
-
-  // initiative 0 + availability closed → 不主动寄（索要类不受此限，她开口要就给）
-  if (!isExplicitRequest && gs && gs.initiative === 0 && gs.availability === 'closed') return false;
-
-  // warmth 0 + 非 longing/sick 类型 → 不寄软性礼物
-  const softTypes = ['longing', 'sad', 'heartbroken', 'worry'];
-  if (!isExplicitRequest && gs && gs.warmth === 0 && softTypes.includes(emotionType)) return false;
-
   if (!isExplicitRequest && typeof canTriggerReverseDelivery === 'function' && !canTriggerReverseDelivery()) return false;
   if (typeof markReverseDeliveryTriggered === 'function') markReverseDeliveryTriggered();
 

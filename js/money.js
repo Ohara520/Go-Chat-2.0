@@ -121,39 +121,17 @@ async function ghostSendInitMessage(offlineHours) {
 
 function getGhostCardMonthlyLimit() {
   /*
-   * Jealousy 状态不再影响 Ghost Card / 钱 / 消费行为。
+   * Ghost Card V2: Fixed £10,000 monthly limit.
    *
-   * 嫉妒不是经济事实。
-   * 系统不能因为后台判断 Simon “有多吃醋”，
-   * 就改变卡片权限、额度、消费或物质行为。
+   * This is NOT a relationship reward and does not vary with:
+   * - Trust, Affection, relationship mode
+   * - moneyEase, availability, or any Unified state
+   * - Career, mood, jealousy, or any other dynamic factor
    *
-   * 什么 Bug 来这里找：
-   * 如果以后又出现“Simon 一吃醋卡就变了 / 钱就变了”，
-   * 检查 money.js 是否重新读取了 jealousy 状态。
+   * Maximum balance: £10,000
+   * Monthly restoration: spent amount is restored, balance capped at £10,000
    */
-  // Simon 的 moodLevel 不再影响 Ghost Card / 额度 / 消费行为。
-  // Money 不该知道 Simon “今天心情几分”，心情不是经济事实。
-  // 什么 Bug 来这里找：如果以后又出现“Simon 心情一变额度就变”，
-  // 检查 money.js 是否重新读取了 moodLevel。
-  const trust     = typeof getTrustHeat === 'function' ? getTrustHeat() : 50;
-  const affection = typeof getAffection === 'function' ? getAffection() : 50;
-  const s         = typeof getGhostResponseState === 'function' ? getGhostResponseState() : { moneyEase: 1, availability: 'normal' };
-
-  // 基础额度由 moneyEase 决定
-  const limitMap = { 0: 0, 1: 1200, 2: 2000, 3: 2600 };
-  let limit = limitMap[s.moneyEase] || 0;
-
-  // 关系特别顺时小幅上调
-  if (trust >= 80 && affection >= 75 && s.availability === 'open') {
-    limit += 400;
-  }
-
-  // 金融师职业福利：Ghost Card 上限加成
-  if (typeof getCareerGhostCardBonus === 'function') {
-    limit += getCareerGhostCardBonus();
-  }
-
-  return Math.max(0, Math.min(limit, 4000)); // 上限提高到4000（金融师满级可达）
+  return 10000;
 }
 
 function getGhostCard() {
@@ -186,45 +164,20 @@ function getGhostCard() {
       // 月初重置
       if (savedMonthKey !== nowMonthKey) {
         const newLimit = getGhostCardMonthlyLimit();
-        // 月初重置：上限取历史最高和新算值的较大值（只升不降，冷战除外）
-        const _peakLimit = saved._peakLimit || 0;
-        const _resetLimit = monthlyLimit === 0 ? 0 : Math.max(newLimit, _peakLimit);
-        saved.monthlyLimit   = _resetLimit;
+        saved.monthlyLimit   = newLimit;
         saved.spentThisMonth = 0;
         saved.lastResetMonth = now.getMonth();
         saved.lastResetYear  = now.getFullYear();
-        // 旧余额保留，叠加新月额度，3个月封顶防止无限堆积。
-        // 修复(#19)：封顶必须基于历史峰值额度，且绝不主动缩减已有余额。
-        // 否则某个月心情差/吃醋把额度临时压到1000时，cap=_resetLimit*3=3000，
-        // 会把之前累积的~6000余额砍半（用户报告"5.20有六千多现在变三千"）。
-        const _prevBalance = saved.balance || 0;
-        const _capBase = Math.max(_resetLimit, saved._peakLimit || 0, saved.monthlyLimit || 0);
-        const _accumCap = Math.max(_capBase * 3, _prevBalance); // 永不低于现有余额
-        saved.balance = Math.min(_prevBalance + _resetLimit, _accumCap);
+        // V2: 余额直接重置为上限，不累积
+        saved.balance = newLimit;
       }
 
-      // 职业切换重算上限：同样只升不降
-      if (_currentCareer !== _savedCareer) {
-        const _peakLimit = saved._peakLimit || 0;
-        const _newCareerLimit = monthlyLimit === 0 ? 0 : Math.max(monthlyLimit, _peakLimit);
-        saved.monthlyLimit = _newCareerLimit;
-        saved._careerType = _currentCareer;
-      }
+      // 职业切换重算上限：V2 固定 £10,000，不再需要
+      saved.monthlyLimit = monthlyLimit;
 
-      // lockedLimit：取当前算出值、已存值、历史峰值三者最大（冷战归零除外）
-      const _peak = saved._peakLimit || 0;
-      const lockedLimit = monthlyLimit === 0 ? 0 : Math.max(saved.monthlyLimit || 0, monthlyLimit, _peak);
+      // 上限升级补差额：V2 固定上限，不再需要
+      // lockedLimit / _peakLimit 逻辑移除
 
-      // 上限升级补差额（只在本次计算周期内执行一次）
-      const oldLimit = saved.monthlyLimit || 0;
-      if (lockedLimit > oldLimit && oldLimit > 0) {
-        const diff = lockedLimit - oldLimit;
-        saved.balance = Math.min((saved.balance || 0) + diff, lockedLimit);
-      }
-
-      saved.monthlyLimit = lockedLimit;
-      // 记录历史峰值（冷战时不更新峰值，恢复后能回到原来的上限）
-      if (lockedLimit > 0) saved._peakLimit = Math.max(saved._peakLimit || 0, lockedLimit);
       saved._careerType = _currentCareer;
       saved._lastCalcKey = _calcKey; // 标记本周期已计算，防止重复执行
     }
@@ -262,37 +215,33 @@ function spendGhostCard(amount, itemName, category) {
 }
 
 function _classifySpend(amount, category, card) {
-  const state = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
-  const { moneyEase = 1 } = state;
-
   const history = JSON.parse(localStorage.getItem('ghostCardRecentSpend') || '[]');
   history.push({ amount, category, at: Date.now() });
   const last10min = history.filter(s => Date.now() - s.at < 10 * 60 * 1000);
   localStorage.setItem('ghostCardRecentSpend', JSON.stringify(history.slice(-20)));
 
-  const limit = card.monthlyLimit || getGhostCardMonthlyLimit() || 2000;
+  const limit = card.monthlyLimit || getGhostCardMonthlyLimit() || 10000;
   const ratio = amount / limit;
 
-  // C: 门槛上移，敏感度只由金额驱动，日常/中小额默认沉默
+  // 门槛上移，敏感度只由金额驱动，日常/中小额默认沉默
   let score = 0;
   const isLarge = ratio > 0.3 || amount > 400;       // 异常大额
   if (isLarge) score = 3;                            // 大额
   else if (ratio > 0.15 || amount > 200) score = 2;  // 中额
   else if (ratio > 0.08 || amount > 100) score = 1;  // 中小额
-  if (moneyEase >= 2 && !isLarge) score -= 0.5;      // 手头宽松更沉默，但异常大额不打折
   const todayReacted = localStorage.getItem(`ghostCardReacted_${category}_${new Date().toDateString()}`);
   if (todayReacted && !isLarge) score -= 1;          // 同品类当天已反应过降一档，但异常大额不打折
 
   // 短时高频（10 分钟内 3 笔）直接担心
   if (last10min.length >= 3) return { reactionType: 'worry' };
 
-  // E: 只有三档 —— 沉默 / 暖一句 / 担心一句
+  // 只有三档 —— 沉默 / 暖一句 / 担心一句
   let reactionType;
   if (score < 2)      reactionType = 'ignore';   // 大多数情况：沉默
   else if (score < 3) reactionType = 'warm';     // 偶尔一次：暖一句
   else                reactionType = 'worry';    // 罕见大额：担心一句
 
-  // D: 判定顺序 —— 先单笔反应，若单笔沉默，再看累积；不叠加
+  // 判定顺序 —— 先单笔反应，若单笔沉默，再看累积；不叠加
   if (reactionType === 'ignore') _maybeSetCumulativePending(history, limit);
 
   return { reactionType };
@@ -322,7 +271,6 @@ function _isoWeekKey(d = new Date()) {
 // A: 注入只留金额，绝不泄露品类/物品。itemName 保留签名但不再用于拼注入。
 function _buildGhostCardPrompt(amount, itemName, category, decision) {
   const { reactionType, cumulative } = decision;
-  const state = typeof getGhostResponseState === 'function' ? getGhostResponseState() : {};
   const reactionHint = {
     ignore: null,
     warm:   `Nothing alarming. If anything, a light, easy line — glad she treated herself. Don't ask what it was. Something like "spend it however makes you happy."`,
@@ -333,7 +281,6 @@ function _buildGhostCardPrompt(amount, itemName, category, decision) {
   if (!reactionHint) return null;
   return `[Bank alert: £${amount} was charged to the card you gave her. That's all you see — an amount, not what she bought.
 Your reaction: ${reactionHint}
-State — warmth: ${state.warmth ?? 1}/3, sharpness: ${state.sharpness ?? 0}/3, money ease: ${state.moneyEase ?? 1}/3.
 One line only. English. Lowercase. Do not mention "card", "bank", or "alert". Never guess or name what she bought.]`;
 }
 
