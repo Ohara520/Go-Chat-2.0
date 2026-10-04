@@ -3,21 +3,9 @@
 //
 // 转账系统（用户↔Ghost 双向）已全部移除。
 // 金钱只保留：周统计（云端同步兼容）、Ghost Card。
-// getMoneyComfortLevel 仅作旧模块兼容，不再读取 Trust / Affection / marriageType。
 //
 // 依赖：state.js / cloud.js
 // ===================================================
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Legacy moneyComfortLevel — compatibility only
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Relationship progression no longer controls money behavior.
-// Keep the function temporarily because older modules may still call it;
-// an established marriage is treated as fully available rather than Trust/marriageType-gated.
-function getMoneyComfortLevel() {
-  return 3;
-}
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
