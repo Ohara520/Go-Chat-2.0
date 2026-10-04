@@ -637,14 +637,6 @@ async function _processMergedMessage(text) {
     const t = text.toLowerCase();
     let sceneHint = '';
 
-    // ── 用户回来检测：融入主回复，不单独发第二条 ──
-    const _comebackHint = sessionStorage.getItem('pendingComebackHint');
-    if (_comebackHint) {
-      sessionStorage.removeItem('pendingComebackHint');
-      sceneHint = _comebackHint;
-      // sceneHint 后面可能被覆盖，但 comeback 优先级高，加到前面
-    }
-
     // 外卖场景：先查 sessionStorage（实时），再查 longTermMemory（持久）
     // 修复：外卖到达后不等记忆更新，本轮就能检测到
     const _ltmNow = localStorage.getItem('longTermMemory') || '';
@@ -1038,7 +1030,7 @@ async function _processMergedMessage(text) {
         // 交接提示不再依赖 intimateMemory 摘要是否已生成：
         // 摘要为异步、且仅在首条日常消息后才写入，若以其存在性为门控，
         // 会导致亲密结束后第一条日常回复拿不到承接提示 → Claude 失忆/否认。
-        // 只在 sceneHint 尚无更高优先级内容（comeback / 外卖等）时才注入，避免覆盖。
+        // 只在 sceneHint 尚无更高优先级内容（外卖等）时才注入，避免覆盖。
         if (!sceneHint) {
           sceneHint = `[Known context: the conversation included a moment of closeness a few minutes ago.]`;
         }
