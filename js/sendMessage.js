@@ -980,28 +980,6 @@ async function _processMergedMessage(text) {
               }
             }
             _emotionLabel = combinedResult.emotion || '平淡';
-            // wantsMoney 判断：用 Haiku 语义结果覆盖关键词匹配
-            if (combinedResult.wantsMoney === true) {
-              const _ms = combinedResult.moneyStyle || 'flirty';
-              sessionStorage.setItem('moneyReasonType', _ms);
-              if (_ms === 'testing') {
-                // testing → 完全拦，他注意到了不会被牵着走
-                sessionStorage.setItem('haikuBlocksMoney', '1');
-              } else if (_ms === 'flirty') {
-                // flirty → 暂保留原基础概率；不再由旧 Affection 数值控制。
-                const _giveChance = 0.2;
-                if (Math.random() > _giveChance) {
-                  sessionStorage.setItem('haikuBlocksMoney', '1');
-                } else {
-                  sessionStorage.removeItem('haikuBlocksMoney');
-                }
-              } else {
-                // care/none → 放行
-                sessionStorage.removeItem('haikuBlocksMoney');
-              }
-            } else {
-              sessionStorage.removeItem('haikuBlocksMoney');
-            }
             /*
              * Jealousy 状态残余已移除。
              *
@@ -1419,7 +1397,6 @@ async function _processMergedMessage(text) {
 
     // ── 副作用（fire-and-forget）────────────────────────────
     const mainReplyHasCareAction = !!sendGift;
-    if (!mainReplyHasCareAction && typeof checkMoneyIntent === 'function') checkMoneyIntent(text).catch(() => {});
     sessionStorage.setItem('thisRoundCareAction', mainReplyHasCareAction ? '1' : '0');
 
     // SEND_GIFT处理
