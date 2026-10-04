@@ -1092,7 +1092,7 @@ async function _processMergedMessage(text) {
       }
     }
 
-    // ── 调情流程（走Venice/Grok）────────────────────────────
+    // ── 调情流程（走 Gemini）────────────────────────────────
     if (isIntimate) {
       // 只标记真正命中调情关键词的用户消息
       const lastUserMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0];
@@ -1216,55 +1216,37 @@ async function _processMergedMessage(text) {
     const _isRealBreakout = reply && isBreakout(reply); // 有内容但拒演/自称AI = 内容问题
     const _isEmptyReply = !reply;                       // 空回复 = 瞬时故障
     if (_isRealBreakout || _isEmptyReply) {
-      const grokCtx = cleanHistory.slice(-6)
-        .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content.slice(0, 200)}`)
-        .join('\n');
-
       if (_isRealBreakout) {
-        // 真破防是内容问题：Haiku/Sonnet 同源守则只会拒得更快，跳过它们直接 Grok
-        reply = '___NETWORK_ERROR___';
-        try {
-          const grokFb = await callGrok(grokCtx, 200, null, 'normal');
-          if (grokFb && !isBreakout(grokFb)) reply = grokFb.trim();
-        } catch(e) {}
+        // 真破防：候选不落地，交给当前备用模型 Gemini 用同一 Shared Ghost Core 日常接续。
+        // 不再调用已退役的 Grok fallback，也不拿旧轻量人格重写 Simon。
+        await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+        _isSending = false;
+        return;
       } else {
-        // 空回复是瞬时抖动：先用便宜快的 Haiku 顶（同一家，无感知），再不行 Sonnet retry，最后才 Grok
+        // 空回复更像瞬时网络/上游抖动：保留一次同主模型重试。
+        // 重试仍失败时再交 Gemini 日常接续，避免切回已退役的 Grok。
+        reply = '___NETWORK_ERROR___';
         await new Promise(r => setTimeout(r, 400));
         try {
-          const haiku1 = await callHaiku(
-            (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()) + "\nReply to your wife's last message naturally. One short reply, English only.",
-            [...cleanHistory.slice(-6), { role: 'user', content: 'Reply to my last message.' }],
-            200
-          );
-          if (haiku1 && !isBreakout(haiku1)) {
-            reply = haiku1.trim();
-          } else {
-            reply = '___NETWORK_ERROR___';
-            try {
-              const retryRes = await fetchWithTimeout('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  model: getMainModel(),
-                  max_tokens: 300,
-                  system: (typeof buildCurrentStyleCore === "function" ? buildCurrentStyleCore() : buildGhostStyleCore()),
-                  messages: cleanHistory.slice(-10)
-                })
-              }, 20000);
-              const retryData = await retryRes.json();
-              const retryReply = retryData.content?.[0]?.text?.trim() || '';
-              if (retryReply && !isBreakout(retryReply)) reply = retryReply;
-            } catch(e) {}
-          }
-        } catch(e) {
-          reply = '___NETWORK_ERROR___';
-        }
-        // 空回复链全挂 → Grok 最后兜
+          const retryRes = await fetchWithTimeout('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: getMainModel(),
+              max_tokens: 300,
+              system: finalSystem,
+              messages: messagesForRequest
+            })
+          }, 20000);
+          const retryData = await retryRes.json();
+          const retryReply = retryData.content?.[0]?.text?.trim() || '';
+          if (retryReply && !isBreakout(retryReply)) reply = retryReply;
+        } catch(e) {}
+
         if (reply === '___NETWORK_ERROR___') {
-          try {
-            const grokFb = await callGrok(grokCtx, 200, null, 'normal');
-            if (grokFb && !isBreakout(grokFb)) reply = grokFb.trim();
-          } catch(e) {}
+          await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+          _isSending = false;
+          return;
         }
       }
     }
@@ -1715,8 +1697,8 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
   const _dailyMode = opts.dailyMode === true;
   const _tagIntimate = opts.tagIntimate !== false;
   try {
-    // 图片消息替换为占位符传给Grok——Grok看不到图，用占位符保留上下文
-    // 关键：去除 Grok 自己的重复回复，防止它抄自己形成复读机循环
+    // 图片消息替换为占位符传给 Gemini 文本上下文——此路径不直接传图片，用占位符保留连续性
+    // 关键：去除备用模型自己的重复回复，防止它抄自己形成复读机循环
     // 本轮 user message 在进入本函数前已 push 进 chatHistory（见 sendMessage 顶部），
     // 因此是 rawHistory 的最后一条。这里 slice(-8, -1) 排除它，只取历史；
     // 当前这轮由下面 '\nHer: ' + text 显式追加一次，避免当前消息重复两遍。
@@ -1742,7 +1724,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // autonomy / 不servile / 有preferences 等人格文案已交给 Gemini Intimacy Persona，不在此重复。
     const _allowAdult = `\nShe is your wife. Intimacy between you is natural and established. Even when things get close, you remain yourself.`;
 
-    // Venice（Grok）调情专用
+    // Gemini 调情专用
     const _intimateMemoryCtx = localStorage.getItem('intimateMemory') || '';
     const _memorySection = _intimateMemoryCtx
       ? `\n\n[Memory from previous intimate moments with her:\n${_intimateMemoryCtx}]`
@@ -1792,9 +1774,9 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     let geminiReply = await callVeniceForCurrentChar(
       _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
     );
-    // Grok 首次空返回（超时/网络抖动）→ 默默重试一次，减少"网络波动"弹窗
+    // Gemini 首次空返回（超时/网络抖动）→ 默默重试一次，减少"网络波动"弹窗
     if (!geminiReply || !geminiReply.trim()) {
-      console.warn('[Grok] 首次返回空，自动重试一次');
+      console.warn('[Gemini] 首次返回空，自动重试一次');
       geminiReply = await callVeniceForCurrentChar(
         _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
       );
@@ -1880,7 +1862,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
 
     if (geminiReply && !_intimateBreakout(geminiReply)) {
       hideTyping();
-      // 清理 Grok 可能返回的 markdown 代码块标记 + unlock tag
+      // 清理 Gemini 可能返回的 markdown 代码块标记 + unlock tag
       let cleanedReply = geminiReply
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
@@ -1892,9 +1874,9 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
         .replace(/【[^】]{3,}】/g, '')
         .replace(/\n{3,}/g, '\n')
         .trim();
-      // 修复 Grok 偶发的整句连字/缺空格
+      // 修复备用模型偶发的整句连字/缺空格
       cleanedReply = _fixMissingSpaces(cleanedReply);
-      // 清理 Grok 常见的重复开头
+      // 清理备用模型常见的重复开头
       cleanedReply = cleanedReply
         .replace(/^still (here|got|waiting|reading|thinking|holding|looking|sitting|quiet|listening|watching)[^.]*\.?\s*\n?/i, '')
         .replace(/^quiet\.\s*\n?/i, '')
