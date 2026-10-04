@@ -110,69 +110,10 @@ function clearBucket(bucketName) {
 function refreshStatusEmoji() { /* retired: no longer computes or shows mood emoji */ }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Trust Heat（慢变量）
+// Trust Heat — RETIRED 2026-10-04
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getTrustHeat() {
-  return parseInt(localStorage.getItem('trustHeat') || '75');
-}
-
-function setTrustHeat(val) {
-  const cap = getRelationshipModifiers().trustHeatCap;
-  localStorage.setItem('trustHeat', Math.max(0, Math.min(cap, Math.round(val))));
-  _touch();
-}
-
-function changeTrustHeat(delta) {
-  setTrustHeat(getTrustHeat() + delta);
-}
-
-function updateTrustFromBehavior() {
-  const todayKey = 'dailyTrust_' + getTodayDateStr();
-  if (!localStorage.getItem(todayKey)) {
-    changeTrustHeat(1);
-    localStorage.setItem(todayKey, '1');
-  }
-  updateVisitStreakTrustBonus();
-}
-
-function updateVisitStreakTrustBonus() {
-  const today    = getTodayDateStr();
-  const lastDate = localStorage.getItem('lastVisitDate');
-  let streak     = parseInt(localStorage.getItem('visitStreak') || '0');
-
-  if (lastDate === today) return;
-
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-
-  streak = (lastDate === yStr) ? streak + 1 : 1;
-  localStorage.setItem('visitStreak', streak);
-  localStorage.setItem('lastVisitDate', today);
-
-  const rewardKey = 'streakTrustReward_' + today;
-  if (!localStorage.getItem(rewardKey)) {
-    if (streak === 3) changeTrustHeat(2);
-    if (streak === 7) changeTrustHeat(4);
-    localStorage.setItem(rewardKey, '1');
-  }
-}
-
-
-function applyTrustMilestone(delta = 8, key = '') {
-  const milestoneKey = key ? `trustMilestone_${key}` : '';
-  if (milestoneKey && localStorage.getItem(milestoneKey)) return;
-  changeTrustHeat(delta);
-  if (milestoneKey) localStorage.setItem(milestoneKey, '1');
-}
-
-function applyConflictHandledWellTrustBonus(delta = 2) {
-  const lastAt = parseInt(localStorage.getItem('conflictTrustAt') || '0');
-  if (Date.now() - lastAt < 48 * 3600 * 1000) return;
-  changeTrustHeat(delta);
-  localStorage.setItem('conflictTrustAt', Date.now());
-}
+// Numeric Trust progression/storage helpers were removed.
+// Simon's relationship behavior is no longer unlocked or capped by trustHeat.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -544,81 +485,10 @@ function changeAttachmentPull(delta) {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 好感度（快变量）
+// Affection Score — RETIRED 2026-10-04
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getAffection() {
-  return parseFloat(localStorage.getItem('affection') || '60');
-}
-
-function setAffection(val) {
-  // Compatibility storage only. Affection no longer has a marriageType floor
-  // and reaching a numeric threshold no longer triggers relationship behavior.
-  val = Math.max(0, Math.min(100, Math.round(val * 10) / 10));
-  localStorage.setItem('affection', val);
-  _touch();
-  return val;
-}
-
-function changeAffection(delta) {
-  setAffection(getAffection() + delta);
-}
-
-function updateAffectionFromExpression(userText) {
-  const { isSweet, isNickname, isNegative } = classifyExpression(userText);
-  let patternDetected = false;
-
-  if (isSweet) {
-    patternDetected = patternDetected || isPatternDetected('sweet');
-    const gain = previewAffectionGain('sweet');
-    if (gain > 0) changeAffection(gain);
-    recordBucketHit('sweet');
-  }
-
-  if (isNickname) {
-    patternDetected = patternDetected || isPatternDetected('nickname');
-    const dailyKey = 'nicknameAffection_' + getTodayDateStr();
-    if (!localStorage.getItem(dailyKey)) {
-      changeAffection(0.5);
-      localStorage.setItem(dailyKey, '1');
-    }
-    recordBucketHit('nickname');
-  }
-
-  if (isNegative) {
-    changeAffection(-0.5);
-    recordBucketHit('negative');
-  }
-
-  return { patternDetected };
-}
-
-function applyAffectionAcceptanceBonus(delta = 1, source = 'gift') {
-  const key = `affectionAccept_${source}_${getTodayDateStr()}`;
-  if (localStorage.getItem(key)) return;
-  changeAffection(delta);
-  localStorage.setItem(key, '1');
-}
-
-
-// checkDailyTalkAffection 已移除
-// 原逻辑"聊满10条+1"属于可刷机制，后续做高质量互动检测时再补
-
-function checkAffectionDecay() {
-  const now          = Date.now();
-  const lastOnline   = parseInt(localStorage.getItem('lastOnlineTime') || now);
-  const lastCheck    = parseInt(localStorage.getItem('lastAffectionDecayCheck') || lastOnline);
-  const hoursOff     = (now - lastOnline) / 3600000;
-
-  if (hoursOff < 48) return;
-
-  const fullDays = Math.floor((now - lastCheck) / 86400000);
-  if (fullDays <= 0) return;
-
-  const floor = localStorage.getItem('marriageType') === 'established' ? 65 : 60;
-  setAffection(Math.max(floor, getAffection() - Math.min(fullDays, 5)));
-  localStorage.setItem('lastAffectionDecayCheck', now);
-}
+// Numeric Affection progression/decay/storage helpers were removed.
+// Sweet talk, nicknames, arguments, gifts, and time away no longer change a relationship score.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -820,7 +690,7 @@ function resolvePendingReversePackages() {} // 兼容旧调用
 // getGhostResponseState() and buildUnifiedGhostStateBlock() removed.
 // Money uses getGhostCardMonthlyLimit() directly.
 // Delivery has no relationship gates.
-// Intimacy routing reads trust/affection directly.
+// Intimacy routing no longer depends on numeric trust/affection relationship scores.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
