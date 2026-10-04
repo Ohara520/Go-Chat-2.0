@@ -275,6 +275,13 @@ window.onload = async function() {
 
     // ── 职业系统每日检查（升级、工资、被动收入、打赏）──────────
     if (typeof dailyCareerCheck === 'function') dailyCareerCheck();
+
+    // ── Diary V2：每日自动检查 ───────────────────────────────
+    // 云端恢复完成后检查昨天是否已有日记；缺失才生成。
+    // 不阻塞主页启动，失败由 diary.js 清锁，后续启动/打开日记页可重试。
+    if (typeof dailyDiaryCheck === 'function') {
+      Promise.resolve(dailyDiaryCheck()).catch(e => console.warn('[app] 日记每日检查失败:', e));
+    }
     // 更新主页职业卡片描述
     const _careerDesc = document.getElementById('careerCardDesc');
     if (_careerDesc && typeof getCareerSummary === 'function') {

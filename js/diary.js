@@ -92,38 +92,11 @@ async function generateDiaryEntry() {
       })
       .join('\n');
 
-    // 如果昨天没有聊天记录，用 memoryBank 里最相关的几条兜底
+    // Diary V2：只使用昨天真实记录。没有昨天聊天时，不随机抽旧记忆替 Simon 决定“今天想起什么”。
     let memoryHint = '';
     if (_chatSnippet) {
       memoryHint = `What happened yesterday between Ghost and her (their actual conversation — "SHE SAID" = her words, "GHOST SAID" = his words):
 ${_chatSnippet}`;
-    } else {
-      // 没有昨天的记录——从 memoryBank 拿几条关于她的背景
-      let _memBank = [];
-      try { _memBank = JSON.parse(localStorage.getItem('memoryBank') || '[]'); } catch(e) {}
-      if (_memBank.length > 0) {
-        // 修复(日记重复)：不再每天固定喂 top5 —— 跳过最近日记已写过的记忆，
-        // 并加入随机轮换，让没聊天的日子每天素材都不一样
-        const _recentDiaryText = getDiaryEntries().slice(-7)
-          .map(e => (e.content || '')).join(' ').toLowerCase();
-        const _memPool = _memBank.filter(m => {
-          const _key = (m.text || '').toLowerCase().slice(0, 16);
-          return _key && !_recentDiaryText.includes(_key);
-        });
-        const _memSource = _memPool.length >= 2 ? _memPool : _memBank;
-        const _memTop = _memSource
-          .map(m => ({ m, r: Math.random() * 2 + (m.importance || 1) }))  // 轻微偏向重要，但每天随机
-          .sort((a, b) => b.r - a.r)
-          .slice(0, 3)
-          .map(x => '- ' + x.m.text)
-          .join('\n');
-        memoryHint = `Background details about her:\n${_memTop}`;
-      } else {
-        // 再兜底：旧版 longTermMemory
-        const _oldMem = localStorage.getItem('longTermMemory') || '';
-        const _oldLines = _oldMem.split('\n').filter(l => l.trim()).slice(-5).join('\n');
-        if (_oldLines) memoryHint = `Background details about her:\n${_oldLines}`;
-      }
     }
 
     // 修复(日记重复)：把最近几篇日记喂给模型，明确要求别重复事件/开头
@@ -145,16 +118,8 @@ ${_chatSnippet}`;
     // Phase 3G-7C: Diary × Mood 解耦 — 日记不再根据 Simon moodLevel 划档位指定语气。
     // 模型根据日记实际 context（聊天记录 / 记忆 / 表达阈值）自行决定语气。
 
-    // Ghost 那边的世界素材——给 DeepSeek 编造细节用
-    const _sideWorld = (() => {
-      const loc = localStorage.getItem('currentLocation') || 'Hereford Base';
-      const isDeployed = !loc.toLowerCase().includes('hereford') && !loc.toLowerCase().includes('base');
-      if (isDeployed) {
-        return `He's currently deployed at ${loc}. Details available to use: patrols, checkpoints, kit maintenance, local weather affecting operations, downtime in transit or barracks, limited comms, food from rations or local mess.`;
-      } else {
-        return `He's at base (${loc}). Details available to use: drills, range practice, briefings, PT, mess hall food, time with Soap/Gaz/Price, evening downtime, cleaning kit, admin work, early nights or late ones.`;
-      }
-    })();
+    // Diary V2：不再根据“基地/部署”自动提供巡逻、训练、擦装备等虚构生活素材。
+    // 地点和天气只作为真实背景事实；没有记录的具体事件不由系统补写。
 
     // 修复：prompt 完全避免"memory system/track/relationship"等触发词
     // 改成创意写作语境，让模型理解这是小说角色的日记创作
@@ -181,30 +146,20 @@ ${_chatSnippet}`;
       }
     } catch (e) {}
 
-    const prompt = `This is a private notebook entry for a fictional character — Simon "Ghost" Riley — written in his own voice, part of an ongoing character study. His private page: he believes no one else reads it, so it's the honest version of his day.
+    const prompt = `This is Simon "Ghost" Riley's private notebook. Write one entry for yesterday in his own voice.
 
-Character: British SAS soldier, ${_ghostAge}. Manchester.
-Setting: ${location}${locationReason ? ` (${locationReason})` : ''}
-Weather: ${weather || 'not noted'}
-Day: ${yesterdayWeekday}
-${_sideWorld}
-${_recentBlock}${_wbHint}
-${memoryHint ? `${memoryHint.startsWith('What happened') ? 'Their conversation yesterday — do NOT transcribe it. Read it, then write what he privately thought AROUND it: what he noticed, what he didn\'t say back, what stuck with him. "SHE SAID" = her words, "GHOST SAID" = his words. Never mix them up.' : 'Background about her — at most one detail, woven in naturally, not listed:'}\n${memoryHint}\n` : 'He didn\'t hear from her yesterday.\n'}
-What this entry is:
+Known facts from yesterday:
+- Location: ${location}${locationReason ? ` (${locationReason})` : ''}
+- Weather: ${weather || 'not noted'}
+- Day: ${yesterdayWeekday}
+${_recentBlock}${_wbHint}${memoryHint ? `- Their recorded conversation yesterday:\n${memoryHint}\n` : '- No recorded conversation from yesterday is available.\n'}
 ${_discloseHint}
 
-How he writes:
-- 3-5 short lines. lowercase. plain words. dry and in-character — this is him thinking, not a poem, not a report.
-- His INNER voice, not a log of events and not a copy of the chat.
-- What he already told her is NOT private material. Do not repeat, paraphrase, summarize, or reframe something he said to her as if it were a private thought. If the chat already has "miss you", the diary must not become "missed her today." Move one layer deeper: what he noticed, did, worried about, remembered, decided, or deliberately left unsaid.
-- Two threads, woven WHEN there is real material: (1) his own day — training, teammates, the base, his body, something he saw or did; (2) something about her, but ONLY if yesterday gave him a real reason to think about her.
-- If there is no genuine new material about her, do NOT invent one. The entry can stay entirely with his own day. A quiet day is allowed to produce a quiet entry.
-- When writing about her, prefer real material in this order: (1) something she said or did yesterday, (2) something surfaced by the worldbook, (3) something from recent memory, (4) something he actually noticed or did for her. Never invent a specific event, conversation, plan, or action that has no basis in the context above.
-- Feeling shows through fact and action, never announced: "checked my phone twice." "didn't believe her." "ordered it." NOT "i felt lonely."
-- Invent plausible soldier detail freely to ground his own day (a drill that ran long, something Soap did, the cold, cleaning kit, a bad night's sleep) — but do not invent specific relationship events.
-- BANNED crutches: "still thinking about it" / "that's enough" / "something felt different" / "quiet moment" / any line that ends on a stated emotion.
-- Do NOT re-live old deliveries, gifts, or finished events — only what's fresh.
-- English only. No "dear diary". No timestamps. No stage directions. No asterisks.`;
+Use only the facts and context actually provided above. Do not invent a patrol, drill, briefing, teammate interaction, meal, call, message, delivery, plan, or other event just to make the day feel complete. If the available day was quiet, the entry may be quiet. If little is known, write only what can naturally be written from what is known.
+
+This is his private writing, not a report and not a transcript. He may choose for himself what mattered enough to write down and what to leave out. Do not force a relationship topic merely because he is married; if something involving his wife genuinely mattered in the provided context, he may write about it naturally.
+
+Voice only: concise, private, plain, direct, recognizably Simon. English only. No "dear diary", timestamps, stage directions, asterisks, poetry, assistant-style explanation, or summary of these instructions.`;
 
     // 破防检测：不存 AI 泄露内容（先定义，供各级模型逐级判断）
     // 加入日记场景特有的拒绝模式（模型容易把日记请求识别为"记忆追踪系统"而拒绝）
@@ -259,8 +214,11 @@ How he writes:
       .replace(/\*[^*]+\*/g, '')
       .trim();
 
+    // Diary V2：模型都失败时不再用静态模板编造“昨天发生过什么”。
+    // 本次不写入；finally 会清锁，下次启动/打开日记页可以重试。
     if (!entry || entry.length < 20) {
-      entry = _getFallbackEntry(location, weather);
+      console.warn('[diary] 生成失败或内容过短，本次跳过，等待下次重试');
+      return;
     }
 
     if (entry) {
@@ -286,46 +244,7 @@ How he writes:
   }
 }
 
-// Phase 3G-7C: 兜底静态日记 — 不再按 Simon mood 分层。
-// 合并三档日记池为一个中性池，随机选取，让日记自然变化而非情绪数字决定。
-function _getFallbackEntry(location, weather) {
-  // 中性日记池 — 融合原 good/neutral/low 池，去除强情绪信号
-  const fallbackPool = [
-    `${location}. ${weather ? weather + '.' : ''} drills in the morning. she messaged around noon. read it between sets. didn't reply until after.`,
-    `solid one. ${weather ? weather + '.' : ''} ran the route. got back. she'd already sent two things by then. read both.`,
-    `${location}. kit check after drills. ${weather ? weather + '.' : ''} she was still up when i got in. later than usual for her.`,
-    `${weather ? weather + '.' : ''} price ran us hard. no complaints. checked my phone after. she'd sent something. decent day.`,
-    `${location}. ${weather ? weather + '.' : ''} long day. she messaged twice. answered the second one. meant to get back to the first.`,
-    `slow one. ${weather ? weather + ' all morning.' : ''} didn't hear from her until late. checked a few times before that.`,
-    `${location} again. ${weather ? weather + '.' : ''} briefing ran over. missed her call. she didn't leave a message.`,
-    `ran drills. ate. ${weather ? weather + '.' : ''} she sent something at an odd hour. she was still awake.`,
-    `long one. ${weather ? weather + '.' : ''} price had us out late. she was already asleep by the time i got back. didn't wake her.`,
-    `${location}. ${weather ? weather + '.' : ''} training ran long. she messaged. didn't have much to say back. said i was fine.`,
-    `${location}. ${weather ? weather + '.' : ''} checked my phone more than i needed to. nothing new.`,
-    `ran the route alone. ${weather ? weather + '.' : ''} she sent something in the morning. read it three times. didn't answer right away.`,
-  ];
-
-  const pool = fallbackPool;
-
-  // 去重：记录最近用过的兜底内容，避免连续几天重复
-  const _usedKey = 'diaryFallbackUsed';
-  let _used = [];
-  try { _used = JSON.parse(localStorage.getItem(_usedKey) || '[]'); } catch(e) {}
-
-  // 过滤掉最近用过的
-  const _available = pool.filter((_, i) => !_used.includes(i));
-  const _pickFrom = _available.length > 0 ? _available : pool; // 全用过了就重置
-
-  // 随机选一条
-  const _poolIdx = pool.indexOf(_pickFrom[Math.floor(Math.random() * _pickFrom.length)]);
-
-  // 记录这次用的，只保留最近3条记录
-  _used.push(_poolIdx);
-  if (_used.length > 3) _used = _used.slice(-3);
-  localStorage.setItem(_usedKey, JSON.stringify(_used));
-
-  return pool[_poolIdx];
-}
+// Diary V2：静态兜底日记已移除，避免系统制造不存在的昨日事实。
 
 // ===== 日记页面渲染 =====
 
