@@ -552,24 +552,11 @@ function getAffection() {
 }
 
 function setAffection(val) {
-  const floor = localStorage.getItem('marriageType') === 'established' ? 65 : 60;
-  // 保留1位小数而不是 Math.round 取整：好感度设计上有 ±0.5、+0.2 这类小增量
-  // （撒娇、昵称、负面情绪）。取整会让 +0.2 永远丢失、+0.5 变成 +1、-0.5 被抹平，
-  // 导致好感度只增不减（非对称膨胀）。保留小数让这些增量正常累积。
-  val = Math.max(floor, Math.min(100, Math.round(val * 10) / 10));
-  const prev = getAffection();
+  // Compatibility storage only. Affection no longer has a marriageType floor
+  // and reaching a numeric threshold no longer triggers relationship behavior.
+  val = Math.max(0, Math.min(100, Math.round(val * 10) / 10));
   localStorage.setItem('affection', val);
   _touch();
-  if (val === floor && prev > floor) {
-    const lastTalk = localStorage.getItem('hadTalkAt');
-    const now = Date.now();
-    if (!lastTalk || now - parseInt(lastTalk) > 7 * 24 * 3600000) {
-      localStorage.setItem('hadTalkAt', now);
-      setTimeout(() => {
-        if (typeof triggerSeriousTalk === 'function') triggerSeriousTalk();
-      }, 3000);
-    }
-  }
   return val;
 }
 
@@ -876,14 +863,11 @@ If you point it out, keep it to one dry line.`;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function updateRelationshipStatsFromUserInput(userText) {
-  updateTrustFromBehavior();
-  const { patternDetected } = updateAffectionFromExpression(userText);
-  // Phase 3G-8B: updateMoodFromUserInput() 调用已删除。
-  checkAffectionDecay();
-  localStorage.setItem('lastOnlineTime', Date.now());
+  // Trust/Affection progression is retired from the per-message path.
+  // Saying sweet things, using nicknames, arguing, visiting daily, or returning after
+  // time away no longer changes how much relationship Simon is allowed to have.
 
-  // 检测重复小习惯——供 Story System '日久有迹' 节点使用
-  // 用户反复做同一件小事（问吃饭/晚安/红茶等），说明有了固定相处模式
+  // Keep only the factual routine counter used by legacy Story/continuity code.
   const input = (userText || '').toLowerCase();
   const routinePatterns = [
     /吃了吗|吃饭了吗|吃了没|ate yet|have you eaten|did you eat/,
@@ -899,7 +883,9 @@ function updateRelationshipStatsFromUserInput(userText) {
     localStorage.setItem('sharedRoutineCount', cnt + 1);
   }
 
-  return { patternDetected };
+  // Keep timestamp as neutral activity metadata for compatibility.
+  localStorage.setItem('lastOnlineTime', Date.now());
+  return { patternDetected: false };
 }
 
 

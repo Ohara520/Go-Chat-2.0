@@ -1,36 +1,22 @@
 // ===================================================
-// money.js — 关系金钱状态 + Ghost Card + 离线惩罚
+// money.js — 金钱状态 + Ghost Card
 //
 // 转账系统（用户↔Ghost 双向）已全部移除。
-// 金钱只保留：关系深度档位(getMoneyComfortLevel)、周统计(云端同步用)、
-// 离线惩罚问候、Ghost Card。嫉妒等情绪走人格语气层，不再触发给钱。
+// 金钱只保留：周统计（云端同步兼容）、Ghost Card。
+// getMoneyComfortLevel 仅作旧模块兼容，不再读取 Trust / Affection / marriageType。
 //
 // 依赖：state.js / cloud.js
 // ===================================================
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// moneyComfortLevel — 关系深度决定钱能进入到哪一步
-// 0 = 不主动给，基本退
-// 1 = 只处理实际需求，小额，克制
-// 2 = 可以照顾，可以庆祝，中等金额
-// 3 = 钱已进入关系内部，自然处理
+// Legacy moneyComfortLevel — compatibility only
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+// Relationship progression no longer controls money behavior.
+// Keep the function temporarily because older modules may still call it;
+// an established marriage is treated as fully available rather than Trust/marriageType-gated.
 function getMoneyComfortLevel() {
-  const trust = getTrustHeat();
-  const mode  = localStorage.getItem('marriageType') || 'slowBurn';
-  const flags = getRelationshipFlags();
-
-  let level = 0;
-  if (trust >= 45) level = 1;
-  if (trust >= 65) level = 2;
-  if (trust >= 82) level = 3;
-
-  // slowBurn压一级——关系还在建立
-  if (mode === 'slowBurn') level = Math.max(0, level - 1);
-
-  return level;
+  return 3;
 }
 
 
@@ -59,60 +45,10 @@ function getWeeklyGiven() {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 离线惩罚 & Ghost主动问候
+// Offline relationship penalty / forced comeback — RETIRED
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function checkOfflinePenalty() {
-  const last  = parseInt(localStorage.getItem('lastOnlineTime') || Date.now());
-  const hours = (Date.now() - last) / 3600000;
-  if (hours >= 48) changeAffection(-Math.min(Math.floor(hours / 24) - 1, 5));
-  if (hours >= 12) {
-    const key = 'ghostInitMsg_' + new Date().toDateString();
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, '1');
-      setTimeout(() => ghostSendInitMessage(hours), 6000);
-    }
-  }
-  localStorage.setItem('lastOnlineTime', Date.now());
-}
-
-async function ghostSendInitMessage(offlineHours) {
-  const hintMap = [
-    { min: 12,  max: 24,       hint: "She's been gone most of the day. Just came back." },
-    { min: 24,  max: 48,       hint: "She was gone yesterday. Back now." },
-    { min: 48,  max: 96,       hint: "She disappeared for two days. Just showed up." },
-    { min: 96,  max: Infinity, hint: "She's been gone for days. Suddenly back." },
-  ];
-  const hint = hintMap.find(h => offlineHours >= h.min && offlineHours < h.max)?.hint || '';
-  try {
-    if (typeof showTyping === 'function') showTyping();
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
-        max_tokens: 150,
-        ...(() => { const s = buildSystemPrompt(); return { system: s, systemParts: buildSystemPromptParts(s) }; })(),
-        messages: [...(typeof chatHistory !== 'undefined' ? chatHistory.slice(-6) : []),
-          { role: 'user', content: `[System: ${hint} Ghost noticed. Say something — could be a pointed question, a casual remark, or just checking in. lowercase, English only.]` }
-        ]
-      })
-    });
-    const data = await res.json();
-    if (typeof hideTyping === 'function') hideTyping();
-    let reply = data.content?.[0]?.text?.trim() || '';
-    if (reply) {
-      reply = reply.replace(/\n?(REFUND|\bKEEP\b|COLD_WAR_START|GIVE_MONEY:[^\n]*)\n?/g, '').trim();
-      if (typeof appendMessage === 'function') appendMessage('bot', reply);
-      if (typeof chatHistory !== 'undefined') {
-        chatHistory.push({ role: 'assistant', content: reply });
-        if (typeof saveHistory === 'function') saveHistory();
-      }
-    }
-  } catch(e) {
-    if (typeof hideTyping === 'function') hideTyping();
-  }
-}
+// Time away no longer lowers Affection and no longer auto-generates a husband reaction.
+// Shared Reality / normal conversation history should carry the fact of elapsed time.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

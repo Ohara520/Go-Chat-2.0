@@ -33,21 +33,9 @@ async function initChat() {
   // 钱包初始化（补偿/礼金/迁移，只执行一次）
   if (typeof initWallet === 'function') initWallet();
 
-  // 好感度首次初始化
-  if (!localStorage.getItem('affection')) setAffection(70);
-
-  // 老用户补偿：延迟执行，避免立刻拉高数值触发剧情条件导致进页面破防
-  // （trust/affection 升高会让 checkStoryOnSessionStart 触发 Haiku，Haiku 容易崩）
-  setTimeout(() => {
-    if (!localStorage.getItem('trustAffectionUpgrade_20260405')) {
-      localStorage.setItem('trustAffectionUpgrade_20260405', '1');
-      const _mode = localStorage.getItem('marriageType') || 'established';
-      if (_mode === 'established') {
-        if (getTrustHeat() < 75) setTrustHeat(75);
-        if (getAffection() < 70) setAffection(70);
-      }
-    }
-  }, 10000); // 10秒后执行，确保页面已稳定，且剧情检测已过
+  // Relationship progression bootstrap retired (2026-10).
+  // Legacy affection/trust values may remain in storage for compatibility,
+  // but opening chat no longer initializes or upgrades the relationship.
 
   // 副作用初始化
   if (typeof ensureGhostBirthday === 'function') ensureGhostBirthday();
@@ -100,8 +88,8 @@ async function initChat() {
     if (badge) badge.style.display = 'block';
   }
 
-  // 检查离线扣好感
-  if (typeof checkOfflinePenalty === 'function') checkOfflinePenalty();
+  // Offline affection penalty / forced comeback message retired.
+  // Returning after time away is a fact, not a relationship score change or scripted reaction.
 
   // Ghost 月度工资上交机制已退役（2026-10），不再自动入账 / 发消息。
 

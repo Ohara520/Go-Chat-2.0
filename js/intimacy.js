@@ -9,7 +9,7 @@
 //   3. 新增 [WHY HE IS LIKE THIS] 块 —— 克制的根源
 //   4. 新增 [WHAT HE WILL NEVER BECOME] 块 —— 防 yes-man / 没立场
 //   5. Level 0-4 重写：从"程度差异"变为"质感差异"
-//   6. 新增 buildIntimateStateBriefing() —— 把 mood/trust/coldWar 翻成英文 brief（jealousy 线已拔除）
+//   6. buildIntimateStateBriefing() 仅保留真实 continuity facts；关系分数不再控制亲密表现
 // ===================================================
 
 
@@ -29,70 +29,40 @@
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 状态简报生成器（v2 新增）
-// 把 Ghost 的当下状态翻译成 Grok 能读懂的英文 brief
-// 这是解决"调情单薄"的关键 —— Grok 知道"今天的他"
+// Gemini 亲密通道只接收真实 continuity facts。
+// Trust / Affection / marriageType 不再翻译成行为质感。
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function buildIntimateStateBriefing() {
   const briefingParts = [];
 
-  // ── 1. Trust (0-100) ──
-  const trust = (typeof getTrustHeat === 'function') ? getTrustHeat() : 75;
-  let trustDesc = '';
-  if (trust < 50)       trustDesc = `low trust (${trust}/100) — wary, distance still there`;
-  else if (trust < 70)  trustDesc = `building trust (${trust}/100) — warming up but not all the way in`;
-  else if (trust < 85)  trustDesc = `established trust (${trust}/100) — comfortable, lets her closer`;
-  else                  trustDesc = `deep trust (${trust}/100) — she's in, fully`;
-  briefingParts.push(`Trust: ${trustDesc}.`);
+  // Relationship progression scores are intentionally NOT injected here.
+  // Simon and his wife are already in an established marriage; Trust/Affection numbers
+  // and legacy marriageType no longer decide how close he is allowed to be.
 
-  // ── 3. Affection (60-100) ──
-  const affection = (typeof getAffection === 'function') ? getAffection() : 70;
-  briefingParts.push(`Affection: ${affection}/100.`);
-
-  /*
-   * Jealousy 状态不再注入亲密互动。
-   *
-   * 真实发生的事情可以通过正常上下文被 Simon 理解，
-   * 但系统不再先判断“他有多吃醋”，
-   * 再规定亲密互动必须带什么语气或占有感。
-   *
-   * 什么 Bug 来这里找：
-   * 如果以后亲密互动又因为 jealousy level
-   * 自动变得 possessive / sharper / colder，
-   * 检查这里是否重新接入了嫉妒状态。
-   */
-
-  // ── 5. Unresolved Conflict ──
+  // Unresolved conflict is a real continuity fact, not a behavior level.
   const conflict = (typeof getUnresolvedConflict === 'function') ? getUnresolvedConflict() : null;
   if (conflict) {
     const cause = conflict.cause || '';
     briefingParts.push(`There is an unresolved conflict${cause ? ': ' + cause : ''}.`);
   }
 
-  // ── 6. Marriage Mode ──
-  const mode = (typeof localStorage !== 'undefined') ? (localStorage.getItem('marriageType') || 'established') : 'established';
-  if (mode === 'established') {
-    briefingParts.push(`Relationship: established (老夫老妻). The ease is already there. He doesn't have to test her — he reads her in seconds. His responses can be lived-in, slightly worn, casually direct in a way that only happens with someone you've had for a long time.`);
-  } else {
-    briefingParts.push(`Relationship: still building (新婚契合). He's still learning her tells. He doesn't always read her right on the first try. There's a freshness to his attention — like everything she says is new information he's filing away.`);
-  }
-
-  // ── 7. Recent reverse package context ──
-  // 如果他最近偷偷给她寄了东西（情绪反寄触发），调情时会带"心虚感"
+  // Recent reverse package is a real world-state fact.
   try {
     const pending = (typeof getPendingReversePackages === 'function') ? getPendingReversePackages() : [];
     const recentSecret = pending.find(p => p.triggerAt && p.triggerAt > Date.now());
     if (recentSecret && recentSecret.item) {
-      briefingParts.push(`Note: he just secretly ordered "${recentSecret.item.name}" for her — she doesn't know yet. If she asks anything that would expose this, deflect or stay vague. Do NOT bring it up directly.`);
+      briefingParts.push(`A package he ordered for her is currently pending: "${recentSecret.item.name}". She has not been told about it in chat.`);
     }
   } catch(e) {}
 
+  if (!briefingParts.length) return '';
+
   return `
-[CURRENT STATE — what's true about him right now]
+[CURRENT STATE — continuity facts]
 ${briefingParts.join('\n')}
 
-This briefing is private — never quote or reference these labels (mood/trust etc.) directly in your reply.
-It only shapes the texture of how he responds tonight.
+These are private continuity facts. Never quote the labels or claim she knows something that has not been told to her.
 `;
 }
 
