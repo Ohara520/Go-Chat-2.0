@@ -1,9 +1,8 @@
 // ===================================================
 // state.js — 状态管理系统 v2
-// 包含：mood / trust / affection /
-//       attachment / resistance / relationship flags /
-//       relationship modifiers / cold war /
-//       表达桶冷却 / pattern detection
+// 包含：relationship facts / memory / attachment /
+//       relationship flags / continuity / cold war migration /
+//       expression buckets / pattern detection
 // 依赖：touchLocalState (cloud.js)
 // ===================================================
 
@@ -108,13 +107,6 @@ function clearBucket(bucketName) {
 // 状态栏情绪 Emoji 已整体退休：Simon 的状态通过语言/行为/连续生活体现，
 // 不再由系统在 UI 贴 NPC 情绪标签。
 function refreshStatusEmoji() { /* retired: no longer computes or shows mood emoji */ }
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Trust Heat — RETIRED 2026-10-04
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Numeric Trust progression/storage helpers were removed.
-// Simon's relationship behavior is no longer unlocked or capped by trustHeat.
-
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 记忆系统：短期记忆与长期记忆
@@ -484,115 +476,8 @@ function changeAttachmentPull(delta) {
 
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Affection Score — RETIRED 2026-10-04
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Numeric Affection progression/decay/storage helpers were removed.
-// Sweet talk, nicknames, arguments, gifts, and time away no longer change a relationship score.
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 爱意抗拒系统（resistance + 情绪锁）
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getLoveResistance() {
-  return parseInt(localStorage.getItem('loveResistance') || '0');
-}
-
-function isResistanceLocked() {
-  return Date.now() < parseInt(localStorage.getItem('resistanceLockUntil') || '0');
-}
-
-function lockResistance(ms = 30 * 60 * 1000) {
-  localStorage.setItem('resistanceLockUntil', Date.now() + ms);
-}
-
-function updateLoveResistance(userInput) {
-  const input = (userInput || '').toLowerCase();
-
-  const affectionTriggers = ['我爱你','爱你','想你','抱抱','亲亲','love you','miss you','i love you'];
-  const pressureTriggers  = ['你爱不爱我','爱不爱我','你现在说','说爱我','你不说就是',"why won't you say",'say it now','say you love me','tell me you love me','i love you say it back'];
-
-  const isPressure  = pressureTriggers.some(t => input.includes(t));
-  const isAffection = affectionTriggers.some(t => input.includes(t)) && !isPressure;
-
-  let resistance = getLoveResistance();
-  const level    = getLovePermission();
-  const flags    = getRelationshipFlags();
-
-  const _decayTime = () => {
-    if (isResistanceLocked()) return;
-    const hoursElapsed = (Date.now() - parseInt(localStorage.getItem('loveResistanceLastDecay') || Date.now())) / 3600000;
-    resistance = Math.max(0, resistance - Math.floor(hoursElapsed));
-    localStorage.setItem('loveResistanceLastDecay', Date.now());
-  };
-
-  if (level >= 5 || flags.loveConfessed) {
-    if (isPressure) {
-      resistance = Math.min(60, resistance + 5);
-      lockResistance();
-      localStorage.setItem('loveResistanceLastDecay', Date.now());
-    } else if (isAffection) {
-      resistance = Math.max(0, resistance - 1);
-      localStorage.setItem('loveResistanceLastDecay', Date.now());
-    } else { _decayTime(); }
-  } else if (level >= 4) {
-    if (isPressure) {
-      const count = parseInt(sessionStorage.getItem('lovePressCount') || '0') + 1;
-      sessionStorage.setItem('lovePressCount', count);
-      if (count >= 2) { resistance = Math.min(40, resistance + 5); lockResistance(); }
-      localStorage.setItem('loveResistanceLastDecay', Date.now());
-    } else {
-      if (!isAffection) sessionStorage.setItem('lovePressCount', '0');
-      _decayTime();
-    }
-  } else {
-    if (isPressure) {
-      const count = parseInt(sessionStorage.getItem('lovePressCount') || '0') + 1;
-      sessionStorage.setItem('lovePressCount', count);
-      if (count >= 2) {
-        resistance = Math.min(100, resistance + 10);
-        lockResistance();
-        localStorage.setItem('loveResistanceLastDecay', Date.now());
-      }
-    } else {
-      if (!isAffection) sessionStorage.setItem('lovePressCount', '0');
-      _decayTime();
-    }
-  }
-
-  localStorage.setItem('loveResistance', resistance);
-  return resistance;
-}
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 承诺锁 & 爱意权限
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getMinLockedLevel() {
-  const flags = getRelationshipFlags();
-  if (flags.loveConfessed)    return 4;
-  if (flags.repairPromised)   return 3;
-  if (flags.bondAcknowledged) return 2;
-  return 0;
-}
-
-function getLovePermission() {
-  const trust      = getTrustHeat();
-  const resistance = getLoveResistance();
-
-  const minLocked = getMinLockedLevel();
-  if (resistance > 40) return Math.max(minLocked, trust >= 70 ? 2 : 1);
-  if (resistance > 20) return Math.max(minLocked, Math.min(2, trust >= 70 ? 2 : 1));
-
-  if (trust < 50) return Math.max(minLocked, 0);
-  if (trust < 60) return Math.max(minLocked, 1);
-  if (trust < 70) return Math.max(minLocked, 2);
-  if (trust < 80) return Math.max(minLocked, 3);
-  if (trust < 88) return Math.max(minLocked, 4);
-  return 5;
-}
+// Legacy Trust/Affection/Love Permission/Resistance numeric director systems retired.
+// relationshipFlags remains as a factual/business state container.
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 关系标记系统
@@ -627,18 +512,7 @@ function validateReunionFlag() {
   if (!metInPerson && !setComplete) setRelationshipFlag('reunionReady', false);
 }
 
-function getRelationshipModifiers() {
-  validateReunionFlag();
-  const flags = getRelationshipFlags();
-  return {
-    reversePackageBonus:  flags.firstReverseShip ? 8 : 0,
-    metInPersonBonus:     flags.reunionReady      ? 5 : 0,
-    trustHeatCap:         100,
-    moneyEaseBonus:       flags.firstSalary       ? 10 : 0,
-    emotionalMemoryDepth: flags.sheCried          ? 1 : 0,
-    emotionOpenness:      flags.saidILoveYou      ? 1 : 0,
-  };
-}
+
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -690,7 +564,6 @@ function resolvePendingReversePackages() {} // 兼容旧调用
 // getGhostResponseState() and buildUnifiedGhostStateBlock() removed.
 // Money uses getGhostCardMonthlyLimit() directly.
 // Delivery has no relationship gates.
-// Intimacy routing no longer depends on numeric trust/affection relationship scores.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
