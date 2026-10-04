@@ -613,24 +613,19 @@ async function _processMergedMessage(text) {
       .slice(-20)
       .map(m => ({ role: m.role, content: m.content }));
 
-    // cleanHistory：Claude 日常聊天用。保持真实对话顺序，不再删除 _intimate 消息制造历史断层。
-    // 较早的亲密原文用中性占位保留“这里发生过一轮对话”这一事实，避免把露骨内容重新喂给 Claude；
-    // 10 分钟内的 Soft Handoff 仍由 handoffHistory 提供真实连续原文。
-    // _recalled 继续排除；_imageDesc / _delivery 事实型 system 消息继续允许穿透。
+    // cleanHistory：Claude 日常聊天使用的真实近期历史（16条）。
+    // Soft Handoff 原则：不因为 _intimate 标记删除、屏蔽、摘要或替换真实对话。
+    // Claude 先看到实际发生过的上文并尝试自然接续；若候选发生高置信身份破防，
+    // 候选不落地，再由 Gemini/Jimmy 无感接手。
+    // _recalled 仍不传；_imageDesc / _delivery 事实型 system 消息继续允许穿透。
     const cleanHistory = (() => {
       const _filtered = chatHistory
         .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled)
         .slice(-16)
-        .map(m => ({
-          role: m.role,
-          content: m._intimate
-            ? (m.role === 'user'
-                ? '[A private intimate message from her occurred here.]'
-                : '[A private intimate reply from you occurred here.]')
-            : m.content
-        }));
-      // 正常历史本身应交替；这里只保留兼容兜底，防旧数据/系统事实造成 API 400。
-      // 关键变化：不再因为删除亲密消息而人为制造相邻同角色和“上一条消失”。
+        .map(m => ({ role: m.role, content: m.content }));
+      // 过滤掉调情/召回消息后，中间可能留下相邻同角色（如两条 user 之间的 assistant
+      // 被剔除），或开头变成 assistant。部分中转/模型对 role 不交替会返回 400。
+      // 这里合并相邻同角色、去掉开头的 assistant，保证 user/assistant 交替且以 user 收尾。
       const _merged = [];
       for (const m of _filtered) {
         const _last = _merged[_merged.length - 1];
@@ -644,28 +639,9 @@ async function _processMergedMessage(text) {
       return _merged;
     })();
 
-    // handoffHistory：Soft Handoff V1 专用 —— 仅在"日常轮 + 近期有亲密"的交接窗口
-    // 替代 cleanHistory 喂给 Claude 候选。与 cleanHistory 唯一区别：不按 _intimate 删除，
-    // 保留近期真实连续原文（含亲密），让 Claude 真正看到刚才发生了什么再尝试接手。
-    // 不做降敏/占位符/摘要替换（A 路线）。窗口判定用 10 分钟，但历史本身按条数取近 16 条，
-    // 不用 10 分钟机械截断实际对话。role 规范化与 cleanHistory 一致，防 400。
-    const handoffHistory = (() => {
-      const _filtered = chatHistory
-        .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled)
-        .slice(-16)
-        .map(m => ({ role: m.role, content: m.content }));
-      const _merged = [];
-      for (const m of _filtered) {
-        const _last = _merged[_merged.length - 1];
-        if (_last && _last.role === m.role) {
-          _last.content = `${_last.content}\n${m.content}`;
-        } else {
-          _merged.push({ ...m });
-        }
-      }
-      while (_merged.length && _merged[0].role === 'assistant') _merged.shift();
-      return _merged;
-    })();
+    // handoffHistory 与 cleanHistory 共用同一份真实历史。
+    // 保留这个名字只为 Soft Handoff 调用点可读性；不再维护第二套历史规则。
+    const handoffHistory = cleanHistory;
 
     // ── System Prompt 构建 ───────────────────────────────────
     // _baseSystem 延迟到调情分支 return 之后再构建（见下方主 API 调用前）：
@@ -1113,9 +1089,9 @@ async function _processMergedMessage(text) {
     }
 
     // ── 图片注入 ─────────────────────────────────────────────
-    // Soft Handoff V1：交接窗口内（日常轮 + 近期有亲密）让 Claude 看到近期真实连续原文；
-    // 其他日常轮使用 cleanHistory：顺序不断裂，但较早亲密原文会被中性占位。
-    let messagesForRequest = _softHandoffWindow ? handoffHistory : cleanHistory;
+    // Claude 始终看到真实连续的近期历史；Soft Handoff 只决定破防后是否让 Gemini/Jimmy 接手，
+    // 不再决定 Claude 能不能看到亲密上文。
+    let messagesForRequest = cleanHistory;
     if (isRecentPhoto && lastPhotoMsg._photoBase64?.length > 0) {
       // 修复：删除"一两行"的死限制，让 Ghost 正常作为丈夫看图回应
       // 原指令强制简短 + "calling her out"（阴阳语气），导致老婆发照片只收到 okay./noted.
