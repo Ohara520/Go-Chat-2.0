@@ -181,8 +181,6 @@ async function handlePostReplyActions(text, reply, intent, pendingEvent) {
     if (typeof handlePostReplyEvents === 'function' && pendingEvent) {
       handlePostReplyEvents(text, reply, pendingEvent).catch(e => console.warn('事件处理出错:', e));
     }
-    // Ghost Card 累积消费 pending：等她聊到钱/消费/近况的合适时机再浮出
-    if (typeof checkGhostCardPending === 'function') checkGhostCardPending(text).catch(() => {});
   } catch(e) { console.warn('[sendMessage] handlePostReplyActions:', e); }
 }
 
@@ -558,18 +556,6 @@ async function _processMergedMessage(text) {
       _feedActionHint = "[Feed action: accepted but not completed yet. You may agree to do it (dry, in character), but do NOT claim it's already posted and do NOT tell her to go look yet — the post hasn't gone up.]";
       _triggerGhostFeedPost();
     }
-  }
-
-  // ── 已读延迟（嘴硬场景，收窄条件）────────────────────────
-  // 修复 #073: 只在撒娇+心情差组合下触发，去掉kiss/miss等泛化词
-  const _delayScenes = /撒娇|哄我|吃醋|jealous/i.test(text); // 收窄：去掉hug/baby/miss等
-  const ghostReadDelay = _delayScenes && Math.random() < 0.20
-    ? (Math.floor(Math.random() * 10) + 6) * 1000  // 6-15秒（旧版8-20）
-    : 0;
-
-  if (ghostReadDelay > 0) {
-    updateToRead();
-    await new Promise(r => setTimeout(r, ghostReadDelay));
   }
 
   showTyping();
