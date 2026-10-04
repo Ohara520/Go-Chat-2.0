@@ -194,122 +194,104 @@ async function saveAvatarUrlToProfile(url) {
   }
 }
 
-// ===== 更新Ghost头像 =====
+// ===== Avatar State V1：唯一头像状态 / 渲染 / 云同步 =====
+const DEFAULT_GHOST_AVATAR = 'images/ghost-avatar.jpg';
+
+function _avatarVersionedUrl(url, stamp) {
+  if (!url || url.startsWith('data:') || url.startsWith('images/')) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}t=${stamp || Date.now()}`;
+}
+
+function _avatarFallbackSrc() {
+  const b64 = localStorage.getItem('ghostAvatarBase64');
+  return b64 ? `data:image/jpeg;base64,${b64}` : DEFAULT_GHOST_AVATAR;
+}
+
+function _renderGhostAvatar(url) {
+  const stamp = localStorage.getItem('ghostAvatarUpdatedAt') || '';
+  const src = url ? _avatarVersionedUrl(url, stamp) : _avatarFallbackSrc();
+  document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+    el.onerror = () => {
+      el.onerror = null;
+      el.src = _avatarFallbackSrc();
+    };
+    el.src = src;
+  });
+}
+
 function updateGhostAvatar(url) {
+  if (!url) return;
   const stamp = Date.now();
-  document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-    el.src = url + (url.startsWith('data:') ? '' : '?t=' + stamp);
-  });
-  if (!url.startsWith('data:')) {
-    localStorage.setItem('ghostAvatarUrl', url);
-    localStorage.setItem('ghostAvatarUpdatedAt', stamp); // 朋友圈渲染时会读这个破缓存
-    if (typeof touchLocalState === 'function') touchLocalState();
-
-    // ✅ 同步写入Supabase数据库，换设备也不丢
-    saveAvatarUrlToProfile(url);
-  }
+  localStorage.setItem('ghostAvatarUrl', url);
+  localStorage.setItem('ghostAvatarUpdatedAt', String(stamp));
+  _renderGhostAvatar(url);
+  if (typeof touchLocalState === 'function') touchLocalState();
+  saveAvatarUrlToProfile(url);
 }
 
-// ===== 轻量头像刷新（切页面时调用，不查数据库）=====
-// 解决：切到个人资料/朋友圈再回来，DOM 重建后头像变回默认
+// 切页面只读同一个 Avatar State，不再自己猜版本。
 function refreshGhostAvatar() {
-  const url = localStorage.getItem('ghostAvatarUrl');
-  if (!url || url.startsWith('data:')) {
-    // 没有正式URL，检查base64备份
-    const b64 = localStorage.getItem('ghostAvatarBase64');
-    if (b64) {
-      const dataUrl = `data:image/jpeg;base64,${b64}`;
-      document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-        if (!el.src || el.src.includes('ghost-avatar') || el.src === window.location.href) {
-          el.src = dataUrl;
-        }
-      });
-    }
-    return;
-  }
-  document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-    // 只更新还是默认头像的元素（避免闪烁）
-    if (!el.src || el.src.includes('ghost-avatar') || el.src === window.location.href || !el.src.includes(url.split('?')[0])) {
-      el.src = url + '?t=' + Date.now();
-    }
-  });
+  const url = localStorage.getItem('ghostAvatarUrl') || '';
+  _renderGhostAvatar(url);
 }
 
-// ===== 自动修复：切屏幕后刷新头像 =====
-// openScreen 切屏只改 CSS class，不增删 DOM，所以用 hook 而不是 MutationObserver
+// openScreen 切屏只改 CSS class，不增删 DOM，所以切屏后重渲染统一头像。
 document.addEventListener('DOMContentLoaded', () => {
-  // 等所有 JS 加载完，openScreen 已被 app.js 和 index.html 定义/包装
   setTimeout(() => {
     const _prevOpenScreen = window.openScreen;
     if (typeof _prevOpenScreen === 'function') {
       window.openScreen = function(screenId) {
         _prevOpenScreen(screenId);
-        // 切屏后刷新所有 ghost 头像（延迟一帧，等 DOM 更新完）
         requestAnimationFrame(() => refreshGhostAvatar());
       };
     }
   }, 0);
 });
 
-// ===== 恢复Ghost头像（优先从数据库读，保证多设备同步）=====
+// 启动恢复：先显示本地；云端只在版本更新或本地为空时接管。
 async function restoreGhostAvatar() {
-  // 先用localStorage快速显示（避免白屏）
-  const cached = localStorage.getItem('ghostAvatarUrl');
-  if (cached) {
-    document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = cached; });
-  }
+  refreshGhostAvatar();
 
-  // 再从Supabase拉最新（换设备/清缓存也能恢复）
   try {
     const sb = typeof getSbClient === 'function' ? getSbClient() : null;
     const userId = typeof getSbUserId === 'function' ? getSbUserId() : null;
-    if (!sb || !userId) return;
+    if (sb && userId) {
+      const { data: row } = await sb
+        .from('user_data')
+        .select('profile')
+        .eq('user_id', userId)
+        .single();
 
-    const { data: row } = await sb
-      .from('user_data')
-      .select('profile')
-      .eq('user_id', userId)
-      .single();
-
-    const url = row?.profile?.ghostAvatarUrl;
-    if (url) {
-      localStorage.setItem('ghostAvatarUrl', url);
-      document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = url; });
-      console.log('[avatar] 从数据库恢复头像:', url);
-    }
-  } catch(e) {}
-
-  // 2秒后再执行一次，防止被loadFromCloud覆盖
-  setTimeout(async () => {
-    const url = localStorage.getItem('ghostAvatarUrl');
-
-    if (url && !url.startsWith('data:')) {
-      // 有正式URL：确保DOM显示正确
-      document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-        if (el.src !== url) el.src = url + '?t=' + Date.now();
-      });
-    } else {
-      // 没有正式URL：检查是否有base64备份，有的话重试上传
-      const b64 = localStorage.getItem('ghostAvatarBase64');
-      if (b64) {
-        console.log('[avatar] 检测到未上传的base64备份，重试上传...');
-        // 先把base64显示出来
-        const dataUrl = `data:image/jpeg;base64,${b64}`;
-        document.querySelectorAll('.ghost-avatar-img').forEach(el => { el.src = dataUrl; });
-        // 重试上传
-        try {
-          const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
-          if (retryUrl) {
-            updateGhostAvatar(retryUrl); // 更新DOM + localStorage + 写数据库
-            localStorage.removeItem('ghostAvatarBase64'); // 上传成功，清除备份
-            console.log('[avatar] 重试上传成功:', retryUrl);
-          }
-        } catch(e) {
-          console.warn('[avatar] 重试上传失败，继续用base64显示');
-        }
+      const cloudUrl = row?.profile?.ghostAvatarUrl || '';
+      const cloudAt = parseInt(row?.profile?.ghostAvatarUpdatedAt || '0');
+      const localUrl = localStorage.getItem('ghostAvatarUrl') || '';
+      const localAt = parseInt(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
+      if (cloudUrl && (!localUrl || (cloudAt > 0 && cloudAt > localAt))) {
+        localStorage.setItem('ghostAvatarUrl', cloudUrl);
+        if (cloudAt > 0) localStorage.setItem('ghostAvatarUpdatedAt', String(cloudAt));
+        refreshGhostAvatar();
       }
     }
-  }, 2000);
+  } catch(e) {
+    console.warn('[avatar] 云端头像恢复失败，继续使用本地头像');
+  }
+
+  // 正式 URL 不存在时，base64 是待同步的本地头像；只重试上传，不再用延时抢写头像。
+  const url = localStorage.getItem('ghostAvatarUrl');
+  const b64 = localStorage.getItem('ghostAvatarBase64');
+  if ((!url || url.startsWith('data:')) && b64) {
+    refreshGhostAvatar();
+    try {
+      const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
+      if (retryUrl) {
+        updateGhostAvatar(retryUrl);
+        localStorage.removeItem('ghostAvatarBase64');
+      }
+    } catch(e) {
+      console.warn('[avatar] 待同步头像上传失败，保留本地备份');
+    }
+  }
 }
 
 // ===== 图片预览 =====
@@ -590,68 +572,57 @@ The ${isTwoPhotos ? 'images are' : 'image is'} part of the conversation, not a r
   }
 }
 
-// ===== 处理用户指定哪张是Ghost的 =====
-async function checkPendingAvatarChoice(userText) {
-  if (!_pendingAvatarChoice) return false;
-  const { base64List } = _pendingAvatarChoice;
-  const text = userText.toLowerCase();
-  let chosenIdx = -1;
-  if (/左|第一|1|first|左边|上/.test(text)) chosenIdx = 0;
-  else if (/右|第二|2|second|右边|下/.test(text)) chosenIdx = 1;
-  else if (/第三|3|third/.test(text)) chosenIdx = 2;
-  if (chosenIdx === -1) return false;
+// ===== Photo V2：头像协商 =====
+// 系统只保存“正在讨论哪张图作为头像”的事实；Ghost 是否愿意换由模型在正常聊天里自己决定。
+// 不使用拒绝次数、说服值、确认弹窗或固定回复。
 
-  _pendingAvatarChoice = null;
-  const ghostB64 = base64List[chosenIdx] || base64List[0];
+function _pickAvatarIndexFromText(text, maxCount) {
+  const t = String(text || '').toLowerCase();
+  let idx = -1;
+  if (/左|第一|1张|first|left|上面|左边/.test(t)) idx = 0;
+  else if (/右|第二|2张|second|right|下面|右边/.test(t)) idx = 1;
+  else if (/第三|3张|third/.test(t)) idx = 2;
+  return idx >= 0 && idx < maxCount ? idx : -1;
+}
 
-  // 先临时显示
-  updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
-
-  // 异步上传并写库
-  uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-    if (url) updateGhostAvatar(url); // 自动调用saveAvatarUrlToProfile
-  });
-
-  if (typeof showTyping === 'function') showTyping();
-  await new Promise(r => setTimeout(r, 800));
-  if (typeof hideTyping === 'function') hideTyping();
-  if (typeof appendMessage === 'function') appendMessage('bot', 'noted.');
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'assistant', content: 'noted.' });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
+function _setAvatarNegotiation(lastPhotos, userText) {
+  const base64List = Array.isArray(lastPhotos?.base64List) ? lastPhotos.base64List.filter(Boolean) : [];
+  if (!base64List.length) return false;
+  const selectedIndex = base64List.length === 1 ? 0 : _pickAvatarIndexFromText(userText, base64List.length);
+  window._avatarChangeIntent = {
+    base64List,
+    selectedIndex,
+    startedAt: Date.now(),
+  };
+  _pendingAvatarChoice = base64List.length > 1 && selectedIndex < 0 ? { base64List } : null;
   return true;
 }
 
-// ===== 用户明确命令触发换头像（三层判断）=====
-// 第一层：强正则 → 直接换（扩词版，覆盖常见口语）
-// 第二层：弱信号（含头像相关词）+ 模型确认 → 确认后再换
-// 第三层：零信号 → 完全不触发，不碰头像逻辑
+// 多图协商中，她后续说明“第一张/右边那张”等：只明确目标，不直接换。
+async function checkPendingAvatarChoice(userText) {
+  const pending = window._avatarChangeIntent;
+  if (!pending || !Array.isArray(pending.base64List) || pending.base64List.length < 2) return false;
+  if (Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0) return false;
+  const chosenIdx = _pickAvatarIndexFromText(userText, pending.base64List.length);
+  if (chosenIdx === -1) return false;
+  pending.selectedIndex = chosenIdx;
+  _pendingAvatarChoice = null;
+  return false; // 继续正常聊天，让 Ghost 自己回应她的选择
+}
+
+// 识别“她正在提出/讨论把刚发的图作为 Ghost 头像”。这里只开启协商，不执行换头像。
 async function checkAvatarCommand(userText) {
-  const text = userText;
-
-  // 有没有最近发过的图片（三层都需要，提前判断）
+  const text = String(userText || '');
   const lastPhotos = window._lastReceivedPhotos;
-  if (!lastPhotos || !lastPhotos.base64List || lastPhotos.base64List.length === 0) return false;
-  // 5分钟内才有效，防止聊了一会儿后误触发换头像
-  if (lastPhotos.sentAt && Date.now() - lastPhotos.sentAt > 5 * 60 * 1000) {
-    window._lastReceivedPhotos = null;
-    return false;
-  }
+  if (!lastPhotos || !Array.isArray(lastPhotos.base64List) || lastPhotos.base64List.length === 0) return false;
 
-  // ── 第一层：强正则，明确意图直接换 ──
-  const isStrongCommand = /用这个当头像|设为头像|换成这个|这个当(你的?)?头像|帮我换头像|给你换头像|换(一下|个)?头像|头像(就)?用这|做(你的?)?头像|当(你的?)?头像吧?|就这张|用上吧?|头像换了|头像换一下|就它了|用它吧|头像就这个|拿来当头像|当作头像|这张当头像|头像用这张|这个做头像|set.*avatar|use.*avatar|change.*avatar|make.*avatar|update.*avatar|this.*as.*avatar|avatar.*this/i.test(text);
+  // 已经在协商中时，不重复分类；后续说服/拒绝/改主意都交给正常聊天。
+  if (window._avatarChangeIntent) return false;
 
-  if (isStrongCommand) {
-    return await _handleAvatarSet(lastPhotos, text);
-  }
+  // 初次进入头像话题必须有头像领域信号，避免“用这个吧/就它了”把普通分享误判成头像。
+  const hasAvatarSignal = /头像|avatar|profile\s*pic|profile\s*picture|pfp|icon|大头照/i.test(text);
+  if (!hasAvatarSignal) return false;
 
-  // ── 第二层：弱信号门槛 + 模型确认 ──
-  // 消息里至少沾了头像/avatar相关词，才值得问模型
-  const hasWeakSignal = /头像|avatar|profile\s*pic|pfp|icon|大头|换.{0,2}(上|掉|了)|用.{0,3}(这|它|上)/i.test(text);
-  if (!hasWeakSignal) return false; // 第三层：零信号，彻底跳过
-
-  // 问模型：这句话是不是在要求换头像？
   try {
     const confirmRes = await fetchWithTimeout('/api/chat', {
       method: 'POST',
@@ -659,86 +630,99 @@ async function checkAvatarCommand(userText) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 10,
-        system: `You are a binary classifier. The user just sent a photo in a chat app. Now they sent a follow-up text message. Determine if they are asking to SET/CHANGE their avatar/profile picture to the photo they just sent.
-Reply ONLY "yes" or "no". When in doubt, say "no".
-Examples of YES: "头像用这个吧", "can this be my pfp", "帮我换上", "当头像", "就用它"
-Examples of NO: "这个头像好丑", "你的头像是什么", "好看吗", "帮我看看这个", "头像在哪改"`,
+        system: `You are an intent classifier. The user recently sent one or more images and is now chatting with her husband. Decide whether her message is proposing or discussing using one of those recent images as HIS avatar/profile picture. This is only intent detection; do not decide whether he agrees. Reply only YES or NO. When uncertain, reply NO.`,
         messages: [{ role: 'user', content: text }]
       })
     }, 8000);
     if (confirmRes.ok) {
       const confirmData = await confirmRes.json();
-      const answer = (confirmData.content?.[0]?.text || '').trim().toLowerCase();
-      console.log('[photo] 头像意图模型判断:', answer, '原文:', text);
-      if (answer.startsWith('yes')) {
-        return await _handleAvatarSet(lastPhotos, text);
-      }
+      const answer = (confirmData.content?.[0]?.text || '').trim().toUpperCase();
+      if (answer.startsWith('YES')) _setAvatarNegotiation(lastPhotos, text);
     }
   } catch(e) {
-    console.warn('[photo] 头像意图判断请求失败:', e.message || e);
+    console.warn('[photo] 头像协商意图判断失败:', e.message || e);
   }
 
-  return false;
+  return false; // 永远不拦截主聊天；Ghost 必须亲自回应
 }
 
-// 内部：执行换头像流程（单张直接换，多张选或问）
-async function _handleAvatarSet(lastPhotos, text) {
-  const { base64List, isTwoPhotos } = lastPhotos;
-
-  // 单张图 → 直接换
-  if (!isTwoPhotos) {
-    await _executeAvatarSet(base64List[0]);
-    return true;
+// 给当前模型的事实提示：只说明正在讨论头像，不规定他应该答应还是拒绝。
+function getAvatarNegotiationContext() {
+  const pending = window._avatarChangeIntent;
+  if (!pending || !Array.isArray(pending.base64List) || !pending.base64List.length) return '';
+  const count = pending.base64List.length;
+  if (count === 1) {
+    return '[Current fact: the photo she recently sent is being discussed as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision.]';
   }
-
-  // 两张图 → 看用户有没有指定哪张
-  let chosenIdx = -1;
-  if (/左|第一|1张|first|left|上面|黑|深色|暗/.test(text)) chosenIdx = 0;
-  else if (/右|第二|2张|second|right|下面|白|浅色|亮/.test(text)) chosenIdx = 1;
-
-  if (chosenIdx !== -1) {
-    await _executeAvatarSet(base64List[chosenIdx] || base64List[0]);
-    return true;
+  if (Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0) {
+    return `[Current fact: she is discussing image ${pending.selectedIndex + 1} of the recent images as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision.]`;
   }
-
-  // 没有指定哪张 → Ghost 问 which one
-  _pendingAvatarChoice = { base64List };
-  if (typeof showTyping === 'function') showTyping();
-  await new Promise(r => setTimeout(r, 600));
-  if (typeof hideTyping === 'function') hideTyping();
-  const q = 'which one.';
-  if (typeof appendMessage === 'function') appendMessage('bot', q);
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'assistant', content: q });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-  return true;
+  return `[Current fact: the ${count} images she recently sent are being discussed as possible avatars for you, but no single image has been selected yet. No avatar change has happened. You may respond naturally; if the target is unclear, that uncertainty is real.]`;
 }
 
-// 执行头像更换
+// Ghost 正常回复后，后台只读取“他刚才是否已经明确决定使用这张图”。
+// 拒绝/犹豫不会清空候选，因此她之后仍可继续聊、继续说服，他也可以自然改变主意。
+async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
+  const pending = window._avatarChangeIntent;
+  if (!pending || !Array.isArray(pending.base64List) || !pending.base64List.length) return false;
+  if (!ghostReply || !String(ghostReply).trim()) return false;
+
+  try {
+    const selected = Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0
+      ? pending.selectedIndex
+      : (pending.base64List.length === 1 ? 0 : -1);
+    const targetFact = selected >= 0
+      ? `The candidate is image ${selected + 1}.`
+      : `There are ${pending.base64List.length} candidate images and no specific one has been selected yet.`;
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply clearly commits to actually using the specific candidate image as his avatar now.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires a clear present decision to use the image. Refusal, hesitation, teasing without commitment, conditional agreement, discussing whether it looks good, or an unclear target are UNRESOLVED. Do not infer agreement merely because he is affectionate or because she wants it.`,
+        messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
+      })
+    }, 8000);
+    if (!res.ok) return false;
+    const data = await res.json();
+    const decision = (data.content?.[0]?.text || '').trim().toUpperCase();
+    if (!decision.startsWith('ACCEPT')) return false;
+    if (selected < 0) return false;
+
+    const ghostB64 = pending.base64List[selected];
+    if (!ghostB64) return false;
+    window._avatarChangeIntent = null;
+    _pendingAvatarChoice = null;
+    await _executeAvatarSet(ghostB64);
+    return true;
+  } catch(e) {
+    console.warn('[photo] 头像协商决定读取失败:', e.message || e);
+    return false;
+  }
+}
+
+// 执行头像更换：保留原有显示 / Storage / localStorage / 云端同步链路。
 async function _executeAvatarSet(ghostB64) {
-  window._lastReceivedPhotos = null; // 用完清掉
+  window._lastReceivedPhotos = null;
 
-  // 立刻显示（不等上传）
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
     el.src = `data:image/jpeg;base64,${ghostB64}`;
   });
 
-  // base64 备份（上传成功前保底）
   try {
     localStorage.setItem('ghostAvatarBase64', ghostB64);
   } catch(e) {
     console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
   }
 
-  // 上传到 Supabase Storage（重试1次）
   let uploadOk = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const url = await uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
       if (url) {
-        updateGhostAvatar(url); // 写 localStorage.ghostAvatarUrl + 云端
-        localStorage.removeItem('ghostAvatarBase64'); // URL 存好了，base64 可以删
+        updateGhostAvatar(url);
+        localStorage.removeItem('ghostAvatarBase64');
         uploadOk = true;
         if (typeof showToast === 'function') showToast('头像已更新 ✅');
         break;
@@ -746,25 +730,15 @@ async function _executeAvatarSet(ghostB64) {
     } catch(e) {
       console.warn(`[avatar] 上传第${attempt + 1}次失败:`, e);
     }
-    if (attempt === 0) await new Promise(r => setTimeout(r, 2000)); // 2秒后重试
+    if (attempt === 0) await new Promise(r => setTimeout(r, 2000));
   }
 
   if (!uploadOk) {
-    // 上传失败：base64 已存 localStorage，切页面时 refreshGhostAvatar 能恢复
-    // 但告诉用户网络有问题，下次打开会自动重试
     if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
     console.warn('[avatar] 上传失败，使用本地 base64 备份');
   }
 
-  if (typeof showTyping === 'function') showTyping();
-  await new Promise(r => setTimeout(r, 600));
-  if (typeof hideTyping === 'function') hideTyping();
-  const reply = 'done.';
-  if (typeof appendMessage === 'function') appendMessage('bot', reply);
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'assistant', content: reply });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
+  // Ghost 已经在正常聊天中表达了自己的决定；执行层不再追加任何硬编码台词。
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
@@ -829,49 +803,8 @@ async function handlePhotoInputChange(e) {
   }
 }
 
-// ===== 检测是否想重新换头像 =====
+// ===== 旧版“重新换头像”直执行逻辑已退休 =====
+// Photo V2 中，换错/想换另一张也回到正常聊天协商；这里不再拦截或自动改头像。
 async function checkAvatarReplace(userText) {
-  const text = userText.toLowerCase();
-
-  // 检测换头像意图
-  const wantReplace = /换错了|换另.个|不喜欢这个|换一张|重新换|换回|换个别的|这个不好|不要这个|换掉|switch.*avatar|change.*avatar|different.*avatar|want.*change/i.test(text);
-  if (!wantReplace) return false;
-
-  // 有没有之前存的图片可以重新选
-  const lastPhotoMsg = typeof chatHistory !== 'undefined'
-    ? chatHistory.filter(m => m.role === 'user' && m._photoBase64 && m._photoBase64.length > 0).slice(-1)[0]
-    : null;
-
-  if (!lastPhotoMsg) return false; // 没有之前的图片，走正常流程
-
-  const base64List = lastPhotoMsg._photoBase64;
-
-  // Ghost回应
-  if (typeof showTyping === 'function') showTyping();
-  await new Promise(r => setTimeout(r, 800));
-
-  let reply = '';
-  if (base64List.length > 1) {
-    // 多张图，问用户要哪张
-    reply = "which one.";
-    _pendingAvatarChoice = { base64List };
-  } else {
-    // 只有一张，直接换
-    const ghostB64 = base64List[0];
-    updateGhostAvatar(`data:image/jpeg;base64,${ghostB64}`);
-    uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`).then(url => {
-      if (url) updateGhostAvatar(url); // 自动调用saveAvatarUrlToProfile
-    });
-    reply = "changed.";
-    // avatarRequestPending 已废弃，换头像改由模型通过AVATAR_SET决定
-  }
-
-  if (typeof hideTyping === 'function') hideTyping();
-  if (typeof appendMessage === 'function') appendMessage('bot', reply);
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'assistant', content: reply });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-  return true;
+  return false;
 }

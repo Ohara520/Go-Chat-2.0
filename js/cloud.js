@@ -241,14 +241,21 @@ async function loadFromCloud() {
       }
       // Ghost档案
       // marriageType 已退役：旧云端字段可保留，但 Simon 不再恢复到本地。
-      // Ghost头像URL：云端有值就用云端（换设备必须恢复），本地有值且云端没有就保留本地
-      if (p.ghostAvatarUrl) {
-        // 云端有头像URL，无论新旧都写入（保证换头像后刷新能恢复）
+      // Ghost头像：按独立版本号决定谁更新，禁止旧云端头像覆盖刚换的新头像。
+      // 旧云端没有 ghostAvatarUpdatedAt 时，只在本地没有头像时用于换设备恢复。
+      const _localAvatarUrl = localStorage.getItem('ghostAvatarUrl') || '';
+      const _localAvatarAt = parseInt(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
+      const _cloudAvatarAt = parseInt(p.ghostAvatarUpdatedAt || '0');
+      const _shouldRestoreCloudAvatar = !!p.ghostAvatarUrl && (
+        !_localAvatarUrl || (_cloudAvatarAt > 0 && _cloudAvatarAt > _localAvatarAt)
+      );
+      if (_shouldRestoreCloudAvatar) {
         localStorage.setItem('ghostAvatarUrl', p.ghostAvatarUrl);
-        // 同时更新页面上的头像元素
-        document.querySelectorAll('.ghost-avatar-img').forEach(el => {
-          el.src = p.ghostAvatarUrl + '?t=' + Date.now();
-        });
+        if (_cloudAvatarAt > 0) localStorage.setItem('ghostAvatarUpdatedAt', String(_cloudAvatarAt));
+        if (typeof refreshGhostAvatar === 'function') refreshGhostAvatar();
+      } else if (_localAvatarUrl && _localAvatarAt > _cloudAvatarAt) {
+        // 本地头像更新：保留本地，稍后完整存档会把新版本同步到云端。
+        if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
       }
       setIfMissing('ghostHeight', p.ghostHeight);
       setIfMissing('ghostWeight', p.ghostWeight);
@@ -987,6 +994,7 @@ async function saveToCloud() {
       // Ghost日记
       ghostDiary: localStorage.getItem('ghostDiary') || '[]',
       ghostAvatarUrl: (() => { const u = localStorage.getItem('ghostAvatarUrl') || ''; return u.startsWith('data:') ? '' : u; })(),
+      ghostAvatarUpdatedAt: localStorage.getItem('ghostAvatarUpdatedAt') || '0',
       ghostHeight: localStorage.getItem('ghostHeight') || '',
       ghostWeight: localStorage.getItem('ghostWeight') || '',
       ghostBloodType: localStorage.getItem('ghostBloodType') || '',

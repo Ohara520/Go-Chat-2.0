@@ -1131,6 +1131,7 @@ async function _processMergedMessage(text) {
       _longContentHint,
       _feedActionHint,
       sceneHint,
+      (typeof getAvatarNegotiationContext === 'function' ? getAvatarNegotiationContext() : ''),
       langHint
     ].filter(Boolean).join('\n');
     const _abortCtrl = _currentAbortController;
@@ -1416,6 +1417,9 @@ async function _processMergedMessage(text) {
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
     _syncRenderedCount();
+    if (typeof evaluateAvatarNegotiationAfterReply === 'function') {
+      evaluateAvatarNegotiationAfterReply(text, reply).catch(e => console.warn('[avatar] 协商结果处理失败:', e));
+    }
 
     // ── 租赁 AA 判断（纯本地，仅读 Ghost 真实回复）──────────────
     if (typeof checkHomeAADeal === 'function') checkHomeAADeal(reply);
@@ -1712,9 +1716,12 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     const _wbRecall = (typeof recallWorldBook === 'function')
       ? recallWorldBook(text, 4)
       : '';
+    const _avatarNegotiationCtx = (typeof getAvatarNegotiationContext === 'function')
+      ? getAvatarNegotiationContext()
+      : '';
     const _veniceSys = _dailyMode
-      ? _sharedGhostCore + _dailyContinueNote + '\n' + _intimacyBlock + _wbRecall
-      : _sharedGhostCore + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection + _wbRecall;
+      ? _sharedGhostCore + _dailyContinueNote + '\n' + _intimacyBlock + _wbRecall + (_avatarNegotiationCtx ? '\n' + _avatarNegotiationCtx : '')
+      : _sharedGhostCore + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection + _wbRecall + (_avatarNegotiationCtx ? '\n' + _avatarNegotiationCtx : '');
     const _veniceUser = recentMsgs + '\nHer: ' + text;
     let geminiReply = await callVeniceForCurrentChar(
       _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice, _images
@@ -1881,6 +1888,9 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
             incrementTodayCount();
             if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
             _syncRenderedCount();
+            if (typeof evaluateAvatarNegotiationAfterReply === 'function') {
+              evaluateAvatarNegotiationAfterReply(text, _retryClean).catch(e => console.warn('[avatar] 协商结果处理失败:', e));
+            }
             return;
           }
         }
@@ -1902,6 +1912,9 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
           incrementTodayCount();
           if (localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email')) consumeQuota().catch(() => {});
           _syncRenderedCount();
+          if (typeof evaluateAvatarNegotiationAfterReply === 'function') {
+            evaluateAvatarNegotiationAfterReply(text, firstPart).catch(e => console.warn('[avatar] 协商结果处理失败:', e));
+          }
           return;
         }
         console.warn('[Grok] 清洗后回复为空，走网络波动兜底');

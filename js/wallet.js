@@ -54,46 +54,8 @@ function initWallet() {
     } catch(e) {}
   }
 
-  // 迁移：老用户 marriageType 升级
-  // affection >= 60 的用户应已是 established，但旧版可能仍停在 slowBurn
-  // slowBurn 会让 moneyEase -1，导致黑卡上限卡在 £2000 而非 £2600
-  if (!localStorage.getItem('marriageTypeUpgrade_v1')) {
-    localStorage.setItem('marriageTypeUpgrade_v1', '1');
-    const _curType = localStorage.getItem('marriageType');
-    const _aff = parseInt(localStorage.getItem('affection') || '0');
-    if (_curType === 'slowBurn' && _aff >= 60) {
-      localStorage.setItem('marriageType', 'established');
-      localStorage.setItem('relationshipUnlocked', 'true');
-    }
-  }
-  // v2：修复 v1 时 affection 不足60但现在已达到的用户
-  if (!localStorage.getItem('marriageTypeUpgrade_v2')) {
-    localStorage.setItem('marriageTypeUpgrade_v2', '1');
-    const _curType2 = localStorage.getItem('marriageType');
-    const _aff2 = parseInt(localStorage.getItem('affection') || '0');
-    if (_curType2 === 'slowBurn' && _aff2 >= 60) {
-      localStorage.setItem('marriageType', 'established');
-      localStorage.setItem('relationshipUnlocked', 'true');
-    }
-  }
-
-  // 关系类型自愈：每次启动都校验，不打一次性标记。
-  // 场景：用户"先选磨合(slowBurn)→聊几句→改成老夫老妻(established)"，但改的那一下
-  // 没存进云端（如云端到期那几天）。之后本地数据一丢，只剩云端旧档(还写着 slowBurn)，
-  // 用户就被打回磨合期，黑卡额度被 moneyEase-1 压回 0/砍半。
-  // 判定：亲密度(affection)已达 60（established 的标志线，磨合初始仅 30），
-  // 关系类型却仍是 slowBurn 或缺失 → 自动纠正回 established。
-  // 用每次校验取代一次性标记，这样云端再抽风导致的新受害者也能自愈。
-  {
-    const _mt = localStorage.getItem('marriageType');
-    const _affNow = parseInt(localStorage.getItem('affection') || '0');
-    if (_affNow >= 60 && _mt !== 'established') {
-      localStorage.setItem('marriageType', 'established');
-      localStorage.setItem('relationshipUnlocked', 'true');
-      if (typeof touchLocalState === 'function') touchLocalState();
-      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-    }
-  }
+  // Relationship/trust-based Ghost Card migrations retired.
+  // Ghost Card now has one fixed monthly rule; money.js owns its migration/state.
 
   // 余额漂移误删补偿：balanceDriftFixed_20260523 把合法余额误删了
   // 受影响用户：本地余额比云端高500+，被清理后余额暴跌
@@ -128,58 +90,9 @@ function initWallet() {
     }
   }
 
-  // 老用户 trust 被云端快照覆盖修复：聊了很久但 trustHeat 被重置到低值
-  // 判断依据：有签到记录或聊天记录，说明是老用户，trust 不应该低于82
-  if (!localStorage.getItem('trustHeatFix_v1')) {
-    localStorage.setItem('trustHeatFix_v1', '1');
-    const _trust = parseInt(localStorage.getItem('trustHeat') || '0');
-    const _turns = parseInt(localStorage.getItem('globalTurnCount') || '0');
-    const _hasHistory = (JSON.parse(localStorage.getItem('chatHistory') || '[]')).length > 20;
-    // 聊超过50轮或有大量历史记录，认为是老用户，trust 至少应该到82
-    if ((_turns > 50 || _hasHistory) && _trust < 82) {
-      localStorage.setItem('trustHeat', '82');
-    }
-  }
+  // Legacy trust self-healing for Ghost Card retired.
 
-  // trust 自愈（每次启动校验，不打一次性标记）——修黑卡余额一直为 0 的根因。
-  // 背景：Ghost Card V2 现在用固定 £10,000 月度额度，不再依赖 trust/moneyEase。
-  // 但旧架构下 trust < 45 会导致额度为 0 的历史 bug 可能让部分老用户卡在低 trust。
-  // 上面 trustHeatFix_v1 用一次性标记，跑过一次就插旗永不再查——
-  // 若用户是在"旗子已插上"之后才被云端旧档打回低 trust（如云端到期那几天没同步），
-  // 就再也救不回来，表现为"老夫老妻重选也没用，黑卡还是 0"。
-  // 这里改成每次启动都校验：是老用户(有聊天/签到记录)但 trust 异常低，就拉回安全值，
-  // 这样云端再抽风导致的新受害者也能自愈。和上面 marriageType 的每次校验同一思路。
-  {
-    const _trustNow = parseInt(localStorage.getItem('trustHeat') || '75');
-    const _turnsNow = parseInt(localStorage.getItem('globalTurnCount') || '0');
-    const _histLen  = (() => { try { return JSON.parse(localStorage.getItem('chatHistory') || '[]').length; } catch(e) { return 0; } })();
-    const _signedIn = parseInt(localStorage.getItem('visitStreak') || '0') > 1;
-    const _isVeteran = _turnsNow > 50 || _histLen > 20 || _signedIn;
-    // 老用户 trust 不该低于 65（established 区间下限）。低于就是被覆盖了，拉回 75。
-    if (_isVeteran && _trustNow < 65) {
-      localStorage.setItem('trustHeat', '75');
-      if (typeof touchLocalState === 'function') touchLocalState();
-      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
-    }
-  }
-
-  // 黑卡余额被月初重置cap砍半补偿(#19)：旧逻辑用临时压制后的额度*3做封顶，
-  // 心情差的月份会把累积余额(如6000)砍到3000。受影响特征：当前余额明显低于
-  // 历史峰值额度能累积的合理上限(_peakLimit*2)。一次性恢复到 _peakLimit*3。
-  if (!localStorage.getItem('ghostCardCapFix_20260603')) {
-    localStorage.setItem('ghostCardCapFix_20260603', '1');
-    try {
-      const _gc = JSON.parse(localStorage.getItem('ghostCard') || 'null');
-      if (_gc && typeof _gc.balance === 'number') {
-        const _peak = _gc._peakLimit || _gc.monthlyLimit || 0;
-        if (_peak > 0 && _gc.balance < _peak * 2) {
-          _gc.balance = _peak * 3;
-          localStorage.setItem('ghostCard', JSON.stringify(_gc));
-          if (typeof renderGhostCardWallet === 'function') renderGhostCardWallet();
-        }
-      }
-    } catch(e) {}
-  }
+  // Legacy variable-limit/cap compensation retired; fixed £10k migration lives in money.js.
 
   // 负数 base 自愈：walletBaseBalance（存钱罐数字）若被搞成负数，会把所有进账吃掉，
   // getBalance 用 Math.max(0,…) 一兜底就永远显示 0——这正是"有进账记录余额还是0/

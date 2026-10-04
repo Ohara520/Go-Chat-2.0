@@ -758,8 +758,7 @@ async function handleUserFeedRequest(userText = '') {
     .join('\n');
 
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
-  const _ghostAvUrl = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
-  const GHOST_AV = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  const GHOST_AV = _ghostAvatarHTML();
 
   // 取历史帖子做反重复
   const _recentPosts = getFeedPosts()
@@ -1210,8 +1209,7 @@ Return a JSON array only, same order, keys "key","en","zh" and optional "replyTo
 async function generateFeedPostFromEvent(evt) {
   const location   = localStorage.getItem('currentLocation') || 'Hereford Base';
   const weather    = localStorage.getItem('lastWeatherDisplay') || '';
-  const _ghostAvUrl = localStorage.getItem('ghostAvatarUrl') || 'images/ghost-avatar.jpg';
-  const GHOST_AV   = `<img src="${_ghostAvUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  const GHOST_AV   = _ghostAvatarHTML();
   const posterMap  = {
     ghost: { name: localStorage.getItem('botNickname') || 'Simon Riley', avatar: GHOST_AV, nameClass: 'couple-ghost-name' },
     soap:  { name: 'Soap',  avatar: '🧼', nameClass: 'couple-soap-name'  },

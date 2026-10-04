@@ -84,7 +84,24 @@ function getGhostCard() {
     const saved = JSON.parse(localStorage.getItem('ghostCard') || 'null');
     if (!saved) {
       localStorage.setItem('ghostCard', JSON.stringify(defaults));
+      localStorage.setItem('ghostCardFixed10k_v1', '1');
       return defaults;
+    }
+
+    // Ghost Card fixed-£10k migration (one time).
+    // Older users can still carry a fully calculated £3k/legacy card for the current month,
+    // which means _lastCalcKey would otherwise prevent the new fixed limit from taking effect.
+    if (localStorage.getItem('ghostCardFixed10k_v1') !== '1') {
+      saved.monthlyLimit = monthlyLimit;
+      saved.balance = monthlyLimit;
+      saved.spentThisMonth = 0;
+      saved.lastResetMonth = now.getMonth();
+      saved.lastResetYear = now.getFullYear();
+      // Force the normal calculation block below to stamp the current fixed-rule calc key.
+      delete saved._lastCalcKey;
+      delete saved._peakLimit;
+      delete saved.lockedLimit;
+      localStorage.setItem('ghostCardFixed10k_v1', '1');
     }
 
     // 修复：月初重置和上限差额补偿只执行一次，用 _lastCalcKey 标记
