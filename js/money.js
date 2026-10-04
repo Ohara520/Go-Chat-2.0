@@ -92,14 +92,11 @@ function getGhostCard() {
       localStorage.setItem('ghostCardFixed10k_v1', '1');
     }
 
-    // 修复：月初重置和上限差额补偿只执行一次，用 _lastCalcKey 标记
+    // 用 _lastCalcKey 标记本月已处理固定额度与月度重置
     // 原逻辑每次调用 getGhostCard() 都重算，导致余额漂移（登录扣20、每日少5等）
     const nowMonthKey = now.getFullYear() * 100 + now.getMonth();
     const savedMonthKey = (saved.lastResetYear || 0) * 100 + (saved.lastResetMonth ?? 99);
-    const _currentCareer = typeof getCareer === 'function' ? getCareer() : '';
-    const _currentLevel  = typeof getCareerLevel === 'function' ? getCareerLevel() : 0;
-    const _savedCareer = saved._careerType || '';
-    const _calcKey = nowMonthKey + '_' + _currentCareer + '_' + _currentLevel;
+    const _calcKey = nowMonthKey;
 
     if (saved._lastCalcKey !== _calcKey) {
       // 月初重置
@@ -113,13 +110,12 @@ function getGhostCard() {
         saved.balance = newLimit;
       }
 
-      // 职业切换重算上限：V2 固定 £10,000，不再需要
+      // 保持固定 £10,000 上限
       saved.monthlyLimit = monthlyLimit;
 
       // 上限升级补差额：V2 固定上限，不再需要
       // lockedLimit / _peakLimit 逻辑移除
 
-      saved._careerType = _currentCareer;
       saved._lastCalcKey = _calcKey; // 标记本周期已计算，防止重复执行
     }
 
