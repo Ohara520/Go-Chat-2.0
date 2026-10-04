@@ -239,8 +239,8 @@ async function loadFromCloud() {
       if (p.coupleCoverBase64 && !localStorage.getItem('coupleCoverBase64')) {
         localStorage.setItem('coupleCoverBase64', p.coupleCoverBase64);
       }
-      // 婚姻模式和Ghost档案
-      setIfMissing('marriageType', p.marriageType);
+      // Ghost档案
+      // marriageType 已退役：旧云端字段可保留，但 Simon 不再恢复到本地。
       // Ghost头像URL：云端有值就用云端（换设备必须恢复），本地有值且云端没有就保留本地
       if (p.ghostAvatarUrl) {
         // 云端有头像URL，无论新旧都写入（保证换头像后刷新能恢复）
@@ -329,16 +329,13 @@ async function loadFromCloud() {
       }
     }
 
-    // ── 3. 关系：云端更新才覆盖，本地操作优先 ────────────
-    // Phase 3G-8A: Simon 不再从云端加载 moodLevel。
-    // data.mood 仍可能存在（旧云端数据），但不恢复到 localStorage。
-    // Keegan 兼容：moodLevel 留在 CHARACTER_KEYS，Keegan 切换时仍能加载自己保存的 mood。
+    // ── 3. 长期记忆：云端更新才覆盖，本地操作优先 ──────────
+    // Simon 的旧 affection / moodLevel 关系状态已退役，不再从云端恢复。
+    // 旧云端字段可继续存在；多角色 CHARACTER_KEYS 兼容逻辑不在这里改动。
     if (cloudIsNewer) {
-      if (data.affection != null) localStorage.setItem('affection', data.affection);
       if (data.long_term_memory != null) localStorage.setItem('longTermMemory', data.long_term_memory);
     } else {
       // 云端较旧：只恢复本地没有的
-      if (data.affection != null && !localStorage.getItem('affection')) localStorage.setItem('affection', data.affection);
       if (data.long_term_memory != null && !localStorage.getItem('longTermMemory')) localStorage.setItem('longTermMemory', data.long_term_memory);
     }
 
@@ -451,18 +448,13 @@ async function loadFromCloud() {
 
       // 动态状态：云端更新才覆盖
       if (cloudIsNewer) {
-        // trustHeat 只取较大值，防止云端旧快照把本地积累的信任值覆盖掉
-        if (s.trustHeat != null) {
-          const _localTrust = parseInt(localStorage.getItem('trustHeat') || '0');
-          const _cloudTrust = parseInt(s.trustHeat);
-          localStorage.setItem('trustHeat', Math.max(_localTrust, _cloudTrust));
-        }
+        // Simon 的 trustHeat 已退役：旧快照字段不再恢复到本地。
         if (s.attachmentPull != null) localStorage.setItem('attachmentPull', s.attachmentPull);
         if (s.globalTurnCount != null) { _globalTurnCount = s.globalTurnCount; localStorage.setItem('globalTurnCount', s.globalTurnCount); }
         if (Array.isArray(s.pendingReversePackages)) savePendingReversePackages(s.pendingReversePackages, { markChanged: false });
         if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
         if (s.lastReversePackageTurn != null) localStorage.setItem('lastReversePackageTurn', s.lastReversePackageTurn);
-        if (s.relationshipFlags != null) localStorage.setItem('relationshipFlags', JSON.stringify(s.relationshipFlags));
+        // Simon 的 relationshipFlags 已退役：旧快照字段不再恢复到本地。
         if (s.pendingSeriousTalk != null) localStorage.setItem('pendingSeriousTalk', String(s.pendingSeriousTalk));
         if (s.pendingColdWarEndStory != null) localStorage.setItem('pendingColdWarEndStory', String(s.pendingColdWarEndStory));
         if (s.loveResistance != null) localStorage.setItem('loveResistance', String(s.loveResistance));
@@ -499,10 +491,8 @@ async function loadFromCloud() {
       } else {
         // 云端较旧：只恢复本地没有的字段
         const restoreIfMissing = (key, val) => { if (val != null && !localStorage.getItem(key)) localStorage.setItem(key, String(val)); };
-        restoreIfMissing('trustHeat', s.trustHeat);
         restoreIfMissing('attachmentPull', s.attachmentPull);
         restoreIfMissing('emotionalHurt', s.emotionalHurt);
-        restoreIfMissing('relationshipFlags', s.relationshipFlags ? JSON.stringify(s.relationshipFlags) : null);
         restoreIfMissing('loveResistance', s.loveResistance);
         restoreIfMissing('moneyRefuseCount', s.moneyRefuseCount);
         restoreIfMissing('userDislikesMoney', s.userDislikesMoney);
@@ -996,7 +986,6 @@ async function saveToCloud() {
       careerLastSalaryMonth: localStorage.getItem('careerLastSalaryMonth') || '',
       // Ghost日记
       ghostDiary: localStorage.getItem('ghostDiary') || '[]',
-      marriageType: localStorage.getItem('marriageType') || 'established',
       ghostAvatarUrl: (() => { const u = localStorage.getItem('ghostAvatarUrl') || ''; return u.startsWith('data:') ? '' : u; })(),
       ghostHeight: localStorage.getItem('ghostHeight') || '',
       ghostWeight: localStorage.getItem('ghostWeight') || '',
@@ -1076,13 +1065,11 @@ async function saveToCloud() {
           .map(m => ({ role: m.role, content: m.content, ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}), ...(m._payCard ? {_payCard: m._payCard} : {}), ...(m._product ? {_product: m._product} : {}), ...(m._house ? {_house: m._house} : {}) }))
       : [];
     const stateSnapshot = {
-      trustHeat: getTrustHeat(),
       attachmentPull: getAttachmentPull(),
       globalTurnCount: _globalTurnCount,
       pendingReversePackages: getPendingReversePackages(),
       emotionalHurt: parseInt(localStorage.getItem('emotionalHurt') || '0'),
       lastReversePackageTurn: getLastReversePackageTurn(),
-      relationshipFlags: getRelationshipFlags(),
       // 钱包和快递数据
       activeDateSession: (() => {
         try { return JSON.parse(localStorage.getItem('activeDateSession') || 'null'); } catch(e) { return null; }
@@ -1176,13 +1163,11 @@ async function saveToCloud() {
     if (_profileHasCore) {
       upsertData.profile = profile;
       upsertData.state_snapshot = stateSnapshot;
-      // Phase 3G-8A: Simon 不再上传 moodLevel 到云端。
-      // affection/long_term_memory 仍需守卫（防止空快照覆盖云端）。
-      // 旧云端 mood 字段保留不删除，但不再主动更新。
-      upsertData.affection = parseInt(localStorage.getItem('affection') || '50');
+      // Simon 不再上传 moodLevel / affection 等旧关系状态。
+      // 旧云端字段保留不删除，但客户端不再续写。
       upsertData.long_term_memory = localStorage.getItem('longTermMemory') || '';
     } else {
-      console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/affection/long_term_memory 字段写入，防止覆盖云端');
+      console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/long_term_memory 字段写入，防止覆盖云端');
     }
     // 只在有内容时才存，防止空值覆盖云端已有数据
     if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;

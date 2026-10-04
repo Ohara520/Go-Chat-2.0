@@ -584,19 +584,6 @@ function loadSecretScreen() {
     ).join('');
   }
 
-  // 婚姻模式
-  const marriageTypeEl = document.getElementById('marriageTypeChips');
-  if (marriageTypeEl) {
-    const savedMode = localStorage.getItem('marriageType') || 'established';
-    const modes = [
-      { key: 'established', emoji: '💫', label: '已有默契，感情稳定' },
-      { key: 'slowBurn',    emoji: '🌱', label: '刚步入婚姻，慢慢磨合' },
-    ];
-    marriageTypeEl.innerHTML = modes.map(m =>
-      `<div class="secret-chip ${savedMode === m.key ? 'selected' : ''}" onclick="selectMarriageType('${m.key}', this)">${m.emoji} ${m.label}</div>`
-    ).join('');
-  }
-
   // 头像预览
   updateAvatarPreview(localStorage.getItem('userAvatarBase64'));
 
@@ -678,19 +665,6 @@ function selectZodiac(label, el) {
   document.querySelectorAll('#zodiacChips .secret-chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   saveSecret('userZodiac', label);
-}
-
-function selectMarriageType(key, el) {
-  document.querySelectorAll('#marriageTypeChips .secret-chip').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  localStorage.setItem('marriageType', key);
-  if (key === 'established') {
-    localStorage.setItem('affection', '60');
-    localStorage.setItem('trustHeat', '75');
-  } else if (key === 'slowBurn') {
-    localStorage.setItem('affection', '30');
-    localStorage.setItem('trustHeat', '50');
-  }
 }
 
 function selectMeetType(key, el) {
