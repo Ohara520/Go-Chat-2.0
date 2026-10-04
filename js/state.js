@@ -626,8 +626,6 @@ function updateRelationshipStatsFromUserInput(userText) {
     localStorage.setItem('sharedRoutineCount', cnt + 1);
   }
 
-  // Keep timestamp as neutral activity metadata for compatibility.
-  localStorage.setItem('lastOnlineTime', Date.now());
   return { patternDetected: false };
 }
 
