@@ -495,9 +495,6 @@ async function _processMergedMessage(text) {
   _isSending = true;
   _currentAbortController = new AbortController();
 
-  // 爱意抗拒值更新
-  updateLoveResistance(text);
-
   // 用户主动要求Ghost发朋友圈 —— 两层 action 检测
   //  第一层 fast path：命中固定关键词 → 直接发帖，零额外 API。
   //  第二层 semantic fallback：没命中固定词，但出现"社交发布"领域词时，
@@ -1013,12 +1010,8 @@ async function _processMergedMessage(text) {
                 // testing → 完全拦，他注意到了不会被牵着走
                 sessionStorage.setItem('haikuBlocksMoney', '1');
               } else if (_ms === 'flirty') {
-                // flirty → 概率机制：关系深/心情好时更容易给
-                const _aff = getAffection();
-                const _giveChance = Math.min(0.5,
-                  0.2
-                  + (_aff >= 70 ? 0.15 : _aff >= 50 ? 0.08 : 0)
-                );
+                // flirty → 暂保留原基础概率；不再由旧 Affection 数值控制。
+                const _giveChance = 0.2;
                 if (Math.random() > _giveChance) {
                   sessionStorage.setItem('haikuBlocksMoney', '1');
                 } else {
@@ -1412,18 +1405,6 @@ async function _processMergedMessage(text) {
 
     // Phase 3H-1B: 用户道歉不再自动 endColdWar。
 
-    // ── 好感度更新（已移至 updateStateFromUserInput 统一处理，此处不再重复）──
-    // 仅保留 updateStateFromUserInput 未覆盖的逻辑：连续登录奖励
-    const streakAffKey = 'streakAffection_' + getTodayDateStr();
-    if (!localStorage.getItem(streakAffKey)) {
-      if (parseInt(localStorage.getItem('visitStreak') || '1') >= 2) {
-        changeAffection(1); localStorage.setItem(streakAffKey, '1');
-      }
-    }
-    if (['你必须','你给我','不然','否则你就','逼你','强迫你','你不许','命令你'].some(k => text.includes(k))) {
-      changeAffection(-0.5);
-    }
-
     // ── 存档 ─────────────────────────────────────────────────
     _currentAbortController = null;
     chatHistory.push({
@@ -1436,26 +1417,6 @@ async function _processMergedMessage(text) {
 
     // ── 租赁 AA 判断（纯本地，仅读 Ghost 真实回复）──────────────
     if (typeof checkHomeAADeal === 'function') checkHomeAADeal(reply);
-
-    // ── 承诺检测 ─────────────────────────────────────────────
-    try {
-      const commitPatterns = [
-        { pattern: /love you too|i love you|爱你/i, flag: 'loveConfessed', memory: 'He said "love you" — clearly, directly.' },
-        { pattern: /we('ll| will) (get better|work on it|figure it out|do better)|i('ll| will) do better/i, flag: 'repairPromised', memory: 'He promised to do better and work on things together.' },
-        { pattern: /i hear you|i know what (matters|you need)|i understand|i('m| am) listening/i, flag: 'bondAcknowledged', memory: 'He acknowledged her feelings and what matters to her.' },
-        { pattern: /i('m| am) (here|not going anywhere)|you('re| are) (mine|my wife)|we('re| are) (fine|okay|good)/i, flag: 'bondAcknowledged', memory: 'He confirmed the bond — directly, without drama.' },
-      ];
-      commitPatterns.forEach(({ pattern, flag, memory }) => {
-        if (pattern.test(reply)) {
-          setRelationshipFlag(flag, true);
-          const today = new Date().toLocaleDateString('zh-CN');
-          const existing = getLongTermMemory();
-          if (!existing.includes(memory)) {
-            saveLongTermMemory(existing ? existing + `\n[${today}] ${memory}` : `[${today}] ${memory}`);
-          }
-        }
-      });
-    } catch(e) {}
 
     // ── Conflict fact transitions (Phase 3H-3N) ──────────────
     // Model-authorized state changes — only when Simon decides

@@ -1,9 +1,7 @@
 // ===================================================
 // persona.js — Ghost 人设层
 // 替换 chat_frontend.js 里所有人设相关函数
-// 依赖：getTrustHeat, getMoodLevel, getAffection,
-//       getJealousyLevelCapped, getLovePermission,
-//       localStorage, sessionStorage
+// 依赖：localStorage, sessionStorage 及当前事实/记忆/现实层 helpers
 // ===================================================
 
 
@@ -479,12 +477,6 @@ function buildSystemPrompt(opts) {
     flags.firstSalary       && 'shared first salary',
   ].filter(Boolean);
 
-  const activeCommitments = [
-    flags.loveConfessed    && 'you have said "love you" — this stands; you do not take it back',
-    flags.repairPromised   && 'you have promised to do better — this stands',
-    flags.bondAcknowledged && 'you have acknowledged what exists between you — you do not deny it later',
-  ].filter(Boolean);
-
   // Legacy money-behaviour tone mapping removed; relationship facts remain stored elsewhere.
 
   // 转账冷却 — 旧系统已移除，Ghost Card 由系统处理
@@ -541,7 +533,6 @@ ${(typeof getUnresolvedConflict === 'function' && getUnresolvedConflict())
   : 'Cold war: no'}
 
 ${relationshipHistory.length ? `Relationship history: ${relationshipHistory.join(', ')}` : ''}
-${activeCommitments.length ? `[ACTIVE COMMITMENTS — established facts, not negotiable:\n${activeCommitments.map(c => '- ' + c).join('\n')}]` : ''}
 ${localStorage.getItem('userDislikesMoney') === 'true' ? `[Known preference: she has expressed discomfort with being given money as comfort.]` : ''}
 ${moneyLimitNote}
 
