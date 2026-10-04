@@ -373,13 +373,12 @@ async function handlePhotoUpload(fileDataList) {
       cleanOldPhotosFromIDB().catch(() => {});
     }
 
-    // 4. photoHint — 模型只负责聊天，不判断头像，不自动换头像
-    // 换头像只通过用户明确命令触发（checkAvatarCommand）
+    // 4. photoHint — 图片是当前聊天的一部分，让模型结合最近上下文自然理解并回应
+    // 这里只提供交流事实，不规定回复长度，也不把头像执行规则塞进普通看图提示
     const isTwoPhotos = base64List.length > 1;
-    const photoHint = `[You just received ${isTwoPhotos ? 'two photos' : 'a photo'} from her.
-React as Ghost. One line. Your honest first reaction to what you see.
-IMPORTANT: You have NO ability to change avatars or profile pictures. You CANNOT set, update, or switch any avatar. Only she can trigger that by telling you to use it as an avatar. Do NOT say "I'll set this", "done, changed it", "avatar updated", or anything implying you performed an action. If the photo looks like a couple avatar, you may comment on it — but NEVER claim you are setting it.
-English only. No translation. No AVATAR_SET tag.]`;
+    const photoHint = `[She just sent you ${isTwoPhotos ? 'the attached images' : 'the attached image'}.
+Understand why she sent ${isTwoPhotos ? 'them' : 'it'} in the context of your recent conversation, and respond to her naturally as Simon.
+The ${isTwoPhotos ? 'images are' : 'image is'} part of the conversation, not a request for a visual description.]`;
 
     // 5. 发给模型看图回复
     if (typeof showTyping === 'function') showTyping();
@@ -399,7 +398,10 @@ English only. No translation. No AVATAR_SET tag.]`;
     }));
     console.log('[photo] 发给模型的图片数量:', imageContents.length, '第一张base64长度:', base64List[0]?.length);
 
-    const lastUserText = cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'here.';
+    // 当前图片本身已经由多模态块表达；不要把“[用户发了N张图片]”占位符再次当成她说的话。
+    const lastUserText = cleanMsgs
+      .filter(m => m.role === 'user' && m.content && !m.content.includes('[用户发了'))
+      .slice(-1)[0]?.content || 'here.';
     // 修复(#20)：构造合法的对话数组。
     // 旧代码 `.slice(0, -1)` 会连真正的上一条用户消息也删掉，且数组可能以
     // assistant 开头 → Anthropic 报 400 → 主模型直接失败掉进 'noted.' 兜底。
@@ -422,9 +424,18 @@ English only. No translation. No AVATAR_SET tag.]`;
     ];
 
     let reply = '';
+    let _geminiHandledPhoto = false;
 
-    // 主模型直接看图回复
-    try {
+    // Photo V2：沿用聊天已有的亲密通道连续性，而非预判图片内容。
+    // 最近一条真实 assistant 回复由 Gemini 亲密通道产生时，本轮图片直接交给 Gemini；
+    // 其他情况先交给 Claude，只有失败或明确破防才由 Gemini 接手。
+    const _lastRealAssistant = typeof chatHistory !== 'undefined'
+      ? chatHistory.filter(m => m.role === 'assistant' && !m._system && !m._recalled).slice(-1)[0]
+      : null;
+    const _inIntimateSession = !!_lastRealAssistant?._intimate;
+
+    // 日常图片：Claude 优先。亲密通道中的图片：跳过 Claude。
+    if (!_inIntimateSession) try {
       const sRes = await fetchWithTimeout('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -448,30 +459,37 @@ English only. No translation. No AVATAR_SET tag.]`;
       console.warn('[photo] 主模型请求失败:', e.message || e);
     }
 
-    // 主模型失败或破防，走Grok兜底（支持识图）
-    if (!reply || isBreakout(reply)) {
+    // 已处于亲密通道时直接 Gemini；日常图片仅在 Claude 失败或破防时兜底。
+    if (_inIntimateSession || !reply || isBreakout(reply)) {
       try {
-        const core = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
-        const grokPhotoRes = await fetchWithTimeout('/api/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system: core + '\n' + photoHint,
-            user: cleanMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || 'she sent a photo.',
-            image_base64: base64List[0],
-            max_tokens: 200
-          })
-        }, 15000);
-        if (grokPhotoRes.ok) {
-          const grokData = await grokPhotoRes.json();
-          const grokText = grokData.text?.trim();
-          // Grok 兜底也需要破防检测
-          if (grokText && !isBreakout(grokText)) reply = grokText;
-        } else {
-          console.warn('[photo] Grok兜底返回非200:', grokPhotoRes.status);
+        const core = typeof buildSystemPromptParts === 'function'
+          ? buildSystemPromptParts(null, { skipWorldBook: true }).fixed
+          : (typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : _sys);
+        // Gemini 只在 Claude 无法正常接住本轮图片时接手。若当前聊天本来处于亲密上下文，
+        // 给 Gemini 它现有的亲密 Persona；否则只给 Shared Ghost Core。图片本身不做预分类。
+        const _recentIntimateContext = _inIntimateSession;
+        const _geminiPersona = (_recentIntimateContext && typeof GEMINI_INTIMACY_PERSONA === 'string')
+          ? '\n\n' + GEMINI_INTIMACY_PERSONA
+          : '';
+        const _adultContext = _recentIntimateContext
+          ? '\nShe is your wife. Intimacy between you is natural and established. Even when things get close, you remain yourself.'
+          : '';
+        const geminiPhotoText = typeof callVeniceForCurrentChar === 'function'
+          ? await callVeniceForCurrentChar(
+              core + _adultContext + _geminiPersona + '\n' + photoHint,
+              _photoHistory.slice(-6).map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m.content}`).join('\n') + '\nHer: [sent the attached image]',
+              200,
+              '',
+              [],
+              base64List
+            )
+          : '';
+        if (geminiPhotoText && !isBreakout(geminiPhotoText)) {
+          reply = geminiPhotoText.trim();
+          _geminiHandledPhoto = true;
         }
       } catch(e) {
-        console.warn('[photo] Grok兜底请求失败:', e.message || e);
+        console.warn('[photo] Venice兜底请求失败:', e.message || e);
       }
     }
 
@@ -491,7 +509,7 @@ English only. No translation. No AVATAR_SET tag.]`;
     // 6. 显示回复
     if (typeof appendMessage === 'function') appendMessage('bot', reply);
     if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({ role: 'assistant', content: reply });
+      chatHistory.push({ role: 'assistant', content: reply, ...(_inIntimateSession && _geminiHandledPhoto ? { _intimate: true } : {}) });
 
       // 生成图片描述（异步，不阻塞，后续对话用）
       fetchWithTimeout('/api/chat', {

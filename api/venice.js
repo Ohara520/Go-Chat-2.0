@@ -174,13 +174,21 @@ function _extractGeminiText(data) {
 
 // Gemini Native transport：POST /v1/models/<model>:generateContent
 // 用 AbortController 施加真正可中断的 upstream 超时（GEMINI_UPSTREAM_TIMEOUT_MS）。
-async function callGeminiNative(system, user, model = VENICE_MODEL, diag = null) {
+async function callGeminiNative(system, user, model = VENICE_MODEL, diag = null, images = []) {
   let lastErr = null;
   let lastStatus = null;
 
+  const imageParts = (Array.isArray(images) ? images : [])
+    .filter(img => typeof img === 'string' && img.trim())
+    .slice(0, 4)
+    .map(img => {
+      const m = img.match(/^data:([^;]+);base64,(.+)$/s);
+      return { inlineData: { mimeType: m?.[1] || 'image/jpeg', data: m?.[2] || img } };
+    });
+
   const body = {
     contents: [
-      { role: 'user', parts: [{ text: user }] },
+      { role: 'user', parts: [...imageParts, { text: user }] },
     ],
     generationConfig: { temperature: 0.7 },
     systemInstruction: { parts: [{ text: system }] },
@@ -251,13 +259,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { system, user, max_tokens = 300 } = req.body || {};
+    const { system, user, max_tokens = 300, images = [], image_base64 = '' } = req.body || {};
 
     if (!user || typeof user !== 'string') {
       return res.status(400).json({ error: 'Invalid user input' });
     }
 
     const safeSystem = typeof system === 'string' ? system : '';
+    const safeImages = Array.isArray(images)
+      ? images.filter(img => typeof img === 'string' && img.trim()).slice(0, 4)
+      : (typeof image_base64 === 'string' && image_base64.trim() ? [image_base64] : []);
 
     const intimateMemory = req.body.intimateMemory || '';
     const systemHasMemory = safeSystem.includes('[Your memory from previous intimate moments') ||
@@ -276,7 +287,8 @@ export default async function handler(req, res) {
       fullSystem,
       user,
       VENICE_MODEL,
-      _diag
+      _diag,
+      safeImages
     );
 
     // ── 诊断日志：upstream 成功后、抹平前，观测 Gemini Native 响应结构 ──

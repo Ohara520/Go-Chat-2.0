@@ -608,7 +608,7 @@ async function _processMergedMessage(text) {
     const rawHistory = chatHistory
       .filter(m => !m._system && !m._recalled)
       .slice(-20)
-      .map(m => ({ role: m.role, content: m.content }));
+      .map(m => ({ role: m.role, content: m.content, _photoBase64: m._photoBase64 }));
 
     // cleanHistory：Claude 日常聊天使用的真实近期历史（16条）。
     // Soft Handoff 原则：不因为 _intimate 标记删除、屏蔽、摘要或替换真实对话。
@@ -827,7 +827,7 @@ async function _processMergedMessage(text) {
     const isRecentPhoto = lastPhotoMsg && chatHistory.indexOf(lastPhotoMsg) >= chatHistory.length - 4;
 
     // ── 调情检测 + 情绪识别（合并一次Haiku调用）────────────
-    // 有图片时强制跳过——Grok看不到图，会破防说Kirk
+    // Photo V2：Venice/Gemini 现在可以接收真实图片，不再因为最近有图而强制退出亲密路由。
     const INTIMATE_PATTERNS = [
       /摸摸|蹭蹭|贴贴|咬我|舔我|撩你/,
       // 补充：咬/舔/亲 的自然变体（旧版只有"咬我"，"咬一口""咬你"全漏）
@@ -863,7 +863,7 @@ async function _processMergedMessage(text) {
     // 暗示性的话、语境性的调情，Venice 接住比 Sonnet 强得多
     // 只有无歧义露骨内容(explicit)才进 Grok 通道；flirt/暗示/撒娇全部走 Sonnet，破防再兜 Grok。
     // INTIMATE_PATTERNS 不再参与进入判定（只保留给下面的退出保险），避免误伤把普通消息踢进 Grok → 网络波动
-    let isIntimate = isRecentPhoto ? false : (_intimateIntent === 'explicit');
+    let isIntimate = (_intimateIntent === 'explicit');
 
     // ── 强制退出调情模式的三道保险 ──
 
@@ -1076,7 +1076,9 @@ async function _processMergedMessage(text) {
       }
 
       sessionStorage.removeItem('intimateSummarized');
-      await _handleIntimateReply(text, rawHistory, _isSending);
+      await _handleIntimateReply(text, rawHistory, _isSending, {
+        images: (isRecentPhoto && lastPhotoMsg?._photoBase64?.length) ? lastPhotoMsg._photoBase64 : []
+      });
       _isSending = false;
       return;
     }
@@ -1638,8 +1640,9 @@ function _isIdentityBreakout(text) {
 async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
   const _dailyMode = opts.dailyMode === true;
   const _tagIntimate = opts.tagIntimate !== false;
+  const _images = Array.isArray(opts.images) ? opts.images : [];
   try {
-    // 图片消息替换为占位符传给 Gemini 文本上下文——此路径不直接传图片，用占位符保留连续性
+    // 历史图片仍用占位符保留连续性；本轮需要视觉理解的最近图片通过 opts.images 单独传给 Gemini。
     // 关键：去除备用模型自己的重复回复，防止它抄自己形成复读机循环
     // 本轮 user message 在进入本函数前已 push 进 chatHistory（见 sendMessage 顶部），
     // 因此是 rawHistory 的最后一条。这里 slice(-8, -1) 排除它，只取历史；
@@ -1714,13 +1717,13 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
       : _sharedGhostCore + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection + _wbRecall;
     const _veniceUser = recentMsgs + '\nHer: ' + text;
     let geminiReply = await callVeniceForCurrentChar(
-      _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
+      _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice, _images
     );
     // Gemini 首次空返回（超时/网络抖动）→ 默默重试一次，减少"网络波动"弹窗
     if (!geminiReply || !geminiReply.trim()) {
       console.warn('[Gemini] 首次返回空，自动重试一次');
       geminiReply = await callVeniceForCurrentChar(
-        _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice
+        _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice, _images
       );
     }
 
@@ -1863,7 +1866,9 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
           _veniceSys,
           recentMsgs + '\nHer: ' + text,
           50,
-          _intimateMemoryCtx
+          _intimateMemoryCtx,
+          [],
+          _images
         );
         if (_retryReply && !_intimateBreakout(_retryReply)) {
           const _retryClean = _fixMissingSpaces(_retryReply.trim()).split('\n').filter(l => l.trim()).slice(0, 2).join('\n');

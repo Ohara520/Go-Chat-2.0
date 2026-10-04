@@ -487,7 +487,7 @@ async function callDeepSeek(prompt, maxTokens = 200) {
 }
 
 /**
- * 调用 DeepSeek 并传入独立 system（用于结构化打分）
+ * 调用 DeepSeek 并传入独立 system（用于结构化打分，如表达风格轴 banterSweet）
  * 后端 /api/deepseek 已支持 system 字段，此处薄封装不动原 callDeepSeek，避免影响其它调用方
  * @param {string} system   系统提示（打分规则）
  * @param {string} user     用户内容（待判断的消息）
@@ -612,13 +612,14 @@ async function isBreakoutAsync(text) {
 }
 
 // 支持多角色的 Venice 调用（自动路由到当前角色的调情 API）
-async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateMemory = '', recentGhostReplies = []) {
+async function callVeniceForCurrentChar(system, user, maxTokens = 120, intimateMemory = '', recentGhostReplies = [], images = []) {
   const endpoint = typeof getCurrentVeniceEndpoint === 'function'
     ? getCurrentVeniceEndpoint()
     : '/api/venice';
   const body = { system, user, max_tokens: maxTokens };
   if (intimateMemory) body.intimateMemory = intimateMemory;
   if (recentGhostReplies && recentGhostReplies.length > 0) body.recentGhostReplies = recentGhostReplies;
+  if (Array.isArray(images) && images.length > 0) body.images = images;
   // 最多 2 次：Grok 偶发整句吞空格（needsRetry），自动重发一次取更好的结果
   let _lastText = '';
   for (let attempt = 0; attempt < 2; attempt++) {
