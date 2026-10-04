@@ -693,8 +693,6 @@ function getStoryContext() {
   return {
     triggered,
     flags,
-    affection:   getAffection(),
-    trust:       getTrustHeat(),
     // Phase 3G-5A：Events × Mood 解耦——移除 ctx.mood（STORY_EVENTS 无活消费者）。
     streak:      parseInt(localStorage.getItem('visitStreak') || '0'),
     marriageDays: (() => {
@@ -716,7 +714,7 @@ const STORY_EVENTS = [
     desc: '你第一次说出那三个字，他沉默了很久。',
     triggerOn: 'message',
     keyword: /我爱你|i love you/i,
-    condition: (ctx) => ctx.affection >= 85 && !ctx.triggered('first_i_love_you'),
+    condition: (ctx) => !ctx.triggered('first_i_love_you'),
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚第一次对你说了"我爱你"。]`, 8);
       if (res) await emitGhostNarrativeEvent(res);
@@ -739,7 +737,7 @@ const STORY_EVENTS = [
     desc: '你第一次叫他Simon，不是Ghost——他顿了顿。',
     triggerOn: 'message',
     keyword: /\bsimon\b|\briley\b|西蒙|赖利/i,
-    condition: (ctx) => ctx.affection >= 75 && ctx.trust >= 60 && !ctx.triggered('first_simon'),
+    condition: (ctx) => !ctx.triggered('first_simon'),
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]`, 6);
       if (res) await emitGhostNarrativeEvent(res);
@@ -769,7 +767,7 @@ const STORY_EVENTS = [
     desc: '你没说，但他还是发现你状态不对。',
     triggerOn: 'message',
     keyword: /难过|不开心|好累|好烦|崩了|撑不住|不想说话|sad|tired|rough|not okay/i,
-    condition: (ctx) => ctx.trust >= 60 && ctx.affection >= 70 && !ctx.triggered('first_notice_mood'),
+    condition: (ctx) => !ctx.triggered('first_notice_mood'),
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她没有明说，但你看出来她状态不对。你注意到了，用你的方式回应她。]`, 6);
       if (res) await emitGhostNarrativeEvent(res);
@@ -786,7 +784,6 @@ const STORY_EVENTS = [
     condition: (ctx) => {
       // 被用户哄回温过（updateMoodFromUserInput 触发后标记）
       return localStorage.getItem('moodRecoveredByUser') === 'true'
-        && ctx.trust >= 55
         && !ctx.triggered('first_mood_recovered');
     },
     execute: async () => {
@@ -806,7 +803,7 @@ const STORY_EVENTS = [
     triggerOn: 'session',
     condition: (ctx) => {
       const streak = parseInt(localStorage.getItem('visitStreak') || '0');
-      return streak >= 5 && ctx.trust >= 65 && !ctx.triggered('first_habit_formed');
+      return streak >= 5 && !ctx.triggered('first_habit_formed');
     },
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她已经连续几天都在，你开始习惯了。今天用一句话，自然地说出这种"习惯了"的感觉——不用解释，不用承认，就是说出来。]`, 4);
@@ -820,7 +817,7 @@ const STORY_EVENTS = [
     title: '默然以待',
     desc: '他说起以后的时候，没有再问你会不会在。',
     triggerOn: 'message',
-    condition: (ctx) => ctx.trust >= 70 && ctx.affection >= 78 && !ctx.triggered('first_future_assumption'),
+    condition: (ctx) => !ctx.triggered('first_future_assumption'),
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你说起以后某件事时，自然地把她算进去了——没有问她会不会在，就是默认了。用你的方式说一句带有未来感的话，轻的，不要太刻意。]`, 6);
       if (res) await emitGhostNarrativeEvent(res);
@@ -835,7 +832,7 @@ const STORY_EVENTS = [
     triggerOn: 'session',
     condition: (ctx) => {
       const count = parseInt(localStorage.getItem('sharedRoutineCount') || '0');
-      return count >= 3 && ctx.trust >= 65 && !ctx.triggered('first_shared_routine');
+      return count >= 3 && !ctx.triggered('first_shared_routine');
     },
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你们之间慢慢有了一个固定的小习惯——可能是某个时间、某句固定的话、或者某样东西。你注意到了，随口提一下，像是不经意说起，但其实你记得。]`, 4);
@@ -897,7 +894,7 @@ const STORY_EVENTS = [
     desc: '那一刻，他没有中立。',
     triggerOn: 'message',
     keyword: /欺负|骚扰|不公平|委屈|被针对|他们|她们|bully|unfair|harass|they|not fair/i,
-    condition: (ctx) => ctx.trust >= 65 && !ctx.triggered('first_protective'),
+    condition: (ctx) => !ctx.triggered('first_protective'),
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她遇到了一些让她委屈或不公平的事。你明显站在她这边——不是中立，不是讲道理，是偏向她。用你的方式表态，简短，但清楚。]`, 6);
       if (res) await emitGhostNarrativeEvent(res);
@@ -960,7 +957,7 @@ const STORY_EVENTS = [
     title: '不言而知',
     desc: '你没说，但他已经知道了。',
     triggerOn: 'message',
-    condition: (ctx) => ctx.trust >= 75 && ctx.affection >= 82 && !ctx.triggered('first_unspoken_understood'),
+    condition: (ctx) => !ctx.triggered('first_unspoken_understood'),
     execute: async () => {
       const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她没有明说，但你已经准确知道她在想什么或者需要什么。用你的方式回应，不用解释你是怎么知道的，就是知道了。]`, 6);
       if (res) await emitGhostNarrativeEvent(res);
@@ -1073,7 +1070,7 @@ const STORY_EVENTS = [
     condition: (ctx) => {
       const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
       const hasMidnight = history.some(o => o.feeLabel && o.feeLabel.includes('凌晨'));
-      return hasMidnight && ctx.affection >= 75 && !ctx.triggered('midnight_delivery');
+      return hasMidnight && !ctx.triggered('midnight_delivery');
     },
     execute: async () => {
       await new Promise(r => setTimeout(r, 3000));
@@ -1095,7 +1092,7 @@ const STORY_EVENTS = [
     condition: (ctx) => {
       const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
       const cities = new Set(history.map(o => o.city).filter(Boolean));
-      return cities.size >= 5 && ctx.affection >= 80 && ctx.trust >= 70 && !ctx.triggered('city_collector');
+      return cities.size >= 5 && !ctx.triggered('city_collector');
     },
     execute: async () => {
       await new Promise(r => setTimeout(r, 3000));
@@ -1198,11 +1195,7 @@ const STORY_EVENTS = [
     condition: (ctx) => typeof getCheckinStreak === 'function' && getCheckinStreak() >= 100 && !ctx.triggered('checkin_100'),
     execute: async () => {} },
 
-  // 情感深度
-  { id: 'affection_max', icon: '❤️‍🔥', title: '情根深种', desc: '好感度到了顶——他不再假装若无其事。',
-    triggerOn: 'session',
-    condition: (ctx) => ctx.affection >= 95 && !ctx.triggered('affection_max'),
-    execute: async () => {} },
+  // Legacy affection-score achievement retired: established marriage is not unlocked by a numeric affection threshold.
 ];
 
 function markStoryDone(event) {
@@ -1321,48 +1314,8 @@ function checkStoryOnSessionStart() {
   }
 }
 
-// Level < 2 时：生日/纪念日不给钱，但 Ghost 说一句
-async function _checkCelebrationFallback() {
-  if (typeof getMoneyComfortLevel === 'function' && getMoneyComfortLevel() >= 2) return;
-
-  const userBirthday = localStorage.getItem('userBirthday');
-  const isBirthday = userBirthday && (() => {
-    const [bm, bd] = userBirthday.split('-').map(Number);
-    const now = new Date();
-    return now.getMonth() + 1 === bm && now.getDate() === bd;
-  })();
-
-  const marriageDate      = localStorage.getItem('marriageDate');
-  const marriageDaysTotal = marriageDate
-    ? Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1)
-    : 0;
-  const isAnniversary = marriageDate && marriageDaysTotal >= 365 && (() => {
-    const [, mm, mdd] = marriageDate.split('-').map(Number);
-    const now = new Date();
-    return now.getMonth() + 1 === mm && now.getDate() === mdd;
-  })();
-
-  if (!isBirthday && !isAnniversary) return;
-
-  const key = 'celebrationFallback_' + new Date().toISOString().slice(0, 10);
-  if (localStorage.getItem(key)) return;
-  localStorage.setItem(key, '1');
-
-  const hint = isBirthday
-    ? `Today is her birthday. You know. Not giving money — the relationship is not there yet. But you are not pretending you don't know either. One short line. Dry. Understated. Not sweet. Not cold. Just present. English only.`
-    : `Today is your anniversary. You remember the date. Not giving money — not yet. One short line. Quiet acknowledgment. English only.`;
-
-  setTimeout(async () => {
-    try {
-      const res = await callGrokWithCtx(
-        buildGhostStyleCore() + '\n' + hint,
-        'Write his line.',
-        4
-      );
-      if (res && res.trim()) await emitGhostNarrativeEvent(res.trim(), { delayMs: 2000 });
-    } catch(e) {}
-  }, 5000);
-}
+// Legacy money-comfort celebration fallback retired. Birthday/anniversary handling no longer branches on relationship score.
+function _checkCelebrationFallback() { /* retired */ }
 
 function checkStoryOnMessage(userText) {
   const ctx = getStoryContext();
