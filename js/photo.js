@@ -210,11 +210,7 @@ function _avatarFallbackSrc() {
 
 function _renderGhostAvatar(url) {
   const stamp = localStorage.getItem('ghostAvatarUpdatedAt') || '';
-  const pendingLocal = localStorage.getItem('ghostAvatarPendingUpload') === '1';
-  const pendingB64 = pendingLocal ? localStorage.getItem('ghostAvatarBase64') : '';
-  const src = pendingB64
-    ? `data:image/jpeg;base64,${pendingB64}`
-    : (url ? _avatarVersionedUrl(url, stamp) : _avatarFallbackSrc());
+  const src = url ? _avatarVersionedUrl(url, stamp) : _avatarFallbackSrc();
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
     el.onerror = () => {
       el.onerror = null;
@@ -229,7 +225,6 @@ function updateGhostAvatar(url) {
   const stamp = Date.now();
   localStorage.setItem('ghostAvatarUrl', url);
   localStorage.setItem('ghostAvatarUpdatedAt', String(stamp));
-  localStorage.removeItem('ghostAvatarPendingUpload');
   _renderGhostAvatar(url);
   if (typeof touchLocalState === 'function') touchLocalState();
   saveAvatarUrlToProfile(url);
@@ -272,8 +267,7 @@ async function restoreGhostAvatar() {
       const cloudAt = parseInt(row?.profile?.ghostAvatarUpdatedAt || '0');
       const localUrl = localStorage.getItem('ghostAvatarUrl') || '';
       const localAt = parseInt(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
-      const hasPendingLocalAvatar = localStorage.getItem('ghostAvatarPendingUpload') === '1' && !!localStorage.getItem('ghostAvatarBase64');
-      if (!hasPendingLocalAvatar && cloudUrl && (!localUrl || (cloudAt > 0 && cloudAt > localAt))) {
+      if (cloudUrl && (!localUrl || (cloudAt > 0 && cloudAt > localAt))) {
         localStorage.setItem('ghostAvatarUrl', cloudUrl);
         if (cloudAt > 0) localStorage.setItem('ghostAvatarUpdatedAt', String(cloudAt));
         refreshGhostAvatar();
@@ -286,8 +280,7 @@ async function restoreGhostAvatar() {
   // 正式 URL 不存在时，base64 是待同步的本地头像；只重试上传，不再用延时抢写头像。
   const url = localStorage.getItem('ghostAvatarUrl');
   const b64 = localStorage.getItem('ghostAvatarBase64');
-  const pendingUpload = localStorage.getItem('ghostAvatarPendingUpload') === '1';
-  if ((pendingUpload || !url || url.startsWith('data:')) && b64) {
+  if ((!url || url.startsWith('data:')) && b64) {
     refreshGhostAvatar();
     try {
       const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
@@ -667,6 +660,30 @@ function getAvatarNegotiationContext() {
   return `[Current fact: the ${count} images she recently sent are being discussed as possible avatars for you, but no single image has been selected yet. No avatar change has happened. You may respond naturally; if the target is unclear, that uncertainty is real.]`;
 }
 
+// 执行层的本地确定性兜底：只识别“已经明确决定现在使用当前候选图”的强承诺。
+// 这里不决定 Simon 应不应该答应；只把他已经说出口的明确决定可靠落地。
+// 单独的 yes / fine / looks good 不算，避免把暧昧、犹豫或单纯评价误执行。
+function _hasExplicitAvatarCommitment(ghostReply) {
+  const t = String(ghostReply || '').trim().toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/\s+/g, ' ');
+  if (!t) return false;
+
+  const explicitPatterns = [
+    /\bi (?:changed|set|switched|updated) (?:it|my avatar|my profile (?:pic|picture))\b/,
+    /\bi(?:'ll| will) (?:use|set|make|switch to|change to) (?:it|that|this|the (?:photo|picture|image))\b/,
+    /\bi(?:'m| am) (?:using|setting|switching to|changing to) (?:it|that|this|the (?:photo|picture|image))\b/,
+    /\b(?:i've|i have) (?:changed|set|switched|updated) (?:it|my avatar|my profile (?:pic|picture))\b/,
+    /\b(?:changing|setting|switching|updating) (?:it|my avatar|my profile (?:pic|picture)) (?:now|then)\b/,
+    /\b(?:use|set|make) (?:it|that|this) (?:as )?(?:my )?(?:avatar|profile (?:pic|picture))\b/,
+    /(?:换|改|设|设置|换成|改成)(?:这张|这个|它)(?:当|做|成|为)?(?:我的)?(?:头像|大头照)/,
+    /(?:我)?(?:已经|现在)?(?:把)?(?:头像)?(?:换成|改成|设成|设置成)(?:这张|这个|它)/,
+    /(?:我)?(?:已经|现在)?(?:把)?(?:这张|这个|它)(?:换成|改成|设成|设置成)(?:我的)?(?:头像|大头照)/,
+    /(?:我的)?(?:头像|大头照)(?:已经|现在)?(?:换好(?:了)?|换了|改了|设置好了|设好了)/
+  ];
+  return explicitPatterns.some(re => re.test(t));
+}
+
 // Ghost 正常回复后，后台只读取“他刚才是否已经明确决定使用这张图”。
 // 拒绝/犹豫不会清空候选，因此她之后仍可继续聊、继续说服，他也可以自然改变主意。
 async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
@@ -674,56 +691,51 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
   if (!pending || !Array.isArray(pending.base64List) || !pending.base64List.length) return false;
   if (!ghostReply || !String(ghostReply).trim()) return false;
 
-  const selected = Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0
-    ? pending.selectedIndex
-    : (pending.base64List.length === 1 ? 0 : -1);
-  if (selected < 0) return false;
+  try {
+    const selected = Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0
+      ? pending.selectedIndex
+      : (pending.base64List.length === 1 ? 0 : -1);
+    // 没有明确目标时绝不执行；多图必须先知道是哪一张。
+    if (selected < 0) return false;
 
-  const ghostB64 = pending.base64List[selected];
-  if (!ghostB64) return false;
-
-  const replyText = String(ghostReply).trim();
-  const targetFact = `The candidate is image ${selected + 1}.`;
-  let accepted = false;
-
-  // 语义判定最多尝试两次。单次 judge 网络失败不能让“Simon 已答应”变成空气操作。
-  for (let attempt = 0; attempt < 2 && !accepted; attempt++) {
-    try {
-      const res = await fetchWithTimeout('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 10,
-          system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply clearly commits to actually using the specific candidate image as his avatar now.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires a clear present decision to use the image. Refusal, hesitation, teasing without commitment, conditional agreement, discussing whether it looks good, or an unclear target are UNRESOLVED. Do not infer agreement merely because he is affectionate or because she wants it.`,
-          messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${replyText.slice(0, 700)}` }]
-        })
-      }, 8000);
-      if (res.ok) {
-        const data = await res.json();
-        const decision = (data.content?.[0]?.text || '').trim().toUpperCase();
-        accepted = decision.startsWith('ACCEPT');
-        if (!accepted) break; // judge 明确判未达成，不重试；只有请求失败才重试
-      }
-    } catch(e) {
-      console.warn(`[photo] 头像协商决定读取第${attempt + 1}次失败:`, e.message || e);
+    // Simon 已经用了非常明确的执行式表达时，直接落地，不再把可靠性押在第二次模型请求上。
+    // 例如 “Yeah, I changed it.” / “I'll use that one.”。
+    if (_hasExplicitAvatarCommitment(ghostReply)) {
+      const ghostB64 = pending.base64List[selected];
+      if (!ghostB64) return false;
+      window._avatarChangeIntent = null;
+      _pendingAvatarChoice = null;
+      await _executeAvatarSet(ghostB64);
+      return true;
     }
+
+    // 其余自然表达仍交给语义分类器判断，保留对非固定措辞的理解能力。
+    const targetFact = `The candidate is image ${selected + 1}.`;
+    const res = await fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply clearly commits to actually using the specific candidate image as his avatar now.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires a clear present decision to use the image. Refusal, hesitation, teasing without commitment, conditional agreement, discussing whether it looks good, or an unclear target are UNRESOLVED. Do not infer agreement merely because he is affectionate or because she wants it.`,
+        messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
+      })
+    }, 8000);
+    if (!res.ok) return false;
+    const data = await res.json();
+    const decision = (data.content?.[0]?.text || '').trim().toUpperCase();
+    if (!decision.startsWith('ACCEPT')) return false;
+
+    const ghostB64 = pending.base64List[selected];
+    if (!ghostB64) return false;
+    window._avatarChangeIntent = null;
+    _pendingAvatarChoice = null;
+    await _executeAvatarSet(ghostB64);
+    return true;
+  } catch(e) {
+    console.warn('[photo] 头像协商决定读取失败:', e.message || e);
+    return false;
   }
-
-  // 高置信执行兜底：只在“已经存在头像协商 + 目标明确”时读取 Simon 自己的完成声明。
-  // 这不是用户口令，也不会让普通发图触发换头像。
-  if (!accepted) {
-    const highConfidenceCommit = /(?:搞定了|弄好了|换好了|已经换了|我换了|就用这张|用这张了|设好了|改好了|done|changed it|switched it|using this one|use this one|set it)/i.test(replyText);
-    if (highConfidenceCommit) accepted = true;
-  }
-
-  if (!accepted) return false;
-
-  // 先清协商，再执行。执行层会立即建立本地 pending avatar，上传失败也不会被旧 URL 抢回去。
-  window._avatarChangeIntent = null;
-  _pendingAvatarChoice = null;
-  await _executeAvatarSet(ghostB64);
-  return true;
 }
 
 // 执行头像更换：保留原有显示 / Storage / localStorage / 云端同步链路。
@@ -736,8 +748,6 @@ async function _executeAvatarSet(ghostB64) {
 
   try {
     localStorage.setItem('ghostAvatarBase64', ghostB64);
-    localStorage.setItem('ghostAvatarPendingUpload', '1');
-    localStorage.setItem('ghostAvatarUpdatedAt', String(Date.now()));
   } catch(e) {
     console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
   }
