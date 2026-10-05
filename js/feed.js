@@ -1,10 +1,8 @@
 // ===== 情侣空间 + 朋友圈系统 (feed.js) =====
 function switchCoupleTab(tab) {
   document.getElementById('panelFeed').style.display = tab === 'feed' ? '' : 'none';
-  document.getElementById('panelMemory').style.display = tab === 'memory' ? '' : 'none';
+  // 回忆 Tab 已退役，不再切换
   document.getElementById('tabFeed').classList.toggle('active', tab === 'feed');
-  document.getElementById('tabMemory').classList.toggle('active', tab === 'memory');
-  if (tab === 'memory') renderSharedMemories();
   if (tab === 'feed') {
     // 看了朋友圈就清红点
     localStorage.removeItem('feedHasNew');
@@ -14,151 +12,26 @@ function switchCoupleTab(tab) {
   }
 }
 
-// ===== 共同回忆区渲染 =====
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 回忆系统已退役
+// Love Space 只保留「动态」，纪念历史统一在「我们的纪念册」管理
+// 以下函数保留空壳防止调用报错，实际不再渲染任何内容
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 function buildSharedMemories() {
-  const stories = JSON.parse(localStorage.getItem('storyBook') || '[]');
-  const deliveries = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
-  const feeds = (typeof getFeedPosts === 'function' ? getFeedPosts() : []);
-
-  const memories = [];
-
-  // 剧情回忆 → major
-  stories.slice(0, 10).forEach(s => {
-    memories.push({
-      id: 'story_' + (s.storyId || s.id || Math.random()),
-      type: 'story', tier: 'major',
-      title: s.title || s.storyId || '一段故事',
-      sub: s.preview || s.en || '',
-      timestamp: s.unlockedAt || s.createdAt || 0,
-      date: s.unlockedAt ? new Date(s.unlockedAt).toISOString().slice(0, 10) : '',
-      badge: '剧情 · 章节'
-    });
-  });
-
-  // 快递回忆 → middle
-  deliveries.filter(d => d.stage >= 5 || d.status === 'done').slice(0, 15).forEach(d => {
-    memories.push({
-      id: 'delivery_' + (d.id || d.name),
-      type: 'delivery', tier: 'middle',
-      title: d.emoji ? `${d.emoji} ${d.name}` : d.name,
-      sub: d.ghostReaction || (d.isFromGhost ? '他寄给你的' : '你寄给他的'),
-      timestamp: d.doneAt || d.createdAt || 0,
-      date: d.doneAt ? new Date(d.doneAt).toISOString().slice(0, 10) : '',
-      badge: d.isFromGhost ? '生活 · 他送的' : '生活 · 你送的'
-    });
-  });
-
-  // 有分量的朋友圈 → light（只取冷战/和好/大事件类型）
-  feeds.filter(p => p.sourceEvent && ['cold_war_started','made_up','gift_received','bought_big_item'].includes(p.sourceEvent))
-    .slice(0, 8).forEach(p => {
-    memories.push({
-      id: 'feed_' + (p.id || p.ts) + '_' + (p.en || '').slice(0, 10),
-      type: 'feed', tier: 'light',
-      title: p.en || '',
-      sub: p.zh || '',
-      timestamp: p.ts || 0,
-      date: p.ts ? new Date(p.ts).toISOString().slice(0, 10) : '',
-      badge: '情绪 · 那一刻'
-    });
-  });
-
-  // 时间线事件 → major（只取不与快递/朋友圈重复的类型：初遇/转账/告白/升职/购置）
-  // gift_received 已由 deliveries 覆盖，cold_war 已由 feeds 覆盖，此处跳过避免重复
-  const timelineEvents = (typeof getTimelineEvents === 'function') ? getTimelineEvents() : [];
-  const _tlBadge = {
-    milestone: '里程碑 · 我们',
-    transfer: '生活 · 她转账',
-    confession: '心动 · 那句话',
-    career: '成长 · 事业',
-    purchase: '生活 · 大件',
-  };
-  timelineEvents
-    .filter(e => ['milestone','transfer','confession','career','purchase'].includes(e.type))
-    .forEach(e => {
-      memories.push({
-        id: 'tl_' + e.id,
-        type: 'timeline', tier: e.type === 'transfer' ? 'middle' : 'major',
-        title: `${e.icon || '✨'} ${e.title}`,
-        sub: e.ghostReaction || (e.amount ? `£${e.amount.toLocaleString()}` : ''),
-        timestamp: e.timestamp || 0,
-        date: e.timestamp ? new Date(e.timestamp).toISOString().slice(0, 10) : '',
-        badge: _tlBadge[e.type] || '时间线'
-      });
-    });
-
-  // 按时间排序
-  memories.sort((a, b) => b.timestamp - a.timestamp);
-  return memories;
+  return [];
 }
 
 function getRelationshipStage(days) {
-  if (days < 30)  return { name: '新婚', desc: '还在摸索怎么和他过日子' };
-  if (days < 90)  return { name: '慢慢习惯', desc: '开始知道他的节奏，也让他知道你的' };
-  if (days < 180) return { name: '跨越时区的日常', desc: '不同的城市，但联系从没断过' };
-  if (days < 365) return { name: '离不开了', desc: '他已经是你时区里最重要的那个人' };
-  return { name: '异国夫妻，就这样', desc: '距离算什么，你们早就过了那关' };
+  return { name: '', desc: '' };
 }
 
 function renderSharedMemories() {
-  const memories = buildSharedMemories();
-  const days = parseInt(document.getElementById('coupleDaysNum')?.textContent || '0');
-  const stage = getRelationshipStage(days);
-
-  // 关系阶段条
-  const stageBar = document.getElementById('memoryStageBar');
-  if (stageBar) {
-    stageBar.innerHTML = `
-      <div class="memory-stage-label">你们现在</div>
-      <div class="memory-stage-name">${stage.name}</div>
-      <div class="memory-stage-desc">${stage.desc} · 已在一起 ${days} 天 · ${memories.length} 个回忆</div>
-    `;
-  }
-
-  // 精选3张（major×1 + middle×1 + light×1）
-  const highlights = document.getElementById('memoryHighlights');
-  if (highlights) {
-    const picks = [
-      memories.find(m => m.tier === 'major'),
-      memories.find(m => m.tier === 'middle'),
-      memories.find(m => m.tier === 'light'),
-    ].filter(Boolean).slice(0, 3);
-
-    if (picks.length) {
-      highlights.innerHTML = `
-        <div class="memory-highlights-title">精选回忆</div>
-        <div style="display:flex;flex-direction:column;gap:0;">
-          ${picks.map(m => renderMemoryCard(m, true)).join('')}
-        </div>
-      `;
-    } else {
-      highlights.innerHTML = '<div style="text-align:center;color:#c4b5d4;padding:20px;font-size:13px;">还没有回忆，继续聊聊吧</div>';
-    }
-  }
-
-  // 完整时间线
-  const timeline = document.getElementById('memoryTimeline');
-  if (timeline) {
-    if (memories.length > 3) {
-      timeline.innerHTML = `
-        <div class="memory-timeline-title">全部回忆</div>
-        ${memories.map(m => renderMemoryCard(m, false)).join('')}
-      `;
-    } else {
-      timeline.innerHTML = '';
-    }
-  }
+  // 已退役，不再渲染
 }
 
 function renderMemoryCard(m, isHighlight) {
-  const tierLabel = { major: '📖 剧情', middle: '📦 生活', light: '💬 情绪' };
-  return `
-    <div class="memory-card tier-${m.tier}" style="${isHighlight ? 'margin:4px 0;' : ''}">
-      <div class="memory-card-badge">${m.badge || tierLabel[m.tier] || ''}</div>
-      <div class="memory-card-title">${m.title}</div>
-      ${m.sub ? `<div class="memory-card-sub">${m.sub}</div>` : ''}
-      ${m.date ? `<div class="memory-card-date">${m.date}</div>` : ''}
-    </div>
-  `;
+  return '';
 }
 
 // refreshChatScreen 定义在 chat_init.js，此处已移除重复定义
@@ -228,10 +101,10 @@ document.addEventListener('visibilitychange', () => {
 // NPC 名册。发帖权重（ambient 抽谁发）+ 评论概率（每条帖对每人独立掷骰）。
 // Ghost 头像走 ghostAvatarUrl（跟聊天同步）；其他人静态 emoji/文件占位，用户可替换。
 const FEED_ACTORS = {
-  ghost: { key: 'ghost', displayName: () => localStorage.getItem('botNickname') || 'Simon Riley', emoji: '👻', nameClass: 'couple-ghost-name', postWeight: 5,  commentChance: 0.6  },
-  soap:  { key: 'soap',  displayName: () => 'Soap',  emoji: '🧼',  avatar: 'images/soap-avatar.jpg',  nameClass: 'couple-soap-name',  postWeight: 3,  commentChance: 0.45 },
-  gaz:   { key: 'gaz',   displayName: () => 'Gaz',   emoji: '🎖️', avatar: 'images/gaz-avatar.jpg',   nameClass: 'couple-gaz-name',   postWeight: 2,  commentChance: 0.35 },
-  price: { key: 'price', displayName: () => 'Price', emoji: '🚬',  avatar: 'images/price-avatar.jpg', nameClass: 'couple-price-name', postWeight: 1,  commentChance: 0.15 },
+  ghost: { key: 'ghost', displayName: () => localStorage.getItem('botNickname') || 'Simon Riley', emoji: '👻', nameClass: 'couple-ghost-name', commentChance: 0.6  },
+  soap:  { key: 'soap',  displayName: () => 'Soap',  emoji: '🧼',  avatar: 'images/soap-avatar.jpg',  nameClass: 'couple-soap-name',  commentChance: 0.45 },
+  gaz:   { key: 'gaz',   displayName: () => 'Gaz',   emoji: '🎖️', avatar: 'images/gaz-avatar.jpg',   nameClass: 'couple-gaz-name',   commentChance: 0.35 },
+  price: { key: 'price', displayName: () => 'Price', emoji: '🚬',  avatar: 'images/price-avatar.jpg', nameClass: 'couple-price-name', commentChance: 0.15 },
 };
 
 // 给远程头像 URL 加缓存破除参数（本地文件/base64 不动），避免换头像后浏览器还显示旧图
@@ -300,7 +173,7 @@ function saveFeedPosts(list) {
 function pickPhotoForAuthor(authorKey) {
   const pool = (typeof FEED_PHOTO_POOL !== 'undefined' ? FEED_PHOTO_POOL : (window.FEED_PHOTO_POOL || []));
   if (!pool.length) return null;
-  const eligible = pool.filter(p => p.owner === authorKey || p.owner === 'any');
+  const eligible = pool.filter(p => p.poster === authorKey || p.poster === 'any');
   if (!eligible.length) return null;
   const recent = JSON.parse(localStorage.getItem('feedPhotoRecent') || '[]');
   let candidates = eligible.filter(p => !recent.includes(p.file));
@@ -308,7 +181,13 @@ function pickPhotoForAuthor(authorKey) {
   const chosen = candidates[Math.floor(Math.random() * candidates.length)];
   const newRecent = [chosen.file, ...recent].slice(0, 12);
   localStorage.setItem('feedPhotoRecent', JSON.stringify(newRecent));
-  return { src: chosen.file, caption: chosen.caption };
+  return {
+    src: chosen.file,
+    caption: chosen.caption,
+    subject: chosen.subject || null,
+    scene: chosen.scene || null,
+    perspective: chosen.perspective || null
+  };
 }
 
 // ----- 相册：聊天里传过的真照片（存在 IndexedDB，chatHistory 里带 _photoIdbKey）-----
@@ -407,8 +286,9 @@ function initCoupleSpace() {
   const mentionZhEl = document.getElementById('coupleUserMentionZh');
   if (mentionZhEl) mentionZhEl.textContent = `@${userName}`;
 
-  // 发圈入口（用户自定义发朋友圈）
-  ensureFeedComposeButton();
+  // V2 UI 初始化
+  initLovespaceHero();
+  initLovespaceComposer();
 
   // 花瓣动画
   spawnCouplePetals();
@@ -465,7 +345,11 @@ function renderCoupleFeed(posts) {
 
     const likeCount = post.likes ?? Math.floor(Math.random() * 30 + 3);
     const isLiked = !!post.liked;
-    const likeEmoji = isLiked ? '❤️' : '🤍';
+    const likeEmoji = isLiked ? '♥' : '♡';
+
+    // 翻译按钮：默认隐藏翻译，点击展开/收起
+    const hasTranslation = !!(post.zh || (post.comments && post.comments.some(c => c.zh)));
+    const translateBtn = hasTranslation ? `<button class="couple-translate-btn" onclick="toggleFeedTranslation(this)">译</button>` : '';
 
     const div = document.createElement('div');
     div.className = 'couple-post-card';
@@ -477,15 +361,16 @@ function renderCoupleFeed(posts) {
           <div class="couple-post-time">${timeAgo(post.ts)}</div>
         </div>
       </div>
-      <div class="couple-post-en">${post.en}</div>
+      ${post.en ? `<div class="couple-post-en">${post.en}</div>` : ''}
       ${post.zh ? `<div class="couple-post-zh">${post.zh}</div>` : ''}
       ${photoHTML}
       ${commentsHTML ? `<div class="couple-divider"></div><div class="couple-comments">${commentsHTML}</div>` : ''}
-      <div class="couple-post-footer" style="display:flex;align-items:center;gap:10px;">
+      <div class="couple-post-footer">
         <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}"
           data-post-id="${post.id}" data-count="${likeCount}"
           style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
-        ${authorKey === 'user' ? `<button class="couple-delete-btn" data-post-id="${post.id}" style="cursor:pointer;pointer-events:auto;margin-left:auto;color:#999;font-size:0.85em;">🗑️ 删除</button>` : ''}
+        ${translateBtn}
+        ${authorKey === 'user' ? `<button class="couple-delete-btn" data-post-id="${post.id}" style="cursor:pointer;pointer-events:auto;">🗑️ 删除</button>` : ''}
       </div>
     `;
     feed.appendChild(div);
@@ -498,6 +383,11 @@ function renderCoupleFeed(posts) {
       const idx = parseInt(img.dataset.idx || '0');
       if (list && list[idx]) img.src = _toDataUri(list[idx]);
     } catch(e) {}
+  });
+
+  // 绑定删除按钮事件
+  feed.querySelectorAll('.couple-delete-btn').forEach(btn => {
+    btn.onclick = () => deleteCoupleFeedPost(btn.dataset.postId);
   });
 }
 
@@ -531,7 +421,7 @@ function toggleCoupleLike(btn, key) {
     saveFeedPosts(list);
     btn.dataset.count = post.likes;
     btn.classList.toggle('couple-liked', post.liked);
-    btn.innerHTML = (post.liked ? '❤️' : '🤍') + ' <span class="like-num">' + post.likes + '</span>';
+    btn.innerHTML = (post.liked ? '♥' : '♡') + ' <span class="like-num">' + post.likes + '</span>';
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
     return;
   }
@@ -545,14 +435,31 @@ function toggleCoupleLike(btn, key) {
     count = Math.max(0, count - 1);
     btn.dataset.count = count;
     btn.classList.remove('couple-liked');
-    btn.innerHTML = '🤍 <span class="like-num">' + count + '</span>';
+    btn.innerHTML = '♡ <span class="like-num">' + count + '</span>';
   } else {
     localStorage.setItem(storageKey, '1');
     count = count + 1;
     btn.dataset.count = count;
     btn.classList.add('couple-liked');
-    btn.innerHTML = '❤️ <span class="like-num">' + count + '</span>';
+    btn.innerHTML = '♥ <span class="like-num">' + count + '</span>';
   }
+}
+
+// 翻译展开/收起
+function toggleFeedTranslation(btn) {
+  const card = btn.closest('.couple-post-card');
+  if (!card) return;
+
+  // 切换正文翻译
+  const postZh = card.querySelector('.couple-post-zh');
+  if (postZh) postZh.classList.toggle('show');
+
+  // 切换所有评论翻译
+  card.querySelectorAll('.couple-comment-zh').forEach(el => el.classList.toggle('show'));
+
+  // 更新按钮文字
+  const isShowing = postZh && postZh.classList.contains('show');
+  btn.textContent = isShowing ? '收起' : '译';
 }
 
 // 删除用户自己发的朋友圈（只允许删 author==='user' 的帖子）
@@ -592,6 +499,16 @@ function setFeedEventPool(list) {
 }
 function pushFeedEvent(event) {
   const pool = getFeedEventPool();
+
+  // 幂等：如果已存在相同 source + sourceId，不重复创建
+  if (event.source && event.sourceId) {
+    const exists = pool.some(e => e.source === event.source && e.sourceId === event.sourceId);
+    if (exists) {
+      console.log('[feed] Event already exists:', event.source, event.sourceId);
+      return;
+    }
+  }
+
   pool.unshift({
     id: 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
     type: event.type,
@@ -601,9 +518,12 @@ function pushFeedEvent(event) {
     shareability: event.shareability ?? 0.5,
     privacy: event.privacy || 'semi',
     createdAt: Date.now(),
+    occurredAt: event.occurredAt || null,
     dueAt: event.dueAt || Date.now(),
     expiresAt: event.expiresAt || (Date.now() + 12 * 3600 * 1000),
     consumed: false,
+    source: event.source || null,
+    sourceId: event.sourceId || null,
     meta: event.meta || {}
   });
   setFeedEventPool(pool.slice(0, 30));
@@ -646,9 +566,16 @@ function feedEvent_boughtBigItem(itemName, amount, isHome = false) {
     meta: { itemName, amount, isHome }
   });
 }
+// ── 已退役：feedEvent_dailyMoment() ──────────────────────────────────
+// 旧机制：sendMessage.js 在用户长对话后调用此函数随机创建 Ghost/Soap/Gaz daily_moment。
+// 新原则：Ghost 不再由系统随机生成虚构生活事件。NPC ambient 改由 maybeGenerateAmbientPost()
+// 低频触发，不再依赖此入口。函数保留但不应被调用；若被调用则只生成 NPC ambient 候选。
 function feedEvent_dailyMoment() {
+  // Ghost 已退役，仅创建 NPC ambient 候选
+  const npcActors = ['soap', 'gaz', 'price'];
+  const actor = npcActors[Math.floor(Math.random() * npcActors.length)];
   pushFeedEvent({
-    type: 'daily_moment', actor: Math.random() < 0.45 ? 'ghost' : (Math.random() < 0.5 ? 'soap' : 'gaz'),
+    type: 'daily_moment', actor,
     mood: 'neutral', intensity: 1, shareability: 0.4, privacy: 'public',
     dueAt: Date.now(),
     expiresAt: Date.now() + 6 * 3600 * 1000
@@ -658,23 +585,29 @@ function feedEvent_dailyMoment() {
 // ── 新增事件类型 ──────────────────────────────────
 
 // 收到外卖：Ghost 发条关于食物的帖子
-function feedEvent_takeoutReceived(itemName, itemNameEn) {
+function feedEvent_takeoutReceived(itemName, itemNameEn, orderId, occurredAt) {
   pushFeedEvent({
     type: 'takeout_received', actor: 'ghost', mood: 'neutral',
     intensity: 2, shareability: 0.4, privacy: 'semi',
+    occurredAt: occurredAt || Date.now(),
     dueAt: Date.now() + randMinutes(15, 60),
     expiresAt: Date.now() + 4 * 3600 * 1000,
+    source: 'takeout',
+    sourceId: orderId,
     meta: { itemName, itemNameEn }
   });
 }
 
 // 收到快递包裹：Ghost 发条关于包裹的帖子
-function feedEvent_deliveryReceived(itemName, emoji) {
+function feedEvent_deliveryReceived(itemName, emoji, deliveryId, occurredAt) {
   pushFeedEvent({
     type: 'delivery_received', actor: 'ghost', mood: 'soft',
     intensity: 3, shareability: 0.5, privacy: 'semi',
+    occurredAt: occurredAt || Date.now(),
     dueAt: Date.now() + randMinutes(20, 90),
     expiresAt: Date.now() + 8 * 3600 * 1000,
+    source: 'delivery',
+    sourceId: deliveryId,
     meta: { itemName, emoji }
   });
 }
@@ -970,16 +903,20 @@ function shouldEventBecomePost(evt) {
   return Math.random() < 0.4;
 }
 
-// ----- 兜底日常路过（按 postWeight 加权选发帖人）-----
+// ----- 兜底日常路过（NPC ambient only，Ghost 退役）-----
 function _pickWeightedActor() {
-  const entries = Object.values(FEED_ACTORS);
-  const total = entries.reduce((s, a) => s + (a.postWeight || 0), 0);
+  const npcActors = [
+    { key: 'soap', weight: 3 },
+    { key: 'gaz', weight: 2 },
+    { key: 'price', weight: 1 }
+  ];
+  const total = npcActors.reduce((s, a) => s + a.weight, 0);
   let r = Math.random() * total;
-  for (const a of entries) {
-    r -= (a.postWeight || 0);
+  for (const a of npcActors) {
+    r -= a.weight;
     if (r <= 0) return a.key;
   }
-  return 'ghost';
+  return 'soap';
 }
 
 async function maybeGenerateAmbientPost(triggerSource) {
@@ -989,7 +926,7 @@ async function maybeGenerateAmbientPost(triggerSource) {
   const chance = triggerSource === 'open_couple_space' ? 0.2 : 0.08;
   if (Math.random() > chance) return null;
 
-  // 加权选发帖人（ghost 最高、price 最低），直接造一个 daily_moment 事件
+  // NPC ambient only（Ghost 随机 daily_moment 已退役）
   const actor = _pickWeightedActor();
   const evt = {
     id: 'amb_' + Date.now(),
@@ -1226,22 +1163,6 @@ async function generateFeedPostFromEvent(evt) {
     return null;
   }
 
-  // ── Ghost 发帖角度池（扩展版）──────────────────────
-  const GHOST_POST_TYPES = [
-    'physical_state',      // 身体状态：手还是冷、睡得不好、肩膀酸
-    'environment',         // 环境：又在下雨、雾、走廊很静
-    'routine',             // 日常：简报、训练、文件、例行任务
-    'teammate_friction',   // 队友摩擦：Soap太吵、Gaz注意到了什么
-    'subtle_her_presence', // 她的影子：没她更静、老看手机、时区问题
-    'dry_humor',           // 干幽默：蹩脚的咖啡还是喝了、简报侥幸撑过去
-    'food_or_drink',       // 吃喝：食堂难吃、难得一杯好咖啡、半夜泡面
-    'night_thought',       // 深夜：睡不着、窗外的声音、某件小事留在脑子里
-    'object_detail',       // 物件：旧手套、桌上的东西、装备磨损
-    'mission_aftermath',   // 任务余韵：回来了、比预想的快、安静下来了
-    'time_awareness',      // 时间感知：又到周五了、天亮得晚了、几点了
-    'body_language',       // 身体语言：站了一天、手指头僵了、走了很远
-  ];
-
   // ── Ghost 核心发帖人设（固定层）────────────────────
   const GHOST_FEED_PROMPT = `Ghost posting style: He does not post for attention.
 If he posts, something small caught on him enough to leave a trace.
@@ -1267,90 +1188,6 @@ Format rules:
 He feels like: someone who rarely posts, but when he does, it comes from a real moment.`;
 
   // ── 按事件类型拼 prompt ─────────────────────────────
-  const buildGhostDailyPrompt = () => {
-    // 去重：取最近6条 Ghost 帖子
-    const recentGhostPosts = getFeedPosts()
-      .filter(p => p.author === 'ghost')
-      .slice(0, 6)
-      .map(p => `"${p.en}"`)
-      .join('\n');
-
-    // 随机选一个角度，避免连续同角度（排除最近2个）
-    const lastType = localStorage.getItem('lastGhostPostType') || '';
-    const lastType2 = localStorage.getItem('lastGhostPostType2') || '';
-    const available = GHOST_POST_TYPES.filter(t => t !== lastType && t !== lastType2);
-    const postType  = available[Math.floor(Math.random() * available.length)];
-    localStorage.setItem('lastGhostPostType2', lastType);
-    localStorage.setItem('lastGhostPostType', postType);
-
-    // 各角度的写作提示
-    const typeHints = {
-      physical_state:      `Focus on body state: cold hands, bad sleep, sore shoulders, bad coffee, still functional.`,
-      environment:         `Focus on environment: rain, fog, dark morning, empty corridor, the base at night.`,
-      routine:             `Focus on routine: briefing, range day, paperwork, kit check, late return from something.`,
-      teammate_friction:   `Focus on a teammate: Soap too loud, Gaz noticed something annoying, Price said one word.`,
-      subtle_her_presence: `Something that implies her without naming her: quieter without her, checked the phone again, time zone math.`,
-      dry_humor:           `Dry complaint or blunt observation. Takes something small too seriously. Deadpan.`,
-      food_or_drink:       `Focus on food or drink: terrible mess hall, decent coffee for once, instant noodles at 2am, someone brought something edible.`,
-      night_thought:       `Late night moment: can't sleep, a sound outside, something stuck in his head, the base is different at night.`,
-      object_detail:       `A specific object caught his attention: worn gloves, something on the desk, a scratch on the kit, a photo he won't explain.`,
-      mission_aftermath:   `Just got back or just finished something. Not about the mission itself — about the stillness after. The quiet.`,
-      time_awareness:      `A note about time passing. Use the real date/day below — do NOT invent a different weekday. Sun setting earlier, lost track of the hour, how long has it been, or the actual day if it fits.`,
-      body_language:       `Physical sensation: stood too long, fingers stiff, walked further than expected, cold got through the jacket.`,
-    };
-
-    // 真实日期，防止模型瞎编"又到周五了"。走 Ghost Local DateTime，随所在地时区变化。
-    const _dateStr = `${getGhostWeekday()}, ${getGhostDateStr()}`;
-
-    return `Write one Ghost social media post.
-
-${GHOST_FEED_PROMPT}
-
-${_feedDistanceRule()}
-
-Current context:
-- Today is: ${_dateStr} (use this if you reference the day — never guess a different one)
-- Location: ${location}
-- Weather: ${weather || 'unclear'}
-- Post angle this time: ${postType}
-- Angle hint: ${typeHints[postType]}
-
-${recentGhostPosts ? `CRITICAL — these are Ghost's recent posts. Your post MUST be completely different in wording, sentence structure, emotional angle, and topic. Do NOT reuse any word or phrase from these:\n${recentGhostPosts}` : ''}
-
-Return JSON only: {"en":"...","zh":"..."}`;
-  };
-
-  // ── 队友发帖人设（丰富版：关系背景 + 角度池）────────
-
-  const SOAP_POST_ANGLES = [
-    'teasing_ghost',        // 调侃 Ghost：发现他变软了、又看手机了、难得笑了
-    'tactical_chaos',       // 战术混乱：训练出岔子、某人搞砸了、意外状况
-    'base_life',            // 基地日常：食堂、健身房、武器库、走廊遇见谁
-    'gear_opinion',         // 装备吐槽：新枪不错、旧装备更好、某个细节很蠢
-    'teammate_observation', // 观察队友：Gaz 又对了、Price 那个眼神、某人做了件事
-    'brag_or_complaint',    // 吹牛/抱怨：自己射得准、咖啡难喝、天气糟糕
-    'spontaneous_energy',   // 突发能量：刚跑完步、睡不着、突然想到某事
-    'about_the_wife',       // 关于她：Ghost 的状态因为她变了、她做了什么、队里都知道
-  ];
-
-  const GAZ_POST_ANGLES = [
-    'ghost_observation',    // 观察 Ghost：他不一样了、某个细节变了、状态比以前好
-    'quiet_insight',        // 安静洞察：注意到某件小事、某个模式、谁在变化
-    'dry_humor',            // 干幽默：冷静吐槽、轻描淡写的讽刺、不动声色的玩笑
-    'tactical_note',        // 战术笔记：训练细节、任务后的观察、装备改进想法
-    'base_atmosphere',      // 基地氛围：今天的气氛、某个时刻、环境的微妙变化
-    'about_teammates',      // 关于队友：Soap 又闹腾、Price 那句话、某人做了件事
-    'about_the_wife',       // 关于她：她对 Ghost 的影响、她做了什么、队里对她的看法
-  ];
-
-  const PRICE_POST_ANGLES = [
-    'approval',             // 认可：某人做得好、某事值得、某个状态是对的
-    'gruff_observation',    // 粗糙观察：注意到某事、某人、某个变化，一句话点出
-    'unit_state',           // 队伍状态：士气、凝聚力、某个时刻的感觉
-    'about_ghost',          // 关于 Ghost：他的状态、他的选择、他的妻子对他的影响
-    'tactical_weight',      // 战术份量：任务后的评价、装备决定、训练标准
-    'fatherly_nod',         // 父亲式点头：给队员（包括她）的简短肯定或警告
-  ];
 
   const buildSoapDailyPrompt = () => {
     const recentSoapPosts = getFeedPosts()
@@ -1358,24 +1195,6 @@ Return JSON only: {"en":"...","zh":"..."}`;
       .slice(0, 6)
       .map(p => `"${p.en}"`)
       .join('\n');
-
-    const lastAngle = localStorage.getItem('lastSoapPostAngle') || '';
-    const lastAngle2 = localStorage.getItem('lastSoapPostAngle2') || '';
-    const available = SOAP_POST_ANGLES.filter(a => a !== lastAngle && a !== lastAngle2);
-    const angle = available[Math.floor(Math.random() * available.length)];
-    localStorage.setItem('lastSoapPostAngle2', lastAngle);
-    localStorage.setItem('lastSoapPostAngle', angle);
-
-    const angleHints = {
-      teasing_ghost:        `Tease Ghost about being softer / checking his phone / smiling. Warm, not mean.`,
-      tactical_chaos:       `React to something that just went wrong in training or on base. Light chaos energy.`,
-      base_life:            `Comment on mess hall, gym, armory, or someone you ran into. Casual, offhand.`,
-      gear_opinion:         `Opinion on a weapon, kit, or equipment. Compliment or light complaint.`,
-      teammate_observation: `Notice what Gaz, Price, or Ghost just did. Teasing or genuine.`,
-      brag_or_complaint:    `Brag about your own skills OR complain about coffee/weather/food. Light.`,
-      spontaneous_energy:   `Just finished a run / can't sleep / random thought. Spontaneous.`,
-      about_the_wife:       `Observe how Ghost's wife affects him or the unit. Warm, teasing tone.`,
-    };
 
     return `Soap (Johnny MacTavish) posting style:
 He posts casually, like talking out loud to the lads. Energetic, teasing, warm. SAS demolitions expert, Ghost's best mate for years.
@@ -1392,18 +1211,18 @@ He does NOT:
 - overshare emotions or write long stories
 - use heavy internet slang or sound like he's performing
 
-Post angle this time: ${angle}
-Angle hint: ${angleHints[angle]}
+Write a casual social post from your own ordinary life.
 
-Good examples:
-"he smiled. i'm concerned."
-"that went wrong fast."
-"caught him staring at his phone again. shocking."
-"best demo man here and the coffee's still shite."
-"she's got him wrapped. it's brilliant."
-"never thought i'd see Ghost domesticated."
+Choose what you want to post about yourself.
+It can be specific, mundane, trivial, interesting, annoying, funny, observational, or simply something you felt like posting.
 
-${recentSoapPosts ? `Do NOT reuse wording, structure, or angle from these recent Soap posts:\n${recentSoapPosts}` : ''}
+Do not invent an action, situation, or interaction involving Ghost, his wife, or another teammate just to create a subject for the post.
+If the supplied context contains a real shared event, you may naturally use that fact. Otherwise, keep the post centered on yourself.
+
+Do not force military/base life into every post.
+Do not fall back to a fixed rotation of training, gear, food, coffee, weather, or work.
+
+${recentSoapPosts ? `Recent posts are provided only to prevent repetition. Do NOT reuse wording, structure, or angle from these recent Soap posts:\n${recentSoapPosts}` : ''}
 
 Return JSON only: {"en":"...","zh":"..."}`;
   };
@@ -1414,23 +1233,6 @@ Return JSON only: {"en":"...","zh":"..."}`;
       .slice(0, 6)
       .map(p => `"${p.en}"`)
       .join('\n');
-
-    const lastAngle = localStorage.getItem('lastGazPostAngle') || '';
-    const lastAngle2 = localStorage.getItem('lastGazPostAngle2') || '';
-    const available = GAZ_POST_ANGLES.filter(a => a !== lastAngle && a !== lastAngle2);
-    const angle = available[Math.floor(Math.random() * available.length)];
-    localStorage.setItem('lastGazPostAngle2', lastAngle);
-    localStorage.setItem('lastGazPostAngle', angle);
-
-    const angleHints = {
-      ghost_observation:  `Notice Ghost is different lately — better, softer, more human. Quiet approval.`,
-      quiet_insight:      `Observe something small about base life, teammates, or a pattern. Understated.`,
-      dry_humor:          `Deadpan observation or light sarcasm. Calm, not loud.`,
-      tactical_note:      `Training detail, post-mission thought, or kit improvement idea. Grounded.`,
-      base_atmosphere:    `The mood today, a specific moment, or environmental shift. Subtle.`,
-      about_teammates:    `Comment on Soap being chaotic, Price saying something, or someone's behavior.`,
-      about_the_wife:     `How she changed Ghost or the unit dynamic. Respectful, understated warmth.`,
-    };
 
     return `Gaz (Kyle Garrick) posting style:
 Observant, grounded, calm. Former British Army, now TF141. Does not post often — when he does, it's because he noticed something worth noting.
@@ -1447,18 +1249,18 @@ He does NOT:
 - overshare emotionally or sound like a narrator
 - be dramatic or chaotic
 
-Post angle this time: ${angle}
-Angle hint: ${angleHints[angle]}
+Write a casual social post from your own ordinary life.
 
-Good examples:
-"he's different lately. not a bad thing."
-"never thought i'd see that."
-"she's good for him. whole unit feels it."
-"caught him smiling at his phone. twice."
-"something shifted. can't put my finger on it."
-"Soap's losing the bet. Ghost is gone."
+Choose what you want to post about yourself.
+It can be specific, mundane, trivial, interesting, annoying, funny, observational, or simply something you felt like posting.
 
-${recentGazPosts ? `Do NOT reuse wording, structure, or angle from these recent Gaz posts:\n${recentGazPosts}` : ''}
+Do not invent an action, situation, or interaction involving Ghost, his wife, or another teammate just to create a subject for the post.
+If the supplied context contains a real shared event, you may naturally use that fact. Otherwise, keep the post centered on yourself.
+
+Do not force military/base life into every post.
+Do not fall back to a fixed rotation of training, gear, food, coffee, weather, or work.
+
+${recentGazPosts ? `Recent posts are provided only to prevent repetition. Do NOT reuse wording, structure, or angle from these recent Gaz posts:\n${recentGazPosts}` : ''}
 
 Return JSON only: {"en":"...","zh":"..."}`;
   };
@@ -1469,22 +1271,6 @@ Return JSON only: {"en":"...","zh":"..."}`;
       .slice(0, 6)
       .map(p => `"${p.en}"`)
       .join('\n');
-
-    const lastAngle = localStorage.getItem('lastPricePostAngle') || '';
-    const lastAngle2 = localStorage.getItem('lastPricePostAngle2') || '';
-    const available = PRICE_POST_ANGLES.filter(a => a !== lastAngle && a !== lastAngle2);
-    const angle = available[Math.floor(Math.random() * available.length)];
-    localStorage.setItem('lastPricePostAngle2', lastAngle);
-    localStorage.setItem('lastPricePostAngle', angle);
-
-    const angleHints = {
-      approval:          `Approve of Ghost's state or someone's action. Short, weighted.`,
-      gruff_observation: `Notice something about the unit, a teammate, or a change. One line.`,
-      unit_state:        `Comment on morale, cohesion, or how the unit feels right now.`,
-      about_ghost:       `Ghost's state, his choice, or his wife's impact on him. Fatherly approval.`,
-      tactical_weight:   `Post-mission assessment, kit decision, or training standard. Authoritative.`,
-      fatherly_nod:      `Short affirmation or warning to Ghost (or her). Captain's nod.`,
-    };
 
     return `Price (John Price) posting style:
 Captain of Task Force 141. Gruff, authoritative, father-figure to the unit. Rarely posts — when he does, it carries weight.
@@ -1500,19 +1286,18 @@ He does NOT:
 - joke around, overshare, or comment on trivial things
 - use slang, write multiple sentences, or explain himself
 
-Post angle this time: ${angle}
-Angle hint: ${angleHints[angle]}
+Write a casual social post from your own ordinary life.
 
-Good examples:
-"good man."
-"that matters."
-"look after her."
-"solid choice."
-"she steadies him."
-"knew it would stick."
-"keep it that way."
+Choose what you want to post about yourself.
+It can be specific, mundane, trivial, interesting, annoying, funny, observational, or simply something you felt like posting.
 
-${recentPricePosts ? `Do NOT reuse wording, structure, or angle from these recent Price posts:\n${recentPricePosts}` : ''}
+Do not invent an action, situation, or interaction involving Ghost, his wife, or another teammate just to create a subject for the post.
+If the supplied context contains a real shared event, you may naturally use that fact. Otherwise, keep the post centered on yourself.
+
+Do not force military/base life into every post.
+Do not fall back to a fixed rotation of training, gear, food, coffee, weather, or work.
+
+${recentPricePosts ? `Recent posts are provided only to prevent repetition. Do NOT reuse wording, structure, or angle from these recent Price posts:\n${recentPricePosts}` : ''}
 
 Return JSON only: {"en":"...","zh":"..."}`;
   };
@@ -1530,7 +1315,13 @@ Return JSON only: {"en":"...","zh":"..."}`;
     _attachedPhoto = pickPhotoForAuthor(evt.actor || 'ghost');
   }
   const _photoHint = _attachedPhoto
-    ? `\n\nYou are posting THIS photo: "${_attachedPhoto.caption}". Write the post AS THE CAPTION for that exact image — it must match what's in the picture, offhand, not a description.`
+    ? `\n\nYou are posting THIS photo:
+Poster: ${_attachedPhoto.poster || evt.actor || 'ghost'}
+Main subject in photo: ${_attachedPhoto.subject || 'none (environment/objects)'}
+Perspective: ${_attachedPhoto.perspective || 'unknown'}
+Objective visual description: "${_attachedPhoto.caption}"
+
+Write the post AS THE CAPTION for that exact image — it must match what's in the picture, offhand, not a description. These are photo facts only; you decide the caption tone and what to say.`
     : '';
 
   const promptMap = {
@@ -1538,12 +1329,12 @@ Return JSON only: {"en":"...","zh":"..."}`;
     made_up:          `You are Simon Riley. Just made up with your wife. One line, lowercase English — do not say you made up, but you are visibly looser. Mention something concrete you're doing right now. Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
     gift_received:    `You are Simon Riley. Just received "${evt.meta?.itemName || 'something'}" from your wife. One line, lowercase English — react to the specific object, not the gesture. What does it look like, feel like, smell like? Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
 
-    takeout_received: `You are Simon Riley. She just ordered takeout for you — "${evt.meta?.itemNameEn || evt.meta?.itemName || 'food'}". You have it now.
+    takeout_received: `You are Simon Riley. She ordered takeout for you — "${evt.meta?.itemNameEn || evt.meta?.itemName || 'food'}".
 One line, lowercase English. React to the FOOD itself: the smell, the taste, the temperature, or how it looks. Be specific and concrete. Do NOT thank her, do NOT mention the gesture. Just the food.
 Examples of good posts: "whoever made this curry knew what they were doing." / "still warm. she timed it." / "the chips are better than they should be."
 Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
 
-    delivery_received: `You are Simon Riley. A package just arrived from her — "${evt.meta?.itemName || 'something'}".
+    delivery_received: `You are Simon Riley. A package from her — "${evt.meta?.itemName || 'something'}".
 One line, lowercase English. React to the OBJECT: what it looks like, where you put it, how it feels in your hands. Do NOT say thank you, do NOT get emotional about the gesture. Just notice the thing.
 Examples of good posts: "fits. didn't expect that." / "it's on the desk now. keeps catching my eye." / "heavier than it looks."
 Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
@@ -1553,7 +1344,7 @@ One line, lowercase English. Do NOT mention the conversation directly. Post some
 Examples of good posts: "quiet again. not the bad kind." / "forgot what i was doing before that." / "three hours. felt like ten minutes."
 Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
 
-    late_night_chat: `You are Simon Riley. It's very late — past midnight in the UK. You were talking to her.
+    late_night_chat: `You are Simon Riley. You were talking to her late into the night.
 One line, lowercase English. Do NOT say you were talking or chatting. Post about the specific late-night moment: the dark, the screen light, the tiredness you don't mind, the time itself.
 Examples of good posts: "0347. should probably stop." / "screen's the only light left." / "eyes are going but not yet."
 Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
@@ -1568,17 +1359,49 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
       if (actor === 'soap')  return buildSoapDailyPrompt();
       if (actor === 'gaz')   return buildGazDailyPrompt();
       if (actor === 'price') return buildPriceDailyPrompt();
-      return buildGhostDailyPrompt();
+      // Ghost random daily_moment 已退役，不应到达此分支
+      console.warn('[feed] Ghost daily_moment triggered, should not happen');
+      return null;
     })(),
   };
 
-  // 真实日期铁律：注入每条帖子（所有角色 + 所有事件类型），禁止模型自己编星期几/日期
-  const _rWeekday = getGhostWeekday();
-  const _rDateStr = getGhostDateStr();
-  const _rDateRule = `\n\nREAL DATE — today is ${_rWeekday}, ${_rDateStr}. If the post references a day of week or date, you MUST use exactly this. Do NOT invent a different weekday (e.g. "another friday") unless today truly is that day.`;
+  // NOW + EVENT TIME context
+  const now = Date.now();
+  const ghostTimeStr = (typeof getGhostTimeStr === 'function') ? getGhostTimeStr() : '??:??';
+  const ghostDateStr = getGhostDateStr();
+  const ghostWeekday = getGhostWeekday();
 
-  // 距离铁律注入每条帖子（daily_moment 的 Ghost 分支已在 buildGhostDailyPrompt 内含，这里重复无害）
-  const prompt = (promptMap[evt.type] || promptMap['daily_moment']) + '\n\n' + _feedDistanceRule() + _photoHint + _rDateRule;
+  let timeContext = `\n\nCURRENT SHARED TIME
+Ghost-local date: ${ghostWeekday}, ${ghostDateStr}
+Ghost-local time: ${ghostTimeStr}`;
+
+  // 真实 Shared Reality event 有 occurredAt，计算时间差并注入 EVENT TIME
+  if (evt.occurredAt) {
+    try {
+      const ghostTZ = (typeof getGhostTimeZone === 'function') ? getGhostTimeZone() : 'Europe/London';
+      const occurredTimeStr = new Intl.DateTimeFormat('en-GB', {
+        timeZone: ghostTZ, hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date(evt.occurredAt));
+
+      const hoursSince = Math.floor((now - evt.occurredAt) / (3600 * 1000));
+      const minutesSince = Math.floor((now - evt.occurredAt) / (60 * 1000));
+
+      timeContext += `\n\nEVENT TIME
+This event occurred at: ${occurredTimeStr} Ghost-local time.
+Time elapsed: ~${hoursSince}h (${minutesSince}min).
+
+Do NOT say "just arrived" or "just now" unless the elapsed time is truly very short (under 30 minutes).
+Your post must reflect how much time has actually passed since the event occurred.`;
+    } catch(e) {
+      console.warn('[feed] Failed to format event time:', e);
+    }
+  } else {
+    // NPC ambient 无 event time，只有 NOW + 时间冲突边界
+    timeContext += `\n\nDo not make an explicit date or time-of-day claim that conflicts with the supplied current shared time.`;
+  }
+
+  // 距离铁律注入每条帖子
+  const prompt = (promptMap[evt.type] || promptMap['daily_moment']) + '\n\n' + _feedDistanceRule() + _photoHint + timeContext;
 
   try {
     const systemPrompt = evt.actor === 'ghost' || !evt.actor
@@ -1632,7 +1455,13 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
       id: 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       author: evt.actor || 'ghost',
       en: post.en, zh: post.zh || '',
-      photo: _attachedPhoto ? { src: _attachedPhoto.src, caption: _attachedPhoto.caption } : null,
+      photo: _attachedPhoto ? {
+        src: _attachedPhoto.src,
+        caption: _attachedPhoto.caption,
+        subject: _attachedPhoto.subject,
+        scene: _attachedPhoto.scene,
+        perspective: _attachedPhoto.perspective
+      } : null,
       ts: Date.now(),
       likes: Math.floor(Math.random() * 30 + 3),
       liked: false,
@@ -1778,7 +1607,11 @@ function _charFeedPostHTML(post, authorKey) {
 
   const likeCount = post.likes ?? Math.floor(Math.random() * 30 + 3);
   const isLiked = !!post.liked;
-  const likeEmoji = isLiked ? '❤️' : '🤍';
+  const likeEmoji = isLiked ? '♥' : '♡';
+
+  // 翻译按钮
+  const hasTranslation = !!(post.zh || (post.comments && post.comments.some(c => c.zh)));
+  const translateBtn = hasTranslation ? `<button class="couple-translate-btn" onclick="toggleFeedTranslation(this)">译</button>` : '';
 
   return `
     <div class="couple-post-card">
@@ -1789,15 +1622,16 @@ function _charFeedPostHTML(post, authorKey) {
           <div class="couple-post-time">${timeAgo(post.ts)}</div>
         </div>
       </div>
-      <div class="couple-post-en">${post.en}</div>
+      ${post.en ? `<div class="couple-post-en">${post.en}</div>` : ''}
       ${post.zh ? `<div class="couple-post-zh">${post.zh}</div>` : ''}
       ${photoHTML}
       ${commentsHTML ? `<div class="couple-divider"></div><div class="couple-comments">${commentsHTML}</div>` : ''}
-      <div class="couple-post-footer" style="display:flex;align-items:center;gap:10px;">
+      <div class="couple-post-footer">
         <button class="couple-like-btn ${isLiked ? 'couple-liked' : ''}"
           data-post-id="${post.id}" data-count="${likeCount}"
           onclick="toggleCoupleLike(this)"
           style="cursor:pointer;pointer-events:auto;">${likeEmoji} <span class="like-num">${likeCount}</span></button>
+        ${translateBtn}
       </div>
     </div>`;
 }
@@ -1862,7 +1696,8 @@ function _weddingPinnedHTML() {
         </div>
       </div>
       <div class="couple-post-footer">
-        <button class="couple-like-btn ${liked ? 'couple-liked' : ''}" data-count="12" onclick="toggleCoupleLike(this, 'weddingLike')">${liked ? '❤️' : '🤍'} <span class="like-num">12</span></button>
+        <button class="couple-like-btn ${liked ? 'couple-liked' : ''}" data-count="12" onclick="toggleCoupleLike(this, 'weddingLike')">${liked ? '♥' : '♡'} <span class="like-num">12</span></button>
+        <button class="couple-translate-btn" onclick="toggleFeedTranslation(this)">译</button>
       </div>
     </div>`;
 }
@@ -1881,14 +1716,30 @@ function _feedUserQuotaLeft() {
 
 // 在动态区顶部注入"发朋友圈"按钮（只注入一次）
 function ensureFeedComposeButton() {
-  const feed = document.getElementById('couplePostsFeed');
-  if (!feed || document.getElementById('feedComposeBtn')) return;
-  const btn = document.createElement('button');
-  btn.id = 'feedComposeBtn';
-  btn.className = 'feed-compose-btn';
-  btn.textContent = '＋ 发朋友圈';
-  btn.onclick = openFeedCompose;
-  feed.parentNode.insertBefore(btn, feed);
+  // V2 UI 已改为 composer 轻量入口，不再需要独立按钮
+  // composer 直接在 HTML 里，此函数保留空壳防止调用报错
+}
+
+// 初始化 composer 头像
+function initLovespaceComposer() {
+  const avatar = document.getElementById('lovespaceComposerAvatar');
+  if (!avatar) return;
+  const userAva = localStorage.getItem('userAvatarBase64');
+  if (userAva) {
+    const src = _toDataUri(userAva);
+    avatar.innerHTML = `<img src="${src}" alt="">`;
+  } else {
+    avatar.innerHTML = `<img src="images/default-avatar.jpg" alt="">`;
+  }
+}
+
+// 初始化 Hero 名字
+function initLovespaceHero() {
+  const namesEl = document.getElementById('lovespaceHeroNames');
+  if (!namesEl) return;
+  const ghostName = localStorage.getItem('botNickname') || 'Simon Riley';
+  const userName = localStorage.getItem('userName') || '你';
+  namesEl.textContent = `${ghostName} × ${userName}`;
 }
 
 let _feedComposePhoto = null; // { idbKey, idbIndex, thumb }

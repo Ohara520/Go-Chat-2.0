@@ -1,0 +1,5 @@
+{
+  "version": "2.0.0",
+  "description": "Feed photo metadata. Each entry maps to a file in the poster's subdirectory.",
+  "photos": []
+}

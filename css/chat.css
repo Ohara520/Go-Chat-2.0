@@ -782,53 +782,12 @@
     100% { transform: translateY(900px) rotate(360deg) translateX(-20px); opacity: 0; }
 }
 
-/* 封面 */
+/* 旧封面（已退役，保留防报错） */
 .couple-cover-section {
-    margin: 0;
-    border-radius: 0 0 22px 22px;
-    overflow: visible;
-    background: linear-gradient(135deg,
-        rgba(155,210,125,0.55) 0%,
-        rgba(175,220,140,0.5) 40%,
-        rgba(195,228,155,0.48) 70%,
-        rgba(210,235,170,0.45) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.72);
-    box-shadow: 0 8px 30px rgba(80,140,55,0.14);
-    position: relative;
+    display: none;
 }
-.couple-cover-top {
-    display: flex; align-items: center;
-    justify-content: center; gap: 22px;
-    margin-bottom: 20px;
-}
-.couple-cover-avatar {
-    width: 62px; height: 62px; border-radius: 50%;
-    background: rgba(255,255,255,0.48);
-    border: 2.5px solid rgba(255,255,255,0.88);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 32px;
-    box-shadow: 0 4px 16px rgba(80,140,55,0.18);
-}
-.couple-cover-heart {
-    font-size: 26px;
-    animation: coverHb 1.8s ease-in-out infinite;
-    filter: drop-shadow(0 0 8px rgba(100,180,70,0.45));
-}
-@keyframes coverHb {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.3); }
-}
-.couple-cover-bottom {
-    display: flex; align-items: flex-end; justify-content: space-between;
-}
-.couple-cover-main { font-size: 16px; font-weight: 700; color: #1e3d20; letter-spacing: 0.3px; }
-.couple-cover-sub { font-size: 11px; color: rgba(40,80,30,0.55); margin-top: 3px; }
-.couple-days-num { font-size: 30px; font-weight: 800; color: #1e3d20; line-height: 1; }
-.couple-days-label { font-size: 11px; color: rgba(40,80,30,0.55); margin-top: 2px; text-align: right; }
 
-/* Feed区 */
+/* Feed区（V2 已迁移到 lovespace.css） */
 .couple-feed-section { padding: 14px 16px 80px; }
 
 /* 帖子卡片 */
@@ -1067,16 +1026,13 @@
     font-weight: 600;
 }
 
-/* ===== 情侣空间 Tab 切换 ===== */
+/* ===== 情侣空间 Tab 切换（已退役） ===== */
 .couple-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 16px 16px 8px;
+  display: none;
 }
 .couple-tab {
-  flex: 1;
-  padding: 10px 0;
-  border-radius: 24px;
+  display: none;
+}
   border: none;
   background: rgba(255,255,255,0.72);
   backdrop-filter: blur(12px);
@@ -1157,7 +1113,7 @@
     left: 12.5%;
     aspect-ratio: 1.586 / 1;
     cursor: pointer;
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s 0s;
+    transition: transform 0.35s ease-out, z-index 0s 0s;
     will-change: transform;
 }
 
@@ -1166,6 +1122,7 @@
     height: 100%;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+    display: block;
 }
 
 /* 卡面余额叠加层 */
@@ -1182,20 +1139,22 @@
     letter-spacing: -0.02em;
 }
 
-/* Ghost Card 黑卡 - 初始插在后面 */
+/* Ghost Card 黑卡 - 默认状态（后层，只露上边缘） */
 .wallet-card-ghost {
-    top: 8%;
+    top: 22%;
     z-index: 2;
+    transform: translateY(0) scale(0.98);
 }
 
 .wallet-card-ghost .card-balance-overlay {
     color: #c9a84c;
 }
 
-/* My Card 白卡 - 初始插在前面 */
+/* My Card 白卡 - 默认状态（前层，完整卡面） */
 .wallet-card-my {
-    top: 20%;
+    top: 14%;
     z-index: 3;
+    transform: translateY(0) scale(1);
 }
 
 .wallet-card-my .card-balance-overlay {
@@ -1219,30 +1178,32 @@
     border-radius: 0 0 16px 16px;
 }
 
-/* 抽卡状态 - Ghost Card 被选中 */
+/* Ghost Card 被选中 - 成为前卡 */
 .wallet-card-ghost.pulled {
-    transform: translateY(-80px) scale(1.05);
     z-index: 10;
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s 0s;
+    transform: translateY(0) scale(1);
+    transition: transform 0.35s ease-out, z-index 0s 0s;
 }
 
-/* 当 Ghost Card 抽出时，My Card 后退 */
+/* Ghost Card 被选中时，My Card 后退 */
 .wallet-card-my.tucked {
-    transform: translateY(10px);
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 2;
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.35s ease-out, z-index 0s 0s;
 }
 
-/* 抽卡状态 - My Card 被选中 */
+/* My Card 被选中 - 成为前卡 */
 .wallet-card-my.pulled {
-    transform: translateY(-70px) scale(1.03);
     z-index: 10;
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s 0s;
+    transform: translateY(0) scale(1);
+    transition: transform 0.35s ease-out, z-index 0s 0s;
 }
 
-/* 当 My Card 抽出时，Ghost Card 后退 */
+/* My Card 被选中时，Ghost Card 后退 */
 .wallet-card-ghost.tucked {
-    transform: translateY(12px);
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 2;
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.35s ease-out, z-index 0s 0s;
 }
 
 /* 卡片切换按钮 */

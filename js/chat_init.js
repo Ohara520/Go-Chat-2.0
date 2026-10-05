@@ -93,8 +93,6 @@ async function initChat() {
 
   // Ghost 月度工资上交机制已退役（2026-10），不再自动入账 / 发消息。
 
-  // 剧情解锁检查（sessionStart类型）
-  setTimeout(() => { if (typeof checkStoryOnSessionStart === 'function') checkStoryOnSessionStart(); }, 1500);
 
   // 地点 / 天气 / 时间
   if (typeof initLocation === 'function') {

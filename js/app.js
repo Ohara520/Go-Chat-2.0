@@ -83,7 +83,7 @@ function openScreen(id) {
     if (id === 'marketScreen'       && typeof initMarket             === 'function') { initMarket(); checkDeliveryUpdates(); }
     if (id === 'takeoutScreen'      && typeof initTakeoutScreen      === 'function') initTakeoutScreen();
     if (id === 'deliveryScreen'     && typeof renderDeliveryPage     === 'function') renderDeliveryPage();
-    if (id === 'achievementScreen'  && typeof switchAchievementTab   === 'function') switchAchievementTab('story');
+    if (id === 'achievementScreen'  && typeof renderLifeEventsAlbum === 'function') renderLifeEventsAlbum();
     // 回到主页时按当前时间重算外卖餐段提示，避免跨餐段后仍留着旧提示
     if (id === 'mainScreen'         && typeof updateTakeoutCardHint  === 'function') updateTakeoutCardHint();
 }
@@ -241,6 +241,15 @@ window.onload = async function() {
       try { linkAutoWorldBookMemories(); } catch (e) { console.warn('[link] migration failed', e); }
     }
 
+    // Life Events V1 Migration（老用户首次进入时从历史数据迁移纪念）
+    if (typeof migrateLifeEventsV1 === 'function') {
+      try { migrateLifeEventsV1(); } catch (e) { console.warn('[Life Events] migration failed', e); }
+    }
+    // Life Events View 初始化
+    if (typeof initLifeEventsView === 'function') {
+      try { initLifeEventsView(); } catch (e) { console.warn('[Life Events] view init failed', e); }
+    }
+
     // 恢复约会 session：如果有进行中的约会，直接恢复约会界面而不是主页
     const _activeDate = localStorage.getItem('activeDateSession');
     if (_activeDate) {
@@ -310,11 +319,10 @@ window.onload = async function() {
     // ── 刷新聊天记录显示 ─────────────────────────────────────
     if (typeof refreshChatScreen === 'function') refreshChatScreen();
 
-    // ── 会话事件检查（生日/周年/告白小作文/沉睡的剧情成就）──
-    // 修复：checkStoryOnSessionStart 此前从未被调用，导致所有 session 事件
-    // （含生日、结婚周年、大量成就）从不触发。这里在进主页后补上调用。
-    if (typeof checkStoryOnSessionStart === 'function') {
-      setTimeout(() => { try { checkStoryOnSessionStart(); } catch(e) { console.warn('[app] session事件检查失败', e); } }, 4000);
+    // ── 真实纪念日检查：生日 / 结婚周年 ─────────────────────
+    // 与已退休的 Story 自动剧情系统分离。
+    if (typeof checkCelebrationOnSessionStart === 'function') {
+      setTimeout(() => { try { checkCelebrationOnSessionStart(); } catch(e) { console.warn('[app] 纪念日检查失败', e); } }, 4000);
     }
 }
 

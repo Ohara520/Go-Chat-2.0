@@ -4,7 +4,7 @@
 // 包含：
 //   initProfile / renderGhostProfile / saveRemark
 //   initLocation / updateWeather / updateUKTime
-//   LOCATIONS / FESTIVALS / MEET_TYPES / GHOST_STATES / COUNTRY_DATA
+//   LOCATIONS / FESTIVALS / MEET_TYPES / COUNTRY_DATA
 //   SECRET_COLORS / ZODIACS
 //   loadSecretScreen / saveSecret / selectXxx 系列
 //   uploadAvatar / updateAvatarPreview / updateAvatarEverywhere
@@ -24,19 +24,11 @@
 // tz: null = 真实时区未知（Classified/Undisclosed）；由 getGhostTimeZone() 在运行时回落 Europe/London，
 // 那只是 compatibility fallback，不代表这些地点真在英国。
 const LOCATIONS = [
-  { name: 'Hereford Base',        weight: 25, weatherCity: 'Hereford',   reason: 'Routine garrison and training.', type: 'base',     tz: 'Europe/London' },
-  { name: 'Manchester',           weight: 12, weatherCity: 'Manchester', reason: 'Leave. Back home.',              type: 'leave',    tz: 'Europe/London' },
-  { name: 'London',               weight: 8,  weatherCity: 'London',     reason: 'NATO coordination briefing.',   type: 'leave',    tz: 'Europe/London' },
-  { name: 'Edinburgh',            weight: 5,  weatherCity: 'Edinburgh',  reason: 'Highland terrain training.',    type: 'base',     tz: 'Europe/London' },
-  { name: 'Germany',              weight: 5,  weatherCity: 'Berlin',     reason: 'NATO joint exercise.',          type: 'deployed', tz: 'Europe/Berlin' },
-  { name: 'Poland',               weight: 4,  weatherCity: 'Warsaw',     reason: 'Eastern European support op.',  type: 'deployed', tz: 'Europe/Warsaw' },
-  { name: 'Norway',               weight: 4,  weatherCity: 'Oslo',       reason: 'Arctic warfare training.',      type: 'deployed', tz: 'Europe/Oslo' },
-  { name: 'Amsterdam',            weight: 3,  weatherCity: 'Amsterdam',  reason: 'European transit. Brief stop.', type: 'deployed', tz: 'Europe/Amsterdam' },
-  { name: 'Paris',                weight: 3,  weatherCity: 'Paris',      reason: 'NATO intel coordination.',      type: 'deployed', tz: 'Europe/Paris' },
-  { name: 'Dublin',               weight: 3,  weatherCity: 'Dublin',     reason: 'Cross-border liaison mission.', type: 'deployed', tz: 'Europe/Dublin' },
-  { name: 'Tokyo',                weight: 3,  weatherCity: 'Tokyo',      reason: 'Far East joint exercise.',      type: 'deployed', tz: 'Asia/Tokyo' },
-  { name: 'Undisclosed Location', weight: 3,  weatherCity: null,         reason: null,                            type: 'deployed', tz: null },
-  { name: 'Classified',           weight: 2,  weatherCity: null,         reason: null,                            type: 'deployed', tz: null },
+  { name: 'Hereford Base',        weatherCity: 'Hereford',   reason: 'Routine garrison and training.', type: 'base',     tz: 'Europe/London' },
+  { name: 'Manchester',           weatherCity: 'Manchester', reason: 'Leave. Back home.',              type: 'leave',    tz: 'Europe/London' },
+  { name: 'London',               weatherCity: 'London',     reason: 'Work in London.',                 type: 'deployed', tz: 'Europe/London' },
+  { name: 'Undisclosed Location', weatherCity: null,         reason: null,                              type: 'deployed', tz: null },
+  { name: 'Classified',           weatherCity: null,         reason: null,                              type: 'deployed', tz: null },
 ];
 
 // ghost_knows: true=主动提; 'heard'=听说过会祝福; false=不知道
@@ -83,98 +75,7 @@ const MEET_TYPES = [
   { key: 'coworker',   emoji: '🎖️', label: '战友情深',   prompt: '一起经历过真正危险的事。那种信任不是培养出来的，是在压力下自然生的。' },
 ];
 
-// GHOST_STATES 按UK时间段分组，避免出现逻辑不合理的状态
-const GHOST_STATES_BY_TIME = {
-  // 清晨 6-9点
-  dawn: [
-    '刚完成一次夜间演习，天刚亮', '快天亮了，睡意刚来',
-    '睡了两个小时，不知道为什么醒了', '今天格外清醒，不知道为什么',
-    '刚做了个奇怪的梦，不打算说', '头有点疼，大概是睡眠不够',
-    '昨晚打雷，几个新人没睡好', '昨天的任务有点出乎意料',
-    '刚结束任务，还没睡',
-  ],
-  // 上午 9-12点
-  morning: [
-    '刚跑完10公里，还没缓过来', '靶场训练结束，耳朵还有点鸣',
-    '今天的训练被Price叫停了，原因不明', '在装备间做维护，手上有油',
-    '刚做完力量训练，手有点抖', '靶场排队等了半小时，轮到他又没子弹了',
-    '装备出了点问题，在等维修', '今天演习用的是实弹，不想细说',
-    '训练科目改了，没人提前通知', '基地今天来了几个不认识的人，身份不明',
-    '今天的简报比平时短，不是好兆头', '刚收到新任务指令，还没看完',
-    '跑步机坏了，只能去室外，结果下雨了', '刚淋完雨，衣服还没干',
-    '今天太阳难得出来，晒了一会儿', '基地今天刮大风，户外训练取消了',
-    '雾很大，能见度极低',
-  ],
-  // 下午 12-18点
-  afternoon: [
-    '待命中，坐在基地里无聊', '在食堂，伙食很差',
-    '伙食今天意外还行，不想承认', '开会，手机放腿上偷偷回消息',
-    '任务前最后准备，可能要消失一段时间', '坐军车颠了几个小时，刚到',
-    '刚从另一个基地转回来，还没适应', '任务延误了，不知道等多久',
-    '在等直升机，可能还要两个小时', '今天特别闲，闲得有点烦',
-    '轮休，没什么事做，比平时话多一点', '在基地图书室，没人知道他会来这里',
-    'Soap今天作死，Ghost没好气', '今天Gaz难得说了句很有道理的话',
-    '基地来了新人，看起来很嫩', '队友赌输了，气氛很微妙',
-    'Price今天提了个他没想到的问题', '新来的队员问了个很蠢的问题，他没回答',
-    '下午突然降温，比预报的冷', '今天湿度很高，装备需要额外保养',
-    '外面在结冰，走路要小心', '在擦枪，比实际需要的时间更长',
-    '今天看了本书，看了三页，放下了', '在整理装备，发现少了一样东西',
-    '发现基地有只猫，不知道从哪来的', '在整理一些旧东西，没打算扔',
-    '窗外有人在踢球，他看了一会儿', '今天话特别少，连队友都没来打扰他',
-    '手上有个小伤，自己处理了', '背有点紧，可能需要拉伸',
-    '今天任务顺利，他自己不太相信',
-  ],
-  // 傍晚 18-22点
-  evening: [
-    '刚洗完澡，难得清醒', '一个人喝茶，难得安静',
-    '队里有人过生日，他出现了，没说话就走了',
-    'Soap又在讲他根本不好笑的笑话', 'Gaz今天难得安静，不知道发生什么了',
-    '在基地屋顶，没人知道他在这', '一个人在宿舍，外面下雪',
-    '今天不知道为什么有点烦', '今天看到一个东西让他想起她',
-    '今天有人提到曼彻斯特，晃了一下神', '看了张旧照片，没说给任何人',
-    '突然想起一件很久以前的事', '在写一份东西，写了删，删了写',
-    '今天第一次听到一首歌，没说给任何人', '想到曼彻斯特的冬天，不知道为什么',
-    '旧伤有点酸，不打算提', '今天吃得少，不是不饿',
-    '基地暖气修了一半，另一半还冷着', '今天状态比昨天好一点',
-    '休假，在曼彻斯特老家', '在曼彻斯特街上，人多得他不习惯',
-    '在超市，不知道买什么', '坐地铁，有人一直看他',
-    '在老家咖啡馆，觉得格格不入', '难得休假，不知道该做什么',
-    '在外面走了很久，没有目的地', '一个人待着，比平时安静',
-  ],
-  // 深夜 22-6点
-  night: [
-    '深夜，营地很安静', '基地停电了，用手机手电筒',
-    '睡不着，不知道为什么', '今天心情不太好，说不清原因',
-    '深夜开着暖气，外面在下雪', '关灯躺着，还没睡着',
-    '在基地操场独自坐着，没什么理由', '夜里起来喝水，顺便看了眼手机',
-    '夜班站岗，没什么动静', '喝了太多咖啡，现在睡不着',
-    '想了一件很久以前的事，没人知道', '老家的东西还放在那里没人动',
-    '想起以前一个地方，现在可能已经拆了', '很久没回去了，不确定还算不算家',
-    '今晚月亮挺圆，没什么原因就注意到了', '刚换了手机壳，没人注意到',
-    '今天格外清醒，不知道为什么', '一个人待着，比平时安静',
-  ],
-};
-
-// 根据UK时间返回对应状态池
-function getGhostStatesByTime() {
-  const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London', hour: 'numeric', hour12: false
-  }).format(new Date()));
-  if (ukHour >= 6 && ukHour < 9)  return GHOST_STATES_BY_TIME.dawn;
-  if (ukHour >= 9 && ukHour < 12) return GHOST_STATES_BY_TIME.morning;
-  if (ukHour >= 12 && ukHour < 18) return GHOST_STATES_BY_TIME.afternoon;
-  if (ukHour >= 18 && ukHour < 22) return GHOST_STATES_BY_TIME.evening;
-  return GHOST_STATES_BY_TIME.night;
-}
-
-// 兼容旧代码，保留 GHOST_STATES 作为完整池的引用
-const GHOST_STATES = [
-  ...GHOST_STATES_BY_TIME.dawn,
-  ...GHOST_STATES_BY_TIME.morning,
-  ...GHOST_STATES_BY_TIME.afternoon,
-  ...GHOST_STATES_BY_TIME.evening,
-  ...GHOST_STATES_BY_TIME.night,
-];
+// Legacy random Ghost activity/state pool retired. Reality facts come from current systems only.
 
 const COUNTRY_DATA = {
   CN:    { name: 'China',        flag: '🇨🇳', offset: +8,  ghostLine: 'Seven hours between us. ...I count.' },
@@ -233,46 +134,20 @@ const PROFILE_SIGNATURES = [
 
 function initLocation() {
   const saved = localStorage.getItem('currentLocation');
-  const nextChange = parseInt(localStorage.getItem('locationNextChange') || '0');
-  const now = Date.now();
-  let chosen;
+  let chosen = LOCATIONS.find(l => l.name === saved);
 
-  // 有保存的地点且没到换地点时间 → 直接用，不重新随机
-  if (saved && now < nextChange) {
-    chosen = LOCATIONS.find(l => l.name === saved) || LOCATIONS[0];
-  } else if (saved && !nextChange) {
-    // 有地点但没有 nextChange（老用户/清缓存用户）→ 保留当前地点，重新设定换点时间
-    chosen = LOCATIONS.find(l => l.name === saved) || LOCATIONS[0];
-    const days = 2 + Math.floor(Math.random() * 2); // 2~3天
-    localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
-  } else {
-    // 真正到了换地点时间 → 随机新地点
-    // 按实际权重总和掷骰（旧版硬编码 *100 但权重和为 80，
-    // 导致约 20% 的 roll 落空、回退到 LOCATIONS[0]，Hereford 被超额选中）
-    const totalWeight = LOCATIONS.reduce((s, l) => s + (l.weight || 0), 0);
-    const roll = Math.random() * totalWeight;
-    let cumulative = 0;
-    chosen = LOCATIONS[0];
-    for (const loc of LOCATIONS) {
-      cumulative += loc.weight;
-      if (roll < cumulative) { chosen = loc; break; }
-    }
-    localStorage.setItem('currentLocation', chosen.name);
-    localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
-    localStorage.setItem('currentLocationReason', chosen.reason || '');
-    localStorage.setItem('currentLocationType', chosen.type || 'base');
-    const days = 2 + Math.floor(Math.random() * 2); // 2~3天
-    localStorage.setItem('locationNextChange', now + days * 24 * 60 * 60 * 1000);
-    const _locKey = (chosen.name || '').replace(/\s+/g, '_');
-    localStorage.setItem('locationArrivedAt_' + _locKey, now.toString());
-    localStorage.setItem('locationArrivedAt_' + chosen.name, now.toString());
+  // Location V2 foundation: no automatic/random city hopping.
+  // Existing supported locations stay put; retired legacy locations migrate once to Hereford Base.
+  if (!chosen) chosen = LOCATIONS[0];
 
-    const monthKey = 'locDays_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1);
-    const locDays  = JSON.parse(localStorage.getItem(monthKey) || '{"deployed":0,"base":0,"leave":0}');
-    const type     = chosen.type || 'base';
-    locDays[type]  = (locDays[type] || 0) + days;
-    localStorage.setItem(monthKey, JSON.stringify(locDays));
-  }
+  localStorage.setItem('currentLocation', chosen.name);
+  localStorage.setItem('currentWeatherCity', chosen.weatherCity || '');
+  localStorage.setItem('currentLocationType', chosen.type || 'base');
+  if (chosen.reason) localStorage.setItem('currentLocationReason', chosen.reason);
+  else localStorage.removeItem('currentLocationReason');
+
+  // Retire the old 2–3 day random-location timer. Historical arrival/day keys are left untouched.
+  localStorage.removeItem('locationNextChange');
 
   const locEl = document.getElementById('botLocation');
   if (locEl) locEl.textContent = chosen.name;
@@ -361,6 +236,19 @@ function getGhostWeekday() {
   } catch(e) {
     return new Intl.DateTimeFormat('en-US', {
       timeZone: _GHOST_TZ_FALLBACK, weekday: 'long'
+    }).format(new Date());
+  }
+}
+
+// Ghost 当地时间，HH:MM（24小时制）。与 getGhostDateStr / getGhostWeekday 同一时区。
+function getGhostTimeStr() {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: getGhostTimeZone(), hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(new Date());
+  } catch(e) {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: _GHOST_TZ_FALLBACK, hour: '2-digit', minute: '2-digit', hour12: false
     }).format(new Date());
   }
 }
@@ -500,6 +388,213 @@ function initProfile() {
 
   renderGhostProfile();
   loadMyInviteCode();
+
+  // Profile V2: 渲染新版 UI
+  renderProfileV2();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Profile V2 渲染
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function renderProfileV2() {
+  // 备注名 / 真实姓名
+  const remark = localStorage.getItem('botNickname') || '';
+  const nicknameEl = document.getElementById('profileDisplayName');
+  if (nicknameEl) {
+    nicknameEl.textContent = remark || 'Sim💗';
+  }
+
+  // 动态个签：本批只展示 placeholder，不做自动生成
+  const sigV2El = document.getElementById('profileSignatureV2');
+  if (sigV2El) {
+    sigV2El.textContent = '"Long day."';
+  }
+
+  // 我们在一起 X 天
+  const marriageDate = localStorage.getItem('marriageDate') || '';
+  let togetherDays = 0;
+  if (marriageDate) {
+    const today = new Date();
+    togetherDays = Math.max(1, Math.floor((today - new Date(marriageDate)) / 86400000) + 1);
+  }
+  const daysEl = document.getElementById('profileTogetherDays');
+  if (daysEl) daysEl.textContent = togetherDays;
+
+  const sinceEl = document.getElementById('profileSinceDate');
+  if (sinceEl) {
+    if (marriageDate) {
+      const [y, m, d] = marriageDate.split('-');
+      sinceEl.textContent = `${y}.${m}.${d}`;
+    } else {
+      sinceEl.textContent = '2026.06.01';
+    }
+  }
+
+  // 地点
+  const location = localStorage.getItem('currentLocation') || 'Manchester';
+  const locV2El = document.getElementById('profileLocationV2');
+  if (locV2El) locV2El.textContent = location;
+
+  // 天气
+  const weatherCity = localStorage.getItem('currentWeatherCity') || '';
+  if (weatherCity) {
+    updateWeatherV2(weatherCity);
+  } else {
+    const weatherV2El = document.getElementById('profileWeatherV2');
+    if (weatherV2El) weatherV2El.textContent = '—';
+    const weatherDescEl = document.getElementById('profileWeatherDesc');
+    if (weatherDescEl) weatherDescEl.textContent = '—';
+  }
+
+  // 当地时间
+  updateGhostLocalTime();
+  setInterval(updateGhostLocalTime, 10000);
+}
+
+async function updateWeatherV2(city) {
+  if (!city) return;
+
+  const cached = localStorage.getItem('lastWeatherDisplay');
+  const cachedCity = localStorage.getItem('lastWeatherCity');
+  const cachedTime = parseInt(localStorage.getItem('lastWeatherTime') || '0');
+  if (cached && cachedCity === city && Date.now() - cachedTime < 30 * 60 * 1000) {
+    // 解析缓存天气
+    parseWeatherV2(cached);
+    return;
+  }
+
+  try {
+    const res = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=%c%t`, { cache: 'no-store' });
+    const display = await res.text();
+    if (display && /[\d°+\-]/.test(display) && display.length < 20 && !/this|query|error/i.test(display)) {
+      localStorage.setItem('lastWeatherDisplay', display.trim());
+      localStorage.setItem('lastWeatherCity', city);
+      localStorage.setItem('lastWeatherTime', Date.now().toString());
+      parseWeatherV2(display.trim());
+    } else if (cached) {
+      parseWeatherV2(cached);
+    }
+  } catch(e) {
+    if (cached) parseWeatherV2(cached);
+  }
+}
+
+function parseWeatherV2(text) {
+  // text 格式类似 "☁️ +12°C" 或 "🌤️+12°C"
+  const weatherV2El = document.getElementById('profileWeatherV2');
+  const weatherDescEl = document.getElementById('profileWeatherDesc');
+  if (!weatherV2El || !weatherDescEl) return;
+
+  // 提取温度
+  const tempMatch = text.match(/([+-]?\d+)°/);
+  if (tempMatch) {
+    weatherV2El.textContent = tempMatch[1] + '°C';
+  } else {
+    weatherV2El.textContent = '—';
+  }
+
+  // 提取天气描述（emoji 或文字）
+  const emojiMatch = text.match(/^([☀️🌤️⛅☁️🌧️⛈️🌩️❄️🌨️🌫️]+)/);
+  if (emojiMatch) {
+    const emoji = emojiMatch[1].trim();
+    const descMap = {
+      '☀️': '晴天',
+      '🌤️': '多云',
+      '⛅': '多云',
+      '☁️': '阴天',
+      '🌧️': '雨',
+      '⛈️': '雷雨',
+      '🌩️': '雷雨',
+      '❄️': '雪',
+      '🌨️': '雪',
+      '🌫️': '雾',
+    };
+    weatherDescEl.textContent = descMap[emoji] || '多云';
+  } else {
+    weatherDescEl.textContent = '多云';
+  }
+}
+
+function updateGhostLocalTime() {
+  const timeEl = document.getElementById('profileTimeV2');
+  if (!timeEl) return;
+
+  const tz = (typeof getGhostTimeZone === 'function') ? getGhostTimeZone() : 'Europe/London';
+  try {
+    const ghostTime = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(new Date());
+    timeEl.textContent = ghostTime;
+  } catch(e) {
+    timeEl.textContent = '—';
+  }
+}
+
+// 备注编辑弹窗
+function openRemarkEditor() {
+  const overlay = document.getElementById('remarkEditorOverlay');
+  if (!overlay) {
+    // 创建弹窗
+    const div = document.createElement('div');
+    div.id = 'remarkEditorOverlay';
+    div.className = 'remark-editor-overlay';
+    div.innerHTML = `
+      <div class="remark-editor-modal" onclick="event.stopPropagation()">
+        <div class="remark-editor-title">编辑备注</div>
+        <input type="text" class="remark-editor-input" id="remarkEditorInput" placeholder="给他起个备注..." maxlength="20">
+        <div class="remark-editor-actions">
+          <button class="remark-editor-cancel" onclick="closeRemarkEditor()">取消</button>
+          <button class="remark-editor-save" onclick="saveRemarkFromEditor()">保存</button>
+        </div>
+      </div>
+    `;
+    div.onclick = function(e) {
+      if (e.target === div) closeRemarkEditor();
+    };
+    document.body.appendChild(div);
+  }
+
+  const input = document.getElementById('remarkEditorInput');
+  if (input) {
+    input.value = localStorage.getItem('botNickname') || '';
+    input.focus();
+  }
+
+  const overlay2 = document.getElementById('remarkEditorOverlay');
+  if (overlay2) overlay2.style.display = 'flex';
+}
+
+function closeRemarkEditor() {
+  const overlay = document.getElementById('remarkEditorOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function saveRemarkFromEditor() {
+  const input = document.getElementById('remarkEditorInput');
+  if (!input) return;
+
+  const val = input.value.trim();
+  localStorage.setItem('botNickname', val);
+
+  // 更新所有显示备注的地方
+  const nameEl = document.getElementById('chatBotName');
+  if (nameEl) nameEl.textContent = val || 'Simon Riley';
+
+  const profileNameEl = document.getElementById('profileDisplayName');
+  if (profileNameEl) profileNameEl.textContent = val || 'Sim💗';
+
+  const remEl = document.getElementById('profileRemark');
+  if (remEl) remEl.value = val;
+
+  if (typeof touchLocalState === 'function') touchLocalState();
+
+  closeRemarkEditor();
+
+  if (typeof showToast === 'function') showToast('备注已保存 ✅');
 }
 
 function renderGhostProfile() {
@@ -1144,15 +1239,15 @@ async function triggerHomeItemMoment(product) {
     });
   }
 
+  // 房产购买：立即进 Feed（无需物流）
   if (typeof feedEvent_boughtBigItem === 'function') feedEvent_boughtBigItem(product.name, product.price || 0, true);
   setTimeout(() => { if (typeof maybeTriggerFeedPost === 'function') maybeTriggerFeedPost('event_arrived'); }, 500);
 }
 
 async function triggerLuxuryMoment(product, poster) {
-  // 用户买的 → 入事件池
+  // 用户买的 → 等快递签收后由 delivery.js 触发 Feed
   if (poster !== 'ghost') {
-    if (typeof feedEvent_boughtBigItem === 'function') feedEvent_boughtBigItem(product.name, product.price || 0, false);
-    setTimeout(() => { if (typeof maybeTriggerFeedPost === 'function') maybeTriggerFeedPost('event_arrived'); }, 500);
+    // Feed 事件在 onGhostReceived() 时创建，这里不操作
     return;
   }
   // Ghost 收到礼物 → 等快递签收后再触发，这里不操作
@@ -1163,72 +1258,9 @@ async function triggerLuxuryMoment(product, poster) {
 // 成就页 Tab 切换 + 相册渲染（从 chat.js 拆分补全）
 // ============================================================
 
-function switchAchievementTab(tab) {
-  const storyPanel = document.getElementById('storyBookPanel');
-  const albumPanel = document.getElementById('albumPanel');
-  const tabStory   = document.getElementById('tabStory');
-  const tabAlbum   = document.getElementById('tabAlbum');
-  const title      = document.getElementById('achievementTitle');
-  const counter    = document.getElementById('storyBookCounter');
-
-  if (tab === 'story') {
-    if (storyPanel) storyPanel.style.display = '';
-    if (albumPanel) albumPanel.style.display = 'none';
-    if (tabStory)   tabStory.classList.add('active');
-    if (tabAlbum)   tabAlbum.classList.remove('active');
-    if (title)      title.textContent = '📖 我们的故事';
-    if (typeof renderStoryBook === 'function') renderStoryBook();
-  } else {
-    if (storyPanel) storyPanel.style.display = 'none';
-    if (albumPanel) albumPanel.style.display = '';
-    if (tabStory)   tabStory.classList.remove('active');
-    if (tabAlbum)   tabAlbum.classList.add('active');
-    if (title)      title.textContent = '📦 回忆相册';
-    if (counter)    counter.textContent = '';
-    renderAlbum();
-  }
-}
-
-function renderAlbum() {
-  const container = document.getElementById('albumList');
-  if (!container) return;
-
-  const history      = JSON.parse(localStorage.getItem('deliveryHistory') || '[]');
-  const deliveries   = JSON.parse(localStorage.getItem('deliveries') || '[]');
-  const fromDeliveries = deliveries.filter(d => d.done && !history.find(h => h.id === d.id));
-  const done         = [...history, ...fromDeliveries];
-
-  if (done.length === 0) {
-    container.innerHTML = `<div class="album-empty">还没有收到任何东西<br>去商城给他寄点什么吧</div>`;
-    return;
-  }
-
-  const sorted = [...done].sort((a, b) => (b.doneAt || b.addedAt || 0) - (a.doneAt || a.addedAt || 0));
-  container.innerHTML = sorted.map(d => {
-    const emoji      = d.productData?.emoji || d.emoji || '📦';
-    const name       = d.name || '神秘包裹';
-    const isFromGhost = d.isGhostSend || d.isLocationSpecial;
-    const isFromHome  = d.productData?.isFromHome;
-    const from       = isFromGhost ? '他寄来的' : isFromHome ? '你从家寄给他的' : '你寄给他的';
-    const dateStr    = d.doneAt
-      ? new Date(d.doneAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
-      : d.addedAt
-        ? new Date(d.addedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
-        : '';
-    const note = d.ghostNote || d.note || '';
-    return `<div class="album-card">
-      <div class="album-card-top">
-        <div class="album-card-emoji">${emoji}</div>
-        <div class="album-card-info">
-          <div class="album-card-name">${name}</div>
-          <div class="album-card-from">${from}</div>
-        </div>
-        <div class="album-card-date">${dateStr}</div>
-      </div>
-      ${note ? `<div class="album-card-note">"${note}"</div>` : ''}
-    </div>`;
-  }).join('');
-}
+// switchAchievementTab / renderAlbum 已退役（2026-12）
+// 旧「我们的故事」页面已重做为「我们的纪念册」
+// Life Events V1 接管纪念展示，旧 storyBook 保留为 legacy data
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 手机资料页备忘录生成

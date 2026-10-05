@@ -573,12 +573,14 @@ One or two lines. English only. Lowercase. No sweet talk. But not hollow either.
       } catch(e) {}
     }, replyDelay);
 
-    // 好感度 + 礼物记录（普通商品）
+    // 好感度（普通商品）
     if (!pd.isLuxury) {
       changeAffection(pd.price > 500 ? 2 : 1);
-      if (typeof feedEvent_boughtBigItem === 'function') {
-        feedEvent_boughtBigItem(delivery.name, pd.price || 0, false);
-      }
+    }
+
+    // Feed 事件候选（真实签收后，不区分普通/奢侈品）
+    if (typeof feedEvent_deliveryReceived === 'function') {
+      feedEvent_deliveryReceived(delivery.name, delivery.emoji || '📦', delivery.id, delivery.doneAt);
     }
 
     // 时间线：记录贵重礼物（≥£1000）
@@ -630,8 +632,6 @@ One to two lines. English only. Lowercase.]`
             changeAffection(pd.price > 3000 ? 5 : 3);
             if (pd.isGhostGift) {
               feedEvent_giftReceived(pd.name, 'ghost');
-            } else {
-              feedEvent_boughtBigItem(pd.name, pd.price || 0, false);
             }
             setTimeout(() => maybeTriggerFeedPost('event_arrived'), 1000);
           }

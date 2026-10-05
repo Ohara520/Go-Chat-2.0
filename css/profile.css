@@ -1,0 +1,287 @@
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Profile V2 — Ghost 个人资料页 UI 清理版
+   2026 design: 静态、安静、有生活感
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* ===== 头像 + 名字 + 动态个签 ===== */
+.profile-header-v2 {
+  text-align: center;
+  padding: 40px 20px 28px;
+  background: rgba(247,244,239,0.3);
+  border-radius: 20px;
+  margin-bottom: 16px;
+}
+
+.profile-avatar-v2 {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.85);
+  box-shadow: 0 4px 24px rgba(80,140,55,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-online-dot-v2 {
+  width: 12px;
+  height: 12px;
+  background: #4ade80;
+  border-radius: 50%;
+  border: 2.5px solid #f7f4ef;
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  box-shadow: 0 0 6px rgba(74,222,128,0.4);
+}
+
+.profile-names-v2 {
+  margin-bottom: 12px;
+}
+
+.profile-nickname-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.profile-nickname {
+  font-size: 22px;
+  font-weight: 600;
+  color: #1F2421;
+  letter-spacing: 0.5px;
+}
+
+.profile-edit-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(231,225,215,0.5);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #5C635D;
+}
+
+.profile-edit-icon:active {
+  transform: scale(0.9);
+  background: rgba(231,225,215,0.8);
+}
+
+.profile-realname {
+  font-size: 16px;
+  font-weight: 500;
+  color: #5C635D;
+  letter-spacing: 0.8px;
+}
+
+.profile-signature-v2 {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(92,99,93,0.7);
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  max-width: 300px;
+  margin: 0 auto;
+  font-weight: 300;
+}
+
+/* ===== 我们在一起 ===== */
+.profile-relationship-v2 {
+  background: rgba(251,249,245,0.7);
+  border: 1px solid rgba(231,225,215,0.5);
+  border-radius: 18px;
+  padding: 24px 20px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.profile-rel-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #5C635D;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.profile-rel-days {
+  font-size: 48px;
+  font-weight: 400;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #1F2421;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.profile-rel-since {
+  font-size: 12px;
+  color: rgba(92,99,93,0.65);
+  letter-spacing: 0.3px;
+}
+
+/* ===== 地点 / 天气 / 时间 ===== */
+.profile-reality-v2 {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.profile-reality-item {
+  flex: 1;
+  background: rgba(251,249,245,0.6);
+  border: 1px solid rgba(231,225,215,0.4);
+  border-radius: 14px;
+  padding: 18px 10px;
+  text-align: center;
+}
+
+.profile-reality-main {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1F2421;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.profile-reality-sub {
+  font-size: 10px;
+  color: #5C635D;
+  letter-spacing: 0.5px;
+}
+
+/* ===== 进入 Love Space 主按钮 ===== */
+.profile-btn-v2 {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, #5a8a46, #7aaa5a);
+  border: none;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.8px;
+  box-shadow: 0 3px 16px rgba(90,138,70,0.2);
+  margin-bottom: 48px;
+}
+
+.profile-btn-v2:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 6px rgba(90,138,70,0.2);
+}
+
+/* ===== 重置对话入口 ===== */
+.profile-reset-v2 {
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(92,99,93,0.45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.profile-reset-v2:active {
+  color: rgba(92,99,93,0.75);
+}
+
+/* ===== 备注编辑弹窗 ===== */
+.remark-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(31,36,33,0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.remark-editor-modal {
+  background: rgba(251,249,245,0.98);
+  border: 1px solid rgba(231,225,215,0.8);
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: 0 12px 40px rgba(31,36,33,0.15);
+}
+
+.remark-editor-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1F2421;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.remark-editor-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid rgba(231,225,215,0.8);
+  border-radius: 12px;
+  font-size: 15px;
+  color: #1F2421;
+  background: rgba(255,255,255,0.7);
+  font-family: inherit;
+  outline: none;
+  margin-bottom: 18px;
+}
+
+.remark-editor-input::placeholder {
+  color: rgba(92,99,93,0.4);
+}
+
+.remark-editor-input:focus {
+  border-color: rgba(90,138,70,0.5);
+  box-shadow: 0 0 0 3px rgba(90,138,70,0.08);
+}
+
+.remark-editor-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.remark-editor-cancel {
+  flex: 1;
+  padding: 11px;
+  border: 1px solid rgba(231,225,215,0.8);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.5);
+  color: #5C635D;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.remark-editor-save {
+  flex: 1;
+  padding: 11px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #5a8a46, #7aaa5a);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}

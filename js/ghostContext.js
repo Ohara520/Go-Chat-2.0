@@ -122,5 +122,15 @@ function buildGhostContextBlock(opts) {
     }
   }
 
+  // —— Continuity V1 (Batch 1) ——
+  // 注入"仍然影响现在"的近期事实（pending / ongoing / recently completed）
+  const continuityBlock = (typeof buildContinuityContext === 'function')
+    ? buildContinuityContext()
+    : '';
+  if (continuityBlock) {
+    lines.push('');
+    lines.push(continuityBlock);
+  }
+
   return lines.join('\n');
 }

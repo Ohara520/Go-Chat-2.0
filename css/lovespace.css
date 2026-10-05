@@ -1,0 +1,443 @@
+/* ===== Love Space V2 UI ===== */
+
+/* Hero 封面 */
+.lovespace-hero {
+  position: relative;
+  height: 280px;
+  overflow: hidden;
+  border-radius: 0 0 24px 24px;
+}
+
+.lovespace-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lovespace-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    rgba(0,0,0,0.15) 0%,
+    rgba(0,0,0,0.4) 100%);
+}
+
+.lovespace-hero-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 32px;
+  text-align: center;
+  color: white;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+.lovespace-hero-title {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.lovespace-hero-names {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  opacity: 0.95;
+}
+
+.lovespace-change-cover {
+  position: absolute;
+  top: calc(52px + env(safe-area-inset-top));
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.lovespace-change-cover:active {
+  transform: scale(0.92);
+}
+
+/* Feed 区域 */
+.lovespace-feed-section {
+  padding: 18px 16px 80px;
+  background: #FBF9F5;
+}
+
+/* 发布入口 composer */
+.lovespace-composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(231,225,215,0.6);
+  border-radius: 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lovespace-composer:active {
+  transform: scale(0.98);
+  background: rgba(255,255,255,0.95);
+}
+
+.lovespace-composer-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e8e4dc, #f0ede6);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.lovespace-composer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lovespace-composer-placeholder {
+  flex: 1;
+  font-size: 14px;
+  color: #9a9486;
+  font-weight: 400;
+}
+
+.lovespace-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.lovespace-composer-icon {
+  width: 20px;
+  height: 20px;
+  color: #9a9486;
+}
+
+.lovespace-composer-plus {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(196,97,47,0.08);
+  color: #A94E22;
+  font-size: 18px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Feed 帖子卡片 - 自然流式布局 */
+#couplePostsFeed {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.couple-post-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 0;
+  animation: none;
+  border-bottom: 1px solid rgba(231,225,215,0.5);
+  padding-bottom: 18px;
+}
+
+.couple-post-card:last-child {
+  border-bottom: none;
+}
+
+.couple-post-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.couple-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(231,225,215,0.6);
+  background: #f8f6f2;
+  overflow: hidden;
+}
+
+.couple-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.couple-avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-width: 1px;
+}
+
+.couple-post-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.couple-post-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2421;
+  margin-bottom: 2px;
+}
+
+.couple-post-time {
+  font-size: 12px;
+  color: #9a9486;
+  font-weight: 400;
+}
+
+.couple-post-en {
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.6;
+  color: #1F2421;
+  margin-bottom: 0;
+}
+
+.couple-post-zh {
+  display: none;
+}
+
+/* 图片 - 放在正文下方 */
+.couple-post-photo {
+  margin: 12px 0 0;
+}
+
+.couple-post-photo img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+  background: rgba(0,0,0,0.02);
+}
+
+/* 点赞/评论行 */
+.couple-post-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.couple-like-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #9a9486;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 400;
+  transition: all 0.2s;
+}
+
+.couple-like-btn:hover {
+  color: #C4612F;
+}
+
+.couple-like-btn.couple-liked {
+  color: #C4612F;
+}
+
+.couple-like-btn .like-num {
+  font-weight: 500;
+}
+
+/* 评论区 */
+.couple-divider {
+  height: 1px;
+  background: rgba(231,225,215,0.4);
+  margin: 14px 0 12px;
+}
+
+.couple-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.couple-comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.couple-comment-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.couple-comment-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1F2421;
+  margin-bottom: 3px;
+}
+
+.couple-comment-en {
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.5;
+  color: #5C635D;
+}
+
+.couple-comment-zh {
+  display: none;
+}
+
+.couple-reply-to {
+  font-size: 12px;
+  color: #9a9486;
+  margin-bottom: 3px;
+}
+
+/* 翻译按钮 */
+.couple-translate-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #9a9486;
+  padding: 0;
+  font-weight: 400;
+  margin-left: auto;
+  transition: color 0.2s;
+}
+
+.couple-translate-btn:hover {
+  color: #C4612F;
+}
+
+/* 翻译展开状态 */
+.couple-post-zh.show,
+.couple-comment-zh.show {
+  display: block;
+  font-size: 13px;
+  color: #7a7a6f;
+  font-weight: 300;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* 空状态 */
+.couple-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #9a9486;
+  font-size: 14px;
+  font-weight: 300;
+}
+
+/* 删除按钮 */
+.couple-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #9a9486;
+  padding: 0;
+  margin-left: auto;
+  transition: color 0.2s;
+}
+
+.couple-delete-btn:hover {
+  color: #C4612F;
+}
+
+/* 角色名字颜色 */
+.couple-ghost-name { color: #2d5a30; }
+.couple-soap-name  { color: #2d6a8a; }
+.couple-gaz-name   { color: #2d7a4a; }
+.couple-price-name { color: #4a7a2a; }
+
+/* 婚帖保护（个人页置顶用） */
+.couple-wedding {
+  background: rgba(242,227,214,0.35);
+  border: 1px solid rgba(196,97,47,0.2);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.couple-pinned-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(196,97,47,0.1);
+  color: #A94E22;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.couple-double-avatar {
+  position: relative;
+  width: 48px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.couple-av1,
+.couple-av2 {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  border: 2px solid #FBF9F5;
+  overflow: hidden;
+}
+
+.couple-av1 {
+  left: 0;
+  top: 0;
+  z-index: 2;
+  background: #3a3a4a;
+}
+
+.couple-av2 {
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: #5a9a50;
+}
+
+.couple-av1 img,
+.couple-av2 img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

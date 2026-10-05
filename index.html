@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="css/welcome.css">
 <link rel="stylesheet" href="css/home.css">
 <link rel="stylesheet" href="css/chat.css">
+<link rel="stylesheet" href="css/lovespace.css">
+<link rel="stylesheet" href="css/profile.css">
 <link rel="stylesheet" href="css/voice.css">
 <link rel="stylesheet" href="css/delivery-v1.css">
 <link rel="stylesheet" href="css/assets-v1.css">
@@ -599,11 +601,11 @@
             <div class="photo-card-sub">SAVED</div>
           </div>
         </div>
-        <div class="card photo-card achievement-card" onclick="openScreen('achievementScreen')">
+        <div class="card photo-card achievement-card" onclick="openScreen('achievementScreen');setTimeout(()=>{if(typeof renderLifeEventsAlbum==='function')renderLifeEventsAlbum();},80);">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png" alt="">
           <div class="photo-card-text">
-            <div class="photo-card-title">故事书</div>
-            <div class="photo-card-sub">OUR STORY</div>
+            <div class="photo-card-title">纪念册</div>
+            <div class="photo-card-sub">MEMORIES</div>
           </div>
         </div>
         <div class="card photo-card secret-card" onclick="openScreen('secretScreen')">
@@ -894,114 +896,65 @@
     <div class="profile-container">
 
       <!-- 头像+名字 -->
-      <div class="profile-header">
-        <div class="profile-avatar">
+      <div class="profile-header-v2">
+        <div class="profile-avatar-v2">
           <img src="images/ghost-avatar.jpg" class="ghost-avatar-img" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
-          <div class="profile-online-dot"></div>
+          <div class="profile-online-dot-v2"></div>
         </div>
-        <div class="profile-name" id="profileDisplayName">Simon Riley</div>
-        <div class="profile-name-sub">西蒙 · 莱利</div>
-        <span class="profile-tag">TF141 · 中尉</span>
+
+        <div class="profile-names-v2">
+          <div class="profile-nickname-row">
+            <span class="profile-nickname" id="profileDisplayName">Sim💗</span>
+            <button class="profile-edit-icon" onclick="openRemarkEditor()" aria-label="编辑备注">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="profile-realname">Simon Riley</div>
+        </div>
+
+        <div class="profile-signature-v2" id="profileSignatureV2">
+          "Long day."
+        </div>
       </div>
 
-      <!-- 手机内容卡片 -->
-      <div class="profile-info-table" style="margin-bottom:14px;">
-
-        <!-- 我的心情 -->
-        <div style="padding:10px 16px 2px;border-bottom:1px solid rgba(140,190,100,0.18);">
-          <div style="font-size:10px;color:rgba(50,100,40,0.45);letter-spacing:1.5px;margin-bottom:8px;">我的心情</div>
-          <div id="moodSelector" style="display:flex;flex-wrap:wrap;gap:8px;padding-bottom:10px;">
-            <div class="mood-chip" data-mood="happy" onclick="setUserMood('happy','😊','开心')"><span>😊</span><span style="font-size:11px;">开心</span></div>
-            <div class="mood-chip" data-mood="sad" onclick="setUserMood('sad','😢','难过')"><span>😢</span><span style="font-size:11px;">难过</span></div>
-            <div class="mood-chip" data-mood="angry" onclick="setUserMood('angry','😤','生气')"><span>😤</span><span style="font-size:11px;">生气</span></div>
-            <div class="mood-chip" data-mood="miss" onclick="setUserMood('miss','🥰','想你了')"><span>🥰</span><span style="font-size:11px;">想你了</span></div>
-            <div class="mood-chip" data-mood="sleepy" onclick="setUserMood('sleepy','😴','困了')"><span>😴</span><span style="font-size:11px;">困了</span></div>
-            <div class="mood-chip" data-mood="sick" onclick="setUserMood('sick','🤒','不舒服')"><span>🤒</span><span style="font-size:11px;">不舒服</span></div>
-            <div class="mood-chip" data-mood="anxious" onclick="setUserMood('anxious','😰','焦虑')"><span>😰</span><span style="font-size:11px;">焦虑</span></div>
-            <div class="mood-chip" data-mood="bored" onclick="setUserMood('bored','🥱','无聊')"><span>🥱</span><span style="font-size:11px;">无聊</span></div>
-          </div>
-        </div>
-
-        <!-- 氛围音乐 -->
-        <div style="padding:10px 16px;border-bottom:1px solid rgba(140,190,100,0.18);">
-          <div onclick="toggleAmbient()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:18px;">🎵</span>
-              <div>
-                <div style="font-size:13px;color:#1e3d20;font-weight:600;">氛围音乐</div>
-                <div style="font-size:11px;color:rgba(50,100,40,0.5);" id="ambientSubtitle">点击开启专注氛围</div>
-              </div>
-            </div>
-            <span id="ambientArrow" style="font-size:12px;color:rgba(50,100,40,0.4);transition:transform 0.3s;">▼</span>
-          </div>
-          <div id="ambientBody" style="display:none;padding-top:10px;">
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
-              <div class="ambient-track" data-id="rain" data-file="audio/rain.mp3" data-color="#5a9a46" data-glow="#5a9a46" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">🌧️</div><div class="ambient-track-name">雨声</div>
-              </div>
-              <div class="ambient-track" data-id="fireplace" data-file="audio/fireplace.mp3" data-color="#d4880f" data-glow="#d4880f" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">🔥</div><div class="ambient-track-name">壁炉</div>
-              </div>
-              <div class="ambient-track" data-id="cafe" data-file="audio/cafe.mp3" data-color="#a08060" data-glow="#a08060" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">☕</div><div class="ambient-track-name">咖啡馆</div>
-              </div>
-              <div class="ambient-track" data-id="cricket" data-file="audio/cricket.mp3" data-color="#4a5568" data-glow="#4a5568" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">🌙</div><div class="ambient-track-name">虫鸣</div>
-              </div>
-              <div class="ambient-track" data-id="piano" data-file="audio/piano.mp3" data-color="#7c6fa0" data-glow="#7c6fa0" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">🎹</div><div class="ambient-track-name">钢琴</div>
-              </div>
-              <div class="ambient-track" data-id="sleep" data-file="audio/sleep.mp3" data-color="#6b8fa3" data-glow="#6b8fa3" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">💤</div><div class="ambient-track-name">助眠</div>
-              </div>
-              <div class="ambient-track" data-id="book" data-file="audio/book.mp3" data-color="#8a7a60" data-glow="#8a7a60" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">📖</div><div class="ambient-track-name">翻书</div>
-              </div>
-              <div class="ambient-track" data-id="story" data-file="audio/story.mp3" data-color="#c47a8a" data-glow="#c47a8a" onclick="toggleTrack(this)">
-                <div class="ambient-track-emoji">🎙️</div><div class="ambient-track-name">故事</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-              <span style="font-size:11px;color:rgba(50,100,40,0.4);">🔈</span>
-              <div style="flex:1;height:4px;background:rgba(90,154,70,0.15);border-radius:2px;cursor:pointer;position:relative;" onclick="setAmbientVolume(Math.round(event.offsetX/this.offsetWidth*100))">
-                <div id="ambientVolumeFill" style="height:100%;width:60%;background:rgba(90,154,70,0.5);border-radius:2px;"></div>
-              </div>
-              <span style="font-size:11px;color:rgba(50,100,40,0.4);">🔊</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 天气 + 步数 -->
-        <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <div style="font-size:12px;color:#1e3d20;font-weight:500;" id="profileLocation">—</div>
-            <div style="font-size:11px;color:rgba(50,100,40,0.5);" id="profileWeatherLine">— °C</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:11px;color:rgba(50,100,40,0.5);">今日步数</div>
-            <div style="font-size:14px;color:#1e3d20;font-weight:600;" id="profileSteps">—</div>
-          </div>
-        </div>
-
+      <!-- 我们在一起 -->
+      <div class="profile-relationship-v2">
+        <div class="profile-rel-label">我们在一起</div>
+        <div class="profile-rel-days" id="profileTogetherDays">0</div>
+        <div class="profile-rel-since">Since <span id="profileSinceDate">2026.06.01</span></div>
       </div>
 
-      <!-- 备注 -->
-      <div class="profile-note" style="margin-bottom:14px;">
-        <div class="profile-note-label">❤️ 我的备注</div>
-        <input type="text" class="profile-note-input" id="profileRemark"
-          placeholder="给他起个备注..."
-          onchange="saveRemark()"
-          maxlength="20">
+      <!-- 地点 / 天气 / 时间 -->
+      <div class="profile-reality-v2">
+        <div class="profile-reality-item">
+          <div class="profile-reality-main" id="profileLocationV2">Manchester</div>
+          <div class="profile-reality-sub">当前地点</div>
+        </div>
+        <div class="profile-reality-item">
+          <div class="profile-reality-main" id="profileWeatherV2">12°C</div>
+          <div class="profile-reality-sub" id="profileWeatherDesc">多云</div>
+        </div>
+        <div class="profile-reality-item">
+          <div class="profile-reality-main" id="profileTimeV2">14:27</div>
+          <div class="profile-reality-sub">当地时间</div>
+        </div>
       </div>
 
-      <!-- 进入情侣空间 -->
-      <button class="profile-btn" onclick="openScreen('coupleScreen')">
-        💑 进入 Love Space
+      <!-- 进入 Love Space -->
+      <button class="profile-btn-v2" onclick="openScreen('coupleScreen')">
+        进入 Love Space
       </button>
 
       <!-- 重置对话 -->
-      <button class="profile-btn" style="background:rgba(200,60,60,0.08);color:#a04040;border:1px solid rgba(200,60,60,0.2);margin-top:8px;" onclick="confirmResetChat()">
-        🔄 重置对话记录
+      <button class="profile-reset-v2" onclick="confirmResetChat()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;">
+          <path d="M23 4v6h-6M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        重置对话记录
       </button>
 
     </div>
@@ -1014,57 +967,40 @@
       <div class="couple-page-title">Love Space</div>
     </div>
 
-    <!-- 封面 -->
-    <div class="couple-cover-section">
-      <!-- 猫咪banner图 -->
-      <div class="couple-cover-banner">
-        <img src="images/couple/couple-banner.jpg" alt="banner" class="couple-banner-img" id="coupleBannerImg">
-        <div class="couple-banner-fade"></div>
-        <!-- 封面换图按钮 -->
-        <label for="coverUploadInput" style="position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;backdrop-filter:blur(4px);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
-          </svg>
-        </label>
-        <input type="file" id="coverUploadInput" accept="image/*" style="display:none" onchange="uploadCoverImage(this)">
+    <!-- Hero：保留现有封面图，只显示标题 -->
+    <div class="lovespace-hero">
+      <img src="images/couple/couple-banner.jpg" alt="Love Space" class="lovespace-hero-img" id="coupleBannerImg">
+      <div class="lovespace-hero-overlay"></div>
+      <div class="lovespace-hero-content">
+        <div class="lovespace-hero-title">Love Space</div>
+        <div class="lovespace-hero-names" id="lovespaceHeroNames">Sim💗 × YN</div>
       </div>
-      <!-- 头像行：左Ghost — 细线 — 右用户 -->
-      <div class="couple-cover-avatars-row">
-        <div class="couple-cover-avatar-wrap">
-          <div class="couple-cover-avatar" id="coupleCoverGhostAvatar"><img src="images/ghost-avatar.jpg" class="ghost-avatar-img" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
-        </div>
-        <div class="couple-cover-connector">
-          <div class="couple-connector-line"></div>
-          <div class="couple-connector-dot"></div>
-          <div class="couple-connector-line"></div>
-        </div>
-        <div class="couple-cover-avatar-wrap">
-          <div class="couple-cover-avatar" id="coupleCoverUserAvatar" style="background-image:url(images/default-avatar.jpg);background-size:cover;background-position:center;"></div>
-        </div>
-      </div>
-      <!-- 名字+天数 -->
-      <div class="couple-cover-info">
-        <div class="couple-cover-main" id="coupleCoverNames">Ghost & 你</div>
-        <div class="couple-cover-sub" id="coupleWeddingDate">—</div>
-        <div class="couple-cover-days">
-          <div class="couple-days-num" id="coupleDaysNum">0</div>
-          <div class="couple-days-label">天在一起</div>
-        </div>
-      </div>
+      <!-- 换封面按钮 -->
+      <label for="coverUploadInput" class="lovespace-change-cover">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </label>
+      <input type="file" id="coverUploadInput" accept="image/*" style="display:none" onchange="uploadCoverImage(this)">
     </div>
 
     <!-- Feed -->
-    <div class="couple-feed-section">
+    <div class="lovespace-feed-section">
 
-      <!-- Tab 切换 -->
-      <div class="couple-tabs">
-        <button class="couple-tab active" id="tabFeed" onclick="switchCoupleTab('feed')">动态</button>
-        <button class="couple-tab" id="tabMemory" onclick="switchCoupleTab('memory')">回忆</button>
+      <!-- 发布入口 -->
+      <div class="lovespace-composer" onclick="openFeedCompose()">
+        <div class="lovespace-composer-avatar" id="lovespaceComposerAvatar"></div>
+        <div class="lovespace-composer-placeholder">分享一点今天的事…</div>
+        <div class="lovespace-composer-actions">
+          <svg class="lovespace-composer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          <span class="lovespace-composer-plus">+</span>
+        </div>
       </div>
-
-      <!-- 动态面板 -->
-      <div id="panelFeed">
 
       <!-- 隐藏占位：initCoupleSpace 仍会写这些 id（婚帖已移到 Ghost 个人页置顶）-->
       <div style="display:none">
@@ -1074,18 +1010,6 @@
 
       <!-- AI动态Feed -->
       <div id="couplePostsFeed"></div>
-
-      </div><!-- end panelFeed -->
-
-      <!-- 回忆面板 -->
-      <div id="panelMemory" style="display:none;">
-        <!-- 关系阶段条 -->
-        <div class="memory-stage-bar" id="memoryStageBar"></div>
-        <!-- 精选3张 -->
-        <div class="memory-highlights" id="memoryHighlights"></div>
-        <!-- 完整时间线 -->
-        <div class="memory-timeline" id="memoryTimeline"></div>
-      </div>
 
     </div>
   </div>
@@ -1680,28 +1604,17 @@
     </div>
   </div>
 
-  <!-- 故事书页 -->
+  <!-- 我们的纪念册 -->
   <div class="screen" id="achievementScreen">
-    <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
-      <div class="screen-title" id="achievementTitle">📖 我们的故事</div>
-      <div id="storyBookCounter" style="font-size:12px;color:#4a8a30;margin-left:auto;padding-right:4px;"></div>
+    <div class="screen-header" style="background:rgba(247,244,239,0.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(231,225,215,0.4);">
+      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')" style="color:#1F2421;">‹</button>
+      <div style="flex:1;text-align:center;">
+        <div class="screen-title" style="color:#1F2421;font-size:16px;font-weight:600;letter-spacing:0.5px;">📖 我们的纪念册</div>
+        <div style="font-size:11px;color:rgba(92,99,93,0.6);margin-top:2px;letter-spacing:0.3px;">一起走过的日子，都留在这里。</div>
+      </div>
+      <div style="width:32px;"></div>
     </div>
-    <!-- 标签切换 -->
-    <div class="achievement-tabs">
-      <button class="achievement-tab active" id="tabStory" onclick="switchAchievementTab('story')">📖 故事书</button>
-      <button class="achievement-tab" id="tabAlbum" onclick="switchAchievementTab('album')">📦 回忆相册</button>
-    </div>
-    <!-- 故事书 -->
-    <div class="story-book-container" id="storyBookPanel">
-      <div class="story-book-hint">和他相处，故事会自然发生</div>
-      <div id="storyBookList" class="story-book-list"></div>
-    </div>
-    <!-- 回忆相册 -->
-    <div class="story-book-container" id="albumPanel" style="display:none;">
-      <div class="story-book-hint">每一件寄来的东西，都是他在意你的证明</div>
-      <div id="albumList" class="album-list"></div>
-    </div>
+    <div id="lifeEventsAlbumContainer"></div>
   </div>
 
   <!-- 收藏页 -->
@@ -2303,6 +2216,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/activity.js"></script>
 <script src="js/worldbook.js"></script>
 <script src="js/relationship.js"></script>
+<script src="js/continuity.js"></script>
+<script src="js/continuityExtractor.js"></script>
 <script src="js/ghostContext.js"></script>
 <script src="js/persona.js"></script>
 <script src="js/ui.js"></script>
@@ -2317,7 +2232,10 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/takeout.js"></script>
 <script src="js/photo.js"></script>
 <script src="js/intimacy.js"></script>
-<script src="js/geminiIntimacyPersona.js"></script><script src="js/checkin.js"></script>
+<script src="js/lifeEvents/lifeEvents.js"></script>
+<script src="js/lifeEvents/lifeEventsView.js"></script>
+<script src="js/lifeEvents/lifeEventsMigration.js"></script>
+<script src="js/checkin.js"></script>
 <script src="js/events.js"></script>
 <script src="js/triggers.js"></script>
 <script src="js/innerThought.js"></script>

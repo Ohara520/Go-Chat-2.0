@@ -462,7 +462,6 @@ async function loadFromCloud() {
         if (s.emotionalHurt != null) localStorage.setItem('emotionalHurt', s.emotionalHurt);
         if (s.lastReversePackageTurn != null) localStorage.setItem('lastReversePackageTurn', s.lastReversePackageTurn);
         // Simon 的 relationshipFlags 已退役：旧快照字段不再恢复到本地。
-        if (s.pendingSeriousTalk != null) localStorage.setItem('pendingSeriousTalk', String(s.pendingSeriousTalk));
         if (s.pendingColdWarEndStory != null) localStorage.setItem('pendingColdWarEndStory', String(s.pendingColdWarEndStory));
         if (s.loveResistance != null) localStorage.setItem('loveResistance', String(s.loveResistance));
         if (s.loveResistanceLastDecay != null) localStorage.setItem('loveResistanceLastDecay', s.loveResistanceLastDecay);
@@ -1129,7 +1128,6 @@ async function saveToCloud() {
       purchaseCounts: JSON.parse(localStorage.getItem('purchaseCounts') || '{}'),
       intimateTriggered: JSON.parse(localStorage.getItem('intimateTriggered') || '{}'),
       // 状态标记
-      pendingSeriousTalk: localStorage.getItem('pendingSeriousTalk') || '',
       pendingColdWarEndStory: localStorage.getItem('pendingColdWarEndStory') || '',
       loveResistance: localStorage.getItem('loveResistance') || '0',
       loveResistanceLastDecay: localStorage.getItem('loveResistanceLastDecay') || '',

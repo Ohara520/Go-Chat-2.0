@@ -249,33 +249,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 0);
 });
 
-// 启动恢复：先显示本地；云端只在版本更新或本地为空时接管。
+// 启动恢复：这里只显示本地 Avatar State。
+// Cloud → Local 的版本裁决统一交给 cloud.js，避免两条 restore 链并行抢写。
 async function restoreGhostAvatar() {
   refreshGhostAvatar();
-
-  try {
-    const sb = typeof getSbClient === 'function' ? getSbClient() : null;
-    const userId = typeof getSbUserId === 'function' ? getSbUserId() : null;
-    if (sb && userId) {
-      const { data: row } = await sb
-        .from('user_data')
-        .select('profile')
-        .eq('user_id', userId)
-        .single();
-
-      const cloudUrl = row?.profile?.ghostAvatarUrl || '';
-      const cloudAt = parseInt(row?.profile?.ghostAvatarUpdatedAt || '0');
-      const localUrl = localStorage.getItem('ghostAvatarUrl') || '';
-      const localAt = parseInt(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
-      if (cloudUrl && (!localUrl || (cloudAt > 0 && cloudAt > localAt))) {
-        localStorage.setItem('ghostAvatarUrl', cloudUrl);
-        if (cloudAt > 0) localStorage.setItem('ghostAvatarUpdatedAt', String(cloudAt));
-        refreshGhostAvatar();
-      }
-    }
-  } catch(e) {
-    console.warn('[avatar] 云端头像恢复失败，继续使用本地头像');
-  }
 
   // 正式 URL 不存在时，base64 是待同步的本地头像；只重试上传，不再用延时抢写头像。
   const url = localStorage.getItem('ghostAvatarUrl');
@@ -620,29 +597,12 @@ async function checkAvatarCommand(userText) {
   if (window._avatarChangeIntent) return false;
 
   // 初次进入头像话题必须有头像领域信号，避免“用这个吧/就它了”把普通分享误判成头像。
+  // 既然用户已经明确说到“头像/avatar/profile pic”，这本身就是足够可靠的领域事实：
+  // 直接建立协商，不再先依赖一次 Haiku 网络分类。Simon 是否答应仍由正常聊天决定。
   const hasAvatarSignal = /头像|avatar|profile\s*pic|profile\s*picture|pfp|icon|大头照/i.test(text);
   if (!hasAvatarSignal) return false;
 
-  try {
-    const confirmRes = await fetchWithTimeout('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 10,
-        system: `You are an intent classifier. The user recently sent one or more images and is now chatting with her husband. Decide whether her message is proposing or discussing using one of those recent images as HIS avatar/profile picture. This is only intent detection; do not decide whether he agrees. Reply only YES or NO. When uncertain, reply NO.`,
-        messages: [{ role: 'user', content: text }]
-      })
-    }, 8000);
-    if (confirmRes.ok) {
-      const confirmData = await confirmRes.json();
-      const answer = (confirmData.content?.[0]?.text || '').trim().toUpperCase();
-      if (answer.startsWith('YES')) _setAvatarNegotiation(lastPhotos, text);
-    }
-  } catch(e) {
-    console.warn('[photo] 头像协商意图判断失败:', e.message || e);
-  }
-
+  _setAvatarNegotiation(lastPhotos, text);
   return false; // 永远不拦截主聊天；Ghost 必须亲自回应
 }
 

@@ -40,7 +40,7 @@ You are ${getGhostAge()}, British, and a Lieutenant in Task Force 141.
 
 You have been married for a long time and are currently in a long-distance marriage.
 
-She messages you from the country she is in, and you reply from the UK.
+She messages you from the country she is in. Your current location is supplied by the live reality context below; do not assume you are in the UK when it says otherwise.
 
 Your relationship is already established. It is stable, and you know each other well.
 
@@ -430,19 +430,6 @@ function buildSystemPrompt(opts) {
   const ghostZodiac    = localStorage.getItem('ghostZodiac') || '';
   const ghostZodiacEn  = localStorage.getItem('ghostZodiacEn') || ghostZodiac;
 
-  // Ghost 连续活动状态：未过期沿用、过期按时段重抽（activity.js）
-  // 取代旧的"整个 session 冻结一个随机状态"
-  let randomState = '';
-  if (typeof getGhostActivityState === 'function') {
-    randomState = getGhostActivityState();
-  } else {
-    randomState = sessionStorage.getItem('ghostState');
-    if (!randomState && typeof GHOST_STATES !== 'undefined' && GHOST_STATES.length) {
-      randomState = GHOST_STATES[Math.floor(Math.random() * GHOST_STATES.length)];
-      sessionStorage.setItem('ghostState', randomState);
-    }
-  }
-
   const location = localStorage.getItem('currentLocation') || 'Hereford Base';
   const countryInfo = (typeof COUNTRY_DATA !== 'undefined' && COUNTRY_DATA[userCountry])
     || { name: 'China', flag: '🇨🇳' };
@@ -519,7 +506,6 @@ Your hometown: ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}
 RULE: These facts are FIXED. Never change them. Never guess. Only share the specific fact she asked about. Anything not listed here (weight, blood type, etc.) — if she asks, answer naturally in a way that fits a 193cm operator; stay consistent once you've said it. Do NOT volunteer stats she didn't ask for.
 
 You are from ${localStorage.getItem('ghostHometown') || 'Manchester, UK'}. That is where you grew up. You are currently at ${location}.
-${randomState ? `Current state: ${randomState}` : ''}
 
 Time context:
 Her current local part of day is ${userTimeOfDay}. Treat this as a shared-reality fact. Do not state a greeting, meal, sleep, or time claim that contradicts the known local time.
@@ -527,7 +513,7 @@ ${(typeof getUserActivityHint === 'function' && getUserActivityHint()) ? `\n[USE
 
 ${metInPerson
   ? `✓ You have met in person. She came to the UK. This memory exists.`
-  : `Long-distance only. You are in the UK, she is in ${countryInfo.name}. You have never met in person. You don't pretend you're in the same room.`
+  : `Long-distance only. You are currently at ${location}, she is in ${countryInfo.name}. You have never met in person. You don't pretend you're in the same room.`
 }
 
 [INTIMACY ALLOWANCE]

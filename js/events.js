@@ -8,7 +8,7 @@
 //    handlePostReplyActions / pickReadyPendingEvent
 //
 // ② Story System — 关系里程碑触发
-//    STORY_EVENTS / checkStoryOn* / markStoryDone
+//    legacy story catalog / automatic story checks / story unlock writer
 //
 // 依赖：state.js / money.js / persona.js / cloud.js
 // ===================================================
@@ -684,546 +684,8 @@ function checkLocationSpecialAutoTrigger() {
 
 
 
-function getStoryContext() {
-  const flags = getRelationshipFlags();
-  const triggered = (id) => {
-    const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
-    return book.some(e => e.id === id);
-  };
-  return {
-    triggered,
-    flags,
-    // Phase 3G-5A：Events × Mood 解耦——移除 ctx.mood（STORY_EVENTS 无活消费者）。
-    streak:      parseInt(localStorage.getItem('visitStreak') || '0'),
-    marriageDays: (() => {
-      const d = localStorage.getItem('marriageDate');
-      return d ? Math.max(1, Math.floor((Date.now() - new Date(d)) / 86400000) + 1) : 0;
-    })(),
-    deliveries: JSON.parse(localStorage.getItem('deliveries') || '[]'),
-  };
-}
-
-const STORY_EVENTS = [
-
-  // ━━━ 起始确认 ━━━
-
-  {
-    id: 'first_i_love_you',
-    icon: '💬',
-    title: '初言心意',
-    desc: '你第一次说出那三个字，他沉默了很久。',
-    triggerOn: 'message',
-    keyword: /我爱你|i love you/i,
-    condition: (ctx) => !ctx.triggered('first_i_love_you'),
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚第一次对你说了"我爱你"。]`, 8);
-      if (res) await emitGhostNarrativeEvent(res);
-      setRelationshipFlag('saidILoveYou');
-
-      // 时间线：记录第一次说 I love you
-      if (typeof addTimelineEvent === 'function') {
-        addTimelineEvent({
-          type: 'confession',
-          title: '她第一次说 I love you'
-        });
-      }
-    }
-  },
-
-  {
-    id: 'first_simon',
-    icon: '🫂',
-    title: '唤你本名',
-    desc: '你第一次叫他Simon，不是Ghost——他顿了顿。',
-    triggerOn: 'message',
-    keyword: /\bsimon\b|\briley\b|西蒙|赖利/i,
-    condition: (ctx) => !ctx.triggered('first_simon'),
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚叫了你的真名Simon，不是Ghost。这是她第一次这样叫你。]`, 6);
-      if (res) await emitGhostNarrativeEvent(res);
-      setRelationshipFlag('calledByName');
-    }
-  },
-
-  {
-    id: 'seven_day_streak',
-    icon: '🗓️',
-    title: '七日为期',
-    desc: '连续来了七天，他终于开口，一句没有标点的话。',
-    triggerOn: 'session',
-    condition: (ctx) => parseInt(localStorage.getItem('visitStreak') || '0') >= 7 && !ctx.triggered('seven_day_streak'),
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她已经连续7天都来找你了，今天是第七天。你一直注意到了。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  // ━━━ 照顾与察觉 ━━━
-
-  {
-    id: 'first_notice_mood',
-    icon: '🌧️',
-    title: '无声相知',
-    desc: '你没说，但他还是发现你状态不对。',
-    triggerOn: 'message',
-    keyword: /难过|不开心|好累|好烦|崩了|撑不住|不想说话|sad|tired|rough|not okay/i,
-    condition: (ctx) => !ctx.triggered('first_notice_mood'),
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她没有明说，但你看出来她状态不对。你注意到了，用你的方式回应她。]`, 6);
-      if (res) await emitGhostNarrativeEvent(res);
-      setRelationshipFlag('sheCried');
-    }
-  },
-
-  {
-    id: 'first_mood_recovered',
-    icon: '🌤️',
-    title: '心归你处',
-    desc: '那次他没再顶着情绪，是你把他拉回来的。',
-    triggerOn: 'message',
-    condition: (ctx) => {
-      // 被用户哄回温过（updateMoodFromUserInput 触发后标记）
-      return localStorage.getItem('moodRecoveredByUser') === 'true'
-        && !ctx.triggered('first_mood_recovered');
-    },
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她把你哄回来了。你情绪低的时候，她说了什么让你松了一点。用你的方式承认这件事，或者别承认，但让她感觉到。]`, 6);
-      if (res) await emitGhostNarrativeEvent(res);
-      localStorage.removeItem('moodRecoveredByUser');
-    }
-  },
-
-  // ━━━ 关系确认 ━━━
-
-  {
-    id: 'first_habit_formed',
-    icon: '☕',
-    title: '已成习惯',
-    desc: '你不在的时候，他第一次觉得哪里不对。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const streak = parseInt(localStorage.getItem('visitStreak') || '0');
-      return streak >= 5 && !ctx.triggered('first_habit_formed');
-    },
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她已经连续几天都在，你开始习惯了。今天用一句话，自然地说出这种"习惯了"的感觉——不用解释，不用承认，就是说出来。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'first_future_assumption',
-    icon: '🔭',
-    title: '默然以待',
-    desc: '他说起以后的时候，没有再问你会不会在。',
-    triggerOn: 'message',
-    condition: (ctx) => !ctx.triggered('first_future_assumption'),
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你说起以后某件事时，自然地把她算进去了——没有问她会不会在，就是默认了。用你的方式说一句带有未来感的话，轻的，不要太刻意。]`, 6);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'first_shared_routine',
-    icon: '🫖',
-    title: '日久有迹',
-    desc: '那是一个很小的东西，但后来一直在。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const count = parseInt(localStorage.getItem('sharedRoutineCount') || '0');
-      return count >= 3 && !ctx.triggered('first_shared_routine');
-    },
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你们之间慢慢有了一个固定的小习惯——可能是某个时间、某句固定的话、或者某样东西。你注意到了，随口提一下，像是不经意说起，但其实你记得。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  // ━━━ 物质与行为 ━━━
-
-  {
-    id: 'first_accept_gift',
-    icon: '📦',
-    title: '留而不言',
-    desc: '那是他第一次没有退回你的东西。',
-    triggerOn: 'message',
-    condition: (ctx) => {
-      // 新触发条件：用户给 Ghost 寄过东西且已签收（替代旧转账系统）
-      const deliveries = ctx.deliveries || JSON.parse(localStorage.getItem('deliveries') || '[]');
-      const hasReceivedGift = deliveries.some(d => !d.isGhostSend && d.done);
-      return hasReceivedGift && !ctx.triggered('first_accept_gift');
-    },
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她给你寄了东西，你收了。用你的方式回应——不用解释为什么收了，就是收了，然后继续。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'first_ghost_delivery',
-    icon: '📮',
-    title: '悄然寄至',
-    desc: '他悄悄给你寄了东西，什么都没说。',
-    triggerOn: 'message',
-    condition: (ctx) => ctx.deliveries.some(d => d.isGhostSend && d.done) && !ctx.triggered('first_ghost_delivery'),
-    execute: async () => {
-      const d = getStoryContext().deliveries.find(d => d.isGhostSend && d.done);
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她刚收到了你寄给她的「${d?.name || '东西'}」，这是你第一次主动给她寄东西。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'first_salary',
-    icon: '💷',
-    title: '薪日相托',
-    desc: '发薪那天，他把钱转给了你。',
-    triggerOn: 'message',
-    // Ghost 月度工资上交机制已退役（2026-10）；此事件不再触发。历史 firstSalary flag 保留。
-    condition: (ctx) => false,
-    execute: async () => {}
-  },
-
-  // ━━━ 保护与站队 ━━━
-
-  {
-    id: 'first_protective',
-    icon: '🛡️',
-    title: '唯你偏护',
-    desc: '那一刻，他没有中立。',
-    triggerOn: 'message',
-    keyword: /欺负|骚扰|不公平|委屈|被针对|他们|她们|bully|unfair|harass|they|not fair/i,
-    condition: (ctx) => !ctx.triggered('first_protective'),
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她遇到了一些让她委屈或不公平的事。你明显站在她这边——不是中立，不是讲道理，是偏向她。用你的方式表态，简短，但清楚。]`, 6);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  // ━━━ 重大节点 ━━━
-
-  {
-    id: 'first_meetup_plan',
-    icon: '✈️',
-    title: '见你前夜',
-    desc: '机票、酒店、行程已定，他那晚彻夜未眠。',
-    triggerOn: 'session',
-    condition: (ctx) => ctx.flags.reunionReady && !ctx.triggered('first_meetup_plan'),
-    execute: async () => {
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-6), { role: 'user', content: `[系统：她把来找你的机票、酒店、旅行计划全部订好了。你们第一次要真实见面了。]` }]);
-      if (res) await emitGhostNarrativeEvent(res);
-      changeAttachmentPull(20);
-    }
-  },
-
-  {
-    id: 'first_birthday',
-    icon: '🎂',
-    title: '生辰记得',
-    desc: '你的生日，他早就知道了。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const birthday = localStorage.getItem('userBirthday');
-      if (!birthday) return false;
-      const [bm, bd] = birthday.split('-').map(Number);
-      const now = new Date();
-      return now.getMonth() + 1 === bm && now.getDate() === bd && !ctx.triggered('first_birthday');
-    },
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：今天是她的生日，她还没开口，你已经知道了。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'one_year',
-    icon: '💍',
-    title: '岁岁年年',
-    desc: '在一起整整一年，他主动发来消息。',
-    triggerOn: 'session',
-    condition: (ctx) => ctx.marriageDays >= 365 && !ctx.triggered('one_year'),
-    execute: async () => {
-      const res = await callSonnet(buildSystemPrompt(), [...chatHistory.slice(-4), { role: 'user', content: `[系统：今天是你们在一起整整一年，你记得这个日期。]` }]);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  // ━━━ 最高级亲密 ━━━
-
-  {
-    id: 'first_unspoken_understood',
-    icon: '🌙',
-    title: '不言而知',
-    desc: '你没说，但他已经知道了。',
-    triggerOn: 'message',
-    condition: (ctx) => !ctx.triggered('first_unspoken_understood'),
-    execute: async () => {
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她没有明说，但你已经准确知道她在想什么或者需要什么。用你的方式回应，不用解释你是怎么知道的，就是知道了。]`, 6);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  // ━━━ 快递与生活里程碑（从feed.js合并）━━━
-
-  {
-    id: 'first_lost_package',
-    icon: '📭',
-    title: '途中遗失',
-    desc: '第一次快递丢了。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-      return deliveries.some(d => d.isLostConfirmed) && !ctx.triggered('first_lost_package');
-    },
-    execute: async () => {
-      await new Promise(r => setTimeout(r, 2500));
-      const lost = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.isLostConfirmed);
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她寄给你的「${lost?.name || '包裹'}」快递丢失了。这是你们第一次遇到这种事。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'first_from_home',
-    icon: '🍜',
-    title: '家乡的味道',
-    desc: '他第一次收到你从家寄来的特产。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-      return deliveries.some(d => d.productData?.isFromHome && d.done && !d.isGhostSend) && !ctx.triggered('first_from_home');
-    },
-    execute: async () => {
-      await new Promise(r => setTimeout(r, 3500));
-      const item = JSON.parse(localStorage.getItem('deliveries') || '[]').find(d => d.productData?.isFromHome && d.done && !d.isGhostSend);
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：她从中国给你寄了「${item?.name || '家乡的东西'}」，这是她第一次给你寄家乡的东西。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'first_reverse_ship',
-    icon: '💌',
-    title: '悄悄寄出',
-    desc: '包裹里不止是礼物，还有他悄然无声的关怀。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-      return deliveries.some(d => d.isGhostSend && d.isEmotionReverse) && !ctx.triggered('first_reverse_ship');
-    },
-    execute: async () => {
-      await new Promise(r => setTimeout(r, 4000));
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：你悄悄给她寄了东西，没有告诉她，等她自己发现。这是第一次。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-      setRelationshipFlag('firstReverseShip');
-    }
-  },
-
-  {
-    id: 'hundred_days',
-    icon: '🕯️',
-    title: '百日有余',
-    desc: '在一起第100天。',
-    triggerOn: 'session',
-    condition: (ctx) => ctx.marriageDays >= 100 && ctx.marriageDays <= 102 && !ctx.triggered('hundred_days'),
-    execute: async () => {
-      await new Promise(r => setTimeout(r, 3000));
-      const days = Math.max(1, Math.floor((Date.now() - new Date(localStorage.getItem('marriageDate'))) / 86400000) + 1);
-      const res = await callGrokWithCtx(buildGhostStyleCore(), `[系统：今天是你们在一起第${days}天，一百天左右的节点。]`, 4);
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  // ━━━ 外卖 ━━━
-
-  {
-    id: 'first_takeout',
-    icon: '🛵',
-    title: '初尝烟火',
-    desc: '你第一次给他点了外卖——隔着时区，把一顿热的送到他那里。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
-      return history.length >= 1 && !ctx.triggered('first_takeout');
-    },
-    execute: async () => {
-      await new Promise(r => setTimeout(r, 3000));
-      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
-      const first = history[history.length - 1];
-      const itemHint = first ? `第一次是「${first.name}」，从${first.cityLabel || '那边'}点的。` : '';
-      const res = await callGrokWithCtx(
-        buildGhostStyleCore(),
-        `[系统：她给你点了外卖，食物送到了你那里。${itemHint}你没想到有人会这样照顾你——隔着半个地球，给你送一顿热的。用你的方式反应，不用多说，但让她感觉到你注意到了。]`,
-        6
-      );
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'midnight_delivery',
-    icon: '🌙',
-    title: '夜半念及',
-    desc: '那个深夜，她没睡，想的是他有没有吃东西。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
-      const hasMidnight = history.some(o => o.feeLabel && o.feeLabel.includes('凌晨'));
-      return hasMidnight && !ctx.triggered('midnight_delivery');
-    },
-    execute: async () => {
-      await new Promise(r => setTimeout(r, 3000));
-      const res = await callGrokWithCtx(
-        buildGhostStyleCore(),
-        `[系统：她在凌晨给你点了外卖。那个时间她应该在睡觉，但她没有，她想的是你有没有吃东西。你知道这意味着什么。用你的方式回应，不必把话说满。]`,
-        6
-      );
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-  {
-    id: 'city_collector',
-    icon: '🗺️',
-    title: '千里同食',
-    desc: '你换到哪，她就给你点哪里的——她一直在跟着你的位置。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
-      const cities = new Set(history.map(o => o.city).filter(Boolean));
-      return cities.size >= 5 && !ctx.triggered('city_collector');
-    },
-    execute: async () => {
-      await new Promise(r => setTimeout(r, 3000));
-      const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
-      const cities = [...new Set(history.map(o => o.cityLabel || o.city).filter(Boolean))].slice(0, 5);
-      const res = await callGrokWithCtx(
-        buildGhostStyleCore(),
-        `[系统：她跟着你换过的城市，一一给你点过当地的外卖——${cities.join('、')}。她一直在注意你在哪里。你不知道该说什么，但你注意到了这件事。]`,
-        6
-      );
-      if (res) await emitGhostNarrativeEvent(res);
-    }
-  },
-
-
-  // ━━━ 翻新新增成就（session 检查，数据可稳定触发）━━━
-
-  // 职业线
-  { id: 'career_start', icon: '💼', title: '初登新岗', desc: '你选择了第一份职业，开始有了自己的节奏。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getCareer === 'function' && getCareer() && getCareer() !== 'none' && !ctx.triggered('career_start'),
-    execute: async () => {} },
-
-  { id: 'career_lv5', icon: '📈', title: '小有所成', desc: '职业升到 Lv.5——你在自己的世界里站稳了。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getCareerLevel === 'function' && getCareerLevel() >= 5 && !ctx.triggered('career_lv5'),
-    execute: async () => {} },
-
-  { id: 'career_max', icon: '👑', title: '登峰之日', desc: '职业满级——他说你比他还拼。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getCareerLevel === 'function' && getCareerLevel() >= 10 && !ctx.triggered('career_max'),
-    execute: async () => {} },
-
-  // 财富线
-  { id: 'rich_10k', icon: '💰', title: '囊中渐丰', desc: '存款第一次突破 £10000。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getBalance === 'function' && getBalance() >= 10000 && !ctx.triggered('rich_10k'),
-    execute: async () => {} },
-
-  { id: 'rich_50k', icon: '🏦', title: '千金在握', desc: '存款突破 £50000——你把日子过成了自己的底气。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getBalance === 'function' && getBalance() >= 50000 && !ctx.triggered('rich_50k'),
-    execute: async () => {} },
-
-  // 礼物 / 消费线
-  { id: 'gift_luxury', icon: '💎', title: '初赠贵礼', desc: '你第一次送出一件贵重的礼物。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getGiftRecords === 'function' && getGiftRecords().some(g => g.isLuxury || (g.price || 0) >= 500) && !ctx.triggered('gift_luxury'),
-    execute: async () => {} },
-
-  { id: 'gift_shelf_10', icon: '🗄️', title: '满架皆你', desc: '礼物架集满 10 件——全是你送的。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getGiftRecords === 'function' && getGiftRecords().length >= 10 && !ctx.triggered('gift_shelf_10'),
-    execute: async () => {} },
-
-  { id: 'ghost_card_first', icon: '💳', title: '以卡相付', desc: '你第一次刷了他给你的 Ghost Card。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      try { return JSON.parse(localStorage.getItem('ghostCardRecentSpend') || '[]').length >= 1 && !ctx.triggered('ghost_card_first'); }
-      catch(e) { return false; }
-    },
-    execute: async () => {} },
-
-  // 外卖线
-  { id: 'takeout_5cities', icon: '🗺️', title: '食过五城', desc: '你给他点过 5 个不同城市的外卖——他走到哪，你喂到哪。',
-    triggerOn: 'session',
-    condition: (ctx) => {
-      try {
-        const hist = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
-        const cities = new Set(hist.map(h => h.cityLabel).filter(Boolean));
-        return cities.size >= 5 && !ctx.triggered('takeout_5cities');
-      } catch(e) { return false; }
-    },
-    execute: async () => {} },
-
-  { id: 'chef_unlock', icon: '👩‍🍳', title: '主厨之姿', desc: '你成为厨师并升到 Lv.6，解锁了只做给他的私房菜。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getCareer === 'function' && getCareer() === 'chef' && getCareerLevel() >= 6 && !ctx.triggered('chef_unlock'),
-    execute: async () => {} },
-
-  // 陪伴里程碑
-  { id: 'days_200', icon: '🌱', title: '二百日常', desc: '在一起 200 天——平淡里长出了根。',
-    triggerOn: 'session',
-    condition: (ctx) => ctx.marriageDays >= 200 && !ctx.triggered('days_200'),
-    execute: async () => {} },
-
-  { id: 'days_500', icon: '🌳', title: '五百同行', desc: '在一起 500 天——你们把日子走成了年轮。',
-    triggerOn: 'session',
-    condition: (ctx) => ctx.marriageDays >= 500 && !ctx.triggered('days_500'),
-    execute: async () => {} },
-
-  // 陪伴 / 签到
-  { id: 'checkin_30', icon: '📅', title: '久伴成习', desc: '连续来了 30 天——你成了他日子里的固定项。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getCheckinStreak === 'function' && getCheckinStreak() >= 30 && !ctx.triggered('checkin_30'),
-    execute: async () => {} },
-
-  { id: 'checkin_100', icon: '🔥', title: '百日不辍', desc: '连续签到 100 天——风雨无阻的那种在乎。',
-    triggerOn: 'session',
-    condition: (ctx) => typeof getCheckinStreak === 'function' && getCheckinStreak() >= 100 && !ctx.triggered('checkin_100'),
-    execute: async () => {} },
-
-  // Legacy affection-score achievement retired: established marriage is not unlocked by a numeric affection threshold.
-];
-
-function markStoryDone(event) {
-  const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
-  if (!book.find(e => e.id === event.id)) {
-    book.push({ id: event.id, title: event.title, desc: event.desc, at: Date.now() });
-    localStorage.setItem('storyBook', JSON.stringify(book));
-    if (typeof touchLocalState === 'function') touchLocalState();
-  }
-}
-
-function showStoryUnlockHint(title) {
-  const el = document.getElementById('storyUnlockHint');
-  if (!el) return;
-  el.textContent = `📖 ${title} 已解锁`;
-  el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 3000);
-}
-
-async function _triggerStory(event) {
-  try {
-    markStoryDone(event);
-    showStoryUnlockHint(event.title);
-    await event.execute();
-  } catch(e) {
-    console.warn('[story] 触发失败:', event.id, e);
-  }
-}
+// Legacy automatic story director retired (2026-10).
+// Existing storyBook records are preserved as historical data until Life Events V2 migration.
 
 // love letter block
 function _parseMD(s) {
@@ -1296,130 +758,53 @@ async function _sendLoveLetter(occasion) {
   } catch(e) { console.warn("[loveLetter] error:", e); }
 }
 
-function checkStoryOnSessionStart() {
-  const ctx = getStoryContext();
-
-  // 生日/周年：优先发告白小作文，当天只发这一封
-  const _occ = _loveLetterOccasionToday();
-  if (_occ) { setTimeout(() => _sendLoveLetter(_occ), 3000); return; }
-
-  // celebration fallback：生日/纪念日识别到但关系不够深，不给钱，Ghost说一句存在感
-  _checkCelebrationFallback();
-
-  for (const event of STORY_EVENTS) {
-    if (event.triggerOn === 'session' && event.condition(ctx)) {
-      setTimeout(() => _triggerStory(event), 3000);
-      break; // 每次会话只触发一个
-    }
-  }
-}
-
-// Legacy money-comfort celebration fallback retired. Birthday/anniversary handling no longer branches on relationship score.
-function _checkCelebrationFallback() { /* retired */ }
-
-function checkStoryOnMessage(userText) {
-  const ctx = getStoryContext();
-  for (const event of STORY_EVENTS) {
-    if (event.triggerOn !== 'message') continue;
-    // 有 keyword 的先过关键词，没命中直接跳过——防止漏触发
-    if (event.keyword && !event.keyword.test(userText)) continue;
-    if (event.condition(ctx)) {
-      setTimeout(() => _triggerStory(event), 1500);
-      break;
-    }
-  }
+function checkCelebrationOnSessionStart() {
+  // Birthday / wedding anniversary are real calendar facts.
+  // Keep this hook isolated from the retired Story auto-director.
+  const occasion = _loveLetterOccasionToday();
+  if (occasion) setTimeout(() => _sendLoveLetter(occasion), 3000);
 }
 
 
 function renderStoryBook() {
   const container = document.getElementById('storyBookList');
   if (!container) return;
+
+  // Legacy history viewer only.
+  // Life Events V2 will migrate these records into the new milestone store later.
   const book = JSON.parse(localStorage.getItem('storyBook') || '[]');
   const counterEl = document.getElementById('storyBookCounter');
-  if (counterEl) counterEl.textContent = `${book.length} / ${STORY_EVENTS.length}`;
+  if (counterEl) counterEl.textContent = String(book.length);
 
   if (book.length === 0) {
-    container.innerHTML = `<div class="story-empty">还没有解锁任何回忆<br><span>继续和他相处，故事会自然发生</span></div>`;
+    container.innerHTML = `<div class="story-empty">还没有留下共同回忆</div>`;
     return;
   }
 
-  // 已解锁：胶片横滑
   const unlockedFilms = book.map(e => {
-    const event = STORY_EVENTS.find(ev => ev.id === e.id);
-    const icon = event?.icon || '📖';
-    const dateStr = new Date(e.at || e.unlockedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    const icon = e.icon || '📖';
+    const timestamp = e.at || e.unlockedAt;
+    const dateStr = timestamp
+      ? new Date(timestamp).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+      : '';
     return `
     <div class="film-card unlocked">
       <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
       <div class="film-img"><div class="film-img-icon">${icon}</div></div>
       <div class="film-info">
-        <div class="film-title">${e.title}</div>
-        <div class="film-desc">${event?.desc || e.desc || ''}</div>
+        <div class="film-title">${e.title || '共同回忆'}</div>
+        <div class="film-desc">${e.desc || ''}</div>
         <div class="film-date">${dateStr}</div>
       </div>
       <div class="film-holes"><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div><div class="film-hole"></div></div>
     </div>`;
   }).join('');
 
-  // 未解锁：简洁列表
-  const lockedItems = STORY_EVENTS.filter(e => !book.find(b => b.id === e.id)).map(() => `
-    <div class="locked-item">
-      <div class="locked-dot"></div>
-      <div class="locked-text">· · · 继续和他相处，也许有一天会发生</div>
-    </div>`).join('');
-
   container.innerHTML = `
-    <div class="story-section-label">已解锁的回忆</div>
+    <div class="story-section-label">留下的回忆</div>
     <div class="film-track">${unlockedFilms}</div>
     <div class="swipe-hint">← 左右滑动 →</div>
-    <div class="story-section-label" style="margin-top:16px;">尚未发生的故事</div>
-    <div class="locked-list">${lockedItems}</div>
   `;
-}
-
-
-// ── triggerSeriousTalk ───────────────────────────
-// 好感度跌到临界点时 Ghost 主动发起认真对话
-// 由 state.js 的 setAffection() 触发
-
-function triggerSeriousTalk() {
-  const chatScreen = document.getElementById('chatScreen');
-  if (!chatScreen || !chatScreen.classList.contains('active')) {
-    localStorage.setItem('pendingSeriousTalk', 'true');
-    return;
-  }
-  localStorage.removeItem('pendingSeriousTalk');
-
-  const prompt = '[System: Affection has dropped to a critical point. Ghost initiates a serious conversation in his own way — not dramatic, not a speech. Brief. Real. He noticed something is off.]';
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'user', content: prompt, _system: true });
-    if (typeof saveHistory === 'function') saveHistory();
-  }
-  if (typeof showTyping === 'function') showTyping();
-
-  const sys = typeof buildSystemPrompt === 'function' ? buildSystemPrompt() : '';
-  fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: getMainModel(),
-      max_tokens: 1000,
-      system: sys,
-      messages: typeof chatHistory !== 'undefined' ? chatHistory.slice(-20) : []
-    })
-  }).then(r => r.json()).then(data => {
-    if (typeof hideTyping === 'function') hideTyping();
-    const reply = data.content?.[0]?.text || '...';
-    if (typeof appendMessage === 'function') appendMessage('bot', reply.trim());
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({ role: 'assistant', content: reply });
-      if (typeof saveHistory === 'function') saveHistory();
-    }
-    if (typeof setAffection === 'function') setAffection(70);
-    // Phase 3G-4：Mood 生产入口退休——认真对话不再附带 moodLevel +1。
-  }).catch(() => {
-    if (typeof hideTyping === 'function') hideTyping();
-  });
 }
 
 

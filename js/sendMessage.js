@@ -1377,6 +1377,18 @@ async function _processMergedMessage(text) {
       evaluateAvatarNegotiationAfterReply(text, reply).catch(e => console.warn('[avatar] 协商结果处理失败:', e));
     }
 
+    // ── Continuity V1 Batch 2: Chat Extraction ────────────────
+    // Simon 回复完成后异步提取 Continuity 事实
+    // 不阻塞聊天流程，extractor 失败静默跳过
+    // 修复：删除字符长度门槛 —— "Done." / "Heading in." 等短回复可能是重要状态更新
+    if (typeof extractContinuityFromReply === 'function' && typeof reply === 'string' && reply.trim()) {
+      setTimeout(() => {
+        _extractAndProcessContinuity(text, reply).catch(e => {
+          console.warn('[Continuity] Extraction failed:', e);
+        });
+      }, 500);
+    }
+
     // ── 租赁 AA 判断（纯本地，仅读 Ghost 真实回复）──────────────
     if (typeof checkHomeAADeal === 'function') checkHomeAADeal(reply);
 
@@ -1445,7 +1457,6 @@ async function _processMergedMessage(text) {
     // 情绪/商城触发：提高到45%（原25%太低）
     // 每轮 30% 概率跑反寄/情绪判断（原为 0.85，与"惊喜才珍贵"的设计冲突，且注释谎称 25%）
     if (Math.random() < 0.30) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
-    if (Math.random() < 0.3) setTimeout(() => { try { checkStoryOnMessage(text); } catch(e) {} }, 2000);
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
     const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
@@ -1945,4 +1956,205 @@ function handleKeyPress(event) {
     event.preventDefault();
     sendMessage();
   }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Continuity V1 Batch 2: Extraction + Validation + Storage
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 提取并处理 Continuity 提案
+ * 系统拥有最终修改权：extractor 提案 → 系统校验 → Continuity Core
+ */
+async function _extractAndProcessContinuity(userMsg, simonReply) {
+  try {
+    // Step 1: Extractor 提案
+    const proposal = await extractContinuityFromReply({
+      userLastMsg: userMsg,
+      simonReply: simonReply,
+      activeContinuity: getActiveContinuity(),
+    });
+
+    if (!proposal || proposal.action === 'none') {
+      return;
+    }
+
+    // Step 2: 系统校验
+    const validated = _validateContinuityProposal(proposal);
+    if (!validated) {
+      return;
+    }
+
+    // Step 3: 调用 Continuity Core
+    if (validated.action === 'create') {
+      recordContinuity({
+        type: validated.type,
+        subject: validated.subject,
+        summary: validated.summary,
+        source: 'chat',
+        sourceId: null,
+      });
+    } else if (validated.action === 'update') {
+      updateContinuity(validated.targetId, {
+        status: validated.status,
+        summary: validated.summary,
+      });
+    } else if (validated.action === 'complete') {
+      completeContinuity(validated.targetId);
+    }
+  } catch (e) {
+    console.warn('[Continuity] Processing error:', e);
+  }
+}
+
+
+/**
+ * 系统校验：Extractor 提案必须通过此关卡才能进入 Continuity Core
+ * @param {object} proposal - Extractor 返回的提案
+ * @returns {object|null} - 通过校验的提案，或 null（不通过）
+ */
+function _validateContinuityProposal(proposal) {
+  if (!proposal || typeof proposal !== 'object') {
+    return null;
+  }
+
+  const { action } = proposal;
+
+  // 1. action 合法性
+  const validActions = ['create', 'update', 'complete'];
+  if (!validActions.includes(action)) {
+    return null;
+  }
+
+  // 2. create 校验
+  if (action === 'create') {
+    const { type, subject, summary, status } = proposal;
+
+    // 必填字段
+    if (!type || !subject || !summary) {
+      console.warn('[Continuity] create: missing required fields');
+      return null;
+    }
+
+    // status 只能是 pending/ongoing
+    if (status !== 'pending' && status !== 'ongoing') {
+      console.warn('[Continuity] create: invalid status', status);
+      return null;
+    }
+
+    // summary 基本安全检查（禁止危险指令）
+    if (!_isSafeSummary(summary)) {
+      console.warn('[Continuity] create: unsafe summary');
+      return null;
+    }
+
+    return { action: 'create', type, subject, summary, status };
+  }
+
+  // 3. update 校验
+  if (action === 'update') {
+    const { targetId, status, summary } = proposal;
+
+    // 必填字段
+    if (!targetId || !summary) {
+      console.warn('[Continuity] update: missing required fields');
+      return null;
+    }
+
+    // targetId 必须存在于 active continuity
+    const active = getActiveContinuity();
+    const target = active.find(c => c.id === targetId);
+    if (!target) {
+      console.warn('[Continuity] update: targetId not found in active continuity', targetId);
+      return null;
+    }
+
+    // completed thread 不能重新打开
+    if (target.status === 'completed') {
+      console.warn('[Continuity] update: cannot reopen completed thread', targetId);
+      return null;
+    }
+
+    // status 只能是 pending/ongoing（如果有）
+    if (status && status !== 'pending' && status !== 'ongoing') {
+      console.warn('[Continuity] update: invalid status', status);
+      return null;
+    }
+
+    // summary 安全检查
+    if (!_isSafeSummary(summary)) {
+      console.warn('[Continuity] update: unsafe summary');
+      return null;
+    }
+
+    return { action: 'update', targetId, status: status || target.status, summary };
+  }
+
+  // 4. complete 校验
+  if (action === 'complete') {
+    const { targetId, summary } = proposal;
+
+    // 必填字段
+    if (!targetId) {
+      console.warn('[Continuity] complete: missing targetId');
+      return null;
+    }
+
+    // targetId 必须存在于 active continuity
+    const active = getActiveContinuity();
+    const target = active.find(c => c.id === targetId);
+    if (!target) {
+      console.warn('[Continuity] complete: targetId not found in active continuity', targetId);
+      return null;
+    }
+
+    // 已经 completed 的不能再次 complete
+    if (target.status === 'completed') {
+      console.warn('[Continuity] complete: thread already completed', targetId);
+      return null;
+    }
+
+    // summary 安全检查（如果有）
+    if (summary && !_isSafeSummary(summary)) {
+      console.warn('[Continuity] complete: unsafe summary');
+      return null;
+    }
+
+    return { action: 'complete', targetId, summary: summary || target.summary };
+  }
+
+  return null;
+}
+
+
+/**
+ * Summary 安全检查（轻量危险指令校验，作为兜底）
+ * Summary 应该是客观事实，不是行为指令
+ * @param {string} summary
+ * @returns {boolean}
+ */
+function _isSafeSummary(summary) {
+  if (typeof summary !== 'string' || summary.length === 0) {
+    return false;
+  }
+
+  // 禁止明显的指令性措辞（这里只做轻量检查，不建立长禁词库）
+  const dangerousPatterns = [
+    /remember to/i,
+    /you should/i,
+    /make sure to/i,
+    /don't forget/i,
+    /act like/i,
+    /pretend/i,
+    /behave as/i,
+  ];
+
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(summary)) {
+      return false;
+    }
+  }
+
+  return true;
 }
