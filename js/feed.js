@@ -102,9 +102,9 @@ document.addEventListener('visibilitychange', () => {
 // Ghost 头像走 ghostAvatarUrl（跟聊天同步）；其他人静态 emoji/文件占位，用户可替换。
 const FEED_ACTORS = {
   ghost: { key: 'ghost', displayName: () => localStorage.getItem('botNickname') || 'Simon Riley', emoji: '👻', nameClass: 'couple-ghost-name', commentChance: 0.6  },
-  soap:  { key: 'soap',  displayName: () => 'Soap',  emoji: '🧼',  avatar: 'images/soap-avatar.jpg',  nameClass: 'couple-soap-name',  commentChance: 0.45 },
-  gaz:   { key: 'gaz',   displayName: () => 'Gaz',   emoji: '🎖️', avatar: 'images/gaz-avatar.jpg',   nameClass: 'couple-gaz-name',   commentChance: 0.35 },
-  price: { key: 'price', displayName: () => 'Price', emoji: '🚬',  avatar: 'images/price-avatar.jpg', nameClass: 'couple-price-name', commentChance: 0.15 },
+  soap:  { key: 'soap',  displayName: () => 'Soap',  emoji: '🧼',  avatar: 'images/soap-avatar.png',  nameClass: 'couple-soap-name',  commentChance: 0.45 },
+  gaz:   { key: 'gaz',   displayName: () => 'Gaz',   emoji: '🎖️', avatar: 'images/gaz-avatar.png',   nameClass: 'couple-gaz-name',   commentChance: 0.35 },
+  price: { key: 'price', displayName: () => 'Price', emoji: '🚬',  avatar: 'images/price-avatar.png', nameClass: 'couple-price-name', commentChance: 0.15 },
 };
 
 // 给远程头像 URL 加缓存破除参数（本地文件/base64 不动），避免换头像后浏览器还显示旧图
