@@ -1194,8 +1194,11 @@ function renderMarket(categoryId) {
   if (isFromHome) {
     try { const seasonal = getSeasonalFromHome(); products = [...products, ...seasonal]; } catch(e) {}
   }
-  // 入冬限定：并入对应分类（顺序须与 openBuyModal 一致）
-  try { const winter = getWinterSeasonal(categoryId); if (winter.length) products = [...products, ...winter]; } catch(e) {}
+  // 入冬限定：并入对应分类，排在最前面
+  try {
+    const winter = getWinterSeasonal(categoryId);
+    if (winter.length) products = [...winter, ...products];
+  } catch(e) {}
   const gridEl = document.getElementById('productsGrid');
   if (!gridEl) return;
 
