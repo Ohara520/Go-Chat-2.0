@@ -45,7 +45,7 @@ function canUnlockProduct(product) {
 const MARKET_CATEGORIES = [
   { id: 'food',     label: '食饮' },   // product-001~012
   { id: 'clothing', label: '穿搭' },   // product-013~024
-  { id: 'lifecare', label: '护理' },   // product-025~035
+  { id: 'lifecare', label: '家居' },   // product-025~035
   { id: 'luxury',   label: '奢品' },   // product-036~047 + product-061
   { id: 'specialty',label: '特产' },   // product-048~060
   { id: 'home',     label: '资产' },   // product-062~069
@@ -628,6 +628,9 @@ function getProductById(id) {
     const found = MARKET_PRODUCTS[cat].find(p => p.id === id);
     if (found) return found;
   }
+  // 入冬限定商品也可按 ID 查找
+  const winter = WINTER_SEASONAL.find(p => p.id === id);
+  if (winter) return winter;
   return null;
 }
 
@@ -720,10 +723,80 @@ function getSeasonalFromHome() {
 
 // 入冬限定：入冬自动上架，开春自动下架（窗口 9/20–次年 3/1）。
 // cat 标明并入哪个商城分类；winterTag 触发商城「入冬限定」角标。
-// 老 emoji prototype 已退役（用户 2026-09-28 决议删除入冬限定）。
-// 保留空数组与 getWinterSeasonal()/isWinterWindow()，各调用点走 length 判断自然不再上架。
-// 老用户存档里已购的 winterTag/isGhostGift 记录按 name 记账，指向已删商品仍静默无害。
-const WINTER_SEASONAL = [];
+const WINTER_SEASONAL = [
+  { id: 'product-073', cat: 'food', winterTag: true, name: '冬季黑巧热可可', nameEn: 'Winter Dark Drinking Chocolate', price: 18, shipping: 5,
+    desc: '高可可含量饮用巧克力，以黑巧克力碎与可可粉调配。加入热牛奶加热搅拌即可饮用，口感浓厚顺滑，甜度偏低。',
+    features: [
+      { label: '类型', value: '饮用巧克力' },
+      { label: '风味', value: '浓郁黑巧' },
+      { label: '冲调', value: '搭配热牛奶' },
+      { label: '包装', value: '250g 金属罐装' },
+    ] },
+  { id: 'product-074', cat: 'food', winterTag: true, name: '苏格兰黄油酥饼铁盒', nameEn: 'Scottish Butter Shortbread Tin', price: 24, shipping: 5,
+    desc: '传统苏格兰风格黄油酥饼，以黄油烘焙，口感酥松厚实，带明显的奶油与烘烤麦香。冷季限定格纹金属铁盒包装。',
+    features: [
+      { label: '类型', value: '黄油酥饼' },
+      { label: '风味', value: '黄油与烘烤麦香' },
+      { label: '产地', value: 'Scotland' },
+      { label: '包装', value: '限定铁盒装' },
+    ] },
+  { id: 'product-075', cat: 'food', winterTag: true, name: '烤栗子焦糖爆米花', nameEn: 'Roasted Chestnut Caramel Popcorn', price: 14, shipping: 5,
+    desc: '焦糖爆米花混合烤栗子，表层裹有薄脆焦糖，口感酥脆，带栗子的坚果香与焦糖烘烤甜味。',
+    features: [
+      { label: '类型', value: '焦糖爆米花' },
+      { label: '配料', value: '爆米花·栗子·焦糖' },
+      { label: '风味', value: '焦糖与烤栗子' },
+      { label: '包装', value: '150g 密封罐装' },
+    ] },
+  { id: 'product-076', cat: 'food', winterTag: true, name: '热红酒套餐', nameEn: 'Mulled Wine Kit', price: 38, shipping: 8,
+    desc: '冷季热红酒组合，包含一瓶红葡萄酒、热红酒香料包、肉桂、八角与干燥橙片。将香料与橙片加入红酒中低温加热即可饮用。',
+    features: [
+      { label: '类型', value: '热红酒组合' },
+      { label: '组合', value: '红葡萄酒·香料包·干燥橙片' },
+      { label: '香料', value: '肉桂·八角等' },
+      { label: '包装', value: '冬季限定套装' },
+    ] },
+  { id: 'product-077', cat: 'clothing', winterTag: true, emoji: '🧤', name: '黑色羊皮羊绒手套', nameEn: 'Black Leather Cashmere-Lined Gloves', price: 85, shipping: 6,
+    desc: '黑色羊皮手套，内里使用羊绒混纺针织衬里。皮质柔软细腻，腕口拼接针织罗纹，搭配皮革搭扣。',
+    features: [
+      { label: '材质', value: '羊皮' },
+      { label: '内里', value: '羊绒混纺' },
+      { label: '设计', value: '针织腕口·皮革搭扣' },
+      { label: '颜色', value: '黑色' },
+    ] },
+  { id: 'product-078', cat: 'clothing', winterTag: true, emoji: '👕', name: '炭灰保暖内衣套装', nameEn: 'Charcoal Thermal Base Layer Set', price: 78, shipping: 6,
+    desc: '炭灰色男士保暖内衣套装，包含圆领长袖上衣与修身长裤。面料柔软贴身，弹力针织结构，袖口与裤脚收窄。',
+    features: [
+      { label: '组合', value: '长袖上衣·长裤' },
+      { label: '材质', value: '弹力保暖针织' },
+      { label: '版型', value: '贴身修身' },
+      { label: '颜色', value: '炭灰色' },
+    ] },
+  { id: 'product-079', cat: 'clothing', winterTag: true, emoji: '🧶', name: '炭灰羊绒高领毛衣', nameEn: 'Charcoal Cashmere Roll-Neck Sweater', price: 165, shipping: 6,
+    desc: '炭灰色羊绒高领毛衣，细密针织面料，高领与袖口、下摆采用罗纹收边。版型简洁，质地柔软厚实。',
+    features: [
+      { label: '材质', value: '羊绒' },
+      { label: '领型', value: '高领' },
+      { label: '工艺', value: '罗纹收边' },
+      { label: '颜色', value: '炭灰色' },
+    ] },
+  { id: 'product-080', cat: 'lifecare', winterTag: true, emoji: '♨️', name: '长效暖贴（20片装）', nameEn: 'Long-Lasting Heat Pads (20-Pack)', price: 16, shipping: 6,
+    desc: '一次性长效暖贴，拆封后接触空气自动发热。单片独立密封包装，轻薄便携，适合冷天通勤、外出或长时间户外活动时使用。',
+    features: [
+      { label: '类型', value: '一次性暖贴' },
+      { label: '数量', value: '20片装' },
+      { label: '发热', value: '最长约12小时' },
+      { label: '包装', value: '独立密封装' },
+    ] },
+  { id: 'product-081', cat: 'lifecare', winterTag: true, emoji: '🍱', name: '真空保温餐盒套装', nameEn: 'Vacuum Insulated Lunch Set', price: 89, shipping: 8,
+    desc: '多层真空保温餐盒，采用食品级不锈钢内胆与双层隔热结构。独立餐盒可将主食、配菜与汤品分开盛放，配有便携提手、保温收纳袋及专用餐具。',
+    features: [
+      { label: '材质', value: '食品级不锈钢' },
+      { label: '结构', value: '多层真空保温' },
+      { label: '配件', value: '餐具·保温收纳袋' },
+      { label: '颜色', value: '橄榄灰' },
+    ] },
+];
 
 // 入冬窗口：9/20 – 次年 3/1（跨年，用 月*100+日 比较）
 function isWinterWindow() {
