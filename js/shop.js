@@ -1331,10 +1331,12 @@ function renderMarket(categoryId) {
            onclick="${owned||isLocked?'':'(function(el){openProductDetail(el.dataset.pname.replace(/__DQUOTE__/g,String.fromCharCode(34)),el.dataset.pcat)})(this)'}">
         ${onSale&&!owned ? '<div class="sale-corner-text">TODAY<br>ONLY</div>' : ''}
         ${p.festival&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(255,200,100,0.15);border-color:rgba(255,180,50,0.4);color:#b45309;">🎋 ${p.festival}限定</div>` : ''}
-        ${p.winterTag&&!owned ? `<div class="ghost-mentioned-tag" style="background:rgba(140,190,230,0.16);border-color:rgba(90,150,210,0.42);color:#2563a8;">❄️ 入冬限定</div>` : ''}
         ${triggerReason&&!owned ? `<div class="ghost-mentioned-tag">💡 ${triggerReason}</div>` : ''}
         ${isLocked ? '<div class="ghost-mentioned-tag" style="background:#9ca3af">🔒 需先买机票</div>' : ''}
-        <div class="product-media">${renderProductVisual(p)}</div>
+        <div class="product-media" style="position:relative;">
+          ${p.winterTag&&!owned ? `<div style="position:absolute;top:8px;left:8px;z-index:10;background:rgba(250,248,245,0.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#5a7a48;font-size:9px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap;letter-spacing:0.5px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">❄ 入冬限定</div>` : ''}
+          ${renderProductVisual(p)}
+        </div>
         ${onSale&&!owned ? `<div class="sale-discount-badge">✦ TODAY ONLY · ${discountLabel}</div>` : ''}
         <div class="product-info">
           <div class="product-name">${p.displayName || p.name}</div>
