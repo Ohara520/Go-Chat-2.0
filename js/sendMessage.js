@@ -270,6 +270,39 @@ function isBreakout(txt) {
   return BREAKOUT_PHRASES.some(p => lower.includes(p));
 }
 
+// ===== Memory Checkpoint V1：统一 Memory 更新入口 =====
+// 所有成功的 semantic turn 都应调用此函数更新记忆
+// 不阻塞用户回复，延迟执行，失败静默跳过
+async function _runPostTurnMemory(reply, text, turn) {
+  // 空回复或网络错误不更新
+  if (!reply || reply.includes('___NETWORK_ERROR___')) return;
+  // 门槛：保持原有 reply.length > 50 的判定，避免太短的回复污染记忆
+  if (reply.length <= 50) return;
+
+  try {
+    // 短期记忆：每次都更新
+    await updateShortTermMemory(reply, text).catch(e =>
+      console.warn('短期记忆更新失败:', e)
+    );
+
+    // 长期记忆：每 5 turn 一次 checkpoint
+    if (turn % 5 === 0) {
+      await updateLongTermMemory(reply, text).catch(e =>
+        console.warn('长期记忆更新失败:', e)
+      );
+
+      // Relationship Learning：每 5 turn 触发一次判断
+      if (typeof maybeLearnRelationship === 'function') {
+        await maybeLearnRelationship().catch(e =>
+          console.warn('关系理解学习失败:', e)
+        );
+      }
+    }
+  } catch (e) {
+    console.warn('[Memory Checkpoint] 更新失败:', e);
+  }
+}
+
 // ===== 辅助：解析模型输出的控制标签 =====
 function parseAssistantTags(reply) {
   // 清理模型可能带的 markdown 代码块标记
@@ -782,7 +815,7 @@ async function _processMergedMessageWithContent(userContentForModel) {
     const antiCountHint = '[DO NOT count her messages or actions. Never say "twice", "again", "that\'s the second time", "third time", "checking in again", or any variation. Each message from her is its own moment — treat it fresh. Respond to WHAT she said, not HOW MANY TIMES she said something.]';
 
     // 多气泡输出协议
-    const multiBubbleHint = '[OUTPUT: Use --- only when genuinely separate thoughts naturally belong in the same reply. Different phrasings, angles, or punchlines about the same thought are one beat, not several. Do not create extra beats merely because more things occur to you. One message is normal; multiple messages are only for genuinely separate thoughts that both belong in this reply.]';
+    const multiBubbleHint = '[OUTPUT: Use --- when a reply naturally falls into separate conversational beats, such as an immediate reaction followed by a distinct punchline, or answering one thing before naturally shifting to another. A beat may contain more than one sentence. Do not split merely at sentence boundaries, repeat the same thought across bubbles, or create extra bubbles just to make the reply feel more active. One bubble is still normal when the response is one continuous beat.]';
 
     // ── Ghost Card hint（用户要钱时提醒模型用卡回应）────────
     const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
@@ -1560,17 +1593,10 @@ async function _processMergedMessageWithContent(userContentForModel) {
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
     const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
 
-    // 🔧 新记忆系统：短期记忆每次更新，长期记忆每5轮更新
-    if (reply.length > 50 && !reply.includes('___NETWORK_ERROR___')) {
+    // 🔧 统一 Memory Checkpoint：Claude 日常回复成功后调用
+    if (reply && !reply.includes('___NETWORK_ERROR___')) {
       setTimeout(() => {
-        updateShortTermMemory(reply, text).catch(e => console.warn('短期记忆更新失败:', e));
-        if (_currentTurn % 5 === 0) {
-          updateLongTermMemory(reply, text).catch(e => console.warn('长期记忆更新失败:', e));
-          // Relationship Understanding：只在此跑轻量 Trigger，有信号才调 Judge（不是每5轮必判）
-          if (typeof maybeLearnRelationship === 'function') {
-            maybeLearnRelationship().catch(e => console.warn('关系理解学习失败:', e));
-          }
-        }
+        _runPostTurnMemory(reply, text, _currentTurn);
       }, 2000);
     }
 
@@ -1956,6 +1982,13 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
             if (typeof evaluateAvatarNegotiationAfterReply === 'function') {
               evaluateAvatarNegotiationAfterReply(text, _retryClean).catch(e => console.warn('[avatar] 协商结果处理失败:', e));
             }
+
+            // 🔧 统一 Memory Checkpoint：Gemini 重试成功后调用
+            const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
+            setTimeout(() => {
+              _runPostTurnMemory(_retryClean, text, _currentTurn);
+            }, 2000);
+
             return;
           }
         }
@@ -1980,6 +2013,14 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
           if (typeof evaluateAvatarNegotiationAfterReply === 'function') {
             evaluateAvatarNegotiationAfterReply(text, firstPart).catch(e => console.warn('[avatar] 协商结果处理失败:', e));
           }
+
+          // 🔧 统一 Memory Checkpoint：Gemini 成功回复后调用
+          // 获取当前 turn number（已在 _commitPendingUserTurn 中 tickTurn，此处读取即可）
+          const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
+          setTimeout(() => {
+            _runPostTurnMemory(firstPart, text, _currentTurn);
+          }, 2000);
+
           return;
         }
         console.warn('[Grok] 清洗后回复为空，走网络波动兜底');
