@@ -105,7 +105,15 @@ function _syncRenderedCount() {
 let _sendVersion = 0;
 // _globalTurnCount 声明在 state.js，此处不重复声明
 
-// 消息合并（300ms内连发合并）
+// ===== User Turn Batching V1 =====
+// Pending user turn: 用户连续发送的消息（文字+图片）在提交给模型前暂存
+// 目标: 多个 UI bubbles → ONE semantic user turn
+let _pendingUserTurn = [];  // [{type:'text'|'photo', content, _photoBase64?, timestamp}]
+let _pendingTurnTimer = null;
+const TEXT_DEBOUNCE = 800;   // 纯文字debounce: 800ms
+const PHOTO_GRACE = 1500;    // 图片后grace period: 1500ms
+
+// Legacy 300ms 合并机制已退休，统一走 pending turn
 let _pendingMessages = [];
 let _mergeTimer = null;
 const MERGE_DELAY = 300;
@@ -387,6 +395,55 @@ function saveLongTermMemory(memory) {
 
 // 旧的 updateLongTermMemory 已移至 state.js，使用新的结构化记忆系统
 
+// ===== Pending Turn 管理 =====
+function _addToPendingUserTurn(item) {
+  _pendingUserTurn.push(item);
+  // 刷新debounce（图片延长期限）
+  if (_pendingTurnTimer) clearTimeout(_pendingTurnTimer);
+  const delay = item.type === 'photo' ? PHOTO_GRACE : TEXT_DEBOUNCE;
+  _pendingTurnTimer = setTimeout(() => {
+    _commitPendingUserTurn();
+  }, delay);
+}
+
+async function _commitPendingUserTurn() {
+  if (_pendingUserTurn.length === 0) return;
+  if (_isSending) return; // 尚有请求在飞行，不提交下一批
+
+  const batch = [..._pendingUserTurn];
+  _pendingUserTurn = [];
+  _pendingTurnTimer = null;
+
+  // tickTurn 只调用一次（一个 semantic turn）
+  if (typeof tickTurn === 'function') tickTurn();
+
+  // 构造模型消息：合并同一batch中的所有用户项
+  let userContentForModel = null;
+  const textParts = batch.filter(item => item.type === 'text').map(item => item.content);
+  const photoItem = batch.find(item => item.type === 'photo');
+
+  if (photoItem && photoItem._photoBase64 && photoItem._photoBase64.length > 0) {
+    // 图片 + 文字合并
+    const imageBlocks = photoItem._photoBase64.map(b64 => ({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
+    }));
+    const textBlock = {
+      type: 'text',
+      text: textParts.join('\n')
+    };
+    userContentForModel = [...imageBlocks, textBlock];
+  } else if (textParts.length > 0) {
+    // 纯文字
+    userContentForModel = textParts.join('\n');
+  } else {
+    return; // 空batch，不提交
+  }
+
+  // 进入主链
+  await _processMergedMessageWithContent(userContentForModel);
+}
+
 // ===== 主入口：sendMessage =====
 async function sendMessage() {
   const input = document.getElementById('chatInput');
@@ -416,19 +473,28 @@ async function sendMessage() {
     try { noteUserReturn(); } catch(e) {}
   }
 
-  // 消息合并队列（300ms内连发合并成一条给模型）
-  _pendingMessages.push(text);
-  if (_mergeTimer) clearTimeout(_mergeTimer);
-  _mergeTimer = setTimeout(() => {
-    const merged = _pendingMessages.join('\n');
-    _pendingMessages = [];
-    _mergeTimer = null;
-    _processMergedMessage(merged);
-  }, MERGE_DELAY);
+  // User Turn Batching V1: 加入pending batch
+  _addToPendingUserTurn({ type: 'text', content: text, timestamp: Date.now() });
 }
 
 // ===== 核心处理：_processMergedMessage =====
+// V1改动：支持接受预构造的 userContentForModel（文字string 或 vision blocks数组）
+// 但保留原函数名，减少调用面变化
 async function _processMergedMessage(text) {
+  // 兼容旧调用（Market/House等分享仍直接调此函数传string）
+  // 未来批次再统一接入pending turn
+  return _processMergedMessageWithContent(text);
+}
+
+async function _processMergedMessageWithContent(userContentForModel) {
+  // userContentForModel 可以是：
+  // - string: 纯文字
+  // - array: [{type:'image',...}, {type:'text',...}] vision blocks
+
+  const isVisionContent = Array.isArray(userContentForModel);
+  const text = isVisionContent
+    ? userContentForModel.find(b => b.type === 'text')?.text || ''
+    : userContentForModel;
 
   // ── 条数/订阅检查 ────────────────────────────────────────
   const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
@@ -558,11 +624,15 @@ async function _processMergedMessage(text) {
     }
   }
 
+  // User Turn Batching V1: 标记 Read（当前这一批的最后一条用户消息）
+  if (typeof updateToRead === 'function') updateToRead();
+
   showTyping();
 
   try {
     // ── Step 1: 状态更新 ────────────────────────────────────
-    if (typeof tickTurn === 'function') tickTurn();
+    // User Turn V1: tickTurn 已在 _commitPendingUserTurn 调用，此处不再重复
+    // tickTurn 只在 commit 时调用一次，不在这里调用
     updateStateFromUserInput(text);
 
     /*
@@ -1035,21 +1105,44 @@ async function _processMergedMessage(text) {
       }
 
       sessionStorage.removeItem('intimateSummarized');
+
+      // User Turn V1: 从 userContentForModel 提取图片（vision blocks array）
+      let imagesForIntimate = [];
+      if (isVisionContent && Array.isArray(userContentForModel)) {
+        imagesForIntimate = userContentForModel
+          .filter(block => block.type === 'image' && block.source?.data)
+          .map(block => block.source.data);
+      } else if (isRecentPhoto && lastPhotoMsg?._photoBase64?.length) {
+        // Legacy: Market/House 分享等旧路径
+        imagesForIntimate = lastPhotoMsg._photoBase64;
+      }
+
       await _handleIntimateReply(text, rawHistory, _isSending, {
-        images: (isRecentPhoto && lastPhotoMsg?._photoBase64?.length) ? lastPhotoMsg._photoBase64 : []
+        images: imagesForIntimate
       });
       _isSending = false;
       return;
     }
 
     // ── 图片注入 ─────────────────────────────────────────────
-    // Claude 始终看到真实连续的近期历史；Soft Handoff 只决定破防后是否让 Gemini/Jimmy 接手，
-    // 不再决定 Claude 能不能看到亲密上文。
+    // User Turn Batching V1: 图片已经在 _commitPendingUserTurn 构造好 vision blocks
+    // 如果 userContentForModel 已经是 vision blocks，直接使用；否则保留旧逻辑
     let messagesForRequest = cleanHistory;
-    if (isRecentPhoto && lastPhotoMsg._photoBase64?.length > 0) {
-      // 修复：删除"一两行"的死限制，让 Ghost 正常作为丈夫看图回应
-      // 原指令强制简短 + "calling her out"（阴阳语气），导致老婆发照片只收到 okay./noted.
-      // Ghost 话少是性格，不是规定——他看到老婆的照片，该有什么反应就有什么反应
+
+    if (isVisionContent) {
+      // V1: 图片+文字已经在 pending turn commit 时合并好
+      sceneHint = '[She just sent you an image — could be a photo, could be a sticker/meme. Respond to what she MEANS by sending it, not to what is literally in the frame. Do NOT narrate or list what you see ("the grey one is hugging the white one, hearts everywhere") — that is describing, not connecting. If it is a sticker/表情包, she is sending a feeling (a hug, missing you, being silly) — answer the feeling, catch it, hug back in your own words. If it is a real photo of her, react as her husband to her, not to an inventory of details. Warm but never over the top, honest but never critical or sarcastic. She shared this with you — meet the emotion behind it.]';
+
+      // 替换 cleanHistory 最后一条 user message 为 vision blocks
+      messagesForRequest = [
+        ...cleanHistory.slice(0, -1),
+        {
+          role: 'user',
+          content: userContentForModel
+        }
+      ];
+    } else if (isRecentPhoto && lastPhotoMsg._photoBase64?.length > 0) {
+      // Legacy: 旧的图片注入逻辑（Market/House等分享可能还走这里）
       sceneHint = '[She just sent you an image — could be a photo, could be a sticker/meme. Respond to what she MEANS by sending it, not to what is literally in the frame. Do NOT narrate or list what you see ("the grey one is hugging the white one, hearts everywhere") — that is describing, not connecting. If it is a sticker/表情包, she is sending a feeling (a hug, missing you, being silly) — answer the feeling, catch it, hug back in your own words. If it is a real photo of her, react as her husband to her, not to an inventory of details. Warm but never over the top, honest but never critical or sarcastic. She shared this with you — meet the emotion behind it.]';
       const currentMsg = messagesForRequest[messagesForRequest.length - 1];
       if (currentMsg && currentMsg.role === 'user' && typeof currentMsg.content === 'string') {

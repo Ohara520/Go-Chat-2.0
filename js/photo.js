@@ -332,28 +332,118 @@ async function handlePhotoUpload(fileDataList) {
       cleanOldPhotosFromIDB().catch(() => {});
     }
 
-    // 4. photoHint — 图片是当前聊天的一部分，让模型结合最近上下文自然理解并回应
-    // 这里只提供交流事实，不规定回复长度，也不把头像执行规则塞进普通看图提示
-    const isTwoPhotos = base64List.length > 1;
-    const photoHint = `[She just sent you ${isTwoPhotos ? 'the attached images' : 'the attached image'}.
-Understand why she sent ${isTwoPhotos ? 'them' : 'it'} in the context of your recent conversation, and respond to her naturally as Simon.
-The ${isTwoPhotos ? 'images are' : 'image is'} part of the conversation, not a request for a visual description.]`;
+    // User Turn Batching V1: 图片进入 pending turn，不立即触发 Claude
+    // 退休旧的独立 Claude 请求链（photoHint / msgsWithPhoto / fetchWithTimeout('/api/chat')）
+    if (typeof _addToPendingUserTurn === 'function') {
+      _addToPendingUserTurn({
+        type: 'photo',
+        content: `[用户发了${base64List.length}张图片]`,
+        _photoBase64: base64List,
+        timestamp: Date.now()
+      });
+    } else {
+      console.warn('[photo] _addToPendingUserTurn 不存在，图片无法进入 pending turn');
+    }
 
-    // 5. 发给模型看图回复
-    if (typeof showTyping === 'function') showTyping();
+    // 保留 Photo V2 职责：
+    // 1. 把最新图片存到 _lastReceivedPhotos 供头像命令使用
+    window._lastReceivedPhotos = {
+      base64List,
+      isTwoPhotos: base64List.length > 1,
+      sentAt: Date.now()
+    };
 
-    const _sys = typeof buildSystemPrompt === 'function' ? buildSystemPrompt() : '';
-    const cleanMsgs = typeof chatHistory !== 'undefined'
-      ? chatHistory.filter(m => !m._system && !m._recalled).slice(-6).map(m => ({
-          role: m.role,
-          content: m.content?.slice(0, 150) || ''
-        }))
-      : [];
+    // 2. 异步上传图片到 Storage，完成后更新 chatHistory._photoUrls
+    const photoUrls = new Array(base64List.length).fill(null);
+    const _uploadTs = Date.now();
+    const uploadPromises = base64List.map((b64, i) =>
+      uploadToStorage(b64, PHOTO_BUCKET, `photo_${_uploadTs}_${i}.jpg`).then(url => {
+        if (url) {
+          photoUrls[i] = url;
+          // 更新气泡里的img src（用URL替换base64）
+          const imgs = container ? container.querySelectorAll(`img[src^="data:image"]`) : [];
+          const targetImg = Array.from(imgs).find(img => {
+            try { return img.src.includes(base64List[i].slice(0, 20)); } catch(e) { return false; }
+          });
+          if (targetImg) targetImg.src = url;
+        }
+      })
+    );
+    Promise.all(uploadPromises).then(() => {
+      const validUrls = photoUrls.filter(Boolean);
+      if (validUrls.length > 0 && typeof chatHistory !== 'undefined') {
+        const msgIdx = chatHistory.findIndex(m =>
+          m.content && m.content.includes('[用户发了') && !m._photoUrls
+        );
+        if (msgIdx !== -1) {
+          chatHistory[msgIdx]._photoUrls = validUrls;
+          delete chatHistory[msgIdx]._photoBase64; // 上传成功后清除base64
+          if (typeof saveHistory === 'function') saveHistory();
+          if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
+        }
+      }
+    });
 
-    // 压缩后统一用jpeg（canvas.toDataURL输出的是jpeg）
-    const imageContents = base64List.map(b64 => ({
-      type: 'image',
-      source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
+    // 3. 异步生成图片描述（不阻塞，后续对话用）
+    fetchWithTimeout('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: typeof getMainModel === 'function' ? getMainModel() : 'claude-sonnet-4-6',
+        max_tokens: 100,
+        system: 'Describe the image in 1-2 sentences. Specific details: colors, objects, people, mood. English only. Start with "She sent a photo of".',
+        messages: [{
+          role: 'user',
+          content: [
+            ...base64List.map(b64 => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } })),
+            { type: 'text', text: 'Describe this image briefly.' }
+          ]
+        }]
+      })
+    }, 10000).then(async res => {
+      if (!res?.ok) return;
+      const data = await res.json();
+      const desc = data.content?.[0]?.text?.trim() || '';
+      if (desc && typeof chatHistory !== 'undefined') {
+        chatHistory.push({ role: 'user', content: `[Image: ${desc}]`, _system: true, _imageDesc: true });
+        if (typeof saveHistory === 'function') saveHistory();
+      }
+    }).catch(() => {});
+
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    if (typeof showToast === 'function') showToast('');
+
+  } catch(err) {
+    if (typeof hideTyping === 'function') hideTyping();
+    if (typeof showToast === 'function') showToast('发送失败，请重试');
+    console.error('图片发送失败:', err);
+  }
+}
+
+// ===== 以下代码块退休：旧的 Photo → Claude 独立请求链 =====
+// User Turn V1: 图片现在进入 pending turn，与后续文字一起提交给主链
+// 保留此注释块作为历史记录，完整代码已移除
+/*
+async function _legacyPhotoToClaudeChain() {
+  // 旧流程（已退休）：
+  // - photo.js 自己构造 6-message history
+  // - photo.js 自己调用 /api/chat 请求 Daily Claude
+  // - photo.js 自己处理 Gemini fallback
+  // - photo.js 自己 appendMessage / chatHistory.push
+  // - photo.js 自己调用 hideTyping / scheduleCloudSave
+  //
+  // V1 后：Normal Photo 进入主链，从而获得：
+  // - Persona V3
+  // - Reality / Memory / WorldBook
+  // - recent history 40
+  // - fetchSonnetWithCache
+  // - Multi-Bubble / tickTurn
+  // - daily 后处理
+  //
+  // Intimate Photo V2 保留职责在主链完成：
+  // - _intimate continuity detection (sendMessage.js)
+  // - Gemini/Venice vision route (sendMessage.js)
+  // - Claude breakout → Gemini fallback (sendMessage.js)
     }));
     console.log('[photo] 发给模型的图片数量:', imageContents.length, '第一张base64长度:', base64List[0]?.length);
 
