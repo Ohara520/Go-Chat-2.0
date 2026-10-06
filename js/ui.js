@@ -70,8 +70,15 @@ function hideTyping() {
 // ===== 已读状态 =====
 
 function updateToRead() {
+  // User Turn Batching V1: 只将"已送达"状态的用户消息变为"已读"
+  // 这些是当前 pending batch 刚提交的消息
+  // 已经是"已读"的消息（历史消息）不再改变
   document.querySelectorAll('.message.user .message-status')
-    .forEach(s => { s.textContent = '已读'; });
+    .forEach(s => {
+      if (s.textContent === '已送达') {
+        s.textContent = '已读';
+      }
+    });
 }
 
 // ===== 文本清洗（bot回复专用）=====
@@ -308,10 +315,10 @@ function appendMessage(role, text, animate = true) {
 
   // ── 消息附件区 ──────────────────────────────────────────
   if (role === 'user') {
-    // 用户消息：已读状态
+    // 用户消息：已送达状态（commit后变为已读）
     const status = document.createElement('div');
     status.className = 'message-status';
-    status.textContent = '已读';
+    status.textContent = '已送达';
     contentDiv.appendChild(status);
   } else {
     // bot消息：收藏按钮（点击气泡才显示）
