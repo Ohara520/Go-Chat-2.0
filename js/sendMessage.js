@@ -604,7 +604,7 @@ async function _processMergedMessage(text) {
     const cleanHistory = (() => {
       const _filtered = chatHistory
         .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled)
-        .slice(-16)
+        .slice(-40)
         .map(m => ({ role: m.role, content: m.content }));
       // 过滤掉调情/召回消息后，中间可能留下相邻同角色（如两条 user 之间的 assistant
       // 被剔除），或开头变成 assistant。部分中转/模型对 role 不交替会返回 400。
@@ -710,6 +710,9 @@ async function _processMergedMessage(text) {
 
     // 禁止计数行为——模型喜欢数用户说了几次然后评论"twice"/"that's three times"
     const antiCountHint = '[DO NOT count her messages or actions. Never say "twice", "again", "that\'s the second time", "third time", "checking in again", or any variation. Each message from her is its own moment — treat it fresh. Respond to WHAT she said, not HOW MANY TIMES she said something.]';
+
+    // 多气泡输出协议
+    const multiBubbleHint = '[OUTPUT: You may send more than one text message in a reply when it feels natural. Use a line containing only --- between separate messages. Do not split a reply merely to create more bubbles. One message is normal when one message is enough.]';
 
     // ── Ghost Card hint（用户要钱时提醒模型用卡回应）────────
     const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
@@ -1079,6 +1082,7 @@ async function _processMergedMessage(text) {
     const finalSystem = [
       _baseSystem,
       antiCountHint,
+      multiBubbleHint,
       _cardHint,
       _specialtyHint,
       _timeGapHint,
@@ -1278,7 +1282,7 @@ async function _processMergedMessage(text) {
       } catch(e) {}
     }
 
-    const finalParts = reply.split('\n---\n').filter(p => p.trim()).slice(0, 2);
+    const finalParts = reply.split('\n---\n').filter(p => p.trim());
     if (finalParts.length === 0) finalParts.push('...');
 
     let lastBotResult = null;
@@ -1366,9 +1370,11 @@ async function _processMergedMessage(text) {
 
     // ── 存档 ─────────────────────────────────────────────────
     _currentAbortController = null;
+    // 清理分隔符后存入 chatHistory（一轮回复仍为一条 assistant item）
+    const historyReply = finalParts.join('\n');
     chatHistory.push({
       role: 'assistant',
-      content: reply,
+      content: historyReply,
     });
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
