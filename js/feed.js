@@ -1074,7 +1074,7 @@ Return a JSON array only, same order, keys "key","en","zh" and optional "replyTo
     } else {
       const res = await fetchWithTimeout('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 320, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+        body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 320, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
       }, 25000);
       const d = await res.json();
       raw = d.content?.[0]?.text || '';
