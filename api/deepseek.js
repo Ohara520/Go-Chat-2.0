@@ -6,14 +6,14 @@ const BASE_URLS = [
 
 const PER_NODE_TIMEOUT_MS = 8000;
 
-async function createWithFailover(messages, max_tokens, model = 'deepseek-v3.2') {
+async function createWithFailover(messages, max_tokens, model = 'deepseek-v4.1-flash') {
   let lastErr = null;
   let lastStatus = null;
 
   for (const baseURL of BASE_URLS) {
     try {
       const client = new OpenAI({
-        apiKey: process.env.ANTHROPIC_API_KEY,
+        apiKey: process.env.DEEPSEEK_API_KEY,
         baseURL,
         timeout: PER_NODE_TIMEOUT_MS,
         maxRetries: 0,
