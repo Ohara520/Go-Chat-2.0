@@ -782,7 +782,7 @@ async function _processMergedMessageWithContent(userContentForModel) {
     const antiCountHint = '[DO NOT count her messages or actions. Never say "twice", "again", "that\'s the second time", "third time", "checking in again", or any variation. Each message from her is its own moment — treat it fresh. Respond to WHAT she said, not HOW MANY TIMES she said something.]';
 
     // 多气泡输出协议
-    const multiBubbleHint = '[OUTPUT: Text in natural conversational beats. When several distinct beats naturally follow, they may stand as separate messages; use a line containing only --- between them. Do not pack distinct beats into one message, and do not split one elaborated response into multiple bubbles. One message is normal when one is enough; several short messages are natural when several beats genuinely occur.]';
+    const multiBubbleHint = '[OUTPUT: Use --- only when genuinely separate thoughts naturally belong in the same reply. Different phrasings, angles, or punchlines about the same thought are one beat, not several. Do not create extra beats merely because more things occur to you. One message is normal; multiple messages are only for genuinely separate thoughts that both belong in this reply.]';
 
     // ── Ghost Card hint（用户要钱时提醒模型用卡回应）────────
     const _moneyKws = /给我钱|转我|给我一点|好穷|买不起|要钱|零花钱|缺钱|没钱|give me money|send me|transfer|broke|can't afford/i;
