@@ -483,12 +483,24 @@ function getAvatarNegotiationContext() {
   if (!pending || !Array.isArray(pending.base64List) || !pending.base64List.length) return '';
   const count = pending.base64List.length;
   if (count === 1) {
-    return '[Current fact: the photo she recently sent is being discussed as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision. If you agree to use it, just respond naturally in character — the system will handle the actual change automatically in the background. Do NOT claim there is a system error or technical issue preventing the change.]';
+    return `[AVATAR CHANGE CAPABILITY: You CAN change your avatar. When you agree to use the photo she sent, the system will automatically update your profile picture in the background. This is a real feature that works.
+
+Current situation: She sent a photo and is asking you to use it as your avatar. Whether you want to use it is your decision. If you agree, just respond naturally in character (e.g., "alright, done" or "changed it"). The system handles the actual change automatically.
+
+IMPORTANT: Do NOT say "I can't change my avatar" or "that's not something I can do" — you CAN, and the system will do it for you when you agree. If you don't want to change it, refuse in character, but don't claim technical limitations that don't exist.]`;
   }
   if (Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0) {
-    return `[Current fact: she is discussing image ${pending.selectedIndex + 1} of the recent images as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision. If you agree, respond naturally — the system handles it automatically. Do NOT mention system errors or technical limitations.]`;
+    return `[AVATAR CHANGE CAPABILITY: You CAN change your avatar. The system will automatically update it when you agree.
+
+Current situation: She is discussing image ${pending.selectedIndex + 1} of the recent images as your potential avatar. If you agree to use it, respond naturally — the system handles the change automatically.
+
+IMPORTANT: Do NOT claim you can't change your avatar. You can. If you don't want to, refuse in character, but don't invent technical limitations.]`;
   }
-  return `[Current fact: the ${count} images she recently sent are being discussed as possible avatars for you, but no single image has been selected yet. No avatar change has happened. You may respond naturally; if the target is unclear, that uncertainty is real. If you agree to use one, the system will handle the change automatically.]`;
+  return `[AVATAR CHANGE CAPABILITY: You CAN change your avatar when you agree to use one of the photos she sent.
+
+Current situation: She sent ${count} images as potential avatars, but no single image has been selected yet. You may respond naturally; if the target is unclear, that uncertainty is real. When you agree to use a specific one, the system will handle the change automatically.
+
+IMPORTANT: Don't say you can't change your avatar. You can.]`;
 }
 
 // 执行层的本地确定性兜底：识别”已经明确决定现在使用当前候选图”的承诺。
@@ -505,14 +517,21 @@ function _hasExplicitAvatarCommitment(ghostReply) {
     /\bi (?:changed|set|switched|updated) (?:it|my avatar|my profile (?:pic|picture))\b/,
     /\b(?:i've|i have) (?:changed|set|switched|updated) (?:it|my avatar|my profile (?:pic|picture))\b/,
     /\b(?:changed|switched|updated) (?:it|my avatar)\b/,
+    /\balready (?:changed|using) it\b/,
     // 将来时 - 会换/正在换
-    /\bi(?:'ll| will) (?:use|set|make|switch to|change to) (?:it|that|this|the (?:photo|picture|image))\b/,
+    /\bi(?:'ll| will) (?:use|set|make|switch to|change to|do) (?:it|that|this|mine|the (?:photo|picture|image))\b/,
     /\bi(?:'m| am) (?:using|setting|switching to|changing to) (?:it|that|this|the (?:photo|picture|image))\b/,
     /\b(?:changing|setting|switching|updating) (?:it|my avatar|my profile (?:pic|picture)) (?:now|then)\b/,
+    // 同意/承诺
+    /\bi agree (?:to )?(?:use|change|switch)/,
+    /\b(?:yeah|yes|yep|sure|fine|alright|okay|ok)[\.,]?\s+(?:i'?ll do|done|changed|using it|switched)\b/,
+    /\b(?:go ahead|done|sorted|there)[\.,]?\s*(?:changed|switched|using|done)?\b/i,
+    // 单独的确认+行动
+    /^(?:done|changed|switched)\.?\s*$/i,
+    /\bdone\.\s*$/i,
+    /\b(?:fine|alright|okay)\.?\s+(?:this|that) (?:one |works|is fine)\b/i,
     // 祈使/决定 - 用这张
     /\b(?:use|set|make) (?:it|that|this) (?:as )?(?:my )?(?:avatar|profile (?:pic|picture))\b/,
-    /\b(?:alright|fine|okay|ok),? (?:done|changed|using it|switched)\b/,
-    /\b(?:done|sorted|there)\b.*\b(?:changed|switched|using)\b/,
     // 中文表达 - 各种换头像的说法
     /(?:换|改|设|设置|换成|改成|用)(?:这张|这个|它|上)(?:了|吧|好了)?(?:当|做|成|为)?(?:我的)?(?:头像|大头照)/,
     /(?:我)?(?:已经|现在)?(?:把)?(?:头像)?(?:换成|改成|设成|设置成|用)(?:这张|这个|它)/,
