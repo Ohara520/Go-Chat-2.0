@@ -284,14 +284,16 @@
 }
 
 .message-bubble {
-    padding: 12px 14px;
+    padding: 11px 15px;
     border-radius: 15px;
     word-wrap: break-word;
     overflow-wrap: break-word;
     word-break: break-word;
     width: auto;
-    line-height: 1.4;
-    font-size: 13px;
+    line-height: 1.42;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: -0.1px;
     white-space: pre-line;
 }
 
@@ -319,17 +321,17 @@
 
 .bubble-en {
     display: contents;
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.42;
     color: inherit;
 }
 
 .message.bot .bubble-zh {
     display: contents;
-    font-size: 11px;
+    font-size: 14px;
     color: rgba(45,90,35,0.5);
     margin-top: 4px;
-    line-height: 1.4;
+    line-height: 1.42;
 }
 
 .bubble-zh-hidden {
