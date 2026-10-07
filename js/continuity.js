@@ -65,6 +65,37 @@ function _generateId() {
   return 'ct_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
+function _formatElapsedTime(mentionedAt) {
+  // 旧数据兼容：无 mentionedAt 时返回空字符串
+  if (!mentionedAt || typeof mentionedAt !== 'number') {
+    return '';
+  }
+
+  const now = Date.now();
+  const elapsed = now - mentionedAt;
+
+  // 负数/未来时间：兼容容错
+  if (elapsed < 0) {
+    return '';
+  }
+
+  const minutes = Math.floor(elapsed / (60 * 1000));
+  const hours = Math.floor(elapsed / (60 * 60 * 1000));
+  const days = Math.floor(elapsed / (24 * 60 * 60 * 1000));
+
+  if (minutes < 5) {
+    return ' (mentioned a few minutes ago)';
+  } else if (minutes < 60) {
+    return ` (mentioned about ${minutes} minutes ago)`;
+  } else if (hours < 24) {
+    return hours === 1 ? ' (mentioned about 1 hour ago)' : ` (mentioned about ${hours} hours ago)`;
+  } else if (days === 1) {
+    return ' (mentioned yesterday)';
+  } else {
+    return ` (mentioned ${days} days ago)`;
+  }
+}
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // API: recordContinuity
@@ -93,6 +124,7 @@ function recordContinuity(opts) {
     summary,
     source: source || 'chat',
     sourceId: sourceId || null,
+    mentionedAt: Date.now(),  // Time Anchor V1: 何时首次提及此事实
     startedAt: 0,
     updatedAt: Date.now(),
     completedAt: null,
@@ -230,7 +262,7 @@ function buildContinuityContext() {
   if (pending.length) {
     lines.push('Pending:');
     pending.forEach(it => {
-      lines.push(`- ${it.summary}`);
+      lines.push(`- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`);
     });
     if (ongoing.length || recent.length) lines.push('');
   }
@@ -238,7 +270,7 @@ function buildContinuityContext() {
   if (ongoing.length) {
     lines.push('Ongoing:');
     ongoing.forEach(it => {
-      lines.push(`- ${it.summary}`);
+      lines.push(`- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`);
     });
     if (recent.length) lines.push('');
   }
@@ -246,7 +278,7 @@ function buildContinuityContext() {
   if (recent.length) {
     lines.push('Recently completed:');
     recent.forEach(it => {
-      lines.push(`- ${it.summary}`);
+      lines.push(`- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`);
     });
   }
 
