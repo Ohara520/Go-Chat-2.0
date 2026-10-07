@@ -321,17 +321,13 @@
 
 .bubble-en {
     display: contents;
-    font-size: 16px;
-    line-height: 1.42;
     color: inherit;
 }
 
 .message.bot .bubble-zh {
     display: contents;
-    font-size: 14px;
     color: rgba(45,90,35,0.5);
     margin-top: 4px;
-    line-height: 1.42;
 }
 
 .bubble-zh-hidden {
