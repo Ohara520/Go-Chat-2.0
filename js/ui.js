@@ -292,9 +292,8 @@ function appendMessage(role, text, animate = true) {
       return { msgDiv: null, bubble: null, innerThoughtEl: null };
     }
 
-    // 每句话单独一行（句号/问号/感叹号后跟空格换行）
+    // 保留模型原始段落结构
     const formattedEn = enText
-      .replace(/([.!?])\s+([a-zA-Z"'])/g, '$1\n$2')
       .replace(/([.!?])\s*$/gm, '$1')
       .trim();
 
