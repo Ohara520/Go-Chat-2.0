@@ -560,6 +560,10 @@ async function _processMergedMessageWithContent(userContentForModel) {
   const _prevUserMessageAt = parseInt(localStorage.getItem('lastUserMessageAt') || '0');
   localStorage.setItem('lastUserMessageAt', Date.now());
 
+  // Return Context V1: 当检测到 ≥1h gap 时，建立"这次回归事实"，
+  // 在之后的连续聊天中持续提供，直到下次长间隔覆盖。
+  // 不设过期倒计时，不判断话题/情绪变化，不强塞旧消息。
+
   // 合并消息：更新最后一条历史记录（让模型看到完整意图）
   if (text.includes('\n') && chatHistory.length > 0) {
     const lastUserIdx = chatHistory.map(m => m.role).lastIndexOf('user');
@@ -776,22 +780,46 @@ async function _processMergedMessageWithContent(userContentForModel) {
       if (detail) sceneHint = `[Something you know about today: ${detail}]`;
     }
 
-    // Last Interaction V1: 上次互动时间事实（纯时间间隔，不解释/不指导）
+    // Return Context V1: 回归事实（描述本段聊天开始前她离开了多久）
     const _timeGapHint = (() => {
       const _lastAt = _prevUserMessageAt;
       if (!_lastAt) return '';
-      const _gapMin = Math.floor((Date.now() - _lastAt) / 60000);
-      if (_gapMin < 60) return '';
-      const _hrs = Math.floor(_gapMin / 60);
-      if (_hrs < 2) return '[Last interaction with her: about 1 hour ago.]';
-      if (_hrs < 12) return `[Last interaction with her: about ${_hrs} hours ago.]`;
-      if (_hrs < 24) {
-        const _isNight = _hrs >= 8 && new Date(_lastAt).getHours() >= 20;
-        return _isNight ? `[Last interaction with her: last night, about ${_hrs} hours ago.]` : `[Last interaction with her: about ${_hrs} hours ago.]`;
+      const _currentGapMin = Math.floor((Date.now() - _lastAt) / 60000);
+
+      // 检测到新的 ≥1h gap：建立/覆盖 return context
+      if (_currentGapMin >= 60) {
+        const _gapMs = Date.now() - _lastAt;
+        localStorage.setItem('returnContext', JSON.stringify({
+          gapMs: _gapMs,
+          returnedAt: Date.now()
+        }));
       }
-      const _days = Math.floor(_hrs / 24);
-      if (_days === 1) return `[Last interaction with her: yesterday, about ${_hrs} hours ago.]`;
-      return `[Last interaction with her: about ${_days} days ago.]`;
+
+      // 读取当前 return context（如果存在）
+      try {
+        const _ctx = JSON.parse(localStorage.getItem('returnContext') || 'null');
+        if (!_ctx || !_ctx.gapMs) return '';
+
+        // 使用保存的 gapMs 计算回归前的间隔（不动态重算，描述回归起点）
+        const _gapMin = Math.floor(_ctx.gapMs / 60000);
+        const _hrs = Math.floor(_gapMin / 60);
+
+        // 复用原有的时间格式化逻辑
+        if (_hrs < 2) return '[She returned to the conversation after being away for about 1 hour.]';
+        if (_hrs < 12) return `[She returned to the conversation after being away for about ${_hrs} hours.]`;
+        if (_hrs < 24) {
+          const _originalLastAt = _ctx.returnedAt - _ctx.gapMs;
+          const _isNight = _hrs >= 8 && new Date(_originalLastAt).getHours() >= 20;
+          return _isNight
+            ? `[She returned to the conversation after being away since last night, about ${_hrs} hours.]`
+            : `[She returned to the conversation after being away for about ${_hrs} hours.]`;
+        }
+        const _days = Math.floor(_hrs / 24);
+        if (_days === 1) return `[She returned to the conversation after being away since yesterday, about ${_hrs} hours.]`;
+        return `[She returned to the conversation after being away for about ${_days} days.]`;
+      } catch(e) {
+        return '';
+      }
     })();
 
     // 她直接问时间时，才给他自己那边的精确表（他知道自己几点，但从不知道她那边精确几点）

@@ -577,6 +577,19 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
 
     // 其余自然表达仍交给语义分类器判断，保留对非固定措辞的理解能力。
     // 修复：放宽判断标准，承诺换头像即可执行，不要求必须"已经换了"
+    // 安全阀：用户这轮必须明确提到头像话题，避免持续协商中的误触发
+    // "这张"等指代词必须配合头像相关动作词，避免泛指其他物品
+    const hasAvatarKeyword = /头像|avatar|profile\s*pic|profile\s*picture|pfp/i.test(userText);
+    const hasAvatarAction = /换|change.*(?:picture|photo|avatar)|use.*(?:as.*)?(?:avatar|profile|picture)|set.*(?:avatar|picture)/i.test(userText);
+    const hasThisReference = /这张|那张|this\s+(?:one|photo|picture|image)/i.test(userText);
+
+    const userMentionsAvatar = hasAvatarKeyword || (hasAvatarAction && hasThisReference);
+
+    if (!userMentionsAvatar) {
+      console.log('[avatar] 协商评估：用户本轮未明确提及头像话题，跳过判断（防误触发）');
+      return false;
+    }
+
     console.log('[avatar] 协商评估：调用 Haiku 进行语义判断...');
     const targetFact = `The candidate is image ${selected + 1}.`;
     const res = await fetchWithTimeout('/api/chat', {
@@ -585,7 +598,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 10,
-        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT when he agrees to use it, will use it, is using it, or already changed it. Natural agreements like "alright, done" or "fine, using it" are ACCEPT. Only UNRESOLVED for clear refusal, hesitation, or discussing without commitment. If he says yes or agrees in character, that's ACCEPT.`,
+        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires: (1) wife explicitly asked about using it as avatar this turn, AND (2) husband clearly agrees. Simple evaluations like "looks good" or "decent" without commitment are UNRESOLVED. Generic agreement like "yeah alright" when she only asked "how is it" (not "use it as avatar") is UNRESOLVED. Only ACCEPT when he commits to the avatar change action.`,
         messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
       })
     }, 8000);
