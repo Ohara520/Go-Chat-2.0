@@ -483,39 +483,48 @@ function getAvatarNegotiationContext() {
   if (!pending || !Array.isArray(pending.base64List) || !pending.base64List.length) return '';
   const count = pending.base64List.length;
   if (count === 1) {
-    return '[Current fact: the photo she recently sent is being discussed as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision.]';
+    return '[Current fact: the photo she recently sent is being discussed as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision. If you agree to use it, just respond naturally in character — the system will handle the actual change automatically in the background. Do NOT claim there is a system error or technical issue preventing the change.]';
   }
   if (Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0) {
-    return `[Current fact: she is discussing image ${pending.selectedIndex + 1} of the recent images as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision.]`;
+    return `[Current fact: she is discussing image ${pending.selectedIndex + 1} of the recent images as a possible avatar for you. No avatar change has happened yet. Whether you want to use it is your decision. If you agree, respond naturally — the system handles it automatically. Do NOT mention system errors or technical limitations.]`;
   }
-  return `[Current fact: the ${count} images she recently sent are being discussed as possible avatars for you, but no single image has been selected yet. No avatar change has happened. You may respond naturally; if the target is unclear, that uncertainty is real.]`;
+  return `[Current fact: the ${count} images she recently sent are being discussed as possible avatars for you, but no single image has been selected yet. No avatar change has happened. You may respond naturally; if the target is unclear, that uncertainty is real. If you agree to use one, the system will handle the change automatically.]`;
 }
 
-// 执行层的本地确定性兜底：只识别“已经明确决定现在使用当前候选图”的强承诺。
+// 执行层的本地确定性兜底：识别”已经明确决定现在使用当前候选图”的承诺。
 // 这里不决定 Simon 应不应该答应；只把他已经说出口的明确决定可靠落地。
-// 单独的 yes / fine / looks good 不算，避免把暧昧、犹豫或单纯评价误执行。
+// 修复：扩展识别范围，包含更多自然的同意表达。
 function _hasExplicitAvatarCommitment(ghostReply) {
   const t = String(ghostReply || '').trim().toLowerCase()
-    .replace(/[’‘]/g, "'")
+    .replace(/['']/g, "'")
     .replace(/\s+/g, ' ');
   if (!t) return false;
 
   const explicitPatterns = [
+    // 完成时态 - 已经换了
     /\bi (?:changed|set|switched|updated) (?:it|my avatar|my profile (?:pic|picture))\b/,
+    /\b(?:i've|i have) (?:changed|set|switched|updated) (?:it|my avatar|my profile (?:pic|picture))\b/,
+    /\b(?:changed|switched|updated) (?:it|my avatar)\b/,
+    // 将来时 - 会换/正在换
     /\bi(?:'ll| will) (?:use|set|make|switch to|change to) (?:it|that|this|the (?:photo|picture|image))\b/,
     /\bi(?:'m| am) (?:using|setting|switching to|changing to) (?:it|that|this|the (?:photo|picture|image))\b/,
-    /\b(?:i've|i have) (?:changed|set|switched|updated) (?:it|my avatar|my profile (?:pic|picture))\b/,
     /\b(?:changing|setting|switching|updating) (?:it|my avatar|my profile (?:pic|picture)) (?:now|then)\b/,
+    // 祈使/决定 - 用这张
     /\b(?:use|set|make) (?:it|that|this) (?:as )?(?:my )?(?:avatar|profile (?:pic|picture))\b/,
-    /(?:换|改|设|设置|换成|改成)(?:这张|这个|它)(?:当|做|成|为)?(?:我的)?(?:头像|大头照)/,
-    /(?:我)?(?:已经|现在)?(?:把)?(?:头像)?(?:换成|改成|设成|设置成)(?:这张|这个|它)/,
-    /(?:我)?(?:已经|现在)?(?:把)?(?:这张|这个|它)(?:换成|改成|设成|设置成)(?:我的)?(?:头像|大头照)/,
-    /(?:我的)?(?:头像|大头照)(?:已经|现在)?(?:换好(?:了)?|换了|改了|设置好了|设好了)/
+    /\b(?:alright|fine|okay|ok),? (?:done|changed|using it|switched)\b/,
+    /\b(?:done|sorted|there)\b.*\b(?:changed|switched|using)\b/,
+    // 中文表达 - 各种换头像的说法
+    /(?:换|改|设|设置|换成|改成|用)(?:这张|这个|它|上)(?:了|吧|好了)?(?:当|做|成|为)?(?:我的)?(?:头像|大头照)/,
+    /(?:我)?(?:已经|现在)?(?:把)?(?:头像)?(?:换成|改成|设成|设置成|用)(?:这张|这个|它)/,
+    /(?:我)?(?:已经|现在)?(?:把)?(?:这张|这个|它)(?:换成|改成|设成|设置成|用(?:作|为)?)(?:我的)?(?:头像|大头照)/,
+    /(?:我的)?(?:头像|大头照)(?:已经|现在)?(?:换好(?:了)?|换了|改了|设置好了|设好了|用上了)/,
+    /(?:好|行|可以)(?:，|,)?(?:换了|用了|改了|就这张)/,
+    /(?:换|用|改)(?:了|好了)/
   ];
   return explicitPatterns.some(re => re.test(t));
 }
 
-// Ghost 正常回复后，后台只读取“他刚才是否已经明确决定使用这张图”。
+// Ghost 正常回复后，后台只读取”他刚才是否已经明确决定使用这张图”。
 // 拒绝/犹豫不会清空候选，因此她之后仍可继续聊、继续说服，他也可以自然改变主意。
 async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
   const pending = window._avatarChangeIntent;
@@ -527,13 +536,20 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       ? pending.selectedIndex
       : (pending.base64List.length === 1 ? 0 : -1);
     // 没有明确目标时绝不执行；多图必须先知道是哪一张。
-    if (selected < 0) return false;
+    if (selected < 0) {
+      console.log('[avatar] 协商评估：目标图片未明确，跳过执行');
+      return false;
+    }
 
     // Simon 已经用了非常明确的执行式表达时，直接落地，不再把可靠性押在第二次模型请求上。
     // 例如 “Yeah, I changed it.” / “I'll use that one.”。
     if (_hasExplicitAvatarCommitment(ghostReply)) {
+      console.log('[avatar] 协商评估：正则检测到明确承诺，执行换头像');
       const ghostB64 = pending.base64List[selected];
-      if (!ghostB64) return false;
+      if (!ghostB64) {
+        console.warn('[avatar] 协商评估：base64 数据丢失，跳过执行');
+        return false;
+      }
       window._avatarChangeIntent = null;
       _pendingAvatarChoice = null;
       await _executeAvatarSet(ghostB64);
@@ -541,6 +557,8 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
     }
 
     // 其余自然表达仍交给语义分类器判断，保留对非固定措辞的理解能力。
+    // 修复：放宽判断标准，承诺换头像即可执行，不要求必须"已经换了"
+    console.log('[avatar] 协商评估：调用 Haiku 进行语义判断...');
     const targetFact = `The candidate is image ${selected + 1}.`;
     const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
@@ -548,50 +566,75 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 10,
-        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply clearly commits to actually using the specific candidate image as his avatar now.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires a clear present decision to use the image. Refusal, hesitation, teasing without commitment, conditional agreement, discussing whether it looks good, or an unclear target are UNRESOLVED. Do not infer agreement merely because he is affectionate or because she wants it.`,
+        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT when he agrees to use it, will use it, is using it, or already changed it. Natural agreements like "alright, done" or "fine, using it" are ACCEPT. Only UNRESOLVED for clear refusal, hesitation, or discussing without commitment. If he says yes or agrees in character, that's ACCEPT.`,
         messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
       })
     }, 8000);
-    if (!res.ok) return false;
+    if (!res.ok) {
+      console.warn('[avatar] 协商评估：Haiku 请求失败');
+      return false;
+    }
     const data = await res.json();
     const decision = (data.content?.[0]?.text || '').trim().toUpperCase();
-    if (!decision.startsWith('ACCEPT')) return false;
+    console.log('[avatar] 协商评估：Haiku 判断结果:', decision);
+    if (!decision.startsWith('ACCEPT')) {
+      console.log('[avatar] 协商评估：判断为未承诺，保持协商状态');
+      return false;
+    }
 
+    console.log('[avatar] 协商评估：Haiku 判断为承诺，执行换头像');
     const ghostB64 = pending.base64List[selected];
-    if (!ghostB64) return false;
+    if (!ghostB64) {
+      console.warn('[avatar] 协商评估：base64 数据丢失，跳过执行');
+      return false;
+    }
     window._avatarChangeIntent = null;
     _pendingAvatarChoice = null;
     await _executeAvatarSet(ghostB64);
     return true;
   } catch(e) {
-    console.warn('[photo] 头像协商决定读取失败:', e.message || e);
+    console.warn('[avatar] 头像协商决定读取失败:', e.message || e);
     return false;
   }
 }
 
 // 执行头像更换：保留原有显示 / Storage / localStorage / 云端同步链路。
 async function _executeAvatarSet(ghostB64) {
+  console.log('[avatar] 开始执行头像更换...');
   window._lastReceivedPhotos = null;
 
-  document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+  // 立即更新所有头像元素显示
+  const avatarElements = document.querySelectorAll('.ghost-avatar-img');
+  console.log(`[avatar] 找到 ${avatarElements.length} 个头像元素，立即更新显示`);
+  avatarElements.forEach(el => {
     el.src = `data:image/jpeg;base64,${ghostB64}`;
   });
 
   try {
     localStorage.setItem('ghostAvatarBase64', ghostB64);
+    console.log('[avatar] base64 已存入 localStorage');
   } catch(e) {
     console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
   }
 
+  // 上传到云端存储
+  console.log('[avatar] 开始上传到云端存储...');
   let uploadOk = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const url = await uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
       if (url) {
+        console.log('[avatar] 上传成功，URL:', url);
         updateGhostAvatar(url);
         localStorage.removeItem('ghostAvatarBase64');
         uploadOk = true;
         if (typeof showToast === 'function') showToast('头像已更新 ✅');
+
+        // 修复：强制刷新动态里的头像（重新渲染 feed posts）
+        if (typeof renderFeed === 'function') {
+          console.log('[avatar] 刷新动态显示');
+          setTimeout(() => renderFeed(), 100);
+        }
         break;
       }
     } catch(e) {
@@ -601,12 +644,18 @@ async function _executeAvatarSet(ghostB64) {
   }
 
   if (!uploadOk) {
-    if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
     console.warn('[avatar] 上传失败，使用本地 base64 备份');
+    if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
+    // 即使上传失败也刷新动态，显示 base64 版本
+    if (typeof renderFeed === 'function') {
+      console.log('[avatar] 刷新动态显示（本地版本）');
+      setTimeout(() => renderFeed(), 100);
+    }
   }
 
   // Ghost 已经在正常聊天中表达了自己的决定；执行层不再追加任何硬编码台词。
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  console.log('[avatar] 头像更换完成');
 }
 
 // ===== 按钮触发 =====

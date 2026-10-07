@@ -114,14 +114,18 @@ function _bustAvatarCache(url) {
   return stamp ? `${url}${url.includes('?') ? '&' : '?'}t=${stamp}` : url;
 }
 // Ghost 头像 HTML（永远读最新头像）
-// 优先正式 URL；上传未完成/失败时读 base64 备份，跟封面和资料页一致，避免朋友圈还显示旧头像
+// 修复：优先正式 URL（非 data: 开头）；否则用 base64 备份；都没有用默认图
 function _ghostAvatarHTML() {
   const url = localStorage.getItem('ghostAvatarUrl');
-  if (url && !url.startsWith('data:')) {
-    return `<img src="${_bustAvatarCache(url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-  }
   const b64 = localStorage.getItem('ghostAvatarBase64');
-  const src = url || (b64 ? _toDataUri(b64) : 'images/ghost-avatar.jpg');
+
+  // 优先使用正式的远程 URL（带缓存破除）
+  if (url && !url.startsWith('data:')) {
+    return `<img src="${_bustAvatarCache(url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.onerror=null;this.src='${b64 ? 'data:image/jpeg;base64,' + b64 : 'images/ghost-avatar.jpg'}'">`;
+  }
+
+  // 回退到 base64 备份或默认图
+  const src = b64 ? _toDataUri(b64) : 'images/ghost-avatar.jpg';
   return `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
 }
 // 取某作者的头像渲染内容（Ghost=图，NPC=emoji，user=用户头像）
