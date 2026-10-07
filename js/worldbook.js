@@ -55,8 +55,10 @@ function _wbAddTombstone({ wbId = null, memId = null }) {
 // 新增/更新一条世界书。keywords 可传数组或逗号分隔字符串。
 function addWorldBookEntry({ keywords, content, source = 'manual', id = null, locked = false }) {
   if (!content || !content.trim()) return null;
-  const kw = (Array.isArray(keywords) ? keywords : String(keywords || '').split(/[,，、\s]+/))
-    .map(k => k.trim().toLowerCase()).filter(Boolean);
+  const kw = (Array.isArray(keywords)
+    ? keywords
+    : String(keywords || '').split(/[,，、]+/).map(k => k.trim()).filter(Boolean))
+    .map(k => k.toLowerCase()).filter(Boolean);
   if (kw.length === 0) return null;
 
   const arr = _wbLoad();
