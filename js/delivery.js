@@ -471,6 +471,7 @@ async function onGhostReceived(delivery) {
   // Chain B retired: 不再由后台模型自动生成签收反应台词
   // Delivery 事实已通过 Continuity 系统提供给 Simon 主模型，由其自主决定是否反应及如何表达
 
+  try {
     // 好感度（普通商品）
     if (!pd.isLuxury) {
       changeAffection(pd.price > 500 ? 2 : 1);
