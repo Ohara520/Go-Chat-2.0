@@ -276,6 +276,7 @@
     flex-direction: column;
     gap: 3px;
     max-width: 80%;
+    align-items: flex-start;
 }
 
 .message.user .message-content {
