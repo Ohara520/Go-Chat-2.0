@@ -325,7 +325,7 @@ If nothing is learned/observed, return: {"action":"no_change"}
 Recent conversation:
 ${recentText}`;
 
-  const raw = await callDeepSeek(prompt, 300);
+  const raw = await callGemini(prompt, 300);
   const res = safeParseJSON(raw);
   if (!res) return;                                    // 解析失败 → 不写入
 

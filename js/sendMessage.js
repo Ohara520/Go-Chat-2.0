@@ -1017,82 +1017,66 @@ async function _processMergedMessageWithContent(userContentForModel) {
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
     // 明确日常消息跳过此步骤
-    let _emotionLabel = '平淡';
     if (!isIntimate && !isRecentPhoto && !_isClearlyNormal) {
       try {
-        // 超时兜底：一律走 Grok，宁可误判也不让 Claude 接到色色内容破防
-        // 5秒超时（原3秒太短，Haiku偶尔慢就触发）
-        // 修复：Haiku超时时根据最近历史决定路由
-        // 原来一律 flirt:true → Grok节点不稳时所有消息变成 here./still here.
-        // 只有30分钟内的才算，防止旧污染标记超时时误走Grok
+        // Gemini 3.1 Flash Lite 路由检测：只判断 flirt/suggestive/affectionate
+        // 超时兜底：有调情上下文时才默认走 Grok，否则走 Claude
         const _hasRecentIntimateForTimeout = chatHistory
           .filter(m => !m._system && !m._recalled)
           .slice(-6)
           .some(m => m._intimate && (m._time || 0) > Date.now() - 10 * 60 * 1000);
         const _timeoutDefault = _hasRecentIntimateForTimeout
-          ? '{"flirt":true,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}'
-          : '{"flirt":false,"emotion":"平淡","need":"普通聊天","target":"无","isWarm":false,"wantsMoney":false,"moneyStyle":"none"}';
+          ? '{“flirt”:true,”suggestive”:false,”affectionate”:false}'
+          : '{“flirt”:false,”suggestive”:false,”affectionate”:false}';
 
-        // 最近5条上下文（排除当前这句）——供双关/暗示判断"最近是否暧昧"
-        const _haikuCtx = chatHistory
+        // 最近5条上下文（排除当前这句）——供双关/暗示判断”最近是否暧昧”
+        const _routingCtx = chatHistory
           .filter(m => !m._system && !m._recalled)
           .slice(-6, -1)
-          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m._intimate ? '[亲密/调情场景]' : (m.content || '').slice(0, 80)}`)
-          .join('\n') || '（无）';
+          .map(m => `${m.role === 'user' ? 'Her' : 'Ghost'}: ${m._intimate ? '[intimate/flirty context]' : (m.content || '').slice(0, 80)}`)
+          .join('\n') || '(none)';
 
-        const combinedRaw = await Promise.race([
-          fetchDeepSeek(
-            '你是一个消息分类器。你的唯一任务是分析用户消息并返回JSON。不要代入任何角色，不要回复用户，不要扮演任何人。\n' +
-            '只返回JSON，不要其他文字。\n' +
-            '格式：{"flirt":false,"suggestive":false,"emotion":"委屈/愤怒/开心/撒娇/难过/害怕/平淡","need":"安慰/保护/陪伴/分享/撒娇/普通聊天","target":"无/外人/Ghost","isWarm":true,"wantsMoney":false,"moneyStyle":"none/care/flirty/testing"}\n' +
-            'wantsMoney：用户是否在索要/暗示要钱，无论说法如何（包括买东西/请我/奖励我/给我/转我等）\n' +
-            'moneyStyle：care=真实需求(急用/生病/交不起)，flirty=撒娇/交换条件/买东西给你看，testing=测试你，none=不涉及钱\n' +
-            'flirt判断标准（只判露骨，宁可漏判不可误判）：\n' +
-            'true的情况：只有无歧义的露骨性内容才判true——做爱/上床/车震、明确的生殖器或性器官描述、露骨的插入/口交/自慰描述、跳蛋/按摩棒等性玩具、"骑你/骑上来/想被你"这类直白性邀约。\n' +
-            'false的情况：日常闲聊、普通撒娇(babe/想你/爱你/抱抱/miss you)、暗示性/擦边的调情(亲/摸/咬/舔/睡衣/浴巾/内衣/贴贴/蹭蹭)、表达思念、问候、分享日常。这些flirt一律false，交给Claude接。\n' +
-            '不确定或只是擦边就判false——擦边调情走Claude(它接得住)，只有明确露骨才走Grok。\n' +
-            'suggestive判断标准（性暗示/双关/隐晦承接，独立于flirt判断，用整句语义判断而不是抓单词）：\n' +
-            'true的情况：\n' +
-            '  (1) 这一句本身的主导含义就指向对方身体/性，哪怕用词委婉——例如问成年男性的"弟弟"放左边还是右边、"安静状态下多少cm"、"想尝尝你的香蕉"。判断依据是"这句话最自然的读法是不是在问性/身体"，不是有没有敏感词。\n' +
-            '  (2) 【最近对话】已经在暧昧/身体/性话题上，这一句是承接（包括没有实义的追问，如"你回答我嘛""继续""说嘛""然后呢"，此时它是在追问上一轮那个隐晦问题）。\n' +
-            'false的情况：这一句有真实且自然的普通读法、且不带身体/性双关——例如真在聊家人弟弟、问物品尺寸、日常问候闲聊。只要整句更像正常话题就判false。\n' +
-            '注意：不要因为出现"弟弟""cm""香蕉"等某个词就判true——必须是整句在这个语境下最自然的读法确实指向性，才判true。孤立一个词不算。',
-            `【最近对话】\n${_haikuCtx}\n\n【要分类的这句】她说：${text}`,
-            100
-          ),
-          // 超时兜底：有调情上下文时才默认走 Grok，否则走 Claude
+        const routingRaw = await Promise.race([
+          fetch('/api/gemini-extractor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user: `You are a message classifier. Analyze the user's message and return JSON only.
+Format: {“flirt”:false,”suggestive”:false,”affectionate”:false}
+
+flirt: explicit sexual content only (sex acts, genitals, sex toys, explicit invitations like “ride you”). Default false for anything unclear.
+suggestive: sexual innuendo, double meanings, or follow-up questions in an already sexual context (e.g. “what about you?” after a sexual question). Context-aware, not keyword-based.
+affectionate: acting cute/clingy (撒娇) in a way that suggests wanting intimacy continuation after recent flirty context. NOT daily cute talk like “babe/miss you/hug”.
+
+Default false when uncertain.
+
+[Recent context]
+${_routingCtx}
+
+[Message to classify]
+Her: ${text}`
+            })
+          }).then(r => r.ok ? r.json().then(d => d.text) : _timeoutDefault),
           new Promise(resolve => setTimeout(() => resolve(_timeoutDefault), 5000))
         ]);
-        if (combinedRaw) {
-          const combinedResult = safeParseJSON(combinedRaw);
-          if (combinedResult) {
+
+        if (routingRaw) {
+          const routingResult = safeParseJSON(routingRaw);
+          if (routingResult) {
             if (!_intimacyForceCleared) {
-              if (combinedResult.flirt === true || combinedResult.suggestive === true) {
-                // flirt=露骨直接进 Grok；suggestive=分类器结合整句语义/最近语境判定的
-                // 隐晦双关或承接（含首句自证），也进 Grok。打破"首句漏判→无 _intimate 标记
-                // →后续拿不到调情证据→永远进不去"的自举死锁。
+              if (routingResult.flirt === true || routingResult.suggestive === true) {
                 isIntimate = true;
               } else {
-                // 修复：收紧余温强制路由——只有消息本身有调情倾向（emotion=撒娇+不是明确日常），才留在Grok
-                // 防止调情后说"鸡胸肉"/"蚊子咬"这种完全无关的消息被强制送给Grok
+                // 余温强制路由：最近10分钟内有调情 + 当前消息有调情倾向（affectionate）
                 const _recentHasIntimate = chatHistory
                   .filter(m => !m._system && !m._recalled)
                   .slice(-6)
                   .some(m => m._intimate && (m._time || 0) > Date.now() - 10 * 60 * 1000);
-                const _isAffectionate = combinedResult.emotion === '撒娇' || combinedResult.need === '撒娇';
-                if (_recentHasIntimate && !_isClearlyNormal && _isAffectionate) {
+                if (_recentHasIntimate && !_isClearlyNormal && routingResult.affectionate === true) {
                   isIntimate = true;
                 }
               }
             }
-            _emotionLabel = combinedResult.emotion || '平淡';
-            /*
-             * Jealousy 状态残余已移除。
-             *
-             * 以前这里会根据用户回复改变 Simon 的嫉妒等级。
-             * 现在正常关系互动直接交给模型理解，
-             * 不再维护后台“吃醋数值”。
-             */
           }
         }
       } catch(e) {}
@@ -1588,6 +1572,7 @@ async function _processMergedMessageWithContent(userContentForModel) {
     }
     // 情绪/商城触发：提高到45%（原25%太低）
     // 每轮 30% 概率跑反寄/情绪判断（原为 0.85，与"惊喜才珍贵"的设计冲突，且注释谎称 25%）
+    // 副作用检测（地点特产触发）
     if (Math.random() < 0.30) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
     if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);

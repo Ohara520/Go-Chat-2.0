@@ -192,7 +192,7 @@ If nothing important, return: {"action":"none"}
 Recent conversation:
 ${conversationText}`;
 
-    const raw = await callDeepSeek(prompt, 300);
+    const raw = await callGemini(prompt, 300);
     const memory = safeParseJSON(raw);
     if (!memory) return;
 

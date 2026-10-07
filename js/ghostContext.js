@@ -132,5 +132,15 @@ function buildGhostContextBlock(opts) {
     lines.push(continuityBlock);
   }
 
+  // —— Delivery Facts ——
+  // 注入当前相关的快递事实（使用 isGhostSend 作为唯一方向标识）
+  const deliveryBlock = (typeof buildDeliveryContext === 'function')
+    ? buildDeliveryContext()
+    : '';
+  if (deliveryBlock) {
+    lines.push('');
+    lines.push(deliveryBlock);
+  }
+
   return lines.join('\n');
 }

@@ -11,7 +11,13 @@
 // - renderDeliveryTracker()    渲染快递追踪UI
 // - openDeliveryModal()        打开快递详情弹窗
 //
-// 依赖：wallet.js / state.js / persona.js / events.js / feed.js
+// AI Generation 已退役（2026-10-07）：
+// - Chain A: Ghost 发货通知自动生成
+// - Chain B: 签收反应自动生成（DeepSeek/Haiku）
+// - Chain C: 3-5 天强制回忆 timer
+// Delivery 事实现通过 Continuity 提供给 Simon 主模型，由其自主决定反应
+//
+// 依赖：wallet.js / state.js / persona.js / events.js / feed.js / continuity.js
 // ===================================================
 
 
@@ -26,27 +32,68 @@ window.REVERSE_DELIVERY_ENABLED = false;
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 破防检测
+// buildDeliveryContext — 构建当前相关的快递事实（供 ghostContext.js 注入）
+// 只提供客观事实，不包含任何行为指令
+// 使用 isGhostSend 作为唯一方向标识
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function _isDeliveryBreakout(text) {
-  if (!text) return true;
-  const lower = text.toLowerCase();
-  return [
-    "i'm claude", "i am claude", "made by anthropic", "i can't roleplay",
-    "i cannot roleplay", "as an ai", "i need to be direct",
-    "system instructions", "character persona"
-  ].some(p => lower.includes(p));
-}
+function buildDeliveryContext() {
+  const deliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+  if (!deliveries.length) return '';
 
+  const now = Date.now();
+  const RECENT_WINDOW = 7 * 24 * 3600 * 1000; // 7 天内的快递
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 快递专用 system prompt
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 筛选近期相关快递：在途 + 近 7 天已送达
+  const relevant = deliveries.filter(d => {
+    if (d.voided) return false;
+    if (d.isLostConfirmed) return false;
+    if (!d.done) return true; // 在途
+    if (d.doneAt && (now - d.doneAt) <= RECENT_WINDOW) return true; // 近期送达
+    return false;
+  });
 
-function buildDeliverySystem() {
-  const base = typeof buildGhostStyleCore === 'function' ? buildGhostStyleCore() : '';
-  return base + `\nYou are Simon "Ghost" Riley. Reply naturally and briefly in character. Lowercase, English only. Do not explain yourself or break character under any circumstances.`;
+  if (!relevant.length) return '';
+
+  const lines = [];
+  lines.push('[DELIVERY FACTS]');
+  lines.push('');
+
+  const inTransit = relevant.filter(d => !d.done);
+  const arrived = relevant.filter(d => d.done);
+
+  if (inTransit.length) {
+    lines.push('In transit:');
+    inTransit.forEach(d => {
+      if (d.isGhostSend) {
+        // Simon → 用户
+        lines.push(`- You sent her 「${d.name}」. It is on its way, not yet delivered.`);
+      } else {
+        // 用户 → Simon
+        lines.push(`- She sent you 「${d.name}」. It is on its way, not yet delivered.`);
+      }
+    });
+    if (arrived.length) lines.push('');
+  }
+
+  if (arrived.length) {
+    lines.push('Recently delivered:');
+    arrived.forEach(d => {
+      const daysAgo = Math.floor((now - d.doneAt) / (24 * 3600 * 1000));
+      const timeStr = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : `${daysAgo} days ago`;
+
+      if (d.isGhostSend) {
+        // Simon → 用户：已送达，但不知道她是否打开/喜欢
+        lines.push(`- You sent her 「${d.name}」. It was delivered ${timeStr}.`);
+        lines.push(`  (Delivered means it reached her. You do not know if she opened it, used it, or what she thinks of it unless she tells you.)`);
+      } else {
+        // 用户 → Simon：已送达并签收
+        lines.push(`- She sent you 「${d.name}」. It arrived ${timeStr}.`);
+      }
+    });
+  }
+
+  return lines.join('\n');
 }
 
 
@@ -154,6 +201,7 @@ function addDelivery(product, isGhostSend, isLuxury, purchaseId) {
   // 修复(礼物消失)：在途快递一律保留，只对已完成/已确认丢件的做 20 条上限，
   // 防止在途快递被挤出数组后既不送达也不上架、凭空消失
   _capDeliveries(deliveries);
+
   renderDeliveryTracker();
   return delivery;
 }
@@ -250,6 +298,8 @@ function addGhostReverseDelivery(item, emotionType) {
   const now         = Date.now();
   const interval    = totalMs / DELIVERY_STAGES_GHOST.length;
   const isSecret    = !!item._secretDelivery;
+
+  // 创建反寄快递记录（isGhostSend = true）
   // 修复：visibleAt 改成立刻显示，不再延迟24-48小时
   // 旧版延迟导致用户完全看不到追踪条，误以为包裹不存在
   // 秘密快递（_secretDelivery）保留延迟显示的设计
@@ -276,45 +326,11 @@ function addGhostReverseDelivery(item, emotionType) {
   });
   _capDeliveries(deliveries);
 
-  // 修复：100%主动告知，去掉沉默路径
-  // 寄了东西就直接告诉她，同时追踪条立刻显示
-  // 注入系统记忆
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({
-      role: 'user',
-      content: `[System: You just sent her 「${item.name}」. It is on the way — NOT delivered yet. Tell her naturally. Do NOT imply she has already received it.]`,
-      _system: true,
-      _delivery: true
-    });
-    if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
-  }
-
   // 追踪条立刻刷新
   if (typeof renderDeliveryTracker === 'function') renderDeliveryTracker();
 
-  // 让模型自己想说什么说什么，Ghost口吻，带点温度但不肉麻
-  const directDelay = [2000, 5000, 10000][Math.floor(Math.random() * 3)];
-  setTimeout(async () => {
-    try {
-      const _itemDesc = item.desc || item.name;
-      const _tipHint = item.tip ? `\n\nTone anchor: ${item.tip}` : '';
-      const line = await callDeepSeek(
-        buildGhostStyleCore() + `\n\n[You just sent her 「${item.name}」 — ${_itemDesc}. It is on its way, not arrived yet.
-Tell her you sent something. Be natural — you chose this, you sent it, let her know.
-Not a system announcement. Not robotic. Not "check your door."
-You can be brief, dry, even a little offhand — but it should feel like something a husband says, not a courier notification.
-Examples of the right texture: "sent you something." / "something's on its way." / "picked something up for you." / "you'll get a package in a day or two."
-One line. English only. Lowercase.${_tipHint}]`,
-        80
-      );
-      if (line && line.trim() && !_isDeliveryBreakout(line)) {
-        const cleanLine = line.trim().split('\n')[0];
-        appendMessage('bot', cleanLine);
-        chatHistory.push({ role: 'assistant', content: cleanLine });
-        _safeDeliverySaveHistory();
-      }
-    } catch(e) {}
-  }, directDelay);
+  // Chain A retired: 不再由 DeepSeek 自动生成发货通知台词
+  // Delivery 事实已记录，物流 UI 正常显示，Simon 主模型可通过 Continuity 读取事实后自主决定是否提及
 
   return true;
 }
@@ -374,7 +390,7 @@ function checkDeliveryUpdates() {
                 : (d.emotionType === 'longing' || d.emotionType === 'compensation' || d.emotionType === 'practical_care')
                 ? ' (when she needed it)'
                 : '';
-              const _note = `You sent her 「${d.name}」 on ${_dateStr}${_reasonTag}. She received it. If she brings it up, acknowledge — this was from you. Do not deny sending it.`;
+              const _note = `You sent her 「${d.name}」 on ${_dateStr}${_reasonTag}. It was delivered.`;
               if (!_ltm.includes(d.name)) {
                 const _ltmLines = (_ltm + '\n' + _note).trim().split('\n').filter(l => l.trim());
                 const _ltmTrimmed = _ltmLines.length > 30 ? _ltmLines.slice(-30).join('\n') : _ltmLines.join('\n');
@@ -388,7 +404,9 @@ function checkDeliveryUpdates() {
             // 写进长期记忆，防止Ghost否认收到
             try {
               const _ltm = localStorage.getItem('longTermMemory') || '';
-              const _note = `She sent you 「${d.name}」. You received it. If she asks, confirm.`;
+              const _d = new Date(d.doneAt);
+              const _dateStr = `${_d.getMonth()+1}/${_d.getDate()}`;
+              const _note = `She sent you 「${d.name}」. You received it on ${_dateStr}.`;
               if (!_ltm.includes(d.name)) {
                 const _ltmLines = (_ltm + '\n' + _note).trim().split('\n').filter(l => l.trim());
                 const _ltmTrimmed = _ltmLines.length > 30 ? _ltmLines.slice(-30).join('\n') : _ltmLines.join('\n');
@@ -435,8 +453,6 @@ async function onGhostReceived(delivery) {
   const container = document.getElementById('messagesContainer');
   if (!container) {
     // 不在聊天页面，存起来下次触发
-    // 注意：这里【不】设去重标记——否则回放时 onGhostReceived 会被自己刚设的标记挡在门外，
-    // 离线到达的快递永远不会有反应（这正是"收到快递不说话"的主因）
     const pending = JSON.parse(localStorage.getItem('pendingDeliveryReactions') || '[]');
     if (!pending.some(p => p.delivery && p.delivery.id === delivery.id)) {
       pending.push({ delivery, savedAt: Date.now() });
@@ -445,133 +461,15 @@ async function onGhostReceived(delivery) {
     return;
   }
 
-  // 到这里说明在聊天页、确定要生成反应了，此刻才设去重标记
+  // 到这里说明在聊天页、确定要执行副作用了，此刻才设去重标记
   localStorage.setItem(_dedupKey, Date.now().toString());
 
   const pd = delivery.productData;
   showToast(`✅ ${delivery.emoji} ${delivery.name} Ghost已签收！`);
   _addDeliveryNotice({ id: 'recv_' + delivery.id, type: 'ghost_received', itemName: delivery.name, itemEmoji: delivery.emoji || '📦' });
 
-  // ── 恶作剧礼物 ───────────────────────────────
-  if (pd.isJokeGift || delivery.name === '《讨好老婆的99招》') {
-    try {
-      const res2  = await fetchWithTimeout('/api/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: MODEL_SONNET,
-          max_tokens: 150,
-          system: buildDeliverySystem(),
-          messages: [...chatHistory.slice(-10), {
-            role: 'user',
-            content: `[She sent him a book called 「讨好老婆的99招」— written by someone called Noah. He just received it. React naturally. English only. lowercase.]`
-          }]
-        })
-      });
-      const data2 = await res2.json();
-      const reply2 = data2.content?.[0]?.text?.trim() || '';
-      if (reply2) {
-        appendMessage('bot', reply2);
-        chatHistory.push({ role: 'assistant', content: reply2 });
-        _safeDeliverySaveHistory();
-        changeAffection(2);
-      }
-    } catch(e) {}
-    return;
-  }
-
-  // ── 普通/奢侈品签收 ──────────────────────────
-  try {
-    const isFromHome  = !!pd.isFromHome;
-    const fromHomeHint = isFromHome
-      ? `This is Chinese local food/specialty he hasn't had much of. He's curious, might not know how to eat it, might get surprised by spice. Real reaction, not exaggerated.${pd.festival ? ` It's a ${pd.festival} seasonal item.` : ''}`
-      : '';
-
-    // 【改】签收→说话加随机延迟，不总是立刻说
-    // 修复：延迟缩短到最多30秒，防止用户等太久或提前问导致答错
-    const replyDelay = [0, 10 * 1000, 30 * 1000][Math.floor(Math.random() * 3)];
-
-    // 修复：系统消息立刻注入，不等延迟——用户提前问也能拿到正确上下文
-    if (typeof chatHistory !== 'undefined') {
-      chatHistory.push({
-        role: 'user',
-        content: `[the item she sent — 「${delivery.name}」— just arrived. you have it now. if she asks, confirm it naturally.]`,
-        _system: true,
-        _delivery: true
-      });
-      _safeDeliverySaveHistory();
-    }
-
-    setTimeout(async () => {
-      try {
-        // 防复读池：记最近5句签收台词，喂给模型让它别重复（对标外卖 takeoutReplyPool）
-        const _getRecvPool  = () => JSON.parse(localStorage.getItem('deliveryReplyPool') || '[]');
-        const _saveRecvPool = (pool) => localStorage.setItem('deliveryReplyPool', JSON.stringify(pool.slice(-5)));
-        const _recentRecv   = _getRecvPool().map(l => `"${l}"`).join(', ');
-        const _noRepeatHint = _recentRecv
-          ? `\nDo not reuse or echo these recent lines: ${_recentRecv}. Vary phrasing and angle completely.`
-          : '';
-
-        const _itemDesc = pd.desc || pd.tip || delivery.name;
-        const _priceHint = pd.price > 500 ? ' She spent real money on this.' : '';
-        const _deliveryUserContent = `[She sent something. It just arrived — 「${delivery.name}」.
-Item: ${_itemDesc}.${_priceHint}${fromHomeHint ? ' ' + fromHomeHint : ''}
-
-She chose this. Bought it. Waited days for it to get here.
-He knows that. He won't say it. But it registers.
-
-How he reacts depends on the moment:
-- Sometimes he looks at it for a second, then says something about the thing itself — what it is, what it looks like, what it reminds him of. Specific. Not generic.
-- Sometimes he gives her a hard time about it — questioning why she sent it, or commenting on the choice. But the fact that he noticed the detail means he looked.
-- Sometimes it's quieter. One line that says more than it should. Then nothing else.
-
-What makes it land:
-- He reacts to THIS item, not "a package." Name it or describe it. Show he actually opened it.
-- The restraint makes the reaction heavier, not emptier. "got it. thanks." is empty. "you sent Earl Grey. bold choice." has weight.
-- He can be amused, surprised, unimpressed, curious, or quietly affected. Not always the same.
-
-One or two lines. English only. Lowercase. No sweet talk. But not hollow either.${_noRepeatHint}]`;
-
-        let reply = '';
-        if (pd.isLuxury) {
-          // 奢侈品 → S
-          const res = await fetchWithTimeout('/api/chat', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: MODEL_SONNET,
-              max_tokens: 150,
-              system: buildDeliverySystem(),
-              messages: [...chatHistory.slice(-10), { role: 'user', content: _deliveryUserContent }]
-            })
-          });
-          const data = await res.json();
-          reply = data.content?.[0]?.text?.trim() || '';
-        } else {
-          // 普通签收 → D
-          reply = await callDeepSeek(buildDeliverySystem() + '\n\n' + _deliveryUserContent, 120);
-        }
-
-        // 主模型空/破防 → 降级 Haiku 再试一次（对标外卖双模型链，救回大部分"不说话"）
-        if (!reply || _isDeliveryBreakout(reply)) {
-          try {
-            const _line = await callHaiku(
-              buildDeliverySystem(),
-              [...chatHistory.filter(m => !m._system).slice(-8), { role: 'user', content: _deliveryUserContent }]
-            );
-            if (_line && !_isDeliveryBreakout(_line)) reply = _line.trim();
-          } catch(e) {}
-        }
-
-        if (reply && !_isDeliveryBreakout(reply)) {
-          appendMessage('bot', reply);
-          chatHistory.push({ role: 'assistant', content: reply });
-          _safeDeliverySaveHistory();
-          // 存进防复读池
-          const _pool = _getRecvPool(); _pool.push(reply); _saveRecvPool(_pool);
-        }
-        // 双模型都失败 → 不硬发兜底台词（B方案）。
-        // 系统记忆已在调模型前注入（上方 _delivery 系统消息），Ghost 下轮自然对话里会认。
-      } catch(e) {}
-    }, replyDelay);
+  // Chain B retired: 不再由后台模型自动生成签收反应台词
+  // Delivery 事实已通过 Continuity 系统提供给 Simon 主模型，由其自主决定是否反应及如何表达
 
     // 好感度（普通商品）
     if (!pd.isLuxury) {
@@ -592,73 +490,21 @@ One or two lines. English only. Lowercase. No sweet talk. But not hollow either.
       });
     }
 
-    // 奢侈品：第二条用 Sonnet，5秒后
+    // 奢侈品额外好感度
     if (pd.isLuxury) {
-      setTimeout(async () => {
-        try {
-          const res2  = await fetchWithTimeout('/api/chat', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: MODEL_SONNET,
-              max_tokens: 400,
-              system: buildDeliverySystem(),
-              messages: [...chatHistory.slice(-15), {
-                role: 'user',
-                content: `[RECEIVING EXPENSIVE GIFTS]
-
-She sent him 「${delivery.name}」. ${pd.desc || ''}
-This was not cheap. He knows that.
-
-He doesn't ignore it. He doesn't treat it lightly.
-But he also doesn't gush or thank her properly — that's not him.
-
-What he might do:
-- Go quiet for a beat, then say something about the item itself — a detail, a quality, something only someone who actually looked would notice.
-- Push back a little — "this was too much" / "you didn't have to" — but the fact that he said it means it landed.
-- Say something that reveals he's already using it or keeping it close. Not announced. Just visible.
-
-The reaction should feel like: he won't tell her what it meant. But she'll know.
-
-One to two lines. English only. Lowercase.]`
-              }]
-            })
-          });
-          const data2  = await res2.json();
-          const reply2 = data2.content?.[0]?.text?.trim() || '';
-          if (reply2) {
-            appendMessage('bot', reply2);
-            chatHistory.push({ role: 'assistant', content: reply2 });
-            _safeDeliverySaveHistory();
-            changeAffection(pd.price > 3000 ? 5 : 3);
-            if (pd.isGhostGift) {
-              feedEvent_giftReceived(pd.name, 'ghost');
-            }
-            setTimeout(() => maybeTriggerFeedPost('event_arrived'), 1000);
-          }
-        } catch(e) {}
-      }, 5000);
+      changeAffection(pd.price > 3000 ? 5 : 3);
+      if (pd.isGhostGift && typeof feedEvent_giftReceived === 'function') {
+        feedEvent_giftReceived(pd.name, 'ghost');
+      }
+      setTimeout(() => {
+        if (typeof maybeTriggerFeedPost === 'function') {
+          maybeTriggerFeedPost('event_arrived');
+        }
+      }, 1000);
     }
 
-    // fromHome：2-3天后随机触发余温回想
-    // 【改】余温回想推广到所有签收，不只 fromHome
-    // fromHome 概率60%，普通商品概率30%
-    const afterthoughtChance = isFromHome ? 0.6 : 0.3;
-    if (Math.random() < afterthoughtChance) {
-      const afterthoughtDelay = (Math.floor(Math.random() * 3) + 2) * 24 * 3600 * 1000;
-      setTimeout(async () => {
-        try {
-          const _afterPrompt = isFromHome
-            ? buildDeliverySystem() + `\n\n[A few days later, something she sent from home crosses his mind. Just a line. Use what you know about it: ${pd.desc || delivery.name}. Write in English — describe how it tasted, felt, or what he did with it. Specific. Offhand. No explanation.]`
-            : buildDeliverySystem() + `\n\n[A few days later, something she sent crosses his mind. Just a line. What it is: ${pd.desc || delivery.name}. Write in English — one concrete detail about it. Dry. Offhand.]`;
-          const line = await callDeepSeek(_afterPrompt, 60);
-          if (line && line.trim()) {
-            appendMessage('bot', line.trim().split('\n')[0]);
-            chatHistory.push({ role: 'assistant', content: line.trim().split('\n')[0] });
-            _safeDeliverySaveHistory();
-          }
-        } catch(e) {}
-      }, afterthoughtDelay);
-    }
+    // Chain C retired: 删除 3-5 天强制回忆 timer
+    // Simon 主模型将通过自然记忆和 Continuity 事实自主决定是否在后续对话中提及
 
   } catch(e) {}
 }
@@ -671,63 +517,8 @@ One to two lines. English only. Lowercase.]`
 async function showMysteryPackage(delivery) {
   renderDeliveryTracker();
 
-  // 注入系统记忆（模型知道但不进聊天框）
-  if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({
-      role: 'user',
-      content: `[You sent her something — 「${delivery.name}」. She just received it. You know. Don't announce it unless she brings it up.]`,
-      _system: true,
-      _delivery: true,
-    });
-    if (typeof saveHistory === 'function') _safeDeliverySaveHistory();
-  }
-  // 写进长期记忆，防止20条后被截掉导致Ghost否认
-  try {
-    const _ltm = localStorage.getItem('longTermMemory') || '';
-    const _note = `You sent her 「${delivery.name}」. She received it.`;
-    if (!_ltm.includes(delivery.name)) {
-      const _ltmLines = (_ltm + '\n' + _note).trim().split('\n').filter(l => l.trim());
-                const _ltmTrimmed = _ltmLines.length > 30 ? _ltmLines.slice(-30).join('\n') : _ltmLines.join('\n');
-                localStorage.setItem('longTermMemory', _ltmTrimmed);
-      if (typeof touchLocalState === 'function') touchLocalState();
-    }
-  } catch(e) {}
-
-  // 生成 Ghost 那句话（显示在礼物盒通知里）
-  // 修复：兜底台词改得更有人情味，去掉"check the door"这种冷冰冰的系统播报感
-  let ghostLine = '';
-  const _fallbacks = [
-    "it's there.",
-    "should be there by now.",
-    "open it.",
-    "got you something.",
-    "you'll see.",
-    "something from me.",
-    "thought you'd want it.",
-  ];
-  try {
-    const res = await fetchWithTimeout('/api/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL_SONNET,
-        max_tokens: 60,
-        system: buildDeliverySystem(),
-        messages: [...chatHistory.slice(-6), {
-          role: 'user',
-          content: `[He sent her 「${delivery.name}」. She just received it.${delivery.productData?.tip ? ' ' + delivery.productData.tip : ''}
-One short line — what he'd say when she opens the package. Like a husband, not a courier.
-Could be: reacting to what it is, a dry comment on why he sent it, or just acknowledging she has it.
-NOT "check the door" — she already has it. NOT a system announcement.
-English only. Lowercase. One line.]`
-        }]
-      })
-    });
-    const data = await res.json();
-    const line = data.content?.[0]?.text?.trim() || '';
-    ghostLine = (line && !_isDeliveryBreakout(line)) ? line.split('\n')[0] : _fallbacks[Math.floor(Math.random() * _fallbacks.length)];
-  } catch(e) {
-    ghostLine = _fallbacks[Math.floor(Math.random() * _fallbacks.length)];
-  }
+  // Chain A retired: 不再由后台模型自动生成发货通知台词
+  // Delivery 事实已通过 Continuity 系统提供给 Simon 主模型，由其自主决定是否提及
 
   // 写入通知（商城卡片提示，进商城后弹礼物盒）
   _addDeliveryNotice({
@@ -736,20 +527,7 @@ English only. Lowercase. One line.]`
     itemName:  delivery.name,
     itemEmoji: delivery.emoji || '📦',
     fromCity:  localStorage.getItem('currentLocation') || 'UK',
-    ghostLine,
   });
-
-  // 在聊天里发一条主动消息（如果当前在聊天页面）
-  const _chatContainer = document.getElementById('messagesContainer');
-  if (_chatContainer && ghostLine && typeof appendMessage === 'function') {
-    setTimeout(() => {
-      appendMessage('bot', ghostLine);
-      if (typeof chatHistory !== 'undefined') {
-        chatHistory.push({ role: 'assistant', content: ghostLine, _delivery: true });
-        if (typeof _safeDeliverySaveHistory === 'function') _safeDeliverySaveHistory();
-      }
-    }, 2000);
-  }
 
   showToast('📦 有来自 Ghost 的包裹！去商城查看');
 

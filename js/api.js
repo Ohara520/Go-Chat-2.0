@@ -457,6 +457,37 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
   return _lastText;
 }
 
+// ===== Gemini 生成调用 =====
+// 用于后台认知任务：Long-term Memory / Relationship Understanding extraction
+// 使用 gemini-3.1-flash-lite-preview
+
+/**
+ * 调用 Gemini 3.1 Flash Lite（后台认知任务专用）
+ * 用于 Long-term Memory extraction / Relationship Understanding extraction
+ * @param {string} prompt      完整 prompt（system+user 合并传入）
+ * @param {number} maxTokens   默认300
+ * @returns {string} 回复文本，失败返回空字符串
+ */
+async function callGemini(prompt, maxTokens = 300) {
+  try {
+    const res = await fetchWithTimeout('/api/gemini-extractor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: prompt, max_tokens: maxTokens }),
+    }, 15000);
+    if (!res.ok) return '';
+    const data = await res.json();
+    if (_isApiErrorBody(data)) {
+      console.warn('[callGemini] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
+      return '';
+    }
+    return data.text?.trim() || '';
+  } catch (e) {
+    console.warn('[callGemini] 调用失败:', e);
+    return '';
+  }
+}
+
 // ===== DeepSeek 生成调用 =====
 // /api/deepseek 路由用于内容生成（情绪判断/心声/签收/转账拒绝等）
 // /api/translate 已删除
