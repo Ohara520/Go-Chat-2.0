@@ -776,20 +776,22 @@ async function _processMergedMessageWithContent(userContentForModel) {
       if (detail) sceneHint = `[Something you know about today: ${detail}]`;
     }
 
-    // 时间流逝感知
+    // Last Interaction V1: 上次互动时间事实（纯时间间隔，不解释/不指导）
     const _timeGapHint = (() => {
       const _lastAt = _prevUserMessageAt;
       if (!_lastAt) return '';
       const _gapMin = Math.floor((Date.now() - _lastAt) / 60000);
-      if (_gapMin < 30) return '';
-      const _lastContext = chatHistory.filter(m => m.role === 'user' && !m._system && !m._recalled).slice(-5).map(m => m.content).join(' ');
-      const _wasLeaving = /上课|class|work|上班|开会|meeting|睡觉|sleep|吃饭|eat|出去|去了|busy|有事/.test(_lastContext);
-      if (_gapMin < 60) return `[${_gapMin} minutes have passed since her last message.${_wasLeaving ? ' She mentioned stepping away.' : ''}]`;
-      if (_gapMin < 180) return `[About ${(_gapMin/60).toFixed(1)} hours have passed.${_wasLeaving ? ' She had mentioned stepping away.' : ''}]`;
-      if (_gapMin < 720) return `[${Math.round(_gapMin/60)} hours have passed.${_wasLeaving ? ' She had said she was going to do something.' : ''} A significant amount of time has passed.]`;
-      const _hrs = Math.round(_gapMin/60);
-      const _days = _hrs >= 24 ? `(about ${Math.round(_hrs/24)} day${Math.round(_hrs/24)>1?'s':''})` : '';
-      return `[${_hrs} hours ${_days} have passed. This is a new conversation window — earlier context is background, not immediate.]`;
+      if (_gapMin < 60) return '';
+      const _hrs = Math.floor(_gapMin / 60);
+      if (_hrs < 2) return '[Last interaction with her: about 1 hour ago.]';
+      if (_hrs < 12) return `[Last interaction with her: about ${_hrs} hours ago.]`;
+      if (_hrs < 24) {
+        const _isNight = _hrs >= 8 && new Date(_lastAt).getHours() >= 20;
+        return _isNight ? `[Last interaction with her: last night, about ${_hrs} hours ago.]` : `[Last interaction with her: about ${_hrs} hours ago.]`;
+      }
+      const _days = Math.floor(_hrs / 24);
+      if (_days === 1) return `[Last interaction with her: yesterday, about ${_hrs} hours ago.]`;
+      return `[Last interaction with her: about ${_days} days ago.]`;
     })();
 
     // 她直接问时间时，才给他自己那边的精确表（他知道自己几点，但从不知道她那边精确几点）

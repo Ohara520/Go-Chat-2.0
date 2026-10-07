@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Last Interaction V1 Test</title>
+</head>
+<body>
+<h1>Last Interaction V1 Test</h1>
+<pre id="output"></pre>
+
+<script>
+// 模拟 _timeGapHint 逻辑
+function testLastInteraction(minutesAgo, lastMsgHour = 14) {
+  const now = Date.now();
+  const _prevUserMessageAt = now - (minutesAgo * 60 * 1000);
+
+  const _gapMin = Math.floor((now - _prevUserMessageAt) / 60000);
+  if (_gapMin < 60) return '';
+  const _hrs = Math.floor(_gapMin / 60);
+  if (_hrs < 2) return '[Last interaction with her: about 1 hour ago.]';
+  if (_hrs < 12) return `[Last interaction with her: about ${_hrs} hours ago.]`;
+  if (_hrs < 24) {
+    const _isNight = _hrs >= 8 && lastMsgHour >= 20;
+    return _isNight ? `[Last interaction with her: last night, about ${_hrs} hours ago.]` : `[Last interaction with her: about ${_hrs} hours ago.]`;
+  }
+  const _days = Math.floor(_hrs / 24);
+  if (_days === 1) return `[Last interaction with her: yesterday, about ${_hrs} hours ago.]`;
+  return `[Last interaction with her: about ${_days} days ago.]`;
+}
+
+const tests = [
+  { desc: '连续聊天 20min', minutes: 20, hour: 14 },
+  { desc: '离开 1h', minutes: 60, hour: 14 },
+  { desc: '离开 2h', minutes: 120, hour: 14 },
+  { desc: '同日离开 6h', minutes: 360, hour: 14 },
+  { desc: '同日离开 10h (非夜间)', minutes: 600, hour: 14 },
+  { desc: '同日离开 10h (夜间出发)', minutes: 600, hour: 22 },
+  { desc: '隔夜回来 (24h)', minutes: 1440, hour: 14 },
+  { desc: '隔夜回来 (30h)', minutes: 1800, hour: 14 },
+  { desc: '离开 2 天', minutes: 2880, hour: 14 },
+  { desc: '离开 3 天', minutes: 4320, hour: 14 },
+];
+
+const output = document.getElementById('output');
+let result = 'Last Interaction V1 — 测试结果\n\n';
+
+tests.forEach(t => {
+  const hint = testLastInteraction(t.minutes, t.hour);
+  result += `${t.desc}:\n  ${hint || '(无提示，< 60min)'}\n\n`;
+});
+
+output.textContent = result;
+console.log(result);
+</script>
+</body>
+</html>
