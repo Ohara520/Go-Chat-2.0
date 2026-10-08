@@ -913,7 +913,7 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
           // 存入防重复池
           const _pool = _getTakeoutPool(); _pool.push(_line); _saveTakeoutPool(_pool);
           if (typeof chatHistory !== 'undefined') {
-            chatHistory.push({ role: 'assistant', content: _line });
+            chatHistory.push({ role: 'assistant', content: _line, _time: Date.now() });
             const _realMsgs = chatHistory.filter(m => !m._system && !m._recalled && m.role && m.content);
             if (_realMsgs.length > 0 && typeof saveHistory === 'function') saveHistory();
             if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
@@ -928,7 +928,7 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
           const _fallbackLine = _fb[Math.floor(Math.random() * _fb.length)];
           if (typeof appendMessage === 'function') appendMessage('bot', _fallbackLine);
           if (typeof chatHistory !== 'undefined') {
-            chatHistory.push({ role: 'assistant', content: _fallbackLine });
+            chatHistory.push({ role: 'assistant', content: _fallbackLine, _time: Date.now() });
             if (typeof saveHistory === 'function') saveHistory();
           }
           // 兜底台词也已进聊天 → 视为已表达

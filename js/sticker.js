@@ -81,7 +81,7 @@ async function sendSticker(id) {
 
   // 存进历史——带情绪描述让Ghost理解
   const stickerMsg = `[用户发了表情包id：${id}，标签：${meta.label}]`;
-  chatHistory.push({ role: 'user', content: stickerMsg, _stickerId: id, _stickerType: meta.type });
+  chatHistory.push({ role: 'user', content: stickerMsg, _stickerId: id, _stickerType: meta.type, _time: Date.now() });
   saveHistory();
 
   if (_isSending) return;
@@ -174,7 +174,7 @@ async function sendSticker(id) {
       setTimeout(() => appendGhostSticker('meh'), 1200);
     }
 
-    chatHistory.push({ role: 'assistant', content: reply });
+    chatHistory.push({ role: 'assistant', content: reply, _time: Date.now() });
     saveHistory();
   } catch(e) {
     hideTyping();
@@ -190,7 +190,7 @@ async function sendSticker(id) {
     const _opts = _fb[meta.type] || _fb.neutral;
     const _line = _opts[Math.floor(Math.random() * _opts.length)];
     appendMessage('bot', _line);
-    chatHistory.push({ role: 'assistant', content: _line });
+    chatHistory.push({ role: 'assistant', content: _line, _time: Date.now() });
     saveHistory();
   } finally {
     _isSending = false;

@@ -436,7 +436,7 @@ Return the thought only. No quotes. No JSON. No explanation. English only.`;
               const t = d.content?.[0]?.text?.trim();
               if (t && !isBreakout(t)) {
                 appendMessage('bot', t);
-                chatHistory.push({ role: 'assistant', content: t, _goodnight: true });
+                chatHistory.push({ role: 'assistant', content: t, _goodnight: true, _time: Date.now() });
                 saveHistory();
                 if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
               }

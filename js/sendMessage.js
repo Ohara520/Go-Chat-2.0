@@ -494,7 +494,7 @@ async function sendMessage() {
   input.value = '';
   input.style.height = 'auto';
   appendMessage('user', text);
-  chatHistory.push({ role: 'user', content: text });
+  chatHistory.push({ role: 'user', content: text, _time: Date.now() });
   saveHistory();
 
   // 时序状态层：从这条消息识别她在做什么（去上班/洗澡/睡觉…），带时间戳存下
@@ -711,13 +711,38 @@ async function _processMergedMessageWithContent(userContentForModel) {
     const cleanHistory = (() => {
       const _filtered = chatHistory
         .filter(m => (!m._system || m._imageDesc || m._delivery) && !m._recalled)
-        .slice(-40)
-        .map(m => ({ role: m.role, content: m.content }));
+        .slice(-40);
+
+      // Chat Time Flow V1 · Phase 2: 注入近期历史时间边界
+      // 在 map 前计算相邻消息的时间 gap (20-59 分钟)，
+      // 直接在后一条消息的临时 content 前增加 [About X minutes later.]
+      // 不创建独立消息，不修改真实 chatHistory，只存在于本次 model request。
+      const _withTimeGaps = [];
+      for (let i = 0; i < _filtered.length; i++) {
+        const curr = _filtered[i];
+        const prev = _filtered[i - 1];
+
+        let timePrefix = '';
+        if (prev && curr._time && prev._time &&
+            typeof curr._time === 'number' && typeof prev._time === 'number' &&
+            curr._time > prev._time) {
+          const gapMin = Math.floor((curr._time - prev._time) / 60000);
+          if (gapMin >= 20 && gapMin < 60) {
+            timePrefix = `[About ${gapMin} minutes later.]\n`;
+          }
+        }
+
+        _withTimeGaps.push({
+          role: curr.role,
+          content: timePrefix + curr.content
+        });
+      }
+
       // 过滤掉调情/召回消息后，中间可能留下相邻同角色（如两条 user 之间的 assistant
       // 被剔除），或开头变成 assistant。部分中转/模型对 role 不交替会返回 400。
       // 这里合并相邻同角色、去掉开头的 assistant，保证 user/assistant 交替且以 user 收尾。
       const _merged = [];
-      for (const m of _filtered) {
+      for (const m of _withTimeGaps) {
         const _last = _merged[_merged.length - 1];
         if (_last && _last.role === m.role) {
           _last.content = `${_last.content}\n${m.content}`;
@@ -1496,7 +1521,7 @@ Her: ${text}`
           hideTyping();
           if (reply2 && !isBreakout(reply2)) {
             appendMessage('bot', reply2.trim());
-            chatHistory.push({ role: 'assistant', content: reply2.trim() });
+            chatHistory.push({ role: 'assistant', content: reply2.trim(), _time: Date.now() });
             saveHistory();
           }
           _isSending = false;
@@ -1515,6 +1540,7 @@ Her: ${text}`
     chatHistory.push({
       role: 'assistant',
       content: historyReply,
+      _time: Date.now()
     });
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});

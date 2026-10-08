@@ -382,7 +382,7 @@ function appendGhostSticker(id) {
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   if (typeof chatHistory !== 'undefined') {
-    chatHistory.push({ role: 'assistant', content: `[Ghost发了表情包：${meta?.label || id}]` });
+    chatHistory.push({ role: 'assistant', content: `[Ghost发了表情包：${meta?.label || id}]`, _time: Date.now() });
     if (typeof saveHistory === 'function') saveHistory();
   }
 }

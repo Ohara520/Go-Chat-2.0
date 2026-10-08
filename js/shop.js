@@ -1997,7 +1997,7 @@ function _payOrderBriefName(snapshotItems) {
 
 // 聊天里插入一张代付卡（存进 chatHistory，可被后续状态更新命中）。
 function _insertPayCard(order) {
-  chatHistory.push({ role: 'user', content: `[代付请求] ${_payOrderBriefName(order.items)} · £${order.total}`, _payCard: order });
+  chatHistory.push({ role: 'user', content: `[代付请求] ${_payOrderBriefName(order.items)} · £${order.total}`, _payCard: order, _time: Date.now() });
   if (typeof saveHistory === 'function') saveHistory();
   if (typeof openScreen === 'function') openScreen('chatScreen');
 }
@@ -2112,7 +2112,7 @@ async function _checkoutConfirmGhostPay() {
     _updatePayCardStatus(requestId, 'declined');
     if (reply && typeof appendMessage === 'function') {
       appendMessage('assistant', reply);
-      chatHistory.push({ role: 'assistant', content: reply });
+      chatHistory.push({ role: 'assistant', content: reply, _time: Date.now() });
       if (typeof saveHistory === 'function') saveHistory();
     }
     // 不扣款、不建 Purchase/Delivery。Checkout 仍可继续选别的付款方式。
@@ -2352,7 +2352,7 @@ function shareProductToChat(product) {
   const priceStr = (typeof product.price === 'number') ? `£${product.price}` : (product.price || '');
   const content = `[分享了一个商品给你看] ${product.emoji || ''} ${product.displayName || product.name}${priceStr ? ` · ${priceStr}` : ''}${product.desc ? ` — ${product.desc}` : ''}`.trim();
 
-  chatHistory.push({ role: 'user', content, _product: product });
+  chatHistory.push({ role: 'user', content, _product: product, _time: Date.now() });
   if (typeof saveHistory === 'function') saveHistory();
 
   if (typeof openScreen === 'function') openScreen('chatScreen');
@@ -2368,7 +2368,7 @@ function shareHouseToChat(house) {
   const parts = [house.layout, house.area].filter(Boolean).join(' · ');
   const content = `[分享了一套住宅给你看] 🏠 ${house.titleEn || ''}${name ? ` ${name}` : ''}｜${house.loc || 'Manchester, UK'}${parts ? `｜${parts}` : ''}${rentStr ? `｜${rentStr}` : ''} (房源ID: ${house.id})`.trim();
 
-  chatHistory.push({ role: 'user', content, _house: house });
+  chatHistory.push({ role: 'user', content, _house: house, _time: Date.now() });
   if (typeof saveHistory === 'function') saveHistory();
 
   if (typeof openScreen === 'function') openScreen('chatScreen');
@@ -2509,7 +2509,7 @@ function _finishPurchase(p, isWishlist, isLuxury, total, payer) {
     setTimeout(() => {
       if (typeof appendMessage === 'function') {
         appendMessage('bot', p.ghostMsg);
-        chatHistory.push({ role: 'assistant', content: p.ghostMsg });
+        chatHistory.push({ role: 'assistant', content: p.ghostMsg, _time: Date.now() });
         saveHistory();
       }
     }, 2000);
