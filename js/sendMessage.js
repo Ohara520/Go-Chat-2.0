@@ -4,6 +4,34 @@
 //       money.js、events.js、jealousy.js、delivery.js
 // ============================================================
 
+// ===== 临时通讯状态显示（Gemini Intimate Error Isolation V1）=====
+// 当 Gemini / provider / transport 失败时，显示独立轻量通讯状态提示
+// 不作为 Ghost 消息、不进入 chatHistory、不保存云端、刷新后消失
+function _showTransientCommStatus(message) {
+  const messagesContainer = document.querySelector('.messages');
+  if (!messagesContainer) return;
+
+  // 创建轻量状态提示 DOM（居中、小号文字、不显示头像）
+  const statusDiv = document.createElement('div');
+  statusDiv.className = 'transient-comm-status';
+  statusDiv.style.cssText = `
+    text-align: center;
+    padding: 12px 20px;
+    margin: 8px auto;
+    font-size: 12px;
+    color: rgba(100, 140, 90, 0.65);
+    background: rgba(220, 245, 210, 0.25);
+    border-radius: 12px;
+    max-width: 280px;
+    line-height: 1.5;
+    animation: slideIn 0.3s ease;
+  `;
+  statusDiv.textContent = message;
+
+  messagesContainer.appendChild(statusDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
 // ===== 条数系统 =====
 // 所有用户必须注册，走云端订阅体系
 // 免费用户：注册后自动获得100条体验额度（由 check-subscription 后端处理）
@@ -2068,8 +2096,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
       }
     }
 
-    // Grok 失败 → 提示网络问题，让用户重发
-    // 不走 Haiku/Sonnet 兜底——调情内容给它们会破防
+    // Gemini / provider / transport 失败 → 显示独立通讯状态，不作为 Ghost 消息
     hideTyping();
     sessionStorage.removeItem('intimateSafeReplyCount');
     // 精确 rollback：本轮 intimate 请求最终失败，撤销"本轮这条 user 消息"上刚打的
@@ -2079,9 +2106,8 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 注意：本失败路径从未 push 过 assistant._intimate（成功分支都已提前 return），
     // 所以不再粗暴清理最近 N 条 assistant 标记——那只会误删之前真正成功的 intimate 历史。
     _rollbackFailedIntimateTurn();
-    appendMessage('bot', '网络波动，没收到，再发一次？');
-    chatHistory.push({ role: 'assistant', content: '网络波动，没收到，再发一次？', _time: Date.now() });
-    saveHistory();
+    // 显示临时通讯状态（不进入 chatHistory，不保存云端，刷新后消失）
+    _showTransientCommStatus('异国信号差 · 回复没有送达，请再试一次');
     _syncRenderedCount();
   } catch(e) {
     hideTyping();
@@ -2089,9 +2115,8 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     sessionStorage.removeItem('intimateSafeReplyCount');
     // 同上：只精确 rollback 本轮 user 消息的 _intimate/_time，不清理历史成功的 assistant 标记
     _rollbackFailedIntimateTurn();
-    appendMessage('bot', '网络波动，没收到，再发一次？');
-    chatHistory.push({ role: 'assistant', content: '网络波动，没收到，再发一次？', _time: Date.now() });
-    saveHistory();
+    // 显示临时通讯状态（不进入 chatHistory，不保存云端，刷新后消失）
+    _showTransientCommStatus('异国信号差 · 回复没有送达，请再试一次');
     _syncRenderedCount();
   }
 }
