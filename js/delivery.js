@@ -82,13 +82,22 @@ function buildDeliveryContext() {
       const daysAgo = Math.floor((now - d.doneAt) / (24 * 3600 * 1000));
       const timeStr = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : `${daysAgo} days ago`;
 
+      // 提供真实 Ghost 当地送达时刻（如果 doneAt 存在）
+      let arrivalTime = '';
+      if (d.doneAt && typeof formatTimestampToGhostLocal === 'function') {
+        const ghostLocalTime = formatTimestampToGhostLocal(d.doneAt);
+        if (ghostLocalTime) {
+          arrivalTime = ` at about ${ghostLocalTime} your local time`;
+        }
+      }
+
       if (d.isGhostSend) {
         // Simon → 用户：已送达，但不知道她是否打开/喜欢
-        lines.push(`- You sent her 「${d.name}」. It was delivered ${timeStr}.`);
+        lines.push(`- You sent her 「${d.name}」. It was delivered ${timeStr}${arrivalTime}.`);
         lines.push(`  (Delivered means it reached her. You do not know if she opened it, used it, or what she thinks of it unless she tells you.)`);
       } else {
         // 用户 → Simon：已送达并签收
-        lines.push(`- She sent you 「${d.name}」. It arrived ${timeStr}.`);
+        lines.push(`- She sent you 「${d.name}」. It arrived ${timeStr}${arrivalTime}.`);
       }
     });
   }

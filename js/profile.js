@@ -253,6 +253,25 @@ function getGhostTimeStr() {
   }
 }
 
+// 将任意 timestamp 转换为 Ghost 当地时间，HH:MM（24小时制）
+// 用于将 doneAt / arrivedAt 等事件时间戳转换为 Ghost 所在地的具体时刻
+function formatTimestampToGhostLocal(timestamp) {
+  if (!timestamp || typeof timestamp !== 'number') return null;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: getGhostTimeZone(), hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(new Date(timestamp));
+  } catch(e) {
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: _GHOST_TZ_FALLBACK, hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date(timestamp));
+    } catch(e2) {
+      return null;
+    }
+  }
+}
+
 function updateUKTime() {
   const el = document.getElementById('botUKTime');
   if (!el) return;
