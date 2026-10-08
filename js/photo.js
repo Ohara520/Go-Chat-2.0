@@ -228,6 +228,13 @@ function updateGhostAvatar(url) {
   _renderGhostAvatar(url);
   if (typeof touchLocalState === 'function') touchLocalState();
   saveAvatarUrlToProfile(url);
+
+  // 修复Bug #1: 换头像后强制刷新聊天页顶部头像
+  // 即使在聊天页面不切屏，也要立即更新显示
+  requestAnimationFrame(() => {
+    console.log('[avatar] 强制刷新所有页面的头像显示');
+    refreshGhostAvatar();
+  });
 }
 
 // 切页面只读同一个 Avatar State，不再自己猜版本。
@@ -638,8 +645,10 @@ async function _executeAvatarSet(ghostB64) {
   // 立即更新所有头像元素显示
   const avatarElements = document.querySelectorAll('.ghost-avatar-img');
   console.log(`[avatar] 找到 ${avatarElements.length} 个头像元素，立即更新显示`);
+  const timestamp = Date.now();
   avatarElements.forEach(el => {
-    el.src = `data:image/jpeg;base64,${ghostB64}`;
+    // 强制破缓存：即使是base64也加参数，确保浏览器重新渲染
+    el.src = `data:image/jpeg;base64,${ghostB64}#t=${timestamp}`;
   });
 
   try {
@@ -647,6 +656,9 @@ async function _executeAvatarSet(ghostB64) {
     console.log('[avatar] base64 已存入 localStorage');
   } catch(e) {
     console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
+    if (typeof showToast === 'function') {
+      showToast('⚠️ 存储空间不足，头像将在上传成功后同步');
+    }
   }
 
   // 上传到云端存储
@@ -676,12 +688,20 @@ async function _executeAvatarSet(ghostB64) {
   }
 
   if (!uploadOk) {
-    console.warn('[avatar] 上传失败，使用本地 base64 备份');
-    if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
-    // 即使上传失败也刷新动态，显示 base64 版本
-    if (typeof renderFeed === 'function') {
-      console.log('[avatar] 刷新动态显示（本地版本）');
-      setTimeout(() => renderFeed(), 100);
+    console.warn('[avatar] 上传失败，无可靠备份');
+    // 检查 localStorage 是否也失败了
+    const hasLocalBackup = !!localStorage.getItem('ghostAvatarBase64');
+    if (hasLocalBackup) {
+      // localStorage 成功，只是云端失败，可以显示并等待下次上传
+      if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
+      if (typeof renderFeed === 'function') {
+        console.log('[avatar] 刷新动态显示（本地版本）');
+        setTimeout(() => renderFeed(), 100);
+      }
+    } else {
+      // localStorage 和云端都失败，没有任何持久化副本
+      if (typeof showToast === 'function') showToast('⚠️ 头像保存失败，请重试');
+      // 不刷新动态，避免显示无法持久化的临时状态
     }
   }
 

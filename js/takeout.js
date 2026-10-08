@@ -23,13 +23,11 @@ const TAKEOUT_PRICE_MULTIPLIER = 2.5;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function getTakeoutFee() {
-  // 时段费按 Ghost 当地时间（外卖送到他所在地）—— 统一 Ghost Time Authority
+  // V2 新配送费规则：按 Ghost 当地时间
   const h = getGhostHour();
-  if (h >= 2  && h < 6)  return { fee: 18.0, label: '凌晨配送费', time: '02–06' };
-  if (h >= 6  && h < 11) return { fee: 8.0,  label: '早间配送费', time: '06–11' };
-  if (h >= 11 && h < 18) return { fee: 8.0,  label: '日常配送费', time: '11–18' };
-  if (h >= 18 && h < 22) return { fee: 12.0, label: '晚高峰配送费', time: '18–22' };
-  return                         { fee: 15.0, label: '深夜配送费',  time: '22–02' };
+  if (h >= 0  && h < 6)  return { fee: 6.0,  label: '夜间配送费', time: '00:00–06:00' };
+  if (h >= 6  && h < 22) return { fee: 3.5,  label: '配送费',     time: '06:00–22:00' };
+  return                         { fee: 4.5,  label: '深夜配送费', time: '22:00–00:00' };
 }
 
 
@@ -138,13 +136,29 @@ function _calcTakeoutPrice(item) {
 // 每日次数
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// 返回 Ghost 当地的「今天」计数（使用 Ghost 时区，而非用户设备时区）
 function getTodayTakeoutCount() {
-  return parseInt(localStorage.getItem('takeoutCount_' + new Date().toDateString()) || '0');
+  try {
+    // 使用 Ghost 当地日期（YYYY-MM-DD）作为 key，而非用户设备的 toDateString()
+    const ghostToday = (typeof getGhostDateStr === 'function')
+      ? getGhostDateStr()
+      : new Date().toISOString().split('T')[0]; // 兜底：UTC 日期
+    return parseInt(localStorage.getItem('takeoutCount_' + ghostToday) || '0');
+  } catch(e) {
+    return 0;
+  }
 }
 
 function _incrementTakeoutCount() {
-  const key = 'takeoutCount_' + new Date().toDateString();
-  localStorage.setItem(key, getTodayTakeoutCount() + 1);
+  try {
+    const ghostToday = (typeof getGhostDateStr === 'function')
+      ? getGhostDateStr()
+      : new Date().toISOString().split('T')[0];
+    const key = 'takeoutCount_' + ghostToday;
+    localStorage.setItem(key, getTodayTakeoutCount() + 1);
+  } catch(e) {
+    console.warn('[Takeout] 计数增加失败:', e);
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -160,8 +174,378 @@ let _menuTab    = 'main';   // 'main' | 'side' | 'drink'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function initTakeoutScreen() {
+  const city = _getTakeoutCity();
+  const fee = getTakeoutFee();
+  const bal = getBalance();
+
+  const screen = document.getElementById('takeoutScreen');
+  if (!screen) return;
+
+  // V2 首页布局（静态展示版）
+  screen.innerHTML = `
+    <!-- Hero 区域 -->
+    <div class="takeout-hero">
+      <img src="images/takeout/takeout-hero.png" alt="撑了吗外卖" class="takeout-hero-image">
+
+      <div class="takeout-hero-overlay"></div>
+
+      <button class="takeout-hero-back" onclick="closeScreen();">←</button>
+
+      <div class="takeout-hero-wallet" onclick="return false;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+          <path d="M7 15h0M2 9.5h20"></path>
+        </svg>
+        <span>£${bal.toFixed(0)}</span>
+      </div>
+
+      <div class="takeout-hero-content">
+        <h1 class="takeout-hero-title">撑了吗 外卖</h1>
+        <p class="takeout-hero-subtitle">CHENG LE MA · FOOD DELIVERY</p>
+        <p class="takeout-hero-tagline">好好吃饭，别饿着。</p>
+      </div>
+    </div>
+
+    <!-- 配送信息卡 -->
+    <div class="takeout-delivery-card">
+      <div class="takeout-delivery-location">
+        <svg class="takeout-location-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+        <div class="takeout-delivery-text">
+          <span class="takeout-delivery-city">${city ? _getCityLabel() : '位置未知'}</span>
+          <span class="takeout-delivery-divider">·</span>
+          <span class="takeout-delivery-time">预计配送 ${city ? '25 – 40 分钟' : '无法配送'}</span>
+        </div>
+      </div>
+      ${city ? `
+      <div class="takeout-delivery-fee-group">
+        <svg class="takeout-delivery-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="3" width="15" height="13"></rect>
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+          <circle cx="18.5" cy="18.5" r="2.5"></circle>
+        </svg>
+        <span class="takeout-delivery-fee-text">配送费 £${fee.fee.toFixed(2)}</span>
+        <span class="takeout-delivery-fee-info" onclick="alert('配送费根据时段浮动：\\n\\n06:00–22:00  £3.50\\n22:00–00:00  £4.50\\n00:00–06:00  £6.00')">ⓘ</span>
+      </div>
+      ` : ''}
+    </div>
+
+    <!-- 附近餐厅 -->
+    ${city ? `
+    <div class="takeout-section">
+      <div class="takeout-section-header">
+        <div>
+          <span class="takeout-section-title">附近餐厅</span>
+          <span class="takeout-section-subtitle">本地人气餐厅，精选推荐</span>
+        </div>
+      </div>
+      <div class="takeout-restaurants-grid">
+        <div class="takeout-restaurant-card" onclick="return false;">
+          <img src="images/takeout/restaurant-red-lion.png" alt="The Red Lion" class="takeout-restaurant-image">
+          <div class="takeout-restaurant-info">
+            <h3 class="takeout-restaurant-name">The Red Lion</h3>
+            <p class="takeout-restaurant-type">英式本地餐馆</p>
+            <p class="takeout-restaurant-tags">经典英餐 · 烤肉肉派</p>
+          </div>
+        </div>
+        <div class="takeout-restaurant-card" onclick="return false;">
+          <img src="images/takeout/restaurant-spice-route.png" alt="Spice Route" class="takeout-restaurant-image">
+          <div class="takeout-restaurant-info">
+            <h3 class="takeout-restaurant-name">Spice Route</h3>
+            <p class="takeout-restaurant-type">印度咖喱餐厅</p>
+            <p class="takeout-restaurant-tags">地道咖喱 · 烤饼香料饭</p>
+          </div>
+        </div>
+        <div class="takeout-restaurant-card" onclick="return false;">
+          <img src="images/takeout/restaurant-oriental.png" alt="东方小馆" class="takeout-restaurant-image">
+          <div class="takeout-restaurant-info">
+            <h3 class="takeout-restaurant-name">东方小馆</h3>
+            <p class="takeout-restaurant-type">中式连锁</p>
+            <p class="takeout-restaurant-tags">中式家常 · 面食米饭</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- 本周推荐 -->
+    ${city ? `
+    <div class="takeout-section">
+      <div class="takeout-section-header">
+        <span class="takeout-section-title">本周推荐</span>
+      </div>
+      <div class="takeout-featured-banner" onclick="return false;">
+        <img src="images/takeout/takeout-featured.png" alt="黄油鸡咖喱" class="takeout-featured-bg">
+        <div class="takeout-featured-overlay"></div>
+        <div class="takeout-featured-content">
+          <span class="takeout-featured-badge">本周精选</span>
+          <h3 class="takeout-featured-name">黄油鸡咖喱</h3>
+          <p class="takeout-featured-name-en">BUTTER CHICKEN</p>
+          <p class="takeout-featured-desc">浓郁番茄奶油酱，搭配香料烤鸡与松软烤馕，经典印度风味。</p>
+          <div class="takeout-featured-footer">
+            <div class="takeout-featured-price">£16.80</div>
+            <button class="takeout-featured-cta" onclick="return false;">
+              查看菜单 <span style="font-size:10px;">↗</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- 人气菜品 -->
+    ${city ? `
+    <div class="takeout-section">
+      <div class="takeout-section-header">
+        <div>
+          <span class="takeout-section-title">人气菜品</span>
+          <span class="takeout-section-subtitle">大家都在点的美味</span>
+        </div>
+      </div>
+      <div class="takeout-products-grid">
+        <div class="takeout-product-card">
+          <img src="images/takeout/food-fish-chips.png" alt="英式炸鱼薯条" class="takeout-product-image">
+          <div class="takeout-product-info">
+            <h4 class="takeout-product-name">英式炸鱼薯条</h4>
+            <p class="takeout-product-desc">外酥里嫩，经典英式风味。</p>
+            <div class="takeout-product-footer">
+              <div class="takeout-product-price">£13.50</div>
+              <button class="takeout-product-add" onclick="return false;">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="takeout-product-card">
+          <img src="images/takeout/food-roast-chicken.png" alt="坦都里香料烤鸡" class="takeout-product-image">
+          <div class="takeout-product-info">
+            <h4 class="takeout-product-name">坦都里香料烤鸡</h4>
+            <p class="takeout-product-desc">印度香料腌制，炭烤焦香多汁。</p>
+            <div class="takeout-product-footer">
+              <div class="takeout-product-price">£15.80</div>
+              <button class="takeout-product-add" onclick="return false;">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="takeout-product-card">
+          <img src="images/takeout/food-beef-burger.png" alt="经典牛肉汉堡" class="takeout-product-image">
+          <div class="takeout-product-info">
+            <h4 class="takeout-product-name">经典牛肉汉堡</h4>
+            <p class="takeout-product-desc">多汁牛肉饼，搭配芝士与薯条。</p>
+            <div class="takeout-product-footer">
+              <div class="takeout-product-price">£14.20</div>
+              <button class="takeout-product-add" onclick="return false;">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="takeout-product-card">
+          <img src="images/takeout/crab-roe-xtangbao.png" alt="蟹黄汤包" class="takeout-product-image">
+          <div class="takeout-product-info">
+            <h4 class="takeout-product-name">蟹黄汤包</h4>
+            <p class="takeout-product-desc">鲜香蟹黄入馅，薄皮包裹浓郁汤汁。</p>
+            <div class="takeout-product-footer">
+              <div class="takeout-product-price">£18.80</div>
+              <button class="takeout-product-add" onclick="return false;">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
+    <div style="height:32px;"></div>
+  `;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 本周推荐区块
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function _renderFeaturedSection(city) {
+  const menu = TAKEOUT_MENUS[city] || [];
+  // 选择推荐菜品：黄油鸡咖喱
+  const featured = menu.find(m => m.id === 'ldn2') || menu.find(m => m.cat === 'main' && m.hot) || menu.find(m => m.cat === 'main');
+  if (!featured) return '';
+
+  const calc = _calcTakeoutPrice(featured);
+
+  return `
+    <div class="takeout-section">
+      <div class="takeout-section-header">
+        <div>
+          <span class="takeout-section-title">本周推荐</span>
+        </div>
+      </div>
+      <div class="takeout-featured-banner">
+        <img src="images/takeout/takeout-featured.png" alt="${featured.name}" class="takeout-featured-bg">
+        <div class="takeout-featured-overlay"></div>
+        <div class="takeout-featured-content">
+          <span class="takeout-featured-badge">👑 本周推荐</span>
+          <h3 class="takeout-featured-name">${featured.name}</h3>
+          <p class="takeout-featured-name-en">${featured.nameEn.toUpperCase()}</p>
+          <p class="takeout-featured-desc">${featured.desc}</p>
+          <div class="takeout-featured-footer">
+            <div class="takeout-featured-price">£${calc.itemPrice.toFixed(2)}</div>
+            <button class="takeout-featured-cta" onclick="alert('查看菜单功能暂未开放\\n\\n可在下方人气菜品区直接下单')">
+              查看菜单 →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 人气菜品区块（V2 新菜单）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function _renderPopularSection(city, count, hasActive, bal) {
+  // V2 翻新：使用全新的4个固定菜品，严格对应设计图
+  const popularItems = [
+    {
+      id: 'v2_fish_chips',
+      name: '英式炸鱼薯条',
+      nameEn: 'Fish & Chips',
+      desc: '外酥里嫩，经典英式口味。',
+      price: 13.50,
+      img: 'images/takeout/food-fish-chips.png'
+    },
+    {
+      id: 'v2_tandoori_chicken',
+      name: '坦都里香料烤鸡',
+      nameEn: 'Tandoori Chicken',
+      desc: '印度香料腌制，炭火烤制。',
+      price: 15.80,
+      img: 'images/takeout/food-roast-chicken.png'
+    },
+    {
+      id: 'v2_beef_burger',
+      name: '经典牛肉汉堡',
+      nameEn: 'Classic Beef Burger',
+      desc: '多汁牛肉饼，搭配培根。',
+      price: 14.20,
+      img: 'images/takeout/food-beef-burger.png'
+    },
+    {
+      id: 'v2_crab_xiaolongbao',
+      name: '蟹黄汤包',
+      nameEn: 'Crab Roe Soup Dumplings',
+      desc: '鲜美蟹黄，汤汁饱满。',
+      price: 18.80,
+      img: 'images/takeout/crab-roe-xtangbao.png'
+    }
+  ];
+
+  const canOrder = count < 3 && !hasActive;
+
+  const cards = popularItems.map(item => {
+    // 直接使用设计图价格，不再套用旧的倍率计算
+    const fee = getTakeoutFee();
+    const itemPrice = item.price;
+    const total = itemPrice + fee.fee;
+    const canAfford = bal >= total;
+    const disabled = !canOrder || !canAfford;
+
+    return `
+      <div class="takeout-product-card">
+        <img src="${item.img}" alt="${item.name}" class="takeout-product-image">
+        <div class="takeout-product-info">
+          <h4 class="takeout-product-name">${item.name}</h4>
+          <p class="takeout-product-name-en">${item.nameEn}</p>
+          <div class="takeout-product-footer">
+            <div class="takeout-product-price">£${itemPrice.toFixed(2)}</div>
+            <button class="takeout-product-add" onclick="_orderV2Item('${item.id}', '${item.name}', ${itemPrice})" ${disabled ? 'disabled' : ''}>+</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const banner = count >= 3
+    ? `<div style="background:rgba(255,248,232,0.95);border:1px solid #e8d8c0;border-radius:12px;padding:12px;margin-bottom:16px;font-size:13px;color:#8a6a40;text-align:center;">今天已点了 ${count} 次，明天再来吧</div>`
+    : hasActive
+    ? `<div style="background:rgba(255,248,232,0.95);border:1px solid #e8d8c0;border-radius:12px;padding:12px;margin-bottom:16px;font-size:13px;color:#8a6a40;text-align:center;">🛵 外卖配送中，送达后才能再点</div>`
+    : '';
+
+  return `
+    <div class="takeout-section">
+      <div class="takeout-section-header">
+        <div>
+          <span class="takeout-section-title">人气菜品</span>
+          <span class="takeout-section-subtitle">大家都在点的美味</span>
+        </div>
+        <button class="takeout-sort-button" onclick="alert('排序功能开发中')">
+          按人气排序 <span style="font-size:10px;">˅</span>
+        </button>
+      </div>
+      ${banner}
+      <div class="takeout-products-grid">
+        ${cards}
+      </div>
+    </div>
+  `;
+}
+
+// V2 新菜品下单函数
+function _orderV2Item(itemId, itemName, itemPrice) {
+  const city = _getTakeoutCity();
+  if (!city) {
+    alert('当前位置无法配送');
+    return;
+  }
+
+  const fee = getTakeoutFee();
+  const total = itemPrice + fee.fee;
+  const bal = getBalance();
+
+  if (bal < total) {
+    alert('余额不足');
+    return;
+  }
+
+  const count = getTodayTakeoutCount();
+  if (count >= 3) {
+    alert('今天已点了3次，明天再来吧');
+    return;
+  }
+
+  const hasActive = JSON.parse(localStorage.getItem('takeoutOrders') || '[]').some(o => !o.done);
+  if (hasActive) {
+    alert('外卖配送中，送达后才能再点');
+    return;
+  }
+
+  if (confirm(`确认点单「${itemName}」？\n\n菜品: £${itemPrice.toFixed(2)}\n${fee.label}: £${fee.fee.toFixed(2)}\n合计: £${total.toFixed(2)}`)) {
+    addTakeoutOrder(itemId, itemName, itemPrice, fee.fee, fee.label);
+    initTakeoutScreen();
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 切换到旧版菜单视图
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function _switchToOldMenu() {
+  const screen = document.getElementById('takeoutScreen');
+  if (!screen) return;
+
+  // 渲染旧版界面
+  screen.innerHTML = `
+    <div id="takeoutTopBar" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff8e8;border-bottom:1px solid #e8d070;flex-shrink:0;">
+      <button onclick="initTakeoutScreen()" style="background:none;border:none;font-size:22px;cursor:pointer;padding:0;line-height:1;">←</button>
+      <div style="font-size:16px;font-weight:700;color:#5a3000;">撑了吗 外卖</div>
+      <div id="takeoutBalanceDisplay" onclick="openScreen('walletScreen')" style="font-size:13px;color:#7a4a00;cursor:pointer;font-weight:600;">£${getBalance().toFixed(0)}</div>
+    </div>
+    <div id="takeoutInfoBar"></div>
+    <div id="takeoutTabBar" style="display:flex;background:#fffbf0;border-bottom:1px solid #e8d070;flex-shrink:0;"></div>
+    <div id="takeoutCatBar" style="display:flex;gap:8px;padding:10px 16px;background:#fff;border-bottom:1px solid #e8d070;flex-shrink:0;"></div>
+    <div id="takeoutBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
+  `;
+
   _takeoutTab = 'shop';
-  _menuTab    = 'main';
+  _menuTab = 'main';
   const balEl = document.getElementById('takeoutBalanceDisplay');
   if (balEl) balEl.textContent = '£' + getBalance().toFixed(0);
   _renderInfoBar();
@@ -419,7 +803,7 @@ function _renderTrackingTab(body) {
     html += `<div style="padding:12px 16px 4px;"><div style="font-size:12px;font-weight:700;color:#a07020;letter-spacing:1px;">已送达</div></div>`;
     html += completed.map(order => {
       const doneTime = order.doneAt ? new Date(order.doneAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: (typeof getGhostTimeZone === 'function' ? getGhostTimeZone() : 'Europe/London') }) : '';
-      const doneDate = order.doneAt ? new Date(order.doneAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
+      const doneDate = order.doneAt ? new Date(order.doneAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', timeZone: (typeof getGhostTimeZone === 'function' ? getGhostTimeZone() : 'Europe/London') }) : '';
       return `<div style="padding:6px 16px;">
         <div style="background:#f8f5ee;border:1px solid #e8dfc0;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
           <div style="font-size:24px;">${order.emoji}</div>
@@ -632,31 +1016,53 @@ function checkTakeoutUpdates() {
   if (!orders.length) return;
 
   const now = Date.now();
-  let updated = false;
+  const newlyDone = []; // 收集本轮从 done=false 转为 done=true 的订单
 
+  // Phase 1: 先标记所有到期订单的送达状态，立即持久化
   orders.forEach(order => {
     if (order.done || now < order.deliverAt) return;
     order.done  = true;
     order.doneAt = now;
-    updated = true;
+    newlyDone.push(order); // 收集新送达订单
+  });
 
-    const hist = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
-    if (!hist.find(h => h.id === order.id)) {
-      hist.unshift(order);
-      localStorage.setItem('takeoutHistory', JSON.stringify(hist.slice(0, 50)));
+  // 持久化订单状态，不被后续附属事件影响
+  if (newlyDone.length) {
+    localStorage.setItem('takeoutOrders', JSON.stringify(orders));
+  }
+
+  // Phase 2: 处理附属事件（小票、事实、回复、Feed），单订单失败不影响其他订单
+  newlyDone.forEach(order => {
+    // 小票去重写入（同步操作，低风险）
+    try {
+      const hist = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+      if (!hist.find(h => h.id === order.id)) {
+        hist.unshift(order);
+        localStorage.setItem('takeoutHistory', JSON.stringify(hist.slice(0, 50)));
+      }
+    } catch(e) {
+      console.warn(`[Takeout] 订单 ${order.id} 小票写入失败:`, e);
     }
-    // 世界事实成立 → 无条件落地"近期事实"（不依赖是否在聊天页 / 表达是否成功）
-    _writeTakeoutFact(order);
-    onGhostReceivedTakeout(order);
 
-    // Feed 事件候选（真实送达后）
-    if (typeof feedEvent_takeoutReceived === 'function') {
-      feedEvent_takeoutReceived(order.name, order.nameEn, order.id, order.doneAt);
+    // Ghost 主动收货反应（async 函数，内部已处理错误）
+    try {
+      onGhostReceivedTakeout(order);
+    } catch(e) {
+      console.warn(`[Takeout] 订单 ${order.id} 主动回复触发失败:`, e);
+    }
+
+    // Feed 事件候选（隔离错误，不中断其他订单）
+    try {
+      if (typeof feedEvent_takeoutReceived === 'function') {
+        feedEvent_takeoutReceived(order.name, order.nameEn, order.id, order.doneAt);
+      }
+    } catch(e) {
+      console.warn(`[Takeout] 订单 ${order.id} Feed 事件生成失败:`, e);
     }
   });
 
-  if (updated) {
-    localStorage.setItem('takeoutOrders', JSON.stringify(orders));
+  // Phase 3: 云同步与 UI 刷新
+  if (newlyDone.length) {
     if (typeof saveToCloud === 'function') saveToCloud().catch(() => {});
     renderTakeoutTracker();
   }
@@ -666,6 +1072,20 @@ function checkTakeoutUpdates() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 外卖三态：世界事实 / 近期事实 / 表达状态（V1）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 读取近期已送达订单（48小时内），用于聊天事实注入
+function _getRecentTakeoutOrders(windowMs = 48 * 3600 * 1000) {
+  const now = Date.now();
+  const cutoff = now - windowMs;
+
+  // 从 takeoutHistory 读取已送达订单
+  try {
+    const history = JSON.parse(localStorage.getItem('takeoutHistory') || '[]');
+    return history.filter(o => o.doneAt && o.doneAt >= cutoff);
+  } catch(e) {
+    return [];
+  }
+}
 
 // 表达状态：这份订单的主动收货反应"是否已经成功进入聊天"。按 order.id 幂等。
 // 只表示"说过"，不表示"是否知道/是否送达/是否进长期记忆"。
@@ -711,41 +1131,7 @@ function _isChatVisible() {
 }
 
 // 送达即写入的"世界事实 → 近期事实"落地：无条件、不依赖是否在聊天页。
-// 1) sessionStorage.currentTakeout —— sendMessage.js 读的结构化近期事实 {name, arrivedAt}
-// 2) legacy longTermMemory note —— 保留日期戳 / 24h 清理 / 防重复 / 2000字上限
-function _writeTakeoutFact(order) {
-  try {
-    sessionStorage.setItem('currentTakeout', JSON.stringify({
-      name: order.nameEn || order.name,
-      arrivedAt: Date.now(),
-    }));
-  } catch(e) {}
-
-  try {
-    const kw = [(order.nameEn || '').toLowerCase(), '外卖', '点外卖', '给你点', '给你买', '点了吃的', 'takeout', 'ordered food', 'ordered you'];
-    const told = (chatHistory || []).filter(m => m.role === 'user' && !m._system).slice(-20)
-      .some(m => kw.some(k => k && (m.content || '').toLowerCase().includes(k)));
-    const _ltm  = localStorage.getItem('longTermMemory') || '';
-    const _now  = Date.now();
-    const _dateStr = new Date(_now).toISOString().split('T')[0];
-    const _note = told
-      ? `[${_dateStr}] She ordered takeout for you — 「${order.nameEn || order.name}」. It arrived. You have it. Confirm if she asks.`
-      : `[${_dateStr}] Takeout showed up — 「${order.nameEn || order.name}」. You didn't know she ordered it. You have it now. Confirm if she asks.`;
-    const _cutoff = new Date(_now - 24 * 3600 * 1000).toISOString().split('T')[0];
-    const _cleanedLtm = _ltm.split('\n').filter(line => {
-      const _m = line.match(/^\[(\d{4}-\d{2}-\d{2})\]/);
-      if (!_m) return true;
-      const _isTakeoutLine = /takeout|ordered food|ordered you/i.test(line);
-      if (_isTakeoutLine && _m[1] < _cutoff) return false;
-      return true;
-    }).join('\n');
-    if (!_cleanedLtm.includes(order.nameEn || order.name)) {
-      localStorage.setItem('longTermMemory', (_cleanedLtm + '\n' + _note).trim().slice(-2000));
-      if (typeof touchLocalState === 'function') touchLocalState();
-    }
-  } catch(e) {}
-}
-
+// sessionStorage.currentTakeout 已废弃（无其他消费者），聊天事实改从 takeoutOrders 读取
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Ghost 收到外卖
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1041,6 +1427,50 @@ function checkPendingTakeoutReactions() {
     });
   } catch(e) {}
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 一次性旧外卖备注清理（2026-10-08 Takeout V2）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function _cleanupLegacyTakeoutMemory() {
+  try {
+    const CLEANUP_FLAG = '_takeoutMemoryCleanedV2';
+    if (localStorage.getItem(CLEANUP_FLAG)) return; // 已清理过
+
+    const ltm = localStorage.getItem('longTermMemory');
+    if (!ltm) {
+      localStorage.setItem(CLEANUP_FLAG, '1');
+      return;
+    }
+
+    // 旧版外卖备注的两种固定格式（包含 "Confirm if she asks" 特征）
+    const LEGACY_PATTERNS = [
+      /She ordered takeout for you — 「.+?」\. It arrived\. You have it\. Confirm if she asks\./g,
+      /Takeout showed up — 「.+?」\. You didn't know she ordered it\. You have it now\. Confirm if she asks\./g,
+    ];
+
+    let cleaned = ltm;
+    let removedCount = 0;
+
+    LEGACY_PATTERNS.forEach(pattern => {
+      const matches = cleaned.match(pattern);
+      if (matches) removedCount += matches.length;
+      cleaned = cleaned.replace(pattern, '');
+    });
+
+    if (removedCount > 0) {
+      // 清理多余空行
+      cleaned = cleaned.split('\n').filter(line => line.trim()).join('\n').trim();
+      localStorage.setItem('longTermMemory', cleaned);
+      console.log(`[Takeout V2] 清理旧外卖备注 ${removedCount} 条`);
+      if (typeof touchLocalState === 'function') touchLocalState();
+      if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    }
+
+    localStorage.setItem(CLEANUP_FLAG, '1');
+  } catch(e) {
+    console.warn('[Takeout V2] 旧备注清理失败:', e);
+  }
+})();
 
 // 用户切回聊天页时自动触发 pending + 检查送达
 if (typeof document !== 'undefined') {

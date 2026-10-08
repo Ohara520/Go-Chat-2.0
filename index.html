@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="css/voice.css">
 <link rel="stylesheet" href="css/delivery-v1.css">
 <link rel="stylesheet" href="css/assets-v1.css">
+<link rel="stylesheet" href="css/takeout-v2.css">
 <style>
 /* ===== 情侣空间封面重设计 ===== */
 .couple-petal-container { display: none !important; }
@@ -1548,17 +1549,7 @@
 
   <!-- 外卖页 -->
   <div class="screen" id="takeoutScreen">
-    <div class="screen-header" style="border-bottom:1px solid rgba(212,168,64,0.2);">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
-      <div class="screen-title" style="color:#5a3000;">🛵 给 Ghost 点外卖</div>
-      <div id="takeoutBalanceDisplay" style="font-size:13px;color:#c47010;font-weight:700;margin-left:auto;padding-right:4px;">£0</div>
-    </div>
-    <div class="takeout-container">
-      <div id="takeoutInfoBar"></div>
-      <div id="takeoutTabBar" style="display:flex;border-bottom:1px solid rgba(212,168,64,0.18);background:rgba(255,252,240,0.9);flex-shrink:0;"></div>
-      <div id="takeoutCatBar" style="display:flex;gap:8px;padding:10px 16px;background:rgba(255,252,240,0.7);flex-shrink:0;overflow-x:auto;scrollbar-width:none;"></div>
-      <div id="takeoutBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:40px;"></div>
-    </div>
+    <!-- V2 首页将由 initTakeoutScreen() 动态渲染 -->
   </div>
 
   <!-- ═══ 物品架页面 ═══ -->

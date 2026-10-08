@@ -797,15 +797,10 @@ async function _processMergedMessageWithContent(userContentForModel) {
     const t = text.toLowerCase();
     let sceneHint = '';
 
-    // 外卖场景：先查 sessionStorage（实时），再查 longTermMemory（持久）
-    // 修复：外卖到达后不等记忆更新，本轮就能检测到
-    const _ltmNow = localStorage.getItem('longTermMemory') || '';
-    const _currentTakeout = (() => {
-      try { return JSON.parse(sessionStorage.getItem('currentTakeout') || 'null'); } catch(e) { return null; }
-    })();
-    // sessionStorage 里有且是6小时内的，认为外卖还"新鲜"
-    const _hasFreshTakeout = _currentTakeout && (Date.now() - (_currentTakeout.arrivedAt || 0) < 6 * 3600 * 1000);
-    const _hasTakeoutMemory = _hasFreshTakeout || /takeout showed up|she ordered takeout|you have it/i.test(_ltmNow);
+    // 外卖场景：从 takeoutOrders 和 takeoutHistory 读取近期已送达订单
+    const _recentTakeouts = (typeof _getRecentTakeoutOrders === 'function')
+      ? _getRecentTakeoutOrders(48 * 3600 * 1000) // 48小时窗口
+      : [];
 
     // ── 快递认知：只来自用户本轮话语，绝不读 isLostConfirmed ──
     // 三级：not_arrived / suspected_lost / confirmed_lost。只给事实/不确定性，不加导演。
@@ -817,15 +812,28 @@ async function _processMergedMessageWithContent(userContentForModel) {
       sceneHint = `[Known this turn, from her own words: she is wondering / asking whether the parcel might be lost. She has NOT said it is lost — it is her worry, not a fact.]`;
     } else if (_deliveryClaim === 'not_arrived') {
       sceneHint = `[Known this turn, from her own words: the parcel is late / not yet received. Nothing indicates it is lost.]`;
-    } else if (_hasTakeoutMemory && /外卖|收到了吗|到了吗|吃了吗|好吃吗|怎么样|did.*arrive|did.*get|receiv|takeout|food.*arrive/i.test(t)) {
-      // 优先用 sessionStorage 里的菜名（最准确），再从 longTermMemory 里找
-      const _tkName = _hasFreshTakeout
-        ? (_currentTakeout.name || '')
-        : (() => {
-            const _tkMatches = [..._ltmNow.matchAll(/「(.+?)」/g)];
-            return _tkMatches.length > 0 ? _tkMatches[_tkMatches.length - 1][1] : '';
-          })();
-      sceneHint = `[She is asking about the takeout she ordered FOR YOU${_tkName ? ` — 「${_tkName}」` : ''}. YOU are the one who received it and ate it, not her. Confirm naturally and react to the specific food — do not deny, and do not tell her to eat.]`;
+    } else if (_recentTakeouts.length > 0 && /外卖|收到了吗|到了吗|吃了吗|好吃吗|怎么样|did.*arrive|did.*get|receiv|takeout|food.*arrive/i.test(t)) {
+      // 用户主动提及外卖，注入近期订单事实（仅当能确定相关订单时）
+      // 如果用户明确提及"今天"，过滤到今天 00:00 之后的订单
+      const _isTodayMentioned = /今天|today/i.test(t);
+      let _candidateOrders = _recentTakeouts;
+      if (_isTodayMentioned) {
+        const _todayStart = new Date();
+        _todayStart.setHours(0, 0, 0, 0);
+        _candidateOrders = _recentTakeouts.filter(o => o.deliverAt >= _todayStart.getTime());
+      }
+
+      if (_candidateOrders.length === 0) {
+        // 无法确定具体订单，不注入事实
+        sceneHint = '';
+      } else {
+        const _latestOrder = _candidateOrders[0]; // 最近一份订单
+        const _deliverTime = new Date(_latestOrder.deliverAt).toLocaleString('zh-CN', {
+          month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+          timeZone: (typeof getGhostTimeZone === 'function' ? getGhostTimeZone() : 'Europe/London')
+        });
+        sceneHint = `[Takeout order: 「${_latestOrder.nameEn || _latestOrder.name}」. Estimated delivery: ${_deliverTime}. Status: delivered. No record of whether consumed.]`;
+      }
     } else if (/时差|几点|时间|time zone|what time|your time/.test(t)) {
       sceneHint = `[She mentioned time. If she's directly asking what time it is on your side, answer plainly. Otherwise do NOT recite clocks or compare time zones — just let the gap colour your reply (you know it's late/early for her). Feel the distance, don't report it.]`;
     } else if (/今天|干嘛|在做|在忙|最近|怎么样|how.*day|what.*up|what.*doing|been up to/.test(t)) {

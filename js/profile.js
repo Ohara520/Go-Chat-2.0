@@ -887,7 +887,8 @@ function uploadAvatar(input) {
             .catch(() => showToast('同步失败，请检查网络'));
         }
       } catch(e) {
-        showToast('图片太大了，换一张小一点的试试');
+        console.warn('[avatar] localStorage存储失败（可能空间不足）:', e);
+        showToast('⚠️ 存储空间不足，请清理浏览器缓存后重试');
       }
     };
     img.src = e.target.result;
