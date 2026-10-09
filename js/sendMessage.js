@@ -2183,39 +2183,77 @@ function handleKeyPress(event) {
  */
 async function _extractAndProcessContinuity(userMsg, simonReply) {
   try {
-    // Step 1: Extractor 提案
+    // Step 1: Extractor 提案（现在返回 actions 数组）
     const proposal = await extractContinuityFromReply({
       userLastMsg: userMsg,
       simonReply: simonReply,
       activeContinuity: getActiveContinuity(),
     });
 
-    if (!proposal || proposal.action === 'none') {
+    if (!proposal || !proposal.actions || proposal.actions.length === 0) {
       return;
     }
 
-    // Step 2: 系统校验
-    const validated = _validateContinuityProposal(proposal);
-    if (!validated) {
-      return;
-    }
+    // Step 2: 防重复创建（同一批次内）
+    const processedSubjects = new Set();
 
-    // Step 3: 调用 Continuity Core
-    if (validated.action === 'create') {
-      recordContinuity({
-        type: validated.type,
-        subject: validated.subject,
-        summary: validated.summary,
-        source: 'chat',
-        sourceId: null,
-      });
-    } else if (validated.action === 'update') {
-      updateContinuity(validated.targetId, {
-        status: validated.status,
-        summary: validated.summary,
-      });
-    } else if (validated.action === 'complete') {
-      completeContinuity(validated.targetId);
+    // Step 3: 逐个处理每个 action
+    for (const action of proposal.actions) {
+      // 系统校验
+      const validated = _validateContinuityProposal(action);
+      if (!validated) {
+        continue; // 跳过无效 action，继续处理其他
+      }
+
+      // 防重复：create 时检查同一批次是否已创建相同 subject
+      if (validated.action === 'create') {
+        const key = `${validated.type}:${validated.subject}`;
+        if (processedSubjects.has(key)) {
+          console.warn('[Continuity] Skipping duplicate create in same batch:', key);
+          continue;
+        }
+        processedSubjects.add(key);
+
+        // Batch 3: 解析时间表达
+        let plannedDate = null;
+        let plannedDayPart = null;
+        if (validated.timeExpr) {
+          plannedDate = parseRelativeDateToGhostLocal(validated.timeExpr);
+          plannedDayPart = extractDayPart(validated.timeExpr);
+        }
+
+        const newItem = recordContinuity({
+          type: validated.type,
+          subject: validated.subject,
+          summary: validated.summary,
+          source: 'chat',
+          sourceId: null,
+        });
+
+        // 更新时间归属字段
+        if (newItem && (plannedDate || plannedDayPart)) {
+          updateContinuity(newItem.id, {
+            plannedDate,
+            plannedDayPart,
+          });
+        }
+      } else if (validated.action === 'update') {
+        // Batch 3: update 也可能改变时间
+        const updates = {
+          status: validated.status,
+          summary: validated.summary,
+          reason: validated.reason || null,
+        };
+
+        if (validated.timeExpr) {
+          updates.plannedDate = parseRelativeDateToGhostLocal(validated.timeExpr);
+          updates.plannedDayPart = extractDayPart(validated.timeExpr);
+        }
+
+        updateContinuity(validated.targetId, updates);
+      } else if (validated.action === 'complete') {
+        completeContinuity(validated.targetId, validated.summary);
+      }
     }
   } catch (e) {
     console.warn('[Continuity] Processing error:', e);
@@ -2224,26 +2262,26 @@ async function _extractAndProcessContinuity(userMsg, simonReply) {
 
 
 /**
- * 系统校验：Extractor 提案必须通过此关卡才能进入 Continuity Core
- * @param {object} proposal - Extractor 返回的提案
- * @returns {object|null} - 通过校验的提案，或 null（不通过）
+ * 系统校验：Extractor 提案中的每个 action 必须通过此关卡才能进入 Continuity Core
+ * @param {object} action - Extractor 返回的单个 action
+ * @returns {object|null} - 通过校验的 action，或 null（不通过）
  */
-function _validateContinuityProposal(proposal) {
-  if (!proposal || typeof proposal !== 'object') {
+function _validateContinuityProposal(action) {
+  if (!action || typeof action !== 'object') {
     return null;
   }
 
-  const { action } = proposal;
+  const { action: actionType } = action;
 
   // 1. action 合法性
   const validActions = ['create', 'update', 'complete'];
-  if (!validActions.includes(action)) {
+  if (!validActions.includes(actionType)) {
     return null;
   }
 
   // 2. create 校验
-  if (action === 'create') {
-    const { type, subject, summary, status } = proposal;
+  if (actionType === 'create') {
+    const { type, subject, summary, status } = action;
 
     // 必填字段
     if (!type || !subject || !summary) {
@@ -2267,8 +2305,8 @@ function _validateContinuityProposal(proposal) {
   }
 
   // 3. update 校验
-  if (action === 'update') {
-    const { targetId, status, summary } = proposal;
+  if (actionType === 'update') {
+    const { targetId, status, summary } = action;
 
     // 必填字段
     if (!targetId || !summary) {
@@ -2306,8 +2344,8 @@ function _validateContinuityProposal(proposal) {
   }
 
   // 4. complete 校验
-  if (action === 'complete') {
-    const { targetId, summary } = proposal;
+  if (actionType === 'complete') {
+    const { targetId, summary } = action;
 
     // 必填字段
     if (!targetId) {

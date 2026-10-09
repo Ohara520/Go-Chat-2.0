@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Continuity V1 Batch 2 Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test-case { margin: 20px 0; padding: 15px; border: 1px solid #444; background: #2a2a2a; }
+    .test-title { font-weight: bold; color: #4fc3f7; margin-bottom: 10px; }
+    .step { margin: 10px 0; padding: 10px; background: #1a1a1a; }
+    .step-title { color: #81c784; font-weight: bold; }
+    .data { color: #ffb74d; margin: 5px 0; font-size: 12px; }
+    .context { color: #ce93d8; margin: 5px 0; white-space: pre-wrap; }
+    .pass { color: #4caf50; }
+    .fail { color: #f44336; }
+    button { padding: 10px 20px; font-size: 14px; margin: 10px 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Continuity V1 · Batch 2 测试</h1>
+  <p>测试事件变化保留功能</p>
+
+  <button onclick="runAllTests()">运行所有测试</button>
+  <button onclick="clearResults()">清除结果</button>
+
+  <div id="test-results"></div>
+
+  <script>
+    // 模拟 Continuity 数据结构
+    function createEvent(id, subject, summary, status = 'pending') {
+      return {
+        id,
+        type: 'work',
+        subject,
+        status,
+        summary,
+        source: 'chat',
+        sourceId: null,
+        mentionedAt: Date.now(),
+        startedAt: 0,
+        updatedAt: Date.now(),
+        completedAt: null,
+        changes: []
+      };
+    }
+
+    function updateEvent(event, newSummary, reason = null) {
+      if (newSummary !== event.summary) {
+        event.changes.push({
+          at: Date.now(),
+          from: event.summary,
+          to: newSummary,
+          reason: reason
+        });
+        if (event.changes.length > 3) {
+          event.changes = event.changes.slice(-3);
+        }
+        event.summary = newSummary;
+      }
+      event.updatedAt = Date.now();
+      return event;
+    }
+
+    function completeEvent(event, completionSummary = null) {
+      if (completionSummary && completionSummary !== event.summary) {
+        event.changes.push({
+          at: Date.now(),
+          from: event.summary,
+          to: completionSummary,
+          reason: null
+        });
+        if (event.changes.length > 3) {
+          event.changes = event.changes.slice(-3);
+        }
+        event.summary = completionSummary;
+      }
+      event.status = 'completed';
+      event.completedAt = Date.now();
+      event.updatedAt = Date.now();
+      return event;
+    }
+
+    function buildContext(event) {
+      let line = `- ${event.summary}`;
+      if (event.status === 'completed' && event.changes && event.changes.length > 0) {
+        const changeDesc = event.changes.map(c => c.from.replace(/\.$/, '')).join(' → ');
+        line += `. (Was: ${changeDesc})`;
+      } else if (event.changes && event.changes.length > 0) {
+        line += `\n  (Originally: ${event.changes[0].from})`;
+      }
+      return line;
+    }
+
+    window.runAllTests = function() {
+      const container = document.getElementById('test-results');
+      container.innerHTML = '';
+
+      // 场景 A: 创建 → 推迟 → 完成
+      const testA = document.createElement('div');
+      testA.className = 'test-case';
+      testA.innerHTML = '<div class="test-title">场景 A: 创建训练计划 → 推迟 → 完成</div>';
+
+      let eventA = createEvent('ct_001', 'training', 'Training scheduled for this morning.');
+
+      let step1 = `<div class="step">
+        <div class="step-title">Step 1: 创建训练计划</div>
+        <div class="data">Data: ${JSON.stringify(eventA, null, 2)}</div>
+        <div class="context">Context: ${buildContext(eventA)}</div>
+      </div>`;
+
+      eventA = updateEvent(eventA, 'Training rescheduled to this afternoon.');
+
+      let step2 = `<div class="step">
+        <div class="step-title">Step 2: 训练推迟到下午</div>
+        <div class="data">Data: ${JSON.stringify(eventA, null, 2)}</div>
+        <div class="context">Context: ${buildContext(eventA)}</div>
+      </div>`;
+
+      eventA = completeEvent(eventA, 'Training completed.');
+
+      let step3 = `<div class="step">
+        <div class="step-title">Step 3: 训练完成</div>
+        <div class="data">Data: ${JSON.stringify(eventA, null, 2)}</div>
+        <div class="context">Context: ${buildContext(eventA)}</div>
+      </div>`;
+
+      const passA = eventA.changes.length === 2 &&
+                     eventA.changes[0].from === 'Training scheduled for this morning.' &&
+                     eventA.changes[0].to === 'Training rescheduled to this afternoon.' &&
+                     eventA.changes[1].from === 'Training rescheduled to this afternoon.' &&
+                     eventA.changes[1].to === 'Training completed.';
+
+      testA.innerHTML += step1 + step2 + step3;
+      testA.innerHTML += `<div class="${passA ? 'pass' : 'fail'}">${passA ? '✓ 通过：保留了 2 次变化历史' : '✗ 失败：变化历史不完整'}</div>`;
+      container.appendChild(testA);
+
+      // 场景 B: 创建 → 改期两次 → 完成
+      const testB = document.createElement('div');
+      testB.className = 'test-case';
+      testB.innerHTML = '<div class="test-title">场景 B: 创建 briefing → 改期两次 → 完成</div>';
+
+      let eventB = createEvent('ct_002', 'briefing', 'Briefing scheduled at 14:00.');
+      eventB = updateEvent(eventB, 'Briefing rescheduled to 16:00.');
+      eventB = updateEvent(eventB, 'Briefing rescheduled to tomorrow at 10:00.');
+      eventB = completeEvent(eventB, 'Briefing completed.');
+
+      const passB = eventB.changes.length === 3; // 限制最多 3 条
+
+      testB.innerHTML += `<div class="data">最终 changes 数量: ${eventB.changes.length}</div>`;
+      testB.innerHTML += `<div class="context">Context: ${buildContext(eventB)}</div>`;
+      testB.innerHTML += `<div class="${passB ? 'pass' : 'fail'}">${passB ? '✓ 通过：限制在 3 条以内' : '✗ 失败：超过 3 条限制'}</div>`;
+      container.appendChild(testB);
+
+      // 场景 C: 重复确认三次
+      const testC = document.createElement('div');
+      testC.className = 'test-case';
+      testC.innerHTML = '<div class="test-title">场景 C: 事件没有变化，重复确认三次</div>';
+
+      let eventC = createEvent('ct_003', 'paperwork', 'Paperwork scheduled for this afternoon.');
+      eventC = updateEvent(eventC, 'Paperwork scheduled for this afternoon.'); // 相同
+      eventC = updateEvent(eventC, 'Paperwork scheduled for this afternoon.'); // 相同
+      eventC = updateEvent(eventC, 'Paperwork scheduled for this afternoon.'); // 相同
+
+      const passC = eventC.changes.length === 0; // 不应产生变化记录
+
+      testC.innerHTML += `<div class="data">changes 数量: ${eventC.changes.length}</div>`;
+      testC.innerHTML += `<div class="${passC ? 'pass' : 'fail'}">${passC ? '✓ 通过：无重复记录' : '✗ 失败：产生了无意义记录'}</div>`;
+      container.appendChild(testC);
+
+      // 场景 D: 推迟但未说明原因
+      const testD = document.createElement('div');
+      testD.className = 'test-case';
+      testD.innerHTML = '<div class="test-title">场景 D: 事件推迟但未说明原因</div>';
+
+      let eventD = createEvent('ct_004', 'training', 'Training scheduled for this morning.');
+      eventD = updateEvent(eventD, 'Training rescheduled.', null); // reason = null
+
+      const passD = eventD.changes.length === 1 && eventD.changes[0].reason === null;
+
+      testD.innerHTML += `<div class="data">reason: ${eventD.changes[0].reason}</div>`;
+      testD.innerHTML += `<div class="${passD ? 'pass' : 'fail'}">${passD ? '✓ 通过：未编造原因' : '✗ 失败：错误记录了原因'}</div>`;
+      container.appendChild(testD);
+
+      // 场景 E: 明确说明推迟原因
+      const testE = document.createElement('div');
+      testE.className = 'test-case';
+      testE.innerHTML = '<div class="test-title">场景 E: 事件明确说明推迟原因</div>';
+
+      let eventE = createEvent('ct_005', 'briefing', 'Briefing scheduled at 14:00.');
+      eventE = updateEvent(eventE, 'Briefing rescheduled due to emergency.', 'emergency');
+
+      const passE = eventE.changes.length === 1 && eventE.changes[0].reason === 'emergency';
+
+      testE.innerHTML += `<div class="data">reason: ${eventE.changes[0].reason}</div>`;
+      testE.innerHTML += `<div class="${passE ? 'pass' : 'fail'}">${passE ? '✓ 通过：保留了明确原因' : '✗ 失败：原因丢失'}</div>`;
+      container.appendChild(testE);
+
+      // 场景 F: 读取旧版数据（无 changes 字段）
+      const testF = document.createElement('div');
+      testF.className = 'test-case';
+      testF.innerHTML = '<div class="test-title">场景 F: 读取旧版 Continuity 数据</div>';
+
+      let eventF = createEvent('ct_006', 'training', 'Training scheduled.');
+      delete eventF.changes; // 模拟旧数据
+
+      eventF = updateEvent(eventF, 'Training rescheduled.');
+
+      const passF = eventF.changes && eventF.changes.length === 1;
+
+      testF.innerHTML += `<div class="data">changes 存在: ${!!eventF.changes}</div>`;
+      testF.innerHTML += `<div class="${passF ? 'pass' : 'fail'}">${passF ? '✓ 通过：兼容旧数据' : '✗ 失败：旧数据处理异常'}</div>`;
+      container.appendChild(testF);
+
+      // 场景 G: 事件完成后的模型上下文
+      const testG = document.createElement('div');
+      testG.className = 'test-case';
+      testG.innerHTML = '<div class="test-title">场景 G: 事件完成后构建模型上下文</div>';
+
+      let eventG = createEvent('ct_007', 'training', 'Training scheduled for this morning.');
+      eventG = updateEvent(eventG, 'Training rescheduled to this afternoon.');
+      eventG = completeEvent(eventG, 'Training completed.');
+
+      const context = buildContext(eventG);
+      const passG = context.includes('Was:') && context.includes('Training scheduled for this morning');
+
+      testG.innerHTML += `<div class="context">模型看到的:\n${context}</div>`;
+      testG.innerHTML += `<div class="${passG ? 'pass' : 'fail'}">${passG ? '✓ 通过：模型能看到完整变化' : '✗ 失败：模型只看到最终状态'}</div>`;
+      container.appendChild(testG);
+    };
+
+    window.clearResults = function() {
+      document.getElementById('test-results').innerHTML = '';
+    };
+  </script>
+</body>
+</html>

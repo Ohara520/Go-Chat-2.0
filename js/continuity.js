@@ -128,6 +128,9 @@ function recordContinuity(opts) {
     startedAt: 0,
     updatedAt: Date.now(),
     completedAt: null,
+    // Batch 3: 时间归属
+    plannedDate: null,  // YYYY-MM-DD，事件计划发生的日期
+    plannedDayPart: null,  // 'morning' / 'afternoon' / 'evening' / 'night'
   };
 
   const items = _loadContinuity();
@@ -153,10 +156,33 @@ function updateContinuity(id, updates) {
 
   const item = items[idx];
 
-  // 允许更新：status / summary / startedAt
+  // 记录 summary 变化（如果有实际改变且不同于当前）
+  if (updates.summary && updates.summary !== item.summary) {
+    if (!item.changes) item.changes = [];
+
+    // 防止重复记录相同变化
+    const lastChange = item.changes[item.changes.length - 1];
+    if (!lastChange || lastChange.to !== updates.summary) {
+      item.changes.push({
+        at: Date.now(),
+        from: item.summary,
+        to: updates.summary,
+        reason: updates.reason || null  // 可选：明确的原因
+      });
+
+      // 限制最多保留 3 条变化记录
+      if (item.changes.length > 3) {
+        item.changes = item.changes.slice(-3);
+      }
+    }
+  }
+
+  // 允许更新：status / summary / startedAt / plannedDate / plannedDayPart
   if (updates.status) item.status = updates.status;
   if (updates.summary) item.summary = updates.summary;
   if (updates.startedAt !== undefined) item.startedAt = updates.startedAt;
+  if (updates.plannedDate !== undefined) item.plannedDate = updates.plannedDate;
+  if (updates.plannedDayPart !== undefined) item.plannedDayPart = updates.plannedDayPart;
 
   // 自动设置 startedAt（如果从 pending → ongoing 但 startedAt 还是 0）
   if (updates.status === 'ongoing' && item.startedAt === 0) {
@@ -177,7 +203,7 @@ function updateContinuity(id, updates) {
 // 将一个 Continuity 记录标记为 completed
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function completeContinuity(id) {
+function completeContinuity(id, completionSummary) {
   const items = _loadContinuity();
   const idx = items.findIndex(it => it.id === id);
   if (idx < 0) {
@@ -186,6 +212,28 @@ function completeContinuity(id) {
   }
 
   const item = items[idx];
+
+  // 如果提供了完成时的 summary，且与当前 summary 不同，记录变化
+  if (completionSummary && completionSummary !== item.summary) {
+    if (!item.changes) item.changes = [];
+
+    const lastChange = item.changes[item.changes.length - 1];
+    if (!lastChange || lastChange.to !== completionSummary) {
+      item.changes.push({
+        at: Date.now(),
+        from: item.summary,
+        to: completionSummary,
+        reason: null
+      });
+
+      if (item.changes.length > 3) {
+        item.changes = item.changes.slice(-3);
+      }
+    }
+
+    item.summary = completionSummary;
+  }
+
   item.status = 'completed';
   item.completedAt = Date.now();
   item.updatedAt = Date.now();
@@ -250,8 +298,22 @@ function buildContinuityContext() {
   const pending = active.filter(it => it.status === 'pending');
   const ongoing = active.filter(it => it.status === 'ongoing');
 
+  // 分离过期和当前的 pending 事件
+  const expiredPending = [];
+  const currentPending = [];
+
+  pending.forEach(it => {
+    if (!it.plannedDate) {
+      currentPending.push(it); // 无计划日期，保留在当前
+    } else if (isEventExpired(it.plannedDate, it.status)) {
+      expiredPending.push(it); // 过期但未完成
+    } else {
+      currentPending.push(it); // 未过期
+    }
+  });
+
   // 如果没有任何有效 Continuity，返回空字符串（不输出空 block）
-  if (!pending.length && !ongoing.length && !recent.length) {
+  if (!currentPending.length && !ongoing.length && !recent.length && !expiredPending.length) {
     return '';
   }
 
@@ -259,10 +321,23 @@ function buildContinuityContext() {
   lines.push('[CURRENT CONTINUITY]');
   lines.push('');
 
-  if (pending.length) {
+  if (currentPending.length) {
     lines.push('Pending:');
-    pending.forEach(it => {
-      lines.push(`- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`);
+    currentPending.forEach(it => {
+      let line = `- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`;
+
+      // 添加计划日期信息
+      if (it.plannedDate) {
+        const dateDesc = formatPlannedDate(it.plannedDate);
+        const dayPartDesc = it.plannedDayPart ? ` ${it.plannedDayPart}` : '';
+        line += `. Planned: ${dateDesc}${dayPartDesc}`;
+      }
+
+      lines.push(line);
+
+      if (it.changes && it.changes.length > 0) {
+        lines.push(`  (Originally: ${it.changes[0].from})`);
+      }
     });
     if (ongoing.length || recent.length) lines.push('');
   }
@@ -270,7 +345,20 @@ function buildContinuityContext() {
   if (ongoing.length) {
     lines.push('Ongoing:');
     ongoing.forEach(it => {
-      lines.push(`- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`);
+      let line = `- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`;
+
+      // ongoing 也可以显示计划信息（如果有）
+      if (it.plannedDate) {
+        const dateDesc = formatPlannedDate(it.plannedDate);
+        const dayPartDesc = it.plannedDayPart ? ` ${it.plannedDayPart}` : '';
+        line += `. Was planned: ${dateDesc}${dayPartDesc}`;
+      }
+
+      lines.push(line);
+
+      if (it.changes && it.changes.length > 0) {
+        lines.push(`  (Originally: ${it.changes[0].from})`);
+      }
     });
     if (recent.length) lines.push('');
   }
@@ -278,7 +366,26 @@ function buildContinuityContext() {
   if (recent.length) {
     lines.push('Recently completed:');
     recent.forEach(it => {
-      lines.push(`- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`);
+      // 完成事件显示简洁的变化历史（如果有）
+      let line = `- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`;
+
+      if (it.changes && it.changes.length > 0) {
+        const changeDesc = it.changes.map(c => c.from.replace(/\.$/, '')).join(' → ');
+        line += `. (Was: ${changeDesc})`;
+      }
+
+      lines.push(line);
+    });
+    if (expiredPending.length) lines.push('');
+  }
+
+  if (expiredPending.length) {
+    lines.push('Uncertain status (planned date passed):');
+    expiredPending.forEach(it => {
+      const dateDesc = formatPlannedDate(it.plannedDate);
+      const dayPartDesc = it.plannedDayPart ? ` ${it.plannedDayPart}` : '';
+      let line = `- ${it.summary} (planned: ${dateDesc}${dayPartDesc})${_formatElapsedTime(it.mentionedAt)}`;
+      lines.push(line);
     });
   }
 

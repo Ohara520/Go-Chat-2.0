@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Continuity V1 · Batch 3 测试</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #0a0d12; color: #e0e0e0; }
+    h2 { color: #6ee7b7; }
+    .test { margin: 20px 0; padding: 15px; background: #161d2b; border-left: 3px solid #38bdf8; }
+    .test-name { font-weight: bold; color: #38bdf8; margin-bottom: 10px; }
+    .pass { color: #6ee7b7; }
+    .fail { color: #ef4444; }
+    pre { background: #0f131c; padding: 10px; overflow-x: auto; }
+    button { background: #38bdf8; color: #0a0d12; border: none; padding: 10px 20px; cursor: pointer; margin: 5px; }
+    button:hover { background: #6ee7b7; }
+  </style>
+</head>
+<body>
+  <h2>Continuity V1 · Batch 3 时间归属测试</h2>
+  <button onclick="runAllTests()">运行所有测试</button>
+  <button onclick="clearResults()">清空结果</button>
+  <div id="results"></div>
+
+  <!-- 模拟必要的依赖 -->
+  <script>
+    // Mock Time Authority
+    let mockGhostDate = '2026-03-09'; // 周一（修正）
+    let mockGhostWeekday = 'Monday';
+
+    function getGhostDateStr() {
+      return mockGhostDate;
+    }
+
+    function getGhostWeekday() {
+      return mockGhostWeekday;
+    }
+
+    // Mock Continuity Core (简化版)
+    function recordContinuity(opts) {
+      return {
+        id: 'ct_' + Date.now(),
+        ...opts,
+        status: 'pending',
+        mentionedAt: Date.now(),
+        startedAt: 0,
+        updatedAt: Date.now(),
+        completedAt: null,
+        plannedDate: null,
+        plannedDayPart: null,
+      };
+    }
+
+    function updateContinuity(id, updates) {
+      return { id, ...updates };
+    }
+  </script>
+
+  <!-- 加载 continuityTime.js -->
+  <script src="../js/continuityTime.js"></script>
+
+  <script>
+    function log(testName, message, isPass) {
+      const div = document.createElement('div');
+      div.className = 'test';
+      div.innerHTML = `
+        <div class="test-name">${testName}</div>
+        <div class="${isPass ? 'pass' : 'fail'}">${message}</div>
+      `;
+      document.getElementById('results').appendChild(div);
+    }
+
+    function logDetail(obj) {
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(obj, null, 2);
+      document.getElementById('results').appendChild(pre);
+    }
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 测试场景
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    function testA() {
+      // A. 周一说「明天上午训练」，周二读取
+      mockGhostDate = '2026-03-09'; // 周一（修正）
+      mockGhostWeekday = 'Monday';
+
+      const result = parseRelativeDateToGhostLocal('tomorrow morning');
+      const dayPart = extractDayPart('tomorrow morning');
+
+      const expected = '2026-03-10'; // 周二（修正）
+      const pass = result === expected && dayPart === 'morning';
+
+      log('场景 A', `周一说"tomorrow morning" → ${result} (${dayPart})`, pass);
+      logDetail({ expected, actual: result, dayPart });
+
+      // 周二读取
+      mockGhostDate = '2026-03-10'; // 周二（修正）
+      mockGhostWeekday = 'Tuesday';
+
+      const formatted = formatPlannedDate('2026-03-10');
+      const expired = isEventExpired('2026-03-10', 'pending');
+
+      const pass2 = formatted === 'today' && !expired;
+      log('场景 A（周二读取）', `计划日期 2026-03-10 → ${formatted}, 过期: ${expired}`, pass2);
+      logDetail({ formatted, expired });
+    }
+
+    function testB() {
+      // B. 周二未确认训练完成，周三读取
+      mockGhostDate = '2026-03-10'; // 周二（修正）
+      mockGhostWeekday = 'Tuesday';
+
+      const plannedDate = parseRelativeDateToGhostLocal('today');
+
+      // 周三读取
+      mockGhostDate = '2026-03-11'; // 周三（修正）
+      mockGhostWeekday = 'Wednesday';
+
+      const formatted = formatPlannedDate(plannedDate);
+      const expired = isEventExpired(plannedDate, 'pending');
+
+      const pass = formatted === 'yesterday' && expired;
+      log('场景 B', `周二的计划，周三读取 → ${formatted}, 过期: ${expired}`, pass);
+      logDetail({ plannedDate, formatted, expired });
+    }
+
+    function testC() {
+      // C. 周一说「明天下午简报」，后来改为周三上午
+      mockGhostDate = '2026-03-09'; // 周一（修正）
+      mockGhostWeekday = 'Monday';
+
+      const date1 = parseRelativeDateToGhostLocal('tomorrow afternoon');
+      const dayPart1 = extractDayPart('tomorrow afternoon');
+
+      const date2 = parseRelativeDateToGhostLocal('this Wednesday morning');
+      const dayPart2 = extractDayPart('this Wednesday morning');
+
+      const pass = date1 === '2026-03-10' && dayPart1 === 'afternoon' &&
+                   date2 === '2026-03-11' && dayPart2 === 'morning';
+
+      log('场景 C', `改期测试: ${date1} ${dayPart1} → ${date2} ${dayPart2}`, pass);
+      logDetail({ original: { date: date1, dayPart: dayPart1 }, updated: { date: date2, dayPart: dayPart2 } });
+    }
+
+    function testD() {
+      // D. Simon 所在地跨午夜（测试日期计算正确性）
+      mockGhostDate = '2026-03-09'; // 周一（修正）
+      mockGhostWeekday = 'Monday';
+
+      const today = parseRelativeDateToGhostLocal('today');
+      const tomorrow = parseRelativeDateToGhostLocal('tomorrow');
+
+      const pass = today === '2026-03-09' && tomorrow === '2026-03-10';
+      log('场景 D', `跨日测试: today=${today}, tomorrow=${tomorrow}`, pass);
+      logDetail({ today, tomorrow });
+    }
+
+    function testE() {
+      // E. 下周日期计算
+      mockGhostDate = '2026-03-09'; // 周一（修正）
+      mockGhostWeekday = 'Monday';
+
+      const nextMon = parseRelativeDateToGhostLocal('next Monday');
+      const nextFri = parseRelativeDateToGhostLocal('next Friday');
+
+      const pass = nextMon === '2026-03-16' && nextFri === '2026-03-20';
+      log('场景 E', `下周测试: next Monday=${nextMon}, next Friday=${nextFri}`, pass);
+      logDetail({ nextMon, nextFri });
+    }
+
+    function testF() {
+      // F. 没有明确日期的事件
+      const result = parseRelativeDateToGhostLocal(null);
+      const result2 = parseRelativeDateToGhostLocal('later');
+
+      const pass = result === null && result2 === null;
+      log('场景 F', `无明确日期: null → ${result}, "later" → ${result2}`, pass);
+      logDetail({ result, result2 });
+    }
+
+    function testG() {
+      // G. 旧版无计划时间字段的数据兼容性
+      const event = {
+        id: 'ct_001',
+        subject: 'training',
+        status: 'pending',
+        summary: 'Training scheduled.',
+        // 无 plannedDate / plannedDayPart
+      };
+
+      const expired = isEventExpired(event.plannedDate, event.status);
+      const formatted = formatPlannedDate(event.plannedDate);
+
+      const pass = !expired && formatted === '';
+      log('场景 G', `旧数据兼容: 无 plannedDate → 过期=${expired}, 格式化="${formatted}"`, pass);
+      logDetail({ event, expired, formatted });
+    }
+
+    function testH() {
+      // H. 时间范围格式化
+      mockGhostDate = '2026-03-09'; // 周一（修正）
+      mockGhostWeekday = 'Monday';
+
+      const tests = [
+        { date: '2026-03-09', expected: 'today' },
+        { date: '2026-03-10', expected: 'tomorrow' },
+        { date: '2026-03-08', expected: 'yesterday' },
+        { date: '2026-03-11', expected: 'Wednesday' }, // 本周三
+        { date: '2026-03-08', expected: 'yesterday' }, // 昨天（周日）
+        { date: '2026-03-20', expected: '2026-03-20' }, // 下下周
+      ];
+
+      let allPass = true;
+      tests.forEach(t => {
+        const result = formatPlannedDate(t.date);
+        if (result !== t.expected) {
+          allPass = false;
+          log('场景 H', `${t.date} → ${result} (期望: ${t.expected})`, false);
+        }
+      });
+
+      if (allPass) {
+        log('场景 H', '所有日期格式化测试通过', true);
+        logDetail(tests);
+      }
+    }
+
+    function runAllTests() {
+      clearResults();
+      testA();
+      testB();
+      testC();
+      testD();
+      testE();
+      testF();
+      testG();
+      testH();
+    }
+  </script>
+</body>
+</html>

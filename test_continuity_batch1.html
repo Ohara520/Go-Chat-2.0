@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Continuity V1 Batch 1 Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test-case { margin: 20px 0; padding: 15px; border: 1px solid #444; background: #2a2a2a; }
+    .test-title { font-weight: bold; color: #4fc3f7; margin-bottom: 10px; }
+    .input { color: #81c784; margin: 5px 0; }
+    .expected { color: #ffb74d; margin: 5px 0; }
+    .result { margin: 10px 0; padding: 10px; background: #1a1a1a; }
+    .pass { color: #4caf50; }
+    .fail { color: #f44336; }
+    button { padding: 10px 20px; font-size: 14px; margin: 10px 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Continuity V1 · Batch 1 测试</h1>
+  <p>测试单次多事件提取功能</p>
+
+  <button onclick="runAllTests()">运行所有测试</button>
+  <button onclick="clearResults()">清除结果</button>
+
+  <div id="test-results"></div>
+
+  <script type="module">
+    // 模拟 Extractor 返回（实际测试需要调用真实 API）
+    window.mockExtractor = function(simonReply) {
+      const tests = {
+        // 场景 A: 两个计划
+        "Got training this morning. Paperwork this afternoon.": {
+          actions: [
+            {
+              action: "create",
+              type: "work",
+              subject: "training",
+              status: "pending",
+              summary: "Training scheduled for this morning."
+            },
+            {
+              action: "create",
+              type: "work",
+              subject: "paperwork",
+              status: "pending",
+              summary: "Paperwork scheduled for this afternoon."
+            }
+          ]
+        },
+
+        // 场景 B: 三个独立安排
+        "Got a briefing at 14:00. Training after that. Heading home around 18:00.": {
+          actions: [
+            {
+              action: "create",
+              type: "work",
+              subject: "briefing",
+              status: "pending",
+              summary: "Briefing scheduled at 14:00."
+            },
+            {
+              action: "create",
+              type: "work",
+              subject: "training",
+              status: "pending",
+              summary: "Training scheduled after briefing."
+            },
+            {
+              action: "create",
+              type: "travel",
+              subject: "heading home",
+              status: "pending",
+              summary: "Heading home around 18:00."
+            }
+          ]
+        },
+
+        // 场景 C: 一个有效 + 一个模糊
+        "Got training this morning. Might go out later.": {
+          actions: [
+            {
+              action: "create",
+              type: "work",
+              subject: "training",
+              status: "pending",
+              summary: "Training scheduled for this morning."
+            }
+          ]
+        },
+
+        // 场景 D: 完成 + 新计划
+        "Just finished training. Still got paperwork to do.": {
+          actions: [
+            {
+              action: "complete",
+              targetId: "ct_training",
+              summary: "Training completed."
+            }
+          ]
+        },
+
+        // 场景 E: 重复提到同一事件
+        "Got training this morning. Yeah, training this morning.": {
+          actions: [
+            {
+              action: "create",
+              type: "work",
+              subject: "training",
+              status: "pending",
+              summary: "Training scheduled for this morning."
+            }
+          ]
+        }
+      };
+
+      return tests[simonReply] || { actions: [] };
+    };
+
+    window.runAllTests = function() {
+      const container = document.getElementById('test-results');
+      container.innerHTML = '';
+
+      const testCases = [
+        {
+          name: "场景 A: 一句话包含两个计划",
+          input: "Got training this morning. Paperwork this afternoon.",
+          expected: "2 个 create action，分别是 training 和 paperwork",
+          validate: (result) => {
+            if (!result.actions || result.actions.length !== 2) return false;
+            const subjects = result.actions.map(a => a.subject);
+            return subjects.includes('training') && subjects.includes('paperwork');
+          }
+        },
+        {
+          name: "场景 B: 一句话包含三个独立安排",
+          input: "Got a briefing at 14:00. Training after that. Heading home around 18:00.",
+          expected: "3 个 create action",
+          validate: (result) => {
+            return result.actions && result.actions.length === 3;
+          }
+        },
+        {
+          name: "场景 C: 一个有效事件和一个模糊意向",
+          input: "Got training this morning. Might go out later.",
+          expected: "1 个 create action (training)，忽略 might",
+          validate: (result) => {
+            if (!result.actions || result.actions.length !== 1) return false;
+            return result.actions[0].subject === 'training';
+          }
+        },
+        {
+          name: "场景 D: 完成事件",
+          input: "Just finished training. Still got paperwork to do.",
+          expected: "1 个 complete action (training)，still got 不触发 create",
+          validate: (result) => {
+            if (!result.actions || result.actions.length !== 1) return false;
+            return result.actions[0].action === 'complete';
+          }
+        },
+        {
+          name: "场景 E: 重复提到同一事件",
+          input: "Got training this morning. Yeah, training this morning.",
+          expected: "1 个 create action，不重复",
+          validate: (result) => {
+            return result.actions && result.actions.length === 1;
+          }
+        }
+      ];
+
+      testCases.forEach((test, index) => {
+        const div = document.createElement('div');
+        div.className = 'test-case';
+
+        const result = window.mockExtractor(test.input);
+        const passed = test.validate(result);
+
+        div.innerHTML = `
+          <div class="test-title">测试 ${index + 1}: ${test.name}</div>
+          <div class="input">输入: "${test.input}"</div>
+          <div class="expected">预期: ${test.expected}</div>
+          <div class="result">
+            <div>实际返回: ${JSON.stringify(result, null, 2)}</div>
+            <div class="${passed ? 'pass' : 'fail'}">
+              ${passed ? '✓ 通过' : '✗ 失败'}
+            </div>
+          </div>
+        `;
+
+        container.appendChild(div);
+      });
+    };
+
+    window.clearResults = function() {
+      document.getElementById('test-results').innerHTML = '';
+    };
+  </script>
+</body>
+</html>
