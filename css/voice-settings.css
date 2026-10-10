@@ -1,0 +1,328 @@
+/* Go Chat · 语音设置 UI — 奶油信纸复古风格 */
+
+.voice-settings-container {
+  padding: 28px 20px 35px;
+  background: #faf8f3;
+}
+
+/* ===== 版头 ===== */
+.voice-settings-eyebrow {
+  font: 9px Georgia, serif;
+  letter-spacing: 2.2px;
+  color: #b39988;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.voice-settings-title {
+  font: 500 24px/1.3 'Songti SC', 'Noto Serif SC', serif;
+  letter-spacing: 4px;
+  color: #765448;
+  text-align: center;
+  margin: 0 0 6px;
+}
+
+.voice-settings-subtitle {
+  font-size: 12px;
+  color: #a48778;
+  text-align: center;
+  margin: 0 0 26px;
+  line-height: 1.6;
+}
+
+/* ===== 分隔线 ===== */
+.voice-settings-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #d9c2ab 20%, #d9c2ab 80%, transparent);
+  margin: 22px 0 24px;
+}
+
+/* ===== 表单组 ===== */
+.voice-settings-group {
+  margin-bottom: 24px;
+}
+
+.voice-settings-label {
+  display: block;
+  font: 11px Georgia, serif;
+  letter-spacing: 1.5px;
+  color: #8c7566;
+  margin-bottom: 8px;
+}
+
+.voice-settings-input,
+.voice-settings-select {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #dfc7b2;
+  background: rgba(255, 250, 244, 0.96);
+  color: #6d5244;
+  font-size: 13px;
+  border-radius: 2px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.voice-settings-input:focus,
+.voice-settings-select:focus {
+  border-color: #c7a08f;
+  box-shadow: 0 0 0 3px rgba(184, 135, 119, 0.1);
+}
+
+.voice-settings-input::placeholder {
+  color: #b39988;
+}
+
+.voice-settings-input[type="password"] {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
+/* ===== 提示文字 ===== */
+.voice-settings-hint {
+  font-size: 11px;
+  color: #a89179;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.voice-settings-hint a {
+  color: #8c6857;
+  text-decoration: underline;
+  text-decoration-color: rgba(140, 104, 87, 0.3);
+  text-underline-offset: 2px;
+}
+
+.voice-settings-hint a:hover {
+  text-decoration-color: rgba(140, 104, 87, 0.7);
+}
+
+/* ===== 状态提示卡片 ===== */
+.voice-settings-status {
+  padding: 13px 16px;
+  border-radius: 2px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  line-height: 1.6;
+  display: flex;
+  align-items: start;
+  gap: 10px;
+}
+
+.voice-settings-status-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.voice-settings-status.status-info {
+  background: rgba(184, 135, 119, 0.08);
+  border: 1px solid rgba(184, 135, 119, 0.2);
+  color: #7d6256;
+}
+
+.voice-settings-status.status-success {
+  background: rgba(122, 159, 92, 0.08);
+  border: 1px solid rgba(122, 159, 92, 0.25);
+  color: #4a6835;
+}
+
+.voice-settings-status.status-warning {
+  background: rgba(204, 142, 87, 0.08);
+  border: 1px solid rgba(204, 142, 87, 0.25);
+  color: #875b3a;
+}
+
+.voice-settings-status.status-error {
+  background: rgba(176, 89, 79, 0.08);
+  border: 1px solid rgba(176, 89, 79, 0.25);
+  color: #8b4a3e;
+}
+
+/* ===== 按钮组 ===== */
+.voice-settings-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.voice-settings-btn {
+  flex: 1;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.voice-settings-btn-primary {
+  background: #b88777;
+  color: #fffaf5;
+  box-shadow: 0 3px 8px rgba(132, 79, 64, 0.2);
+}
+
+.voice-settings-btn-primary:hover {
+  background: #a87667;
+  box-shadow: 0 4px 12px rgba(132, 79, 64, 0.28);
+}
+
+.voice-settings-btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 6px rgba(132, 79, 64, 0.25);
+}
+
+.voice-settings-btn-primary:disabled {
+  background: #c5a99a;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.voice-settings-btn-secondary {
+  background: rgba(255, 250, 244, 0.96);
+  color: #8c6857;
+  border: 1px solid #dfc7b2;
+}
+
+.voice-settings-btn-secondary:hover {
+  background: rgba(255, 245, 235, 1);
+  border-color: #cdb19f;
+}
+
+.voice-settings-btn-secondary:active {
+  transform: translateY(1px);
+}
+
+.voice-settings-btn-danger {
+  background: rgba(176, 89, 79, 0.1);
+  color: #8b4a3e;
+  border: 1px solid rgba(176, 89, 79, 0.3);
+}
+
+.voice-settings-btn-danger:hover {
+  background: rgba(176, 89, 79, 0.15);
+  border-color: rgba(176, 89, 79, 0.45);
+}
+
+.voice-settings-btn-danger:active {
+  transform: translateY(1px);
+}
+
+/* ===== 开关 (auto_play) ===== */
+.voice-settings-switch-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid #dfc7b2;
+  background: rgba(255, 250, 244, 0.96);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.voice-settings-switch-wrap:hover {
+  background: rgba(255, 245, 235, 1);
+}
+
+.voice-settings-switch-label {
+  font-size: 13px;
+  color: #6d5244;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.voice-settings-switch-label strong {
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.voice-settings-switch-label small {
+  font-size: 11px;
+  color: #a89179;
+}
+
+.voice-settings-toggle {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  background: #d9c2ab;
+  border-radius: 12px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.voice-settings-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s;
+}
+
+.voice-settings-switch-wrap[data-checked="true"] .voice-settings-toggle {
+  background: #b88777;
+}
+
+.voice-settings-switch-wrap[data-checked="true"] .voice-settings-toggle::after {
+  transform: translateX(18px);
+}
+
+/* ===== 加载中遮罩 ===== */
+.voice-settings-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(250, 248, 243, 0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  backdrop-filter: blur(2px);
+}
+
+.voice-settings-loading.show {
+  display: flex;
+}
+
+.voice-settings-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(184, 135, 119, 0.2);
+  border-top-color: #b88777;
+  border-radius: 50%;
+  animation: voiceSpinnerRotate 0.8s linear infinite;
+}
+
+@keyframes voiceSpinnerRotate {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 420px) {
+  .voice-settings-container {
+    padding: 22px 16px 30px;
+  }
+
+  .voice-settings-title {
+    font-size: 22px;
+  }
+
+  .voice-settings-actions {
+    flex-direction: column;
+  }
+
+  .voice-settings-btn {
+    width: 100%;
+  }
+}

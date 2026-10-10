@@ -344,3 +344,66 @@
   min-height: 44px; font-style: italic; letter-spacing: 0.2px;
   word-break: break-word; overflow-wrap: anywhere;
 }
+
+/* ===== Go Chat · 私人语音留声 V1 ===== */
+/* 只覆盖语音条及约会喇叭；其他语音模块保持原样 */
+.vc-bar-wrap {
+  background:#fff9f1;
+  border:1px solid #e7cfc0;
+  border-radius:15px 15px 15px 5px;
+  box-shadow:0 3px 10px rgba(111,74,57,.08);
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  max-width:244px;
+  color:#795548;
+}
+.vc-bar-wrap.vc-playing {
+  border-color:#c79d8b;
+  box-shadow:0 3px 13px rgba(156,106,86,.14);
+}
+.vc-bar-main {gap:8px;padding:9px 11px;}
+.vc-play-btn {
+  width:35px;height:35px;
+  background:#b88777;color:#fffaf5;
+  box-shadow:0 2px 5px rgba(132,79,64,.15);
+}
+.vc-play-btn:focus-visible,.vc-txt-btn:focus-visible,.date-spk-btn:focus-visible {
+  outline:2px solid #946454;outline-offset:3px;
+}
+.vc-icon-spin {width:14px;height:14px;border:2px solid rgba(255,255,255,.4);
+  border-top-color:#fff;border-radius:50%;font-size:0;animation:vcTurn .8s linear infinite;}
+@keyframes vcTurn {to{transform:rotate(360deg)}}
+.vc-waveform {height:25px;gap:2.5px;}
+.vc-bar {width:2.5px;border-radius:2px;background:#dcc1b3;}
+.vc-bar-wrap.vc-playing .vc-bar {background:#b98473;}
+.vc-duration {color:#9b7a6a;font-size:11px;}
+.vc-bar-wrap.vc-playing .vc-duration {color:#80594a;}
+.vc-txt-btn {
+  border:0;border-bottom:1px solid #cda999;border-radius:0;
+  background:transparent;color:#976e5d;padding:3px 1px;
+}
+.vc-txt-btn.vc-txt-active {background:transparent;border-color:#986657;color:#7f5244;}
+.vc-transcript {
+  color:#795b4d;border-top:1px solid #ecd9ca;
+  padding:11px 13px 13px;font-style:normal;line-height:1.65;
+}
+.date-spk-btn {
+  width:30px;height:30px;bottom:5px;right:7px;
+  border:1px solid #e4c8b7;background:#f8e9df;
+  color:#a57666;box-shadow:0 2px 5px rgba(122,82,61,.09);
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+.date-spk-btn svg {display:block;flex-shrink:0;}
+.date-spk-btn.date-spk-playing {
+  background:#b88777;color:#fff9f1;border-color:#b88777;
+  box-shadow:0 2px 8px rgba(122,82,61,.17);
+}
+.date-spk-btn.date-spk-loading {animation:vcPulse .8s ease-in-out infinite;}
+@media(max-width:420px) {
+  .vc-bar-wrap {min-width:140px;max-width:min(230px,calc(100vw - 95px));}
+  .vc-play-btn {width:33px;height:33px;}
+  .date-spk-btn {width:29px;height:29px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .vc-bar-wrap.vc-playing .vc-bar,.date-spk-btn.date-spk-loading,.vc-icon-spin {animation:none;}
+}

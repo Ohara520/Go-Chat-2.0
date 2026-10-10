@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="css/lovespace.css">
 <link rel="stylesheet" href="css/profile.css">
 <link rel="stylesheet" href="css/voice.css">
+<link rel="stylesheet" href="css/voice-settings.css">
 <link rel="stylesheet" href="css/me-v2.css">
 <link rel="stylesheet" href="css/delivery-v1.css">
 <link rel="stylesheet" href="css/assets-v1.css">
@@ -2003,6 +2004,12 @@ async function handleLogout() {
   try {
     if (typeof saveToCloud === 'function') await saveToCloud();
   } catch(e) {}
+
+  // 清空语音缓存（配置和音频都按用户隔离）
+  if (typeof clearVoiceCache === 'function') {
+    clearVoiceCache();
+  }
+
   await sbClient.auth.signOut();
   // 修复账号串号：登出时清空所有本地数据，防止下一个账号在同一设备登录时
   // 继承上一个用户的头像/职业/余额，并把脏数据 saveToCloud 覆盖到 TA 的云端
@@ -2091,6 +2098,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/keegan_persona.js"></script>
 <script src="js/api.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/voice-settings.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/state.js"></script>
 <script src="js/activity.js"></script>
@@ -3736,13 +3744,23 @@ function openMeDetail(type) {
   if (!overlay || !title || !body) return;
   if (type === 'voice') {
     title.textContent = '语音设置';
-    body.innerHTML = '<div class="me-v1-detail-kicker">VOICE STUDIO</div><h3>让文字有声音</h3><p>语音合成（TTS）已具备基础播放模块。接下来将开放服务商选择、个人 API Key 安全配置、音色选择和试听。</p><div class="me-v1-coming"><span>01</span><div><strong>文字转语音</strong><small>配置与试听功能待接入</small></div><em>即将开放</em></div><div class="me-v1-coming"><span>02</span><div><strong>实时语音通话</strong><small>预留未来扩展入口</small></div><em>规划中</em></div><p class="me-v1-detail-note">此页面目前为视觉入口，尚不能保存 API Key 或生成试听音频。</p>';
+    body.innerHTML = '<p style="text-align:center;padding:40px 20px;color:#a89179;">加载中...</p>';
+    overlay.hidden = false;
+    document.body.classList.add('me-v1-detail-open');
+    // 延迟渲染，确保 overlay 已显示
+    setTimeout(() => {
+      if (typeof renderVoiceSettings === 'function') {
+        renderVoiceSettings();
+      } else {
+        body.innerHTML = '<p style="text-align:center;padding:40px 20px;color:#a89179;">功能加载失败，请刷新页面重试</p>';
+      }
+    }, 100);
   } else if (type === 'updates') {
     title.textContent = '更新日志';
     body.innerHTML = '<div class="me-v1-detail-kicker">RELEASE NOTES</div><h3>每一次小小改变</h3><p>这里将记录 Go Chat 的新功能、体验优化与问题修复。</p><div class="me-v1-coming"><span>—</span><div><strong>更新记录即将上线</strong><small>待接入真实版本记录后显示</small></div></div>';
+    overlay.hidden = false;
+    document.body.classList.add('me-v1-detail-open');
   } else return;
-  overlay.hidden = false;
-  document.body.classList.add('me-v1-detail-open');
 }
 function closeMeDetail() {
   const overlay = document.getElementById('meDetailOverlay');

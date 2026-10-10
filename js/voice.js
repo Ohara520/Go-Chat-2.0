@@ -1,5 +1,5 @@
 // ============================================================
-// voice.js — 语音功能 v2.0
+// voice.js — 语音功能 v2.1（V4 修复版）
 //
 // 两种形态：
 //   ① 日常聊天  → 语音条（播放键 + 波形 + 时长 + 转文字）
@@ -12,17 +12,15 @@
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ① 配置
+// ① 配置（初始为 null，等待用户配置初始化）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const VOICE_CONFIG = {
-  voiceId:  'QHVs2huJe5wggzgIHMIi',
-  modelId:  'eleven_turbo_v2_5',
+  voiceId:  null,  // 初始 null，禁止写死默认值，等待用户配置初始化
+  modelId:  null,  // 初始 null，禁止写死默认值，等待用户配置初始化
   voiceSettings: {
     stability:         0.75,
     similarity_boost:  0.82,
-    style:             0.12,
-    use_speaker_boost: true
   },
   apiEndpoint: '/api/tts',
   cacheMax: 30,
@@ -31,18 +29,109 @@ const VOICE_CONFIG = {
   maxTextLengthForVoice: 65,    // 超过这个字数不触发（语音条适合短句）
 };
 
+// 平台默认配置（仅在用户无配置时使用）
+const PLATFORM_DEFAULTS = {
+  voiceId: 'QHVs2huJe5wggzgIHMIi',
+  modelId: 'eleven_turbo_v2_5',
+};
+
+// 用户配置初始化标志
+let _userConfigLoaded = false;
+
+// 初始化用户语音配置（在页面加载后调用）
+async function initUserVoiceConfig() {
+  if (_userConfigLoaded) return;
+
+  try {
+    const { data: { session } } = await window.sbClient.auth.getSession();
+    if (!session) {
+      // 未登录：使用平台默认
+      VOICE_CONFIG.voiceId = PLATFORM_DEFAULTS.voiceId;
+      VOICE_CONFIG.modelId = PLATFORM_DEFAULTS.modelId;
+      _userConfigLoaded = true;
+      return;
+    }
+
+    const res = await fetch('/api/voice-config', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+    });
+
+    if (res.ok) {
+      const config = await res.json();
+      // 用户配置优先
+      VOICE_CONFIG.voiceId = config.voice_id || PLATFORM_DEFAULTS.voiceId;
+      VOICE_CONFIG.modelId = config.model_id || PLATFORM_DEFAULTS.modelId;
+      _userConfigLoaded = true;
+    } else {
+      // 读取失败：使用平台默认
+      VOICE_CONFIG.voiceId = PLATFORM_DEFAULTS.voiceId;
+      VOICE_CONFIG.modelId = PLATFORM_DEFAULTS.modelId;
+      _userConfigLoaded = true;
+    }
+  } catch (e) {
+    console.warn('[voice] Failed to load user config:', e?.message);
+    // 异常：使用平台默认
+    VOICE_CONFIG.voiceId = PLATFORM_DEFAULTS.voiceId;
+    VOICE_CONFIG.modelId = PLATFORM_DEFAULTS.modelId;
+    _userConfigLoaded = true;
+  }
+}
+
+// 页面加载时自动初始化
+if (typeof window !== 'undefined' && window.sbClient) {
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initUserVoiceConfig, 1000);
+  });
+
+  // 监听登录状态变化，清空缓存并重新加载配置
+  window.sbClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+      console.log('[voice] Auth state changed, clearing cache and reloading config');
+      clearVoiceCache();
+      _userConfigLoaded = false;
+      initUserVoiceConfig();
+    }
+  });
+}
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ② 音频缓存（text → blob URL）
+// ② 音频缓存（按 user_id + voice_id + model_id + text 隔离）
+// 修复：不同用户/配置不能复用音频，账号切换/配置更新自动失效
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const _voiceCache = new Map();
+let _currentCacheKey = null; // 当前缓存配置标识（user_id + voice_id + model_id）
 
-function _vcKey(text) { return (text || '').trim().slice(0, 80); }
-function _vcGet(text) { return _voiceCache.get(_vcKey(text)) || null; }
-function _vcSet(text, url) {
+// 生成缓存键：user_id + voice_id + model_id + text
+function _vcKey(text, userId, voiceId, modelId) {
+  const configKey = `${userId || 'anon'}:${voiceId || 'default'}:${modelId || 'default'}`;
+  const textKey = (text || '').trim().slice(0, 80);
+  return `${configKey}:${textKey}`;
+}
+
+// 获取缓存
+function _vcGet(text, userId, voiceId, modelId) {
+  const key = _vcKey(text, userId, voiceId, modelId);
+  return _voiceCache.get(key) || null;
+}
+
+// 设置缓存
+function _vcSet(text, url, userId, voiceId, modelId) {
   if (!text || !url) return;
-  _voiceCache.set(_vcKey(text), url);
+  const key = _vcKey(text, userId, voiceId, modelId);
+  _voiceCache.set(key, url);
+
+  // 更新当前配置标识
+  const configKey = `${userId || 'anon'}:${voiceId || 'default'}:${modelId || 'default'}`;
+  if (_currentCacheKey && _currentCacheKey !== configKey) {
+    // 配置变更：清空旧配置的缓存
+    clearVoiceCache();
+  }
+  _currentCacheKey = configKey;
+
+  // LRU 淘汰
   if (_voiceCache.size > VOICE_CONFIG.cacheMax) {
     const oldKey = _voiceCache.keys().next().value;
     const oldUrl = _voiceCache.get(oldKey);
@@ -56,26 +145,70 @@ function _vcSet(text, url) {
 // ③ TTS 调用
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-async function generateVoice(text) {
+async function generateVoice(text, customVoiceId, customModelId) {
   if (!text || !text.trim()) return null;
-  const cached = _vcGet(text);
-  if (cached) return cached;
+
   try {
+    // 获取 Supabase Access Token + User ID
+    let userId = null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (window.sbClient) {
+      try {
+        const { data: { session } } = await window.sbClient.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+          userId = session.user?.id || null;
+        }
+      } catch (authErr) {
+        console.warn('[voice] Failed to get auth token:', authErr?.message);
+      }
+    }
+
+    // 如果没有 token，请求会被后端拒绝（401）
+    if (!headers['Authorization']) {
+      console.warn('[voice] No access token available, TTS will fail');
+      return null;
+    }
+
+    // 确定使用的 voice_id 和 model_id
+    // 优先级：调用参数 > 用户配置(VOICE_CONFIG) > 平台默认
+    const finalVoiceId = customVoiceId || VOICE_CONFIG.voiceId || PLATFORM_DEFAULTS.voiceId;
+    const finalModelId = customModelId || VOICE_CONFIG.modelId || PLATFORM_DEFAULTS.modelId;
+
+    // 检查缓存（按 user + voice_id + model_id + text 隔离）
+    const cached = _vcGet(text, userId, finalVoiceId, finalModelId);
+    if (cached) return cached;
+
     const res = await fetchWithTimeout(VOICE_CONFIG.apiEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         text:           text.trim().slice(0, 500),
-        voice_id:       VOICE_CONFIG.voiceId,
-        model_id:       VOICE_CONFIG.modelId,
+        voice_id:       finalVoiceId,
+        model_id:       finalModelId,
         voice_settings: VOICE_CONFIG.voiceSettings,
       }),
     }, 18000);
-    if (!res.ok) { console.warn('[voice] TTS HTTP', res.status); return null; }
+
+    if (!res.ok) {
+      // 401 = 鉴权失败（可能是语音 Key 失效，而非登录过期）
+      if (res.status === 401) {
+        const errData = await res.json().catch(() => ({}));
+        // 区分：语音 Key 失效 vs 登录过期
+        if (errData.error && errData.error.includes('API Key')) {
+          console.warn('[voice] Voice API Key invalid:', errData.error);
+        } else {
+          console.warn('[voice] TTS authentication failed (401)');
+        }
+      }
+      console.warn('[voice] TTS HTTP', res.status);
+      return null;
+    }
+
     const blob = await res.blob();
     if (!blob || blob.size < 100) return null;
     const url = URL.createObjectURL(blob);
-    _vcSet(text, url);
+    _vcSet(text, url, userId, finalVoiceId, finalModelId);
     return url;
   } catch (e) {
     console.warn('[voice] generateVoice error:', e?.message);
@@ -100,6 +233,21 @@ function _stopCurrent() {
 function _esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ③-B 缓存清理：配置变更或退出登录时清空音频缓存
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function clearVoiceCache() {
+  _voiceCache.forEach(url => {
+    try { URL.revokeObjectURL(url); } catch(e) {}
+  });
+  _voiceCache.clear();
+  _currentCacheKey = null;
+}
+window.clearVoiceCache = clearVoiceCache;
+
+// 暴露 generateVoice（供约会场景等调用）
+window.generateVoiceWithConfig = generateVoice;
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -130,7 +278,7 @@ function createVoiceBar(text) {
         <svg class="vc-icon-pause" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="display:none">
           <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
         </svg>
-        <span class="vc-icon-spin" style="display:none">…</span>
+        <span class="vc-icon-spin" style="display:none" aria-hidden="true"></span>
       </button>
       <div class="vc-waveform">${bars}</div>
       <span class="vc-duration">—</span>
@@ -190,8 +338,7 @@ function createVoiceBar(text) {
     txtBtn.textContent = _txtShown ? '收起' : '文字';
   });
 
-  // 预加载
-  setTimeout(() => generateVoice(text), 300);
+  // 按需合成：仅在用户点击播放时请求 TTS，避免消耗用户额度。
 
   return wrap;
 }
@@ -263,7 +410,9 @@ function installDateVoiceButtons() {
 
     const btn = document.createElement('button');
     btn.className = 'date-spk-btn';
-    btn.innerHTML = `🔊`;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '播放 Ghost 的声音');
     btn.title = '播放 Ghost 的声音';
 
     let _url = null, _audio = null, _loading = false;
@@ -302,13 +451,6 @@ function installDateVoiceButtons() {
       btn.classList.add('date-spk-playing');
       _audio.play().catch(() => btn.classList.remove('date-spk-playing'));
 
-      // 顺手预热下一条
-      const all = [...container.querySelectorAll('.date-bubble-ghost')];
-      const idx = all.indexOf(bubble);
-      if (idx >= 0 && idx + 1 < all.length) {
-        const nxt = all[idx+1].querySelector('.date-bubble-text')?.textContent.trim();
-        if (nxt) generateVoice(nxt);
-      }
     });
 
     bubble.appendChild(btn);
