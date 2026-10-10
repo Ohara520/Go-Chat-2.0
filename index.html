@@ -509,6 +509,61 @@
     .message.user .sticker-message { margin-left: auto; }
     .message.bot .sticker-message { margin-right: auto; }
 </style>
+<!-- Go Chat temporary maintenance overlay: remove this entire block to disable -->
+<style id="gc-maintenance-style">
+html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibility: hidden !important; }
+#gc-maintenance-overlay { position:fixed!important;inset:0!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:24px!important;min-height:100dvh!important;background:radial-gradient(ellipse at 15% 12%,#fffdf8 0%,#f8f2e9 55%,#f0e5d7 100%)!important;color:#4c382d!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;overflow:auto!important;visibility:visible!important;box-sizing:border-box!important; }
+#gc-maintenance-overlay * { box-sizing:border-box!important; }
+#gc-maintenance-overlay .gc-panel {width:100%;max-width:420px;padding:48px 34px 34px;text-align:center;border:1px solid rgba(169,132,99,.22);border-radius:24px;background:rgba(255,255,255,.68);box-shadow:0 20px 65px rgba(100,71,50,.09);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+#gc-maintenance-overlay .gc-eyebrow {font-family:Georgia,serif;font-size:13px;letter-spacing:4px;color:#b3977e;margin-bottom:28px;}
+#gc-maintenance-overlay h1 {font-size:23px;letter-spacing:2px;font-weight:500;line-height:1.6;margin:0 0 14px;color:#49362c;}
+#gc-maintenance-overlay .gc-sub {font-size:13px;line-height:1.9;color:#998476;margin:0 0 42px;}
+#gc-maintenance-overlay .gc-rule {height:1px;width:55px;margin:0 auto 24px;background:#d9c2ab;}
+#gc-maintenance-overlay .gc-open {display:inline-block;border:0;background:transparent;color:#a28b78;font-size:12px;letter-spacing:1px;cursor:pointer;padding:8px 12px;}
+#gc-maintenance-overlay .gc-open:hover {color:#5d4334;}
+#gc-maintenance-overlay .gc-form {margin-top:18px;display:none;}
+#gc-maintenance-overlay .gc-form.gc-visible {display:block;}
+#gc-maintenance-overlay .gc-password {width:100%;height:44px;padding:0 14px;background:#fffdfb;border:1px solid #dbcbbb;border-radius:10px;font-size:14px;color:#49362c;outline:none;}
+#gc-maintenance-overlay .gc-password:focus {border-color:#b6987b;}
+#gc-maintenance-overlay .gc-submit {width:100%;height:43px;margin-top:12px;border:0;border-radius:10px;background:#80634e;color:#fff;font-size:13px;cursor:pointer;}
+#gc-maintenance-overlay .gc-error {font-size:12px;color:#a4524c;min-height:18px;margin-top:10px;}
+@media(max-width:480px){#gc-maintenance-overlay .gc-panel{padding:42px 24px 30px}}
+</style>
+<script id="gc-maintenance-script">
+(function(){
+  'use strict';
+  var key='gochat_maintenance_admin';
+  try { if (sessionStorage.getItem(key)==='1') { document.documentElement.classList.add('gc-maintenance-unlocked');return; } } catch(e) {}
+  function render(){
+    if(!document.body || document.getElementById('gc-maintenance-overlay'))return;
+    var overlay=document.createElement('div');
+    overlay.id='gc-maintenance-overlay';
+    overlay.setAttribute('role','dialog');
+    overlay.setAttribute('aria-modal','true');
+    overlay.setAttribute('aria-label','网站维护通知');
+    overlay.innerHTML='<div class="gc-panel"><div class="gc-eyebrow">GO CHAT</div><h1>网站正在维护</h1><p class="gc-sub">请耐心等待，感谢您的理解。</p><div class="gc-rule"></div><button type="button" class="gc-open">管理员入口</button><form class="gc-form"><input class="gc-password" type="password" placeholder="请输入维护密码" aria-label="维护密码" autocomplete="off" required><button class="gc-submit" type="submit">进入网站</button><div class="gc-error" role="alert"></div></form></div>';
+    document.body.appendChild(overlay);
+    var open=overlay.querySelector('.gc-open'),form=overlay.querySelector('.gc-form'),input=overlay.querySelector('.gc-password'),error=overlay.querySelector('.gc-error');
+    open.addEventListener('click',function(){form.classList.toggle('gc-visible');if(form.classList.contains('gc-visible'))input.focus();});
+    form.addEventListener('keydown',function(e){e.stopPropagation();});
+    form.addEventListener('submit',async function(e){
+      e.preventDefault();e.stopPropagation();error.textContent='';
+      var value=input.value;
+      try {
+        var bytes=new TextEncoder().encode(value);
+        var buffer=await crypto.subtle.digest('SHA-256',bytes);
+        var hash=Array.from(new Uint8Array(buffer)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+        if(hash!== 'c7956ff2f8247ade9fe08e97365cb92d7652e18e660e6c7ff0cf073f65872870'){error.textContent='密码错误，请重试';input.value='';input.focus();return;}
+        try{sessionStorage.setItem(key,'1');}catch(err){}
+        document.documentElement.classList.add('gc-maintenance-unlocked');
+        overlay.remove();
+      } catch(err){error.textContent='验证暂时不可用，请刷新重试';}
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render,{once:true});else render();
+})();
+</script>
+<!-- End temporary maintenance overlay -->
 </head>
 <body>
 <!-- 维护模式已关闭 -->
