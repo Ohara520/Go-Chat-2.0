@@ -228,6 +228,8 @@ function cleanBotText(text, scene = 'normal') {
 // 返回 { msgDiv, bubble, innerThoughtEl }
 // 失败/空内容返回 { msgDiv: null, bubble: null, innerThoughtEl: null }
 
+const CHAT_HEART_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>';
+
 function appendMessage(role, text, animate = true) {
   const container = document.getElementById('messagesContainer');
   if (!container) return { msgDiv: null, bubble: null, innerThoughtEl: null };
@@ -275,12 +277,7 @@ function appendMessage(role, text, animate = true) {
         enText = enLines.join('\n');
       } else {
         // 纯中文：直接显示
-        bubble.textContent = text;
-        contentDiv.appendChild(bubble);
-        msgDiv.appendChild(contentDiv);
-        container.appendChild(msgDiv);
-        if (animate) scrollToBottom();
-        return { msgDiv, bubble, innerThoughtEl: null };
+        enText = text;
       }
     } else {
       // 纯英文
@@ -320,21 +317,20 @@ function appendMessage(role, text, animate = true) {
     status.textContent = '已送达';
     contentDiv.appendChild(status);
   } else {
-    // bot消息：收藏按钮（点击气泡才显示）
-    const actions = document.createElement('div');
-    actions.className = 'message-actions';
-    actions.style.display = 'none';
-
+    // 收藏爱心常驻于 Ghost 文字气泡内部；不新增底部操作行
     const collectBtn = document.createElement('button');
-    collectBtn.className = 'message-action-btn';
-    collectBtn.textContent = '⭐';
-    collectBtn.title = '收藏';
+    collectBtn.type = 'button';
+    collectBtn.className = 'message-action-btn chat-heart';
+    collectBtn.innerHTML = CHAT_HEART_SVG;
+    collectBtn.dataset.collectText = bubble.querySelector('.bubble-en')?.textContent || bubble.textContent;
+    collectBtn.setAttribute('aria-label', '收藏这句话');
+    collectBtn.title = '收藏这句话';
     collectBtn.onclick = function(e) {
       e.stopPropagation();
       if (typeof collectMessage === 'function') collectMessage(this);
     };
-    actions.appendChild(collectBtn);
-    contentDiv.appendChild(actions);
+    bubble.appendChild(collectBtn);
+    if (typeof syncCollectionHearts === 'function') syncCollectionHearts();
 
     // 内心独白容器（初始隐藏，由 innerThought.js 异步填充）
     const innerThought = document.createElement('div');
@@ -351,14 +347,7 @@ function appendMessage(role, text, animate = true) {
       thoughtBtn.classList.remove('thought-btn-pulse');
     }
 
-    // 点击气泡：显示/隐藏收藏按钮，同时隐藏其他气泡的收藏按钮
-    bubble.style.cursor = 'pointer';
-    bubble.onclick = function(e) {
-      document.querySelectorAll('.message-actions').forEach(a => {
-        if (a !== actions) a.style.display = 'none';
-      });
-      actions.style.display = actions.style.display === 'none' ? 'flex' : 'none';
-    };
+
   }
 
   msgDiv.appendChild(contentDiv);

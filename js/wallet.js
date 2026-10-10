@@ -212,7 +212,7 @@ function selectCard(cardType) {
   const myCard = document.getElementById('myCardSlot');
 
   if (cardType === 'ghost') {
-    if (ghostCard) ghostCard.classList.add('pulled');
+    if (ghostCard) { ghostCard.classList.remove('tucked'); ghostCard.classList.add('pulled'); }
     if (myCard) {
       myCard.classList.remove('pulled');
       myCard.classList.add('tucked');
@@ -227,6 +227,11 @@ function selectCard(cardType) {
       myCard.classList.add('pulled');
     }
   }
+
+  const activeLabel = document.getElementById('walletActiveLabel');
+  if (activeLabel) activeLabel.textContent = cardType === 'ghost' ? 'GHOST CARD' : 'MY CARD';
+  if (ghostCard) ghostCard.setAttribute('aria-pressed', String(cardType === 'ghost'));
+  if (myCard) myCard.setAttribute('aria-pressed', String(cardType === 'my'));
 
   const tabGhost = document.getElementById('tabGhost');
   const tabMy = document.getElementById('tabMy');
@@ -284,6 +289,10 @@ function renderWallet() {
   renderTransactionList();
 }
 
+function escapeWalletTxText(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
 function renderTransactionList() {
   const txList = getTransactions().filter(t => !t.ghostCard);
   const container = document.getElementById('transactionList');
@@ -291,7 +300,7 @@ function renderTransactionList() {
   if (!container) return;
 
   if (txList.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:rgba(130,80,170,0.5);padding:24px;font-size:13px;">暂无交易记录</div>';
+    container.innerHTML = '<div style="text-align:center;color:#a38b78;padding:24px;font-size:13px;">暂无交易记录</div>';
     if (toggleBtn) toggleBtn.style.display = 'none';
     return;
   }
@@ -301,12 +310,14 @@ function renderTransactionList() {
     const isIn = tx.amount > 0;
     return `
     <div class="transaction-item">
-      <div class="transaction-info">
-        <div class="transaction-name">${tx.name}</div>
-        <div class="transaction-time">${formatTxTime(tx.time)}</div>
-      </div>
-      <div class="transaction-amount ${isIn ? 'in' : 'out'}">
-        ${isIn ? '+' : ''}£${tx.amount.toFixed(0)}
+      <div class="transaction-date-rail"><span>${tx.time ? tx.time.slice(5,10).replace('-', '.') : '—'}</span><i></i></div>
+      <div class="transaction-entry">
+        <div class="transaction-symbol" aria-hidden="true">${isIn ? '+' : '−'}</div>
+        <div class="transaction-info">
+          <div class="transaction-name">${escapeWalletTxText(tx.name)}</div>
+          <div class="transaction-time">${formatTxTime(tx.time)}</div>
+        </div>
+        <div class="transaction-amount ${isIn ? 'in' : 'out'}">${isIn ? '+' : '−'}£${Math.abs(tx.amount).toFixed(2)}</div>
       </div>
     </div>`;
   }).join('');

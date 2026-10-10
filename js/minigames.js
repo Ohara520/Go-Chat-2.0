@@ -497,60 +497,49 @@ function getSlackQuote() {
 }
 
 // ===== 收藏系统 =====
+function getCollectionMessageText(button) {
+  const bubble = button.closest('.message-bubble') || button.closest('.message-content')?.querySelector('.message-bubble');
+  if (!bubble) return '';
+  const en = bubble.querySelector('.bubble-en');
+  const zh = bubble.querySelector('.bubble-zh');
+  return (en ? en.textContent + (zh ? '\n' + zh.textContent : '') :
+    (button.dataset.collectText || bubble.textContent)).trim();
+}
+
+function syncCollectionHearts() {
+  let collections = [];
+  try { collections = JSON.parse(localStorage.getItem('collections') || '[]'); } catch (_) {}
+  const saved = new Set(collections.map(c => c.text?.trim()).filter(Boolean));
+  document.querySelectorAll('.chat-heart').forEach(btn => {
+    const selected = saved.has(getCollectionMessageText(btn));
+    btn.classList.toggle('is-collected', selected);
+    btn.setAttribute('aria-pressed', String(selected));
+    btn.setAttribute('aria-label', selected ? '取消收藏' : '收藏这句话');
+    btn.title = selected ? '取消收藏' : '收藏这句话';
+  });
+}
+
 function collectMessage(button) {
   const msgEl = button.closest('.message');
   if (msgEl && msgEl.querySelector('.transfer-card')) return;
-
-  const bubble = button.closest('.message-content')?.querySelector('.message-bubble');
-  if (!bubble) return;
-
-  const enEl = bubble.querySelector('.bubble-en');
-  const zhEl = bubble.querySelector('.bubble-zh');
-  const messageText = enEl
-    ? (enEl.textContent + (zhEl ? '\n' + zhEl.textContent : ''))
-    : bubble.textContent;
-
-  // 空内容不收藏
-  if (!messageText || messageText.trim().length < 2) {
-    showToast('内容还没加载完 🌸');
-    return;
+  const messageText = getCollectionMessageText(button);
+  if (messageText.length < 2) return;
+  let collections = [];
+  try { collections = JSON.parse(localStorage.getItem('collections') || '[]'); } catch (_) {}
+  const wasSaved = collections.some(c => c.text?.trim() === messageText);
+  if (wasSaved) {
+    collections = collections.filter(c => c.text?.trim() !== messageText);
+  } else {
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+    const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    collections.unshift({ text: messageText, time: dateStr + ' ' + timeStr });
   }
-
-  // 检查是否已收藏（用trim比对，避免空格差异误判）
-  const collections = JSON.parse(localStorage.getItem('collections') || '[]');
-  const alreadyCollected = collections.some(c => c.text?.trim() === messageText.trim());
-  if (alreadyCollected) {
-    showToast('已经收藏过了 ⭐');
-    const actions = button.closest('.message-actions');
-    if (actions) setTimeout(() => { actions.style.display = 'none'; }, 800);
-    return;
-  }
-
-  const now = new Date();
-  const dateStr = now.getFullYear() + '-' +
-    String(now.getMonth()+1).padStart(2,'0') + '-' +
-    String(now.getDate()).padStart(2,'0');
-  const timeStr = String(now.getHours()).padStart(2,'0') + ':' +
-    String(now.getMinutes()).padStart(2,'0');
-
-  collections.unshift({ text: messageText, time: dateStr + ' ' + timeStr });
   localStorage.setItem('collections', JSON.stringify(collections));
+  syncCollectionHearts();
   renderCollectionScreen();
-  saveToCloud().catch(() => {});
-
-  // 按钮反馈：✓出现后消失，整个actions隐藏
-  button.textContent = '✓';
-  button.style.background = 'linear-gradient(135deg, #ba55d3, #ff6b9d)';
-  button.style.color = 'white';
-  setTimeout(() => {
-    button.textContent = '⭐';
-    button.style.background = '';
-    button.style.color = '';
-    const actions = button.closest('.message-actions');
-    if (actions) actions.style.display = 'none';
-  }, 1500);
-
-  showToast('已收藏 ⭐');
+  if (typeof saveToCloud === 'function') Promise.resolve(saveToCloud()).catch(() => {});
+  if (typeof showToast === 'function') showToast(wasSaved ? '已取消收藏' : '已收藏');
 }
 
 function deleteCollection(el, index, currentPage = 0) {
@@ -562,6 +551,8 @@ function deleteCollection(el, index, currentPage = 0) {
   const totalPages = Math.max(1, Math.ceil(collections.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages - 1);
   renderCollectionScreen(safePage);
+  syncCollectionHearts();
+  if (typeof saveToCloud === 'function') Promise.resolve(saveToCloud()).catch(() => {});
 }
 
 function renderCollectionScreen(page = 0) {
@@ -569,7 +560,7 @@ function renderCollectionScreen(page = 0) {
   if (!container) return;
   const collections = JSON.parse(localStorage.getItem('collections') || '[]');
   if (collections.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:rgba(130,80,170,0.45);padding:40px 20px;font-size:13px;">还没有收藏 ⭐<br><span style=\'font-size:11px;opacity:0.7\'>点击消息下方的星星收藏</span></div>';
+    container.innerHTML = '<div style="text-align:center;color:rgba(130,80,170,0.45);padding:40px 20px;font-size:13px;">还没有收藏<br><span style=\'font-size:11px;opacity:0.7\'>点击 Ghost 消息里的爱心收藏</span></div>';
     return;
   }
 

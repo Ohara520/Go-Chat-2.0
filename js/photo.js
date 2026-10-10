@@ -354,6 +354,8 @@ async function handlePhotoUpload(fileDataList) {
 
     // 保留 Photo V2 职责：
     // 1. 把最新图片存到 _lastReceivedPhotos 供头像命令使用
+    window._avatarChangeIntent = null;
+    _pendingAvatarChoice = null;
     window._lastReceivedPhotos = {
       base64List,
       isTwoPhotos: base64List.length > 1,
@@ -448,6 +450,7 @@ function _setAvatarNegotiation(lastPhotos, userText) {
     base64List,
     selectedIndex,
     startedAt: Date.now(),
+    photoSentAt: lastPhotos.sentAt || Date.now(),
   };
   _pendingAvatarChoice = base64List.length > 1 && selectedIndex < 0 ? { base64List } : null;
   return true;
@@ -457,6 +460,7 @@ function _setAvatarNegotiation(lastPhotos, userText) {
 async function checkPendingAvatarChoice(userText) {
   const pending = window._avatarChangeIntent;
   if (!pending || !Array.isArray(pending.base64List) || pending.base64List.length < 2) return false;
+  if (Date.now() - pending.startedAt > 10 * 60 * 1000) { window._avatarChangeIntent = null; _pendingAvatarChoice = null; return false; }
   if (Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0) return false;
   const chosenIdx = _pickAvatarIndexFromText(userText, pending.base64List.length);
   if (chosenIdx === -1) return false;
@@ -472,13 +476,20 @@ async function checkAvatarCommand(userText) {
   if (!lastPhotos || !Array.isArray(lastPhotos.base64List) || lastPhotos.base64List.length === 0) return false;
 
   // 已经在协商中时，不重复分类；后续说服/拒绝/改主意都交给正常聊天。
-  if (window._avatarChangeIntent) return false;
+  if (window._avatarChangeIntent) {
+    // 新的明确头像请求可以替换旧候选；普通图片不沿用旧授权。
+    if (!/(?:头像|avatar|profile\s*pic|profile\s*picture|pfp|大头照)/i.test(text)) return false;
+    window._avatarChangeIntent = null;
+    _pendingAvatarChoice = null;
+  }
 
   // 初次进入头像话题必须有头像领域信号，避免“用这个吧/就它了”把普通分享误判成头像。
   // 既然用户已经明确说到“头像/avatar/profile pic”，这本身就是足够可靠的领域事实：
   // 直接建立协商，不再先依赖一次 Haiku 网络分类。Simon 是否答应仍由正常聊天决定。
   const hasAvatarSignal = /头像|avatar|profile\s*pic|profile\s*picture|pfp|icon|大头照/i.test(text);
   if (!hasAvatarSignal) return false;
+  // 只绑定近期真实发送的图片，不能把几小时前的普通图片作为头像候选。
+  if (!lastPhotos.sentAt || Date.now() - lastPhotos.sentAt > 10 * 60 * 1000) return false;
 
   _setAvatarNegotiation(lastPhotos, text);
   return false; // 永远不拦截主聊天；Ghost 必须亲自回应
@@ -488,6 +499,7 @@ async function checkAvatarCommand(userText) {
 function getAvatarNegotiationContext() {
   const pending = window._avatarChangeIntent;
   if (!pending || !Array.isArray(pending.base64List) || !pending.base64List.length) return '';
+  if (Date.now() - pending.startedAt > 10 * 60 * 1000) { window._avatarChangeIntent = null; _pendingAvatarChoice = null; return ''; }
   const count = pending.base64List.length;
   if (count === 1) {
     return `[AVATAR CHANGE CAPABILITY: You CAN change your avatar. When you agree to use the photo she sent, the system will automatically update your profile picture in the background. This is a real feature that works.
@@ -532,10 +544,7 @@ function _hasExplicitAvatarCommitment(ghostReply) {
     // 同意/承诺
     /\bi agree (?:to )?(?:use|change|switch)/,
     /\b(?:yeah|yes|yep|sure|fine|alright|okay|ok)[\.,]?\s+(?:i'?ll do|done|changed|using it|switched)\b/,
-    /\b(?:go ahead|done|sorted|there)[\.,]?\s*(?:changed|switched|using|done)?\b/i,
     // 单独的确认+行动
-    /^(?:done|changed|switched)\.?\s*$/i,
-    /\bdone\.\s*$/i,
     /\b(?:fine|alright|okay)\.?\s+(?:this|that) (?:one |works|is fine)\b/i,
     // 祈使/决定 - 用这张
     /\b(?:use|set|make) (?:it|that|this) (?:as )?(?:my )?(?:avatar|profile (?:pic|picture))\b/,
@@ -545,7 +554,6 @@ function _hasExplicitAvatarCommitment(ghostReply) {
     /(?:我)?(?:已经|现在)?(?:把)?(?:这张|这个|它)(?:换成|改成|设成|设置成|用(?:作|为)?)(?:我的)?(?:头像|大头照)/,
     /(?:我的)?(?:头像|大头照)(?:已经|现在)?(?:换好(?:了)?|换了|改了|设置好了|设好了|用上了)/,
     /(?:好|行|可以)(?:，|,)?(?:换了|用了|改了|就这张)/,
-    /(?:换|用|改)(?:了|好了)/
   ];
   return explicitPatterns.some(re => re.test(t));
 }
@@ -556,6 +564,10 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
   const pending = window._avatarChangeIntent;
   if (!pending || !Array.isArray(pending.base64List) || !pending.base64List.length) return false;
   if (!ghostReply || !String(ghostReply).trim()) return false;
+  if (Date.now() - pending.startedAt > 10 * 60 * 1000) { window._avatarChangeIntent = null; _pendingAvatarChoice = null; return false; }
+  // 头像协商只对本轮明确的头像请求授权，不能让日后普通图片/聊天触发旧候选。
+  const avatarRequestThisTurn = /头像|avatar|profile\s*pic|profile\s*picture|pfp|大头照/i.test(String(userText || ''));
+  if (!avatarRequestThisTurn) return false;
 
   try {
     const selected = Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0

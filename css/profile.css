@@ -285,3 +285,46 @@
   cursor: pointer;
   font-family: inherit;
 }
+
+
+/* ━━━ Ghost Profile V3 · 奶油纸张与手绘双人心形 ━━━ */
+#profileScreen { background:#f8f5ef; }
+#profileScreen .profile-screen-nav { background:#f8f5ef; border-bottom:1px solid #e9ded2; padding-top:calc(12px + env(safe-area-inset-top)); padding-bottom:12px; }
+#profileScreen .profile-nav-back { background:#fffaf5; border:1px solid #e8d9cb; color:#755d50; }
+#profileScreen .profile-nav-title { color:#705749; font-weight:600; letter-spacing:.04em; }
+#profileScreen .profile-container { background:linear-gradient(180deg,#f8f5ef 0%,#fcfaf6 100%); padding:12px 18px calc(32px + env(safe-area-inset-bottom)); }
+#profileScreen .profile-header-v2 { padding:6px 6px 22px; margin-bottom:10px; border-radius:0; background:transparent; }
+.profile-couple-art { width:min(100%,340px); height:210px; margin:0 auto 2px; position:relative; }
+.profile-handdrawn-heart { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.profile-heart-stroke { stroke:#c9918c; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:740; stroke-dashoffset:0; filter:drop-shadow(0 3px 5px rgba(172,115,111,.10)); }
+.profile-heart-echo { stroke:#d9b4a6; stroke-width:1.2; stroke-linecap:round; opacity:.72; }
+#profileScreen.active .profile-heart-stroke { animation:profileHeartDraw 1.65s ease-out both; }
+@keyframes profileHeartDraw { from {stroke-dashoffset:740;opacity:.45} to {stroke-dashoffset:0;opacity:1} }
+.profile-couple-portraits { position:absolute; left:0;right:0; top:60px; display:flex; align-items:center; justify-content:center; gap:7px; }
+.profile-couple-person { display:flex; flex-direction:column; align-items:center; gap:8px; min-width:86px; }
+.profile-couple-person>span { font-family:Georgia,serif; font-size:10px; letter-spacing:2.3px; color:#a78b7b; }
+.profile-couple-avatar { width:78px; height:78px; border-radius:50%; padding:4px; background:#fffdf9; box-shadow:0 3px 16px rgba(122,84,68,.14); border:1px solid #e8d5c7; box-sizing:border-box; overflow:hidden; }
+.profile-couple-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+.profile-heartbeat { width:65px; height:35px; margin-top:-19px; overflow:visible; flex-shrink:0; }
+.profile-heartbeat path { stroke:#b97d78; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:115; }
+#profileScreen.active .profile-heartbeat path { animation:profileBeatDraw 1s .5s ease-out both; }
+@keyframes profileBeatDraw { from {stroke-dashoffset:115;opacity:.3} to {stroke-dashoffset:0;opacity:1} }
+#profileScreen .profile-names-v2 { margin-bottom:8px; }
+#profileScreen .profile-nickname { color:#654e43; font-size:21px; }
+#profileScreen .profile-realname { color:#a28a7b; font-family:Georgia,serif; font-size:14px; }
+#profileScreen .profile-edit-icon { color:#93796a; background:#f0e7df; }
+#profileScreen .profile-signature-v2 { color:#90786b; font-size:13px; max-width:290px; }
+#profileScreen .profile-relationship-v2 { padding:19px 14px 17px; background:#fffaf5; border:1px solid #eadbd0; box-shadow:0 5px 22px rgba(116,81,60,.045); margin-bottom:12px; }
+#profileScreen .profile-rel-label { color:#a18a7b; font-size:12px; letter-spacing:2px; margin-bottom:5px; }
+.profile-rel-number { display:flex; align-items:baseline; justify-content:center; gap:8px; }
+#profileScreen .profile-rel-days { color:#78594b; font-size:48px; margin:0; }
+.profile-rel-unit { font-size:13px; color:#9f8374; }
+#profileScreen .profile-rel-since { color:#b09887; margin-top:6px; font-family:Georgia,serif; letter-spacing:1px; }
+#profileScreen .profile-reality-v2 { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-bottom:17px; }
+#profileScreen .profile-reality-item { min-width:0; padding:15px 9px; background:#fffaf5; border:1px solid #eadbd0; border-radius:15px; }
+#profileScreen .profile-reality-main { color:#735c50; font-size:14px; overflow-wrap:anywhere; }
+#profileScreen .profile-reality-sub { color:#a18b7d; font-size:11px; }
+#profileScreen .profile-btn-v2 { background:linear-gradient(110deg,#b8917b,#98705e); box-shadow:0 5px 15px rgba(127,87,70,.13); margin-bottom:26px; font-weight:500; }
+#profileScreen .profile-reset-v2 { color:#b8a59b; }
+@media (max-width:360px) { .profile-couple-art { transform:scale(.92); transform-origin:center center; margin:-8px auto -8px; } .profile-couple-portraits {gap:3px} }
+@media (prefers-reduced-motion:reduce) { #profileScreen.active .profile-heart-stroke, #profileScreen.active .profile-heartbeat path { animation:none; } }

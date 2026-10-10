@@ -313,6 +313,18 @@ async function loadFromCloud() {
                 }
                 // 标准 key 为空（异常）：允许快照兜底恢复，继续往下写
               }
+              // 头像是独立版本化状态，角色快照不能覆盖更新的标准头像。
+              // 同时回写前缀，避免切角色时再恢复旧头像。
+              if (charId === _currentChar && (key === 'ghostAvatarUrl' || key === 'ghostAvatarUpdatedAt' || key === 'ghostAvatarBase64')) {
+                const localAt = Number(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
+                const snapshotAt = Number(charData.ghostAvatarUpdatedAt || '0');
+                if (localAt > snapshotAt) {
+                  const latest = localStorage.getItem(key);
+                  if (latest !== null) localStorage.setItem(`${charId}_${key}`, latest);
+                  else localStorage.removeItem(`${charId}_${key}`);
+                  return;
+                }
+              }
               const val = typeof charData[key] === 'string'
                 ? charData[key]
                 : JSON.stringify(charData[key]);

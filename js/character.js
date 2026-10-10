@@ -74,7 +74,7 @@ const CHARACTER_KEYS = [
   // 角色档案
   'ghostBirthday', 'ghostZodiac', 'ghostZodiacEn',
   'ghostHeight', 'ghostWeight', 'ghostBloodType', 'ghostHometown',
-  'ghostAvatarUrl', 'ghostAvatarBase64',
+  'ghostAvatarUrl', 'ghostAvatarBase64', 'ghostAvatarUpdatedAt',
   'ghostUnlocked_birthday', 'ghostUnlocked_zodiac',
   'ghostUnlocked_height', 'ghostUnlocked_weight',
   'ghostUnlocked_blood_type', 'ghostUnlocked_hometown',
@@ -400,8 +400,10 @@ function initCharacterSystem() {
 function applyCharacterAvatar(config) {
   if (!config) config = getCurrentCharacterConfig();
 
-  // 直接用本地头像文件
-  const avatarSrc = config.defaultAvatar || '';
+  // 优先使用当前角色已经保存的头像，不用默认图覆盖自定义头像。
+  const savedUrl = localStorage.getItem('ghostAvatarUrl') || '';
+  const savedB64 = localStorage.getItem('ghostAvatarBase64') || '';
+  const avatarSrc = (savedUrl && !savedUrl.startsWith('data:')) ? savedUrl : (savedB64 ? (savedB64.startsWith('data:') ? savedB64 : 'data:image/jpeg;base64,' + savedB64) : (config.defaultAvatar || ''));
   if (!avatarSrc) return;
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
     el.src = avatarSrc;

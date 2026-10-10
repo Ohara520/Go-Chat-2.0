@@ -3708,3 +3708,139 @@ body.theme-keegan .inner-thought { border-color: rgba(58,122,150,0.32); }
 body.theme-keegan .inner-thought-label { color: rgba(130,190,220,0.7); }
 body.theme-keegan .it-en { color: rgba(220,240,250,0.95); }
 
+
+/* ===== Wallet editorial refresh — scoped to walletScreen only ===== */
+#walletScreen { background: #f8f5ef; color: #53463c; }
+#walletScreen .screen-header { background: #f8f5ef; border-bottom: 1px solid rgba(174,143,111,.15); }
+#walletScreen .screen-title { color: #59483a; }
+#walletScreen .chat-back-btn { color: #856d58; background: rgba(255,255,255,.68); border-color: #e9ddce; }
+#walletScreen .wallet-container { background: radial-gradient(ellipse at 50% 5%,#fffdf9 0%,#f8f5ef 52%,#f4efe7 100%); gap: 0; padding: 0 20px calc(48px + env(safe-area-inset-bottom)); min-height: 100%; }
+#walletScreen .wallet-editorial { text-align: center; padding: 26px 0 8px; }
+#walletScreen .wallet-editorial span { display: block; color: #b2997b; font-size: 9px; letter-spacing: 3px; font-weight: 600; }
+#walletScreen .wallet-editorial h2 { margin: 7px 0 3px; font: 500 37px/1.15 'Cormorant Garamond', Georgia, serif; letter-spacing: .3px; color: #59483a; }
+#walletScreen .wallet-editorial p { margin: 0; font-size: 11px; letter-spacing: 2px; color: #a28e7d; }
+#walletScreen .wallet-physical { max-width: 380px; width: 100%; aspect-ratio: 1.2 / 1; margin: 7px auto 0; isolation: isolate; }
+#walletScreen .wallet-base { top: 24%; bottom: 0; z-index: 1; }
+#walletScreen .wallet-base img { filter: drop-shadow(0 18px 22px rgba(92,69,49,.15)); }
+#walletScreen .wallet-card-item { width: 77%; left: 11.5%; top: 0; border-radius: 12px; outline-offset: 5px; transition: transform .42s cubic-bezier(.22,.8,.25,1),filter .42s ease; }
+#walletScreen .wallet-card-item .card-bg { border-radius: 12px; filter: drop-shadow(0 7px 12px rgba(45,33,27,.19)); }
+#walletScreen .wallet-card-ghost { z-index: 3; transform: translate(-7%, 9%) rotate(-7deg) scale(.94); }
+#walletScreen .wallet-card-my { z-index: 4; transform: translate(8%, 29%) rotate(6deg) scale(.94); }
+#walletScreen .wallet-card-ghost.pulled { z-index: 10; transform: translate(-4%, -2%) rotate(-3deg) scale(1); }
+#walletScreen .wallet-card-my.tucked { z-index: 2; transform: translate(10%, 34%) rotate(6deg) scale(.91); }
+#walletScreen .wallet-card-my.pulled { z-index: 10; transform: translate(5%, 0%) rotate(3deg) scale(1); }
+#walletScreen .wallet-card-ghost.tucked { z-index: 2; transform: translate(-8%, 28%) rotate(-7deg) scale(.91); }
+#walletScreen .card-balance-overlay, #walletScreen .card-limit-mask { display: none; }
+#walletScreen .wallet-card-caption { display: flex; align-items: center; justify-content: center; gap: 13px; margin: 2px auto 19px; width: 100%; max-width: 320px; font-size: 10px; letter-spacing: 2.5px; color: #9e8368; }
+#walletScreen .wallet-caption-rule { width: 30px; height: 1px; background: #d9c5ad; }
+#walletScreen .card-tabs { display: none !important; }
+#walletScreen .card-details-panel { background: rgba(255,253,249,.87); border: 1px solid #e8ddcf; border-radius: 20px; padding: 18px 21px; box-shadow: 0 8px 30px rgba(100,73,52,.06); margin-bottom: 18px; }
+#walletScreen .detail-row { border-bottom-color: #eee6dc; padding: 11px 0; }
+#walletScreen .detail-label { color: #968474; font-size: 12px; }
+#walletScreen .detail-value { color: #544439; font: 600 19px/1.3 'Cormorant Garamond', Georgia, serif; }
+#walletScreen .detail-value.income { color: #68836b; }
+#walletScreen .detail-value.expense { color: #ae796a; }
+#walletScreen .transaction-section { background: rgba(255,253,249,.88); border: 1px solid #e8ddcf; border-radius: 20px; box-shadow: 0 8px 30px rgba(100,73,52,.06); overflow: hidden; }
+#walletScreen .transaction-header { color: #5b483c; border-bottom-color: #eee6dc; padding: 17px 20px; font-size: 13px; letter-spacing: 1px; }
+#walletScreen .transaction-item { padding: 13px 19px; border-bottom-color: #f0e9df; }
+#walletScreen .transaction-name { color: #59493e; }
+#walletScreen .transaction-time { color: #aa9888; }
+#walletScreen .transaction-amount.in { color: #68836b; }
+#walletScreen .transaction-amount.out { color: #a67465; }
+#walletScreen .transaction-toggle { color: #9d8168; border-top-color: #eee6dc; }
+/* Legacy dynamically-created second Ghost card is redundant with the original card artwork. */
+#walletScreen #ghostCardWallet { display: none !important; }
+@media(max-width:360px){#walletScreen .wallet-container{padding-left:13px;padding-right:13px}#walletScreen .wallet-editorial h2{font-size:33px}}
+@media(prefers-reduced-motion:reduce){#walletScreen .wallet-card-item{transition:none}}
+
+/* ===== Wallet V4 — private ledger, scoped only to wallet ===== */
+#walletScreen {background:#f7f0e6;}
+#walletScreen .screen-header {background:rgba(250,246,239,.94);}
+#walletScreen .wallet-container {position:relative; isolation:isolate; background:#f8f2e9; padding:0 16px calc(70px + env(safe-area-inset-bottom)); overflow:visible;}
+#walletScreen .wallet-container::before {content:"";position:absolute;inset:0 0 auto;height:min(700px,115vw);background:linear-gradient(to bottom,rgba(255,251,246,.12) 0%,rgba(255,250,244,.18) 65%,#f8f2e9 100%),url('../images/wallet/wallet-bg.png') center top / cover no-repeat;z-index:-1;pointer-events:none;}
+#walletScreen .wallet-editorial {padding:31px 0 12px;text-align:left;max-width:390px;width:100%;margin:auto;}
+#walletScreen .wallet-editorial span {font-size:9px;letter-spacing:3px;color:#9d7b5d;}
+#walletScreen .wallet-editorial h2 {font-size:clamp(39px,11vw,51px);margin:6px 0 1px;color:#4b3328;}
+#walletScreen .wallet-editorial p {font-size:11px;letter-spacing:1.2px;color:#8f6e57;}
+#walletScreen .wallet-physical {max-width:390px;aspect-ratio:1.15/1;margin:0 auto 0;overflow:visible;}
+#walletScreen .wallet-base {top:22%;bottom:0;z-index:1;pointer-events:none;}
+#walletScreen .wallet-base img {object-fit:contain;filter:drop-shadow(0 14px 18px rgba(67,43,29,.19));}
+#walletScreen .wallet-card-item {width:79%;left:10.5%;cursor:pointer;touch-action:manipulation;}
+#walletScreen .wallet-card-item .card-bg {pointer-events:none;user-select:none;}
+#walletScreen .wallet-card-ghost {z-index:4;transform:translate(-5%,6%) rotate(-5deg) scale(.96);}
+#walletScreen .wallet-card-my {z-index:3;transform:translate(7%,30%) rotate(5deg) scale(.94);}
+#walletScreen .wallet-card-ghost.pulled {z-index:9;transform:translate(-5%,-2%) rotate(-3deg) scale(1);}
+#walletScreen .wallet-card-my.pulled {z-index:9;transform:translate(7%,-1%) rotate(3deg) scale(1);}
+#walletScreen .wallet-card-ghost.tucked {z-index:3;transform:translate(-7%,7%) rotate(-6deg) scale(.94);}
+#walletScreen .wallet-card-my.tucked {z-index:3;transform:translate(9%,33%) rotate(6deg) scale(.92);}
+#walletScreen .wallet-card-caption {margin:8px auto 17px;}
+#walletScreen .card-details-panel {padding:15px 18px;background:rgba(255,252,248,.94);border-radius:23px;}
+#walletScreen .card-details {width:100%;}
+#walletScreen .detail-row {padding:12px 2px;}
+#walletScreen .detail-value {font-size:21px;}
+#walletScreen .transaction-section {background:rgba(255,253,250,.93);border-radius:23px;overflow:visible;margin-top:8px;}
+#walletScreen .transaction-header {display:flex;justify-content:space-between;align-items:center;padding:21px 20px 18px;font-size:18px;letter-spacing:1px;}
+#walletScreen .transaction-header small {font-size:9px;font-weight:500;letter-spacing:2px;color:#b3987b;}
+#walletScreen #transactionList {padding:10px 13px 5px;}
+#walletScreen .transaction-item {display:flex;align-items:stretch;gap:7px;padding:0;border:0;min-height:76px;}
+#walletScreen .transaction-date-rail {width:47px;flex:0 0 47px;display:flex;flex-direction:column;align-items:center;padding-top:24px;color:#aa8c72;font:11px Georgia,serif;position:relative;}
+#walletScreen .transaction-date-rail:after {content:"";position:absolute;top:43px;bottom:-22px;width:1px;background:#e8dac9;left:50%;z-index:0;}
+#walletScreen .transaction-item:last-child .transaction-date-rail:after {display:none;}
+#walletScreen .transaction-date-rail i {width:6px;height:6px;border-radius:50%;background:#c4a889;margin-top:10px;z-index:1;}
+#walletScreen .transaction-entry {min-width:0;flex:1;display:flex;align-items:center;gap:10px;border:1px solid #f0e5d9;background:rgba(255,252,248,.88);border-radius:17px;padding:12px 11px;margin:0 0 9px;}
+#walletScreen .transaction-symbol {width:33px;height:33px;flex:0 0 33px;display:grid;place-items:center;border-radius:50%;background:#f5e9dc;color:#947253;font-size:18px;font-weight:400;}
+#walletScreen .transaction-name {font-size:12px;color:#584236;font-weight:600;overflow-wrap:anywhere;}
+#walletScreen .transaction-time {font-size:10px;color:#aa9280;margin-top:4px;}
+#walletScreen .transaction-amount {font:600 16px/1.2 'Cormorant Garamond',Georgia,serif;white-space:nowrap;}
+#walletScreen .transaction-amount.in {color:#58765a;}
+#walletScreen .transaction-amount.out {color:#ad634c;}
+#walletScreen .transaction-toggle {padding:16px;}
+@media(max-width:360px){#walletScreen .wallet-editorial{padding-top:20px}#walletScreen .transaction-date-rail{width:39px;flex-basis:39px}#walletScreen .transaction-entry{gap:7px;padding:10px 8px}#walletScreen .transaction-amount{font-size:14px}}
+
+/* ===== Chat visual V1: approved cream stationery design ===== */
+#chatScreen .chat-container { background:#F8F5EF; }
+#chatScreen .chat-header { background:rgba(255,253,249,.96); border-bottom:1px solid #E9E1D7; backdrop-filter:blur(16px); }
+#chatScreen .chat-header-center h3 { color:#493B33; font-size:14px; }
+#chatScreen .chat-header-meta { color:#938174; }
+#chatScreen .chat-back-btn,#chatScreen .call-btn,#chatScreen .thought-btn { color:#806650; background:#FFFEFB; border:1px solid #E8D9C8; box-shadow:0 2px 8px rgba(94,69,50,.06); }
+#chatScreen .chat-header-actions { gap:5px; }
+#chatScreen .call-btn,#chatScreen .thought-btn { width:33px;height:33px;align-items:center;justify-content:center;display:flex;padding:0; }
+#chatScreen .thought-btn-pulse { animation:thoughtPulseCream 1.8s ease-in-out infinite; }
+@keyframes thoughtPulseCream { 0%,100% { box-shadow:0 0 0 0 rgba(190,152,112,.15); } 50% { box-shadow:0 0 0 6px rgba(190,152,112,.12); background:#FFF8EF; } }
+#chatScreen .messages { background:#F8F5EF !important; background-image:none !important; padding:18px 14px; }
+#chatScreen .messages::before { display:none; }
+#chatScreen .message.bot .message-bubble { background:#FFFEFB; color:#4F4239; border:1px solid #E9E1D7; border-radius:18px 18px 18px 5px; box-shadow:0 2px 10px rgba(90,65,44,.055); }
+#chatScreen .message.user .message-bubble { background:#E8D5C2; color:#503C30; border:1px solid #E4CFBA; border-radius:18px 18px 5px 18px; box-shadow:0 2px 10px rgba(90,65,44,.07); }
+#chatScreen .message-bubble { line-height:1.55; }
+#chatScreen .message.bot .bubble-en { display:inline; white-space:pre-line; }
+#chatScreen .chat-heart { display:inline-flex; vertical-align:baseline; align-items:center; justify-content:center; margin-left:6px; padding:0; width:17px; height:17px; border:0; background:none; color:#B6A092; cursor:pointer; opacity:1; line-height:1; transform:translateY(2px); }
+#chatScreen .chat-heart svg { display:block; flex:none; }
+#chatScreen .chat-heart.is-collected { color:#B7837E; }
+#chatScreen .chat-heart.is-collected svg { fill:#B7837E; }
+#chatScreen .chat-heart:hover { color:#A87C70; transform:translateY(2px) scale(1.08); }
+#chatScreen .message-status,#chatScreen .message-time { color:#A59689; }
+#chatScreen .typing-indicator { background:#FFFEFB; border:1px solid #E9E1D7; }
+#chatScreen .typing-dot { background:#B9A084; }
+#chatScreen .input-area { background:rgba(255,253,249,.97); border-top:1px solid #E9E1D7; }
+#chatScreen .send-btn { background:#8E7560; color:#fff; box-shadow:0 2px 8px rgba(100,70,50,.13); }
+#chatScreen .send-btn:hover { background:#806650; box-shadow:0 3px 10px rgba(100,70,50,.16); }
+#chatScreen .thought-bubble { position:absolute; top:calc(77px + env(safe-area-inset-top)); right:15px; width:max-content; max-width:min(280px,calc(100vw - 34px)); padding:15px 17px 12px; text-align:left; background:#FFFDF9; border:1px solid #E7D5C2; border-radius:18px 5px 18px 18px; box-shadow:0 9px 28px rgba(92,63,40,.12); color:#655144; font-size:13px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+#chatScreen .thought-bubble::after { top:-6px;right:44px; transform:rotate(-45deg); background:#FFFDF9; border-color:#E7D5C2; }
+#chatScreen .thought-note-head { display:flex; gap:8px; align-items:center; font-family:Georgia,serif; letter-spacing:1.3px; font-size:10px; color:#A5866C; margin-bottom:12px; }
+#chatScreen .thought-note-feather { font-size:16px; color:#B59678; }
+#chatScreen .thought-note-sign { border-top:1px solid #EDE3D8; margin-top:12px; padding-top:7px; text-align:right; font-family:Georgia,serif; font-size:9px; letter-spacing:1.6px; color:#B5A394; }
+@media(max-width:390px) { #chatScreen .chat-header { padding-left:8px;padding-right:8px; } #chatScreen .chat-header-center { padding:0 7px; } #chatScreen .chat-header-actions { gap:3px; } #chatScreen .call-btn,#chatScreen .thought-btn { width:30px;height:30px; } }
+
+/* ===== Chat bottom controls V1.1 — photo only, no built-in sticker picker ===== */
+#chatScreen .plus-btn { width:40px; height:40px; border:1px solid #E7D7C6; background:#F7F0E8; color:#806650; font-size:23px; font-weight:300; box-shadow:none; }
+#chatScreen .plus-btn:active { background:#EEE2D5; }
+#chatScreen .input-field { min-width:0; min-height:40px; background:#FFFEFB; border:1px solid #E7D7C6; color:#4F4239; font-size:14px; border-radius:22px; }
+#chatScreen .input-field::placeholder { color:#B3A296; }
+#chatScreen .input-field:focus { border-color:#BDA58D; background:#FFFEFB; box-shadow:0 0 0 2px rgba(189,165,141,.12); }
+#chatScreen .plus-panel { display:flex; flex-direction:column; flex:0 0 auto; width:100%; max-height:none; overflow:visible; padding:12px 16px; background:#FFFDF9; border:0; border-top:1px solid #E9E1D7; border-radius:0; box-shadow:0 -4px 16px rgba(92,63,40,.045); box-sizing:border-box; }
+#chatScreen .plus-panel-actions { display:flex; align-items:center; justify-content:flex-start; gap:0; }
+#chatScreen .plus-action-btn { display:flex; flex-direction:row; align-items:center; gap:10px; padding:7px 12px; background:#F7F0E8; border:1px solid #E9DED1; border-radius:13px; min-height:48px; }
+#chatScreen .plus-action-btn:active { background:#EEE2D5; }
+#chatScreen .plus-action-icon { display:flex; align-items:center; justify-content:center; color:#806650; font-size:0; }
+#chatScreen .plus-action-label { color:#6A5547; font-size:13px; font-weight:500; }
+@media(max-width:768px) { #chatScreen .input-area { padding:9px 12px calc(9px + env(safe-area-inset-bottom)); gap:9px; align-items:center; } #chatScreen .plus-btn,#chatScreen .send-btn { width:40px;height:40px;flex:0 0 40px; } #chatScreen .input-field { padding:9px 13px;font-size:14px; } }

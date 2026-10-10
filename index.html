@@ -509,61 +509,6 @@
     .message.user .sticker-message { margin-left: auto; }
     .message.bot .sticker-message { margin-right: auto; }
 </style>
-<!-- Go Chat temporary maintenance overlay: remove this entire block to disable -->
-<style id="gc-maintenance-style">
-html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibility: hidden !important; }
-#gc-maintenance-overlay { position:fixed!important;inset:0!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:24px!important;min-height:100dvh!important;background:radial-gradient(ellipse at 15% 12%,#fffdf8 0%,#f8f2e9 55%,#f0e5d7 100%)!important;color:#4c382d!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;overflow:auto!important;visibility:visible!important;box-sizing:border-box!important; }
-#gc-maintenance-overlay * { box-sizing:border-box!important; }
-#gc-maintenance-overlay .gc-panel {width:100%;max-width:420px;padding:48px 34px 34px;text-align:center;border:1px solid rgba(169,132,99,.22);border-radius:24px;background:rgba(255,255,255,.68);box-shadow:0 20px 65px rgba(100,71,50,.09);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
-#gc-maintenance-overlay .gc-eyebrow {font-family:Georgia,serif;font-size:13px;letter-spacing:4px;color:#b3977e;margin-bottom:28px;}
-#gc-maintenance-overlay h1 {font-size:23px;letter-spacing:2px;font-weight:500;line-height:1.6;margin:0 0 14px;color:#49362c;}
-#gc-maintenance-overlay .gc-sub {font-size:13px;line-height:1.9;color:#998476;margin:0 0 42px;}
-#gc-maintenance-overlay .gc-rule {height:1px;width:55px;margin:0 auto 24px;background:#d9c2ab;}
-#gc-maintenance-overlay .gc-open {display:inline-block;border:0;background:transparent;color:#a28b78;font-size:12px;letter-spacing:1px;cursor:pointer;padding:8px 12px;}
-#gc-maintenance-overlay .gc-open:hover {color:#5d4334;}
-#gc-maintenance-overlay .gc-form {margin-top:18px;display:none;}
-#gc-maintenance-overlay .gc-form.gc-visible {display:block;}
-#gc-maintenance-overlay .gc-password {width:100%;height:44px;padding:0 14px;background:#fffdfb;border:1px solid #dbcbbb;border-radius:10px;font-size:14px;color:#49362c;outline:none;}
-#gc-maintenance-overlay .gc-password:focus {border-color:#b6987b;}
-#gc-maintenance-overlay .gc-submit {width:100%;height:43px;margin-top:12px;border:0;border-radius:10px;background:#80634e;color:#fff;font-size:13px;cursor:pointer;}
-#gc-maintenance-overlay .gc-error {font-size:12px;color:#a4524c;min-height:18px;margin-top:10px;}
-@media(max-width:480px){#gc-maintenance-overlay .gc-panel{padding:42px 24px 30px}}
-</style>
-<script id="gc-maintenance-script">
-(function(){
-  'use strict';
-  var key='gochat_maintenance_admin';
-  try { if (sessionStorage.getItem(key)==='1') { document.documentElement.classList.add('gc-maintenance-unlocked');return; } } catch(e) {}
-  function render(){
-    if(!document.body || document.getElementById('gc-maintenance-overlay'))return;
-    var overlay=document.createElement('div');
-    overlay.id='gc-maintenance-overlay';
-    overlay.setAttribute('role','dialog');
-    overlay.setAttribute('aria-modal','true');
-    overlay.setAttribute('aria-label','网站维护通知');
-    overlay.innerHTML='<div class="gc-panel"><div class="gc-eyebrow">GO CHAT</div><h1>网站正在维护</h1><p class="gc-sub">请耐心等待，感谢您的理解。</p><div class="gc-rule"></div><button type="button" class="gc-open">管理员入口</button><form class="gc-form"><input class="gc-password" type="password" placeholder="请输入维护密码" aria-label="维护密码" autocomplete="off" required><button class="gc-submit" type="submit">进入网站</button><div class="gc-error" role="alert"></div></form></div>';
-    document.body.appendChild(overlay);
-    var open=overlay.querySelector('.gc-open'),form=overlay.querySelector('.gc-form'),input=overlay.querySelector('.gc-password'),error=overlay.querySelector('.gc-error');
-    open.addEventListener('click',function(){form.classList.toggle('gc-visible');if(form.classList.contains('gc-visible'))input.focus();});
-    form.addEventListener('keydown',function(e){e.stopPropagation();});
-    form.addEventListener('submit',async function(e){
-      e.preventDefault();e.stopPropagation();error.textContent='';
-      var value=input.value;
-      try {
-        var bytes=new TextEncoder().encode(value);
-        var buffer=await crypto.subtle.digest('SHA-256',bytes);
-        var hash=Array.from(new Uint8Array(buffer)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
-        if(hash!== 'c7956ff2f8247ade9fe08e97365cb92d7652e18e660e6c7ff0cf073f65872870'){error.textContent='密码错误，请重试';input.value='';input.focus();return;}
-        try{sessionStorage.setItem(key,'1');}catch(err){}
-        document.documentElement.classList.add('gc-maintenance-unlocked');
-        overlay.remove();
-      } catch(err){error.textContent='验证暂时不可用，请刷新重试';}
-    });
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render,{once:true});else render();
-})();
-</script>
-<!-- End temporary maintenance overlay -->
 </head>
 <body>
 <!-- 维护模式已关闭 -->
@@ -639,7 +584,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
     </div>
 
 
-    <div class="home-editorial-intro"><div class="home-editorial-heading"><h2>Life at Home</h2><span>我们的生活，在这里延续</span></div><p>Same home. Different days. Always us.</p></div>
+    <div class="home-editorial-intro"><button type="button" id="walletCard" class="home-wallet-shortcut" onclick="openScreen('walletScreen')" aria-label="打开钱包" title="钱包"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6V4.5A2.5 2.5 0 0 1 6.5 2H19"/><rect x="2.5" y="6" width="19" height="15" rx="3"/><path d="M15 12h6v5h-6a2.5 2.5 0 0 1 0-5Z"/><circle cx="17.5" cy="14.5" r=".65" fill="currentColor" stroke="none"/></svg></button><div class="home-editorial-heading"><h2>Life at Home</h2><span>我们的生活，在这里延续</span></div><p>Same home. Different days. Always us.</p></div>
     <section class="home-story-section home-story-us">
       <button type="button" class="home-story-banner" onclick="openHomeStory('us')" aria-label="进入我们的故事详情页">
         <img src="images/ui-backgrounds/home/home-banner-us.png" alt="" loading="lazy" onerror="this.style.opacity='0'">
@@ -651,7 +596,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
       <button type="button" class="home-story-banner" onclick="openHomeStory('life')" aria-label="进入生活日常详情页">
         <img src="images/ui-backgrounds/home/home-banner-life.png" alt="" loading="lazy" onerror="this.style.opacity='0'">
         <span class="home-story-shade"></span>
-        <span class="home-story-copy"><span class="home-story-en"><small>02 /</small> LIFE</span><span class="home-story-zh">生活日常</span><span class="home-story-sub">商城 · 外卖 · 快递 · 钱包</span></span>
+        <span class="home-story-copy"><span class="home-story-en"><small>02 /</small> LIFE</span><span class="home-story-zh">生活日常</span><span class="home-story-sub">商城 · 外卖 · 快递 · 资产</span></span>
       </button>
     </section>
     <section class="home-story-section home-story-you">
@@ -661,119 +606,38 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
         <span class="home-story-copy"><span class="home-story-en"><small>03 /</small> YOU</span><span class="home-story-zh">你的世界</span><span class="home-story-sub">关于 · 忆书 · 职业 · 出行</span></span>
       </button>
     </section>
-    <!-- 首页栏目独立详情页：沿用原功能卡及其事件，不在首页展开 -->
-    <div id="homeStoryDetail" class="home-story-detail" hidden aria-hidden="true">
-      <header class="home-story-detail-header"><button type="button" class="home-story-back" onclick="closeHomeStory()" aria-label="返回首页">← <span>返回首页</span></button><span class="home-story-detail-brand">GO CHAT</span></header>
-      <div class="home-story-detail-page" data-home-story="us" hidden>
-        <div class="home-story-detail-cover home-story-detail-cover-us"><div class="home-story-detail-cover-shade"></div><div class="home-story-detail-heading"><span>01 / US</span><h2>我们的故事</h2><p>日历 · 珍藏 · 纪念 · 日记</p></div></div>
-        <div id="home-story-menu-us" class="home-story-menu">
-        <div class="us-row">
-        <div class="card photo-card" id="calendarCard" onclick="openScreen('calendarScreen');setTimeout(()=>{if(typeof initCalendar==='function')initCalendar();},80);">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-memories.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">日历</div>
-            <div class="photo-card-sub">MEMORIES</div>
-          </div>
-        </div>
-        <div class="card photo-card" onclick="openScreen('collectionScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-saved.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">珍藏</div>
-            <div class="photo-card-sub">SAVED</div>
-          </div>
-        </div>
-        <div class="card photo-card achievement-card" onclick="openScreen('achievementScreen');setTimeout(()=>{if(typeof renderLifeEventsAlbum==='function')renderLifeEventsAlbum();},80);">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">纪念</div>
-            <div class="photo-card-sub">MEMORIES</div>
-          </div>
-        </div>
-        </div>
-        <div class="card photo-card vocab-card" onclick="openScreen('diaryScreen');setTimeout(async()=>{if(typeof generateDiaryEntry==='function')await generateDiaryEntry();if(typeof renderDiary==='function')renderDiary();},80);">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-diary.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">日记</div>
-            <div class="photo-card-sub">GHOST'S DIARY</div>
-          </div>
-        </div>
-        </div>
-      </div>
-      </div>
-      <div class="home-story-detail-page" data-home-story="life" hidden>
-        <div class="home-story-detail-cover home-story-detail-cover-life"><div class="home-story-detail-cover-shade"></div><div class="home-story-detail-heading"><span>02 / LIFE</span><h2>生活日常</h2><p>商城 · 外卖 · 快递 · 钱包 · 资产</p></div></div>
-        <div id="home-story-menu-life" class="home-story-menu">
-        <div class="life-row">
-        <div class="card photo-card" onclick="openScreen('marketScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-market.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">商城</div>
-            <div class="photo-card-sub">NOA MARKET</div>
-          </div>
-        </div>
-        <div class="card photo-card" onclick="openScreen('takeoutScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-takeout.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">外卖</div>
-            <div class="photo-card-sub">TAKEOUT</div>
-          </div>
-        </div>
-        <div class="card photo-card" onclick="openScreen('deliveryScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-delivery.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">快递</div>
-            <div class="photo-card-sub">DELIVERY</div>
-          </div>
-        </div>
-        <div class="card photo-card" id="walletCard" onclick="openScreen('walletScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-wallet.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">钱包</div>
-            <div class="photo-card-sub">WALLET</div>
-          </div>
-        </div>
-        <div class="card photo-card" onclick="openScreen('assetsScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-mortgage.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">资产</div>
-            <div class="photo-card-sub">ASSETS</div>
-          </div>
-        </div>
-        </div>
-      </div>
-      </div>
-      <div class="home-story-detail-page" data-home-story="you" hidden>
-        <div class="home-story-detail-cover home-story-detail-cover-you"><div class="home-story-detail-cover-shade"></div><div class="home-story-detail-heading"><span>03 / YOU</span><h2>你的世界</h2><p>关于 · 忆书 · 职业 · 出行</p></div></div>
-        <div id="home-story-menu-you" class="home-story-menu">
-        <div class="you-row">
-        <div class="card photo-card" onclick="openScreen('meScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-secret.png" alt="">
-          <div class="photo-card-text"><div class="photo-card-title">关于</div><div class="photo-card-sub">ABOUT YOU</div></div>
-        </div>
-        <div class="card photo-card" onclick="openScreen('worldBookScreen');if(typeof renderWorldBook==='function')renderWorldBook();">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png" alt="">
-          <div class="photo-card-text"><div class="photo-card-title">忆书</div><div class="photo-card-sub">WORLD BOOK</div></div>
-        </div>
-        
-        <div class="card photo-card" onclick="openScreen('careerScreen');setTimeout(()=>{if(typeof renderCareerSelection==='function')renderCareerSelection();},80);">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-career.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">职业</div>
-            <div class="photo-card-sub">CAREER</div>
-          </div>
-        </div>
-        <div class="card photo-card" onclick="if(typeof showToast==='function')showToast('出行系统开发中，敬请期待～')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-travel.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">出行</div>
-            <div class="photo-card-sub">TRAVEL</div>
-          </div>
-        </div>
-        </div>
-      </div>
-      </div>
-    </div>
-    <!-- QQ群弹窗 -->
+    <!-- 三栏目详情页：共用纸张背景 / 左右交错卡片 / 保留原功能入口 -->
+    <div aria-hidden="true" class="home-story-detail" hidden="" id="homeStoryDetail">
+<header class="home-story-detail-header"><button aria-label="返回首页" class="home-story-back" onclick="closeHomeStory()" type="button">←</button><span class="home-story-detail-brand">GO CHAT</span></header>
+<section class="home-story-detail-page" data-home-story="us" hidden="">
+<div class="home-story-detail-heading"><span>01 / US</span><h2>我们的故事</h2><p>Some moments are meant to stay.</p></div>
+<div class="home-story-menu" id="home-story-menu-us"><div class="home-story-path"><svg class="home-story-thread" aria-hidden="true" focusable="false"></svg>
+<div class="card photo-card" id="calendarCard" onclick="openScreen('calendarScreen');setTimeout(()=&gt;{if(typeof initCalendar==='function')initCalendar();},80);"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><rect height="16" rx="2" width="18" x="3" y="5"></rect><path d="M7 3v4M17 3v4M3 10h18M8 14h2M13 14h2"></path></svg><div class="photo-card-title">日历</div><div class="photo-card-sub">CALENDAR</div><div class="photo-card-caption">一起走过的日子</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-memories.png"/></div>
+<div class="card photo-card" onclick="openScreen('collectionScreen')"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"></path></svg><div class="photo-card-title">珍藏</div><div class="photo-card-sub">KEEPSAKES</div><div class="photo-card-caption">舍不得遗忘的瞬间</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-saved.png"/></div>
+<div class="card photo-card achievement-card" onclick="openScreen('achievementScreen');setTimeout(()=&gt;{if(typeof renderLifeEventsAlbum==='function')renderLifeEventsAlbum();},80);"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"></path></svg><div class="photo-card-title">纪念</div><div class="photo-card-sub">MILESTONES</div><div class="photo-card-caption">属于我们的重要时刻</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png"/></div>
+<div class="card photo-card vocab-card" onclick="openScreen('diaryScreen');setTimeout(async()=&gt;{if(typeof generateDiaryEntry==='function')await generateDiaryEntry();if(typeof renderDiary==='function')renderDiary();},80);"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M12 6c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zM12 6v15"></path></svg><div class="photo-card-title">日记</div><div class="photo-card-sub">DIARY</div><div class="photo-card-caption">他未曾说出口的话</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-diary.png"/></div>
+</div></div>
+</section>
+<section class="home-story-detail-page" data-home-story="life" hidden="">
+<div class="home-story-detail-heading"><span>02 / LIFE</span><h2>生活日常</h2><p>A good life is made of small details.</p></div>
+<div class="home-story-menu" id="home-story-menu-life"><div class="home-story-path"><svg class="home-story-thread" aria-hidden="true" focusable="false"></svg>
+<div class="card photo-card" onclick="openScreen('marketScreen')"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M4 8h16l1 13H3L4 8zM9 9V6a3 3 0 0 1 6 0v3"></path></svg><div class="photo-card-title">商城</div><div class="photo-card-sub">SHOPPING</div><div class="photo-card-caption">生活所需</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-market.png"/></div>
+<div class="card photo-card" onclick="openScreen('takeoutScreen')"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M4 3v8a3 3 0 0 0 6 0V3M7 3v18M17 21V3c-5 2-5 10 0 10"></path></svg><div class="photo-card-title">外卖</div><div class="photo-card-sub">FOOD DELIVERY</div><div class="photo-card-caption">美味随时送达</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-takeout.png"/></div>
+<div class="card photo-card" onclick="openScreen('deliveryScreen')"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M2 6h12v12H2zM14 10h4l4 4v4h-8z"></path><circle cx="6" cy="19" r="2"></circle><circle cx="18" cy="19" r="2"></circle></svg><div class="photo-card-title">快递</div><div class="photo-card-sub">EXPRESS</div><div class="photo-card-caption">包裹里的期待</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-delivery.png"/></div>
+<div class="card photo-card" onclick="openScreen('assetsScreen')"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M4 20V12h4v8M10 20V7h4v13M16 20V3h4v17M2 21h20"></path></svg><div class="photo-card-title">资产</div><div class="photo-card-sub">ASSETS</div><div class="photo-card-caption">记录财务状况</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-mortgage.png"/></div>
+</div></div>
+</section>
+<section class="home-story-detail-page" data-home-story="you" hidden="">
+<div class="home-story-detail-heading"><span>03 / YOU</span><h2>你的世界</h2><p>A wider world for a deeper you.</p></div>
+<div class="home-story-menu" id="home-story-menu-you"><div class="home-story-path"><svg class="home-story-thread" aria-hidden="true" focusable="false"></svg>
+<div class="card photo-card" onclick="openScreen('secretScreen')"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M5 2h10l5 5v15H5zM15 2v5h5M8 12h9M8 16h9"></path></svg><div class="photo-card-title">关于</div><div class="photo-card-sub">ABOUT</div><div class="photo-card-caption">你的基本设置</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-secret.png"/></div>
+<div class="card photo-card" onclick="sessionStorage.setItem('worldBookSource','you');openScreen('worldBookScreen');if(typeof renderWorldBook==='function')renderWorldBook();"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M12 6c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zM12 6v15"></path></svg><div class="photo-card-title">忆书</div><div class="photo-card-sub">WORLD BOOK</div><div class="photo-card-caption">属于你的世界设定</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png"/></div>
+<div class="card photo-card" onclick="openScreen('careerScreen');setTimeout(()=&gt;{if(typeof renderCareerSelection==='function')renderCareerSelection();},80);"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><rect height="14" rx="2" width="20" x="2" y="7"></rect><path d="M8 7V4h8v3M2 13h20M10 12h4v3h-4z"></path></svg><div class="photo-card-title">职业</div><div class="photo-card-sub">CAREER</div><div class="photo-card-caption">你的工作与发展</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-career.png"/></div>
+<div class="card photo-card" onclick="if(typeof showToast==='function')showToast('出行系统开发中，敬请期待～')"><div class="photo-card-text"><svg aria-hidden="true" class="home-story-card-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24"><path d="M21 3 3 11l8 2 2 8 8-18zM11 13l10-10"></path></svg><div class="photo-card-title">出行</div><div class="photo-card-sub">TRAVEL</div><div class="photo-card-caption">去看更大的世界</div></div><img alt="" class="photo-card-img" src="images/ui-backgrounds/home/menu-travel.png"/></div>
+</div></div>
+</section>
+</div>
+<!-- QQ群弹窗 -->
     <div id="qqGroupModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
       <div style="background:white;border-radius:24px;padding:24px 20px;width:85%;max-width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
         <div style="font-size:18px;font-weight:900;color:#1e4020;margin-bottom:4px;">💬 加入反馈群</div>
@@ -832,7 +696,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
       <!-- 操作区 -->
       <div style="background:rgba(255,255,255,0.6);backdrop-filter:blur(14px);border-radius:16px;
         overflow:hidden;border:1px solid rgba(255,255,255,0.85);margin-bottom:12px;">
-        <div onclick="openScreen('worldBookScreen'); if(typeof renderWorldBook==='function') renderWorldBook();" style="padding:14px 16px;border-bottom:1px solid rgba(140,190,100,0.15);
+        <div onclick="sessionStorage.setItem('worldBookSource','me');openScreen('worldBookScreen'); if(typeof renderWorldBook==='function') renderWorldBook();" style="padding:14px 16px;border-bottom:1px solid rgba(140,190,100,0.15);
           display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
           <div style="font-size:13px;font-weight:600;color:#1e3d20;">📖 记忆世界书</div>
           <div style="font-size:13px;color:#aaa;">›</div>
@@ -867,23 +731,25 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
           </div>
         </div>
         <div class="chat-header-center">
-          <h3 id="chatBotName">Simon "Ghost" Riley</h3>
+          <h3 id="chatBotName">Simon Riley</h3>
           <div class="chat-header-meta">
             <span style="display:inline-flex;align-items:center;gap:4px;">
               <span style="width:6px;height:6px;background:#4ade80;border-radius:50%;display:inline-block;"></span>
-              <span>Online</span>
+              <span>在线</span>
             </span>
           </div>
           <div id="feedNewBadge" class="feed-new-badge" style="display:none;" onclick="openScreen('coupleScreen')">📸 有新动态</div>
         </div>
         <div class="chat-header-actions">
-          <button class="thought-btn" id="thoughtBtn" onclick="toggleThought()" title="他在想什么">💭</button>
+          <button class="call-btn" type="button" title="电话功能敬请期待" aria-label="电话功能敬请期待"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.5 19.5 0 0 1-8.5-3 19 19 0 0 1-5.8-5.8 19.5 19.5 0 0 1-3-8.6A2 2 0 0 1 4.5 2h3a2 2 0 0 1 2 1.7l.5 3a2 2 0 0 1-.6 1.8L7.6 10a16 16 0 0 0 6.4 6.4l1.5-1.8a2 2 0 0 1 1.8-.6l3 .5a2 2 0 0 1 1.7 1.8Z"/></svg></button>
+          <button class="thought-btn" id="thoughtBtn" onclick="toggleThought()" title="他的心声" aria-label="他的心声"><svg viewBox="0 0 40 40" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M27 10c5 1.3 8 5 8 9.6 0 3.4-1.7 6.4-4.5 8.2l.5 4.2-5.2-2.4-4.4.2"/><path d="M17.5 7C10 7 5 11.5 5 17.4c0 3.2 1.5 5.9 4 7.6l-1 5 5.5-2.4 4 .5c7.3 0 12.5-4.4 12.5-10.7S24.8 7 17.5 7Z"/><circle cx="12.5" cy="17.5" r="1" fill="currentColor"/><circle cx="17.5" cy="17.5" r="1" fill="currentColor"/><circle cx="22.5" cy="17.5" r="1" fill="currentColor"/></svg></button>
+          <button class="call-btn" type="button" onclick="document.querySelector('.ghost-avatar')?.click()" title="个人资料" aria-label="个人资料"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
         </div>
       </div>
 
       <!-- 思想气泡弹出 -->
       <div class="thought-bubble" id="thoughtBubble">
-        <span id="thoughtText">...</span>
+        <div class="thought-note-head"><span class="thought-note-feather">✦</span><span>INNER THOUGHTS</span></div><span id="thoughtText">...</span><div class="thought-note-sign">SIMON RILEY</div>
       </div>
 
       <div class="messages" id="messagesContainer" onclick="closePlusPanel()"></div>
@@ -894,63 +760,10 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
 
       <div class="plus-panel" id="plusPanel" style="display:none">
         <div class="plus-panel-actions">
-          <button class="plus-action-btn" onclick="toggleStickerFromPlus();" type="button">
-            <div class="plus-action-icon">🖼️</div>
-            <div class="plus-action-label">表情包</div>
+          <button class="plus-action-btn" type="button" onclick="closePlusPanel(); setTimeout(function(){ var i=document.getElementById('photoFileInput'); if(i){i.value='';i.click();} },80);" aria-label="发图片">
+            <span class="plus-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg></span>
+            <span class="plus-action-label">发图片</span>
           </button>
-          <button class="plus-action-btn" type="button" onclick="closePlusPanel(); setTimeout(function(){ var i=document.getElementById('photoFileInput'); if(i){i.value='';i.click();} },80);" style="cursor:pointer;">
-            <div class="plus-action-icon">📷</div>
-            <div class="plus-action-label">发图片</div>
-          </button>
-        </div>
-        <!-- 表情包子面板 -->
-        <div class="sticker-sub-panel" id="stickerSubPanel" style="display:none">
-          <div style="display:flex;justify-content:flex-end;padding:4px 8px 0;">
-            <button onclick="document.getElementById('stickerSubPanel').style.display='none'" style="background:none;border:none;font-size:18px;color:#4a8a30;cursor:pointer;padding:4px 8px;">✕</button>
-          </div>
-          <!-- emoji 快捷表情 -->
-          <div style="display:flex;flex-wrap:wrap;gap:4px;padding:6px 8px 8px;">
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😂</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">🤣</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😭</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">🥺</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😳</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">💀</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😏</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😤</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">🥰</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😍</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😘</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">💕</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😎</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">🤭</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😈</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">👻</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">🤔</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">😑</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">💔</button>
-            <button onclick="(function(){const i=document.getElementById('chatInput');if(i){i.value+=this.textContent;i.focus();if(typeof autoResizeInput==='function')autoResizeInput(i);}}).call(this)" style="font-size:24px;background:none;border:none;cursor:pointer;padding:2px;">🥳</button>
-          </div>
-          <div style="height:1px;background:rgba(90,160,70,0.14);margin:0 8px;"></div>
-          <!-- 猫猫表情包 -->
-          <div class="sticker-grid">
-            <div class="sticker-item" onclick="sendSticker('cry')"><img src="images/stickers/cry.png" alt="哭"></div>
-            <div class="sticker-item" onclick="sendSticker('shy')"><img src="images/stickers/shy.png" alt="害羞"></div>
-            <div class="sticker-item" onclick="sendSticker('angry')"><img src="images/stickers/angry.png" alt="生气"></div>
-            <div class="sticker-item" onclick="sendSticker('meh')"><img src="images/stickers/meh.png" alt="无语"></div>
-            <div class="sticker-item" onclick="sendSticker('star')"><img src="images/stickers/star.png" alt="星星眼"></div>
-            <div class="sticker-item" onclick="sendSticker('kiss')"><img src="images/stickers/kiss.png" alt="亲亲"></div>
-          </div>
-          <div class="sticker-series-label">🐱 Ghost猫猫 · 由 k教练 无偿创作，感谢💜</div>
-          <div class="sticker-grid">
-            <div class="sticker-item" onclick="sendSticker('cat-tired')"><img src="images/stickers/cat-tired.png" alt="累了"></div>
-            <div class="sticker-item" onclick="sendSticker('cat-neutral')"><img src="images/stickers/cat-neutral.png" alt="普通"></div>
-            <div class="sticker-item" onclick="sendSticker('cat-confused')"><img src="images/stickers/cat-confused.png" alt="疑惑"></div>
-            <div class="sticker-item" onclick="sendSticker('cat-sleepy')"><img src="images/stickers/cat-sleepy.png" alt="困了"></div>
-            <div class="sticker-item" onclick="sendSticker('cat-proud')"><img src="images/stickers/cat-proud.png" alt="得意"></div>
-            <div class="sticker-item" onclick="sendSticker('cat-bored')"><img src="images/stickers/cat-bored.png" alt="无聊"></div>
-            <div class="sticker-item" onclick="sendSticker('cat-rage')"><img src="images/stickers/cat-rage.png" alt="生气"></div>
-          </div>
         </div>
       </div>
 
@@ -977,9 +790,22 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
 
       <!-- 头像+名字 -->
       <div class="profile-header-v2">
-        <div class="profile-avatar-v2">
-          <img src="images/ghost-avatar.jpg" class="ghost-avatar-img" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
-          <div class="profile-online-dot-v2"></div>
+        <div class="profile-couple-art" aria-label="Ghost 与我的情侣头像">
+          <svg class="profile-handdrawn-heart" viewBox="0 0 340 210" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path class="profile-heart-stroke" d="M170 191 C145 170 39 123 33 73 C27 26 75 12 109 29 C134 41 151 58 170 77 C191 52 214 26 250 25 C298 24 319 60 307 99 C296 136 231 166 170 191Z"/>
+            <path class="profile-heart-echo" d="M171 197 C111 163 37 128 26 82"/>
+          </svg>
+          <div class="profile-couple-portraits">
+            <div class="profile-couple-person">
+              <div class="profile-couple-avatar profile-couple-avatar-ghost"><img src="images/ghost-avatar.jpg" class="ghost-avatar-img" alt="Ghost 的头像"></div>
+              <span>GHOST</span>
+            </div>
+            <svg class="profile-heartbeat" viewBox="0 0 74 35" fill="none" aria-hidden="true"><path d="M1 18 H18 L24 13 L30 26 L39 5 L47 22 L53 18 H73"/></svg>
+            <div class="profile-couple-person">
+              <div class="profile-couple-avatar profile-couple-avatar-user"><img id="profileUserAvatar" src="images/default-avatar.jpg" alt="我的头像"></div>
+              <span>YOU</span>
+            </div>
+          </div>
         </div>
 
         <div class="profile-names-v2">
@@ -996,14 +822,14 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
         </div>
 
         <div class="profile-signature-v2" id="profileSignatureV2">
-          "Long day."
+          <span class="profile-signature-placeholder">—</span>
         </div>
       </div>
 
       <!-- 我们在一起 -->
       <div class="profile-relationship-v2">
         <div class="profile-rel-label">我们在一起</div>
-        <div class="profile-rel-days" id="profileTogetherDays">0</div>
+        <div class="profile-rel-number"><span class="profile-rel-days" id="profileTogetherDays">0</span><span class="profile-rel-unit">天</span></div>
         <div class="profile-rel-since">Since <span id="profileSinceDate">2026.06.01</span></div>
       </div>
 
@@ -1016,10 +842,6 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
         <div class="profile-reality-item">
           <div class="profile-reality-main" id="profileWeatherV2">12°C</div>
           <div class="profile-reality-sub" id="profileWeatherDesc">多云</div>
-        </div>
-        <div class="profile-reality-item">
-          <div class="profile-reality-main" id="profileTimeV2">14:27</div>
-          <div class="profile-reality-sub">当地时间</div>
         </div>
       </div>
 
@@ -1042,18 +864,15 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 情侣空间 -->
   <div class="screen" id="coupleScreen">
 
-    <div class="couple-page-header">
+    <div class="couple-page-header lovespace-minimal-header">
       <button class="couple-back-btn" onclick="if(typeof getCurrentCharacter==='function'&&getCurrentCharacter()==='keegan'){if(typeof showToast==='function')showToast('🔒 Keegan 资料即将开放～');return;}openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);">‹</button>
-      <div class="couple-page-title">Love Space</div>
     </div>
 
-    <!-- Hero：保留现有封面图，只显示标题 -->
+    <!-- Love Space V3：桌面照片是固定装饰，用户封面独立叠在拍立得中 -->
     <div class="lovespace-hero">
-      <img src="images/couple/couple-banner.jpg" alt="Love Space" class="lovespace-hero-img" id="coupleBannerImg">
-      <div class="lovespace-hero-overlay"></div>
-      <div class="lovespace-hero-content">
-        <div class="lovespace-hero-title">Love Space</div>
-        <div class="lovespace-hero-names" id="lovespaceHeroNames">Sim💗 × YN</div>
+      <div class="lovespace-desk" aria-hidden="true"></div>
+      <div class="lovespace-polaroid">
+        <div class="lovespace-polaroid-photo"><img src="images/couple/couple-banner.jpg" alt="我们的封面照片" class="lovespace-hero-img" id="coupleBannerImg"></div>
       </div>
       <!-- 换封面按钮 -->
       <label for="coverUploadInput" class="lovespace-change-cover">
@@ -1092,6 +911,55 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
       <div id="couplePostsFeed"></div>
 
     </div>
+
+    <!-- coupleScreen 专用底部导航栏 -->
+    <div class="couple-tab-bar">
+      <div class="tab-bar-item" onclick="switchTab('main')">
+        <div class="tab-bar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3.5 10.5 12 4l8.5 6.5"/>
+            <path d="M5.5 9.5V19a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/>
+            <path d="M9.5 20v-5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V20"/>
+          </svg>
+        </div>
+        <div class="tab-bar-label">首页</div>
+      </div>
+      <div class="tab-bar-item" onclick="switchTab('chat')">
+        <div class="tab-bar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 15.5a1.5 1.5 0 0 1-1.5 1.5H8l-4 3.5V6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5z"/>
+            <circle cx="8.5" cy="11" r="0.6" fill="currentColor" stroke="none"/>
+            <circle cx="12" cy="11" r="0.6" fill="currentColor" stroke="none"/>
+            <circle cx="15.5" cy="11" r="0.6" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <div class="tab-bar-label">聊天</div>
+        <div class="tab-bar-dot" id="couple-dot-chat" style="display:none;"></div>
+      </div>
+      <div class="tab-bar-item tab-active">
+        <div class="tab-bar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="1.9"/>
+            <ellipse cx="12" cy="6.4" rx="2.1" ry="2.9"/>
+            <ellipse cx="12" cy="17.6" rx="2.1" ry="2.9"/>
+            <ellipse cx="6.4" cy="12" rx="2.9" ry="2.1"/>
+            <ellipse cx="17.6" cy="12" rx="2.9" ry="2.1"/>
+          </svg>
+        </div>
+        <div class="tab-bar-label">情侣空间</div>
+      </div>
+      <div class="tab-bar-item" onclick="switchTab('me')">
+        <div class="tab-bar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="3.4"/>
+            <path d="M5.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/>
+          </svg>
+        </div>
+        <div class="tab-bar-label">我的</div>
+        <div class="tab-bar-dot" id="couple-dot-me" style="display:none;"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- 角色个人朋友圈页 -->
@@ -1101,10 +969,10 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
       <div class="couple-page-title" id="charFeedTitle">动态</div>
     </div>
     <div class="charfeed-cover" id="charFeedCover">
-      <div class="charfeed-avatar" id="charFeedAvatar"></div>
-      <div class="charfeed-name" id="charFeedName">—</div>
-      <div class="charfeed-sub" id="charFeedSub">—</div>
+      <div class="charfeed-photo-frame"><div class="charfeed-avatar" id="charFeedAvatar"></div><span class="charfeed-photo-caption">a page of his own</span></div>
+      <div class="charfeed-info"><span class="charfeed-eyebrow">PERSONAL ALBUM</span><div class="charfeed-name" id="charFeedName">—</div><div class="charfeed-quote" id="charFeedQuote">His moments, kept here.</div><div class="charfeed-sub" id="charFeedSub">—</div></div>
     </div>
+    <div class="charfeed-section-heading"><span>他的动态</span><small>RECENT MOMENTS</small></div>
     <div class="charfeed-list" id="charFeedList"></div>
   </div>
 
@@ -1115,6 +983,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
       <div class="screen-title">我的钱包</div>
     </div>
     <div class="wallet-container">
+      <div class="wallet-editorial"><span>PRIVATE ACCOUNTS · RILEY</span><h2>Our Wallet</h2><p>账户与收支 · 每一笔都清清楚楚</p></div>
       <!-- 实体钱包+双卡 -->
       <div class="wallet-physical">
         <!-- 钱包底座 -->
@@ -1123,23 +992,23 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
         </div>
 
         <!-- Ghost Card (黑卡, 后层) -->
-        <div class="wallet-card-item wallet-card-ghost" id="ghostCardSlot" onclick="selectCard('ghost')">
+        <div class="wallet-card-item wallet-card-ghost" id="ghostCardSlot" role="button" tabindex="0" aria-label="选择 Ghost Card" aria-pressed="true" onclick="selectCard('ghost')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCard('ghost')}">
           <img src="images/wallet/ghost-card.png" alt="Ghost Card" class="card-bg">
           <div class="card-balance-overlay" id="ghostCardBalance">£0</div>
         </div>
 
         <!-- My Card (白卡, 前层) -->
-        <div class="wallet-card-item wallet-card-my" id="myCardSlot" onclick="selectCard('my')">
+        <div class="wallet-card-item wallet-card-my" id="myCardSlot" role="button" tabindex="0" aria-label="选择 My Card" aria-pressed="false" onclick="selectCard('my')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCard('my')}">
           <img src="images/wallet/my-card.png" alt="My Card" class="card-bg">
           <div class="card-balance-overlay" id="myCardBalance">£0</div>
           <div class="card-limit-mask"></div>
         </div>
       </div>
 
-      <!-- 卡片切换按钮 -->
-      <div class="card-tabs">
-        <button class="card-tab" id="tabGhost" onclick="selectCard('ghost')">Ghost Card</button>
-        <button class="card-tab" id="tabMy" onclick="selectCard('my')">My Card</button>
+      <div class="wallet-card-caption" aria-live="polite">
+        <span class="wallet-caption-rule"></span>
+        <span id="walletActiveLabel">GHOST CARD</span>
+        <span class="wallet-caption-rule"></span>
       </div>
 
       <!-- 卡片详情面板 -->
@@ -1179,7 +1048,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
 
       <!-- 交易记录 -->
       <div class="transaction-section">
-        <div class="transaction-header">交易记录</div>
+        <div class="transaction-header"><span>交易记录</span><small>TRANSACTIONS</small></div>
         <div id="transactionList"></div>
         <div id="transactionToggle" class="transaction-toggle" onclick="toggleTransactions()" style="display:none">
           <span class="toggle-text">展开全部 </span><span id="transactionToggleCount"></span><span class="toggle-arrow">▾</span>
@@ -1191,7 +1060,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 职业页 -->
   <div class="screen" id="careerScreen">
     <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <button class="back-button chat-back-btn" onclick="backToSection('you')">‹</button>
       <div class="screen-title">💼 我的职业</div>
     </div>
     <div id="careerSelectionContainer" style="overflow-y:auto;height:calc(100vh - 60px);-webkit-overflow-scrolling:touch;"></div>
@@ -1200,7 +1069,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- Ghost日记页 -->
   <div class="screen" id="diaryScreen">
     <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <button class="back-button chat-back-btn" onclick="backToSection('us')">‹</button>
       <div class="screen-title">📓 Ghost的日记</div>
     </div>
     <div id="diaryContainer" style="overflow-y:auto;height:calc(100vh - 60px);-webkit-overflow-scrolling:touch;background:linear-gradient(180deg,rgba(245,240,230,0.3),rgba(240,235,220,0.2));"></div>
@@ -1209,7 +1078,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 商城页 -->
   <div class="screen" id="marketScreen">
     <div class="market-hero">
-      <button class="back-button market-hero-back" onclick="openScreen('mainScreen')">‹</button>
+      <button class="back-button market-hero-back" onclick="backToSection('life')">‹</button>
       <div class="market-hero-copy">
         <div class="market-hero-eyebrow">a little more for your everyday</div>
         <h1 class="market-hero-title">NOA MARKET</h1>
@@ -1238,7 +1107,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 快递 V1「我的快递」主页 -->
   <div class="screen" id="deliveryScreen">
     <div class="dlv-hero">
-      <button class="dlv-hero-back" onclick="openScreen('mainScreen')" aria-label="返回">‹</button>
+      <button class="dlv-hero-back" onclick="backToSection('life')" aria-label="返回">‹</button>
       <div class="dlv-hero-copy">
         <h1 class="dlv-hero-title">DELIVERY</h1>
         <div class="dlv-hero-zh">我的快递</div>
@@ -1251,7 +1120,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- ASSETS V1 — 资产首页 -->
   <div class="screen" id="assetsScreen">
     <div class="asset-hero">
-      <button class="asset-hero-back" onclick="openScreen('mainScreen')" aria-label="返回">‹</button>
+      <button class="asset-hero-back" onclick="backToSection('life')" aria-label="返回">‹</button>
       <div class="asset-hero-copy">
         <div class="asset-hero-eyebrow">a life we build together</div>
         <h1 class="asset-hero-title">ASSETS</h1>
@@ -1677,7 +1546,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 我们的纪念册 -->
   <div class="screen" id="achievementScreen">
     <div class="screen-header" style="background:rgba(247,244,239,0.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(231,225,215,0.4);">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')" style="color:#1F2421;">‹</button>
+      <button class="back-button chat-back-btn" onclick="backToSection('us')" style="color:#1F2421;">‹</button>
       <div style="flex:1;text-align:center;">
         <div class="screen-title" style="color:#1F2421;font-size:16px;font-weight:600;letter-spacing:0.5px;">📖 我们的纪念册</div>
         <div style="font-size:11px;color:rgba(92,99,93,0.6);margin-top:2px;letter-spacing:0.3px;">一起走过的日子，都留在这里。</div>
@@ -1691,7 +1560,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
 
   <div class="screen" id="collectionScreen">
     <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <button class="back-button chat-back-btn" onclick="backToSection('us')">‹</button>
       <div class="screen-title">我的收藏</div>
     </div>
     <div class="collection-container" id="collectionList">
@@ -1701,7 +1570,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 记忆世界书 -->
   <div class="screen" id="worldBookScreen">
     <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('meScreen')">‹</button>
+      <button class="back-button chat-back-btn" onclick="if(sessionStorage.getItem('worldBookSource')==='me'){openScreen('meScreen');}else{backToSection('you');}">‹</button>
       <div class="screen-title">记忆世界书</div>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px 16px calc(90px + env(safe-area-inset-bottom));background:rgba(235,248,228,0.12);">
@@ -1750,7 +1619,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 日历页 -->
   <div class="screen" id="calendarScreen">
     <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <button class="back-button chat-back-btn" onclick="backToSection('us')">‹</button>
       <div class="screen-title">结婚纪念</div>
     </div>
     <!-- 特效粒子容器 -->
@@ -1808,7 +1677,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
   <!-- 秘密页 -->
   <div class="screen" id="secretScreen">
     <div class="screen-header">
-      <button class="back-button chat-back-btn" onclick="openScreen('mainScreen')">‹</button>
+      <button class="back-button chat-back-btn" onclick="backToSection('you')">‹</button>
       <div class="screen-title">💌 我的秘密</div>
     </div>
     <div class="secret-container">
@@ -3274,6 +3143,62 @@ function _updateMainCharInfo() {
 
 // ── 首页 Hero：用户本地时间的问候/日期/背景 + Ghost 真相源卡 ──
 // 独立于 _updateMainCharInfo，只管 Hero，不碰角色信息条逻辑。
+
+// US scrapbook thread: measure the actual cards and draw each connector in the
+// visible gap. No hard-coded viewport coordinates or lines hidden behind cards.
+function updateHomeStoryThread() {
+  var page = document.querySelector('#homeStoryDetail .home-story-detail-page:not([hidden])');
+  if (!page) return;
+  var track = page.querySelector('.home-story-path');
+  var svg = track && track.querySelector('.home-story-thread');
+  if (!svg) return;
+  var cards = Array.from(track.querySelectorAll(':scope > .photo-card'));
+  if (cards.length < 2) return;
+  var box = track.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+  var ns = 'http://www.w3.org/2000/svg';
+  svg.setAttribute('viewBox', '0 0 ' + box.width + ' ' + box.height);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.replaceChildren();
+  // V12: hand-drawn reference: LEFT / RIGHT / LEFT broad C-shaped ribbons.
+  // Each curve starts and ends underneath the paper, and bows through the
+  // visible outer gutter. The cards mask the ends; no stiff horizontal links.
+  cards.slice(0, -1).forEach(function(card, i) {
+    var a = card.getBoundingClientRect();
+    var b = cards[i + 1].getBoundingClientRect();
+    var leftSide = i % 2 === 0;
+    var x1 = (leftSide ? a.left + 16 : a.right - 16) - box.left;
+    var x2 = (leftSide ? b.left + 16 : b.right - 16) - box.left;
+    var y1 = a.top - box.top + a.height * .56;
+    var y2 = b.top - box.top + b.height * .45;
+    // V13: move each outer bend inward, into the visible floral gutter.
+    var gutterInset = Math.min(25, Math.max(18, box.width * .052));
+    var outer = leftSide ? gutterInset : box.width - gutterInset;
+    var dy = y2 - y1;
+    if (dy <= 15) return;
+    // A single cubic makes a large, calm outward C, not two tight hooks.
+    var d = 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
+      ' C ' + outer.toFixed(1) + ' ' + (y1 + dy * .06).toFixed(1) +
+      ', ' + outer.toFixed(1) + ' ' + (y2 - dy * .06).toFixed(1) +
+      ', ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
+    var path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+    // One quiet node at the outermost bend, not at the hidden endpoints.
+    var dot = document.createElementNS(ns, 'circle');
+    var midX = .125 * x1 + .75 * outer + .125 * x2;
+    var midY = (y1 + y2) / 2;
+    dot.setAttribute('cx', midX.toFixed(1));
+    dot.setAttribute('cy', midY.toFixed(1));
+    dot.setAttribute('r', '4');
+    svg.appendChild(dot);
+  });
+}
+window.addEventListener('resize', function() {
+  if (document.querySelector('#homeStoryDetail .home-story-detail-page:not([hidden])'))
+    requestAnimationFrame(updateHomeStoryThread);
+});
+
 function openHomeStory(section) {
   var overlay = document.getElementById('homeStoryDetail');
   if (!overlay || !['us','life','you'].includes(section)) return;
@@ -3285,6 +3210,7 @@ function openHomeStory(section) {
   overlay.scrollTop = 0;
   var main = document.getElementById('mainScreen');
   if (main) main.classList.add('home-story-detail-open');
+  requestAnimationFrame(updateHomeStoryThread);
 }
 function closeHomeStory() {
   var overlay = document.getElementById('homeStoryDetail');
@@ -3546,32 +3472,116 @@ body.theme-keegan #switchLoadingStatus { color:rgba(26,58,80,0.5); }
 .tab-active { color: #8a5a34; }
 .tab-active .tab-bar-label { color: #6b4a2c !important; font-weight: 700; }
 .tab-active .tab-bar-icon { color: #8a5a34; transform: translateY(-1px); }
+
+/* coupleScreen 专用底部导航栏 */
+#coupleScreen .couple-tab-bar {
+  position: fixed;
+  bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  height: calc(60px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(248,244,237,0.82);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(160,140,110,0.14);
+  box-shadow: 0 -4px 20px rgba(90,75,50,0.06);
+  display: none; /* 由 JavaScript 控制显示 */
+  align-items: flex-start;
+  padding-top: 8px;
+  z-index: 200;
+}
+
+/* coupleScreen Feed 区域需要底部留白 */
+#coupleScreen .lovespace-feed-section {
+  padding-bottom: calc(70px + env(safe-area-inset-bottom));
+}
 </style>
 
 <script>
 let _currentTab = 'main';
+// 页面来源记录，用于逐级返回
+let _pageSource = {};
+
+// 记录页面来源
+function _recordPageSource(targetScreen, sourceScreen) {
+  _pageSource[targetScreen] = sourceScreen;
+}
+
+// 返回到板块选择页（US / LIFE / YOU）
+function backToSection(section) {
+  if (!['us', 'life', 'you'].includes(section)) {
+    openScreen('mainScreen');
+    return;
+  }
+  // 先回到首页
+  openScreen('mainScreen');
+  // 延迟一点打开板块详情页，确保动画流畅
+  setTimeout(() => {
+    if (typeof openHomeStory === 'function') {
+      openHomeStory(section);
+    }
+  }, 50);
+}
+
+let _switchingTab = false; // 防止递归标志
 
 function switchTab(tab) {
-  if (tab === 'chat') { openScreen('chatScreen'); return; }
+  if (_switchingTab) return; // 防止递归
+  _switchingTab = true;
+
+  if (typeof closeHomeStory === 'function') closeHomeStory();
+
+  // 获取主导航栏
+  const mainTb = document.getElementById('mainTabBar');
+
+  // 切换 Tab 时隐藏 coupleScreen 导航栏（除非切换到 couple）
+  const coupleTb = document.querySelector('.couple-tab-bar');
+  if (coupleTb && tab !== 'couple') {
+    coupleTb.style.display = 'none';
+  }
+
+  if (tab === 'chat') {
+    _switchingTab = false;
+    openScreen('chatScreen');
+    return;
+  }
   if (tab === 'couple') {
+    _switchingTab = false;
     openScreen('coupleScreen');
     if (typeof initCoupleFeed === 'function') setTimeout(initCoupleFeed, 80);
     return;
   }
+
   _currentTab = tab;
-  ['mainScreen','meScreen'].forEach(id => {
+
+  // 隐藏所有主要 screen
+  ['mainScreen','meScreen','coupleScreen','chatScreen'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
+    if (el) {
+      el.style.display = 'none';
+      el.classList.remove('active');
+    }
   });
+
+  // 显示目标 screen
   const targetId = tab === 'main' ? 'mainScreen' : 'meScreen';
   const t = document.getElementById(targetId);
-  if (t) t.style.display = 'flex';
+  if (t) {
+    t.style.display = 'flex';
+    t.classList.add('active');
+  }
+
+  // 确保主导航栏显示
+  if (mainTb) {
+    mainTb.style.display = 'flex';
+  }
+
   // 同步邮箱到「我的」
   if (tab === 'me') {
     const email = localStorage.getItem('sb_user_email') || localStorage.getItem('userEmail') || '';
     const el = document.getElementById('me-account-email');
     if (el) el.textContent = email;
   }
+
   // 更新高亮
   ['main','chat','couple','me'].forEach(k => {
     const el = document.getElementById('tab-' + k);
@@ -3579,6 +3589,8 @@ function switchTab(tab) {
     if (el) { el.classList.toggle('tab-active', k === tab); }
     if (dot) dot.style.display = (k === tab) ? 'block' : 'none';
   });
+
+  _switchingTab = false;
 }
 
 // 显示 Tab Bar（登录后调用）
@@ -3591,7 +3603,15 @@ function showTabBar() {
 // 进入子页时隐藏 Tab Bar，返回主页时恢复
 const _origOpenScreen = window.openScreen;
 window.openScreen = function(screenId) {
+  if (typeof closeHomeStory === 'function') closeHomeStory();
   if (typeof _origOpenScreen === 'function') _origOpenScreen(screenId);
+
+  // 首先强制隐藏 coupleScreen 导航栏（当不是 coupleScreen 时）
+  const coupleTb = document.querySelector('.couple-tab-bar');
+  if (coupleTb) {
+    coupleTb.style.display = (screenId === 'coupleScreen') ? 'flex' : 'none';
+  }
+
   const tb = document.getElementById('mainTabBar');
   if (!tb) return;
   const hideFor = ['chatScreen','profileScreen','coupleScreen','walletScreen',
@@ -3600,7 +3620,7 @@ window.openScreen = function(screenId) {
     'achievementScreen','collectionScreen','calendarScreen','secretScreen','charFeedScreen'];
   if (screenId === 'mainScreen') {
     tb.style.display = 'flex';
-    switchTab(_currentTab === 'me' ? 'me' : 'main');
+    // 不再调用 switchTab，避免递归
   } else if (hideFor.includes(screenId)) {
     tb.style.display = 'none';
   } else {
@@ -3641,9 +3661,6 @@ function togglePlusPanel() {
   if (!panel) return;
   const isVisible = panel.style.display !== 'none';
   panel.style.display = isVisible ? 'none' : 'flex';
-  // 每次开关都重置子面板到关闭状态
-  const sub = document.getElementById('stickerSubPanel');
-  if (sub) sub.style.display = 'none';
 }
 
 function closePlusPanel() {
@@ -3651,14 +3668,6 @@ function closePlusPanel() {
   if (panel) panel.style.display = 'none';
 }
 
-// ===== 表情包面板（从加号入口打开）=====
-function toggleStickerFromPlus() {
-  const sub = document.getElementById('stickerSubPanel');
-  if (!sub) return;
-  const isOpen = sub.style.display !== 'none';
-  sub.style.display = isOpen ? 'none' : 'block';
-  // plusPanel 保持打开，只切换子面板
-}
 </script>
 
 

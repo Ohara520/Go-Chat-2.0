@@ -416,6 +416,17 @@ function initProfile() {
 // Profile V2 渲染
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+function refreshProfileUserAvatar(avatar) {
+  const img = document.getElementById('profileUserAvatar');
+  if (!img) return;
+  const raw = avatar || localStorage.getItem('userAvatarBase64') || '';
+  // 兼容旧版纯 base64 和新版完整 data URI，也兼容云端 http(s) URL。
+  const src = !raw ? getDefaultAvatar()
+    : (/^(data:image\/|https?:\/\/|blob:)/i.test(raw) ? raw : 'data:image/jpeg;base64,' + raw);
+  img.src = src;
+  img.onerror = function() { this.onerror = null; this.src = getDefaultAvatar(); };
+}
+
 function renderProfileV2() {
   // 备注名 / 真实姓名
   const remark = localStorage.getItem('botNickname') || '';
@@ -424,11 +435,22 @@ function renderProfileV2() {
     nicknameEl.textContent = remark || 'Sim💗';
   }
 
-  // 动态个签：本批只展示 placeholder，不做自动生成
+  // V3 只展示已有个签数据，不在资料页创建或随机更换台词。
   const sigV2El = document.getElementById('profileSignatureV2');
   if (sigV2El) {
-    sigV2El.textContent = '"Long day."';
+    let savedSignature = '';
+    try {
+      const raw = localStorage.getItem('profileSignature');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        savedSignature = [parsed.en, parsed.zh].filter(Boolean).join(' · ');
+      }
+    } catch(e) { /* malformed legacy signature: keep neutral fallback */ }
+    sigV2El.textContent = savedSignature || '—';
   }
+
+  // 资料页用户头像：优先本地已保存头像，未设置时显示默认图。
+  refreshProfileUserAvatar();
 
   // 我们在一起 X 天
   const marriageDate = localStorage.getItem('marriageDate') || '';
@@ -466,9 +488,7 @@ function renderProfileV2() {
     if (weatherDescEl) weatherDescEl.textContent = '—';
   }
 
-  // 当地时间
-  updateGhostLocalTime();
-  setInterval(updateGhostLocalTime, 10000);
+  // 资料页 V3 不展示当地钟点；全局 Ghost 时间事实函数保持不变。
 }
 
 async function updateWeatherV2(city) {
@@ -915,6 +935,7 @@ function updateAvatarEverywhere(base64) {
   };
   apply(document.getElementById('coupleCoverUserAvatar'));
   apply(document.getElementById('coupleUserAvatar'));
+  refreshProfileUserAvatar(base64);
 }
 
 

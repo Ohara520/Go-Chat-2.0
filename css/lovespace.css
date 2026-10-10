@@ -441,3 +441,100 @@
   height: 100%;
   object-fit: cover;
 }
+
+
+/* ===== Love Space V3 / desktop scrapbook ===== */
+#coupleScreen, #charFeedScreen { background:#f8f2eb; }
+#coupleScreen .couple-page-header, #charFeedScreen .couple-page-header { background:#f8f0e7; border-bottom:1px solid #e7d8ca; }
+#coupleScreen .couple-page-title, #charFeedScreen .couple-page-title { color:#604537; font-family:Georgia,'Times New Roman',serif; }
+.lovespace-hero { height:196px; border-radius:0 0 16px 16px; isolation:isolate; background:#bd9372; }
+.lovespace-desk { position:absolute;inset:0; background-image:url('../images/love-space-desk-bg.png');background-position:center 50%;background-size:cover; }
+.lovespace-hero::after { content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(60,34,20,.06),transparent 65%);pointer-events:none;z-index:0; }
+.lovespace-polaroid { position:absolute;z-index:2;left:24%;top:12px;width:132px;height:164px;box-sizing:border-box;padding:8px 8px 0;background:#fffaf2;box-shadow:0 5px 16px rgba(62,35,20,.3);transform:rotate(-6deg); }
+.lovespace-polaroid-photo { width:100%;height:122px;overflow:hidden;background:#e6d6c8; }
+.lovespace-hero-img {display:block;width:100%;height:100%;object-fit:cover;}
+.lovespace-polaroid-caption {font-family:Georgia,'Times New Roman',serif;font-size:10px;line-height:30px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#745446;}
+.lovespace-hero-stamp {position:absolute;z-index:2;right:13px;bottom:11px;font-family:Georgia,serif;font-size:9px;letter-spacing:1.6px;color:#fff8eb;text-shadow:0 1px 5px #65422f;}
+.lovespace-hero-overlay,.lovespace-hero-content {display:none;}
+.lovespace-change-cover {top:auto;right:auto;left:calc(24% + 103px);bottom:37px;width:30px;height:30px;background:rgba(106,69,52,.82);border:1px solid rgba(255,255,255,.8);box-shadow:0 2px 8px rgba(40,20,10,.25);}
+.lovespace-feed-section {background:#f8f2eb;padding:14px 13px 80px;}
+.lovespace-composer {background:#fffcf8;border-color:#e8d8c8;box-shadow:0 2px 10px rgba(102,67,48,.04);}
+#couplePostsFeed {gap:12px;}
+#couplePostsFeed .couple-post-card,#charFeedScreen .couple-post-card {background:#fffcf8;border:1px solid #ecded2;border-radius:15px;padding:15px;margin:0;box-shadow:0 3px 14px rgba(103,71,53,.05);}
+#couplePostsFeed .couple-post-name,#charFeedScreen .couple-post-name {color:#674738;}
+#couplePostsFeed .couple-post-en,#charFeedScreen .couple-post-en {color:#513d33;}
+#couplePostsFeed .couple-post-time,#charFeedScreen .couple-post-time {color:#a48a7b;}
+#couplePostsFeed .couple-post-photo img,#charFeedScreen .couple-post-photo img {border-radius:9px;}
+#couplePostsFeed .couple-like-btn.couple-liked,#charFeedScreen .couple-like-btn.couple-liked {color:#bc7966;}
+#charFeedScreen {background:#f8f2eb;overflow-y:auto;}
+#charFeedScreen .charfeed-cover {position:relative;box-sizing:border-box;min-height:194px;display:flex;flex-direction:row;align-items:center;gap:17px;padding:15px 18px 18px;background:radial-gradient(ellipse at 80% 15%,#f6e3d1,#ead6c4 75%,#e2c8b3);border-bottom:1px solid #dcc2ae;overflow:hidden;}
+#charFeedScreen .charfeed-cover::before {content:'';position:absolute;right:-15px;top:-30px;width:110px;height:140px;border:1px solid rgba(156,106,75,.17);transform:rotate(18deg);pointer-events:none;}
+#charFeedScreen .charfeed-photo-frame {position:relative;z-index:1;flex:0 0 126px;width:126px;height:163px;box-sizing:border-box;padding:8px;background:#fffbf4;box-shadow:0 5px 14px rgba(92,59,39,.21);transform:rotate(-6deg);}
+#charFeedScreen .charfeed-photo-frame::before {content:'';position:absolute;left:34px;top:-12px;width:62px;height:22px;background:rgba(209,166,121,.55);transform:rotate(7deg);z-index:3;}
+#charFeedScreen .charfeed-avatar {width:110px;height:120px;border:0;border-radius:0;background:#e5d2c3;box-shadow:none;overflow:hidden;font-size:44px;}
+#charFeedScreen .charfeed-avatar img {width:100%;height:100%;border-radius:0;object-fit:cover;}
+#charFeedScreen .charfeed-photo-caption {display:block;font:italic 10px Georgia,serif;text-align:center;line-height:26px;color:#8b6e5b;}
+#charFeedScreen .charfeed-info {position:relative;z-index:1;min-width:0;flex:1;color:#604639;}
+#charFeedScreen .charfeed-eyebrow {font:9px Georgia,serif;letter-spacing:1.3px;color:#a7816e;}
+#charFeedScreen .charfeed-name {font:600 21px Georgia,'Times New Roman',serif;color:#5d4033;margin:9px 0 8px;overflow-wrap:anywhere;}
+#charFeedScreen .charfeed-quote {font:italic 12px/1.55 Georgia,serif;color:#826354;}
+#charFeedScreen .charfeed-sub {font-size:11px;color:#a27f6e;margin-top:14px;padding-top:9px;border-top:1px solid rgba(144,99,73,.2);}
+#charFeedScreen .charfeed-section-heading {display:flex;justify-content:space-between;align-items:center;padding:17px 16px 8px;color:#674b3c;font-size:14px;font-weight:600;}
+#charFeedScreen .charfeed-section-heading small {font:9px Georgia,serif;letter-spacing:1px;color:#a78a79;}
+#charFeedScreen .charfeed-list {padding:5px 13px 80px;display:flex;flex-direction:column;gap:12px;}
+#charFeedScreen .couple-wedding {background:#fff7f1;border-color:#e5c4b4;}
+#charFeedScreen .couple-pinned-tag {background:#f5e5dd;color:#ad7264;}
+#charFeedScreen .couple-empty {color:#9d8375;}
+@media (max-width:360px) {
+ .lovespace-hero {height:185px;}
+ .lovespace-polaroid {left:22%;width:121px;height:152px;}
+ .lovespace-polaroid-photo {height:111px;}
+ .lovespace-change-cover {left:calc(22% + 94px);bottom:36px;}
+ #charFeedScreen .charfeed-cover {gap:12px;padding-left:14px;padding-right:12px;}
+ #charFeedScreen .charfeed-photo-frame {flex-basis:114px;width:114px;height:152px;}
+ #charFeedScreen .charfeed-avatar {width:98px;height:109px;}
+ #charFeedScreen .charfeed-name {font-size:19px;}
+}
+
+/* V3.1: compact back-only navigation and unclipped photo */
+#coupleScreen .couple-page-header.lovespace-minimal-header {
+  height:48px !important;min-height:48px !important;padding:0 12px !important;
+  display:flex;align-items:center;justify-content:flex-start;position:relative;
+  background:#f8f2eb;border-bottom:0;box-sizing:border-box;
+}
+#coupleScreen .lovespace-minimal-header .couple-back-btn {position:relative;top:auto;left:auto;margin:0;}
+#coupleScreen .lovespace-hero {height:196px !important;min-height:196px !important;flex-shrink:0;overflow:hidden;}
+#coupleScreen .lovespace-desk {background-image:url('../images/love-space-desk-bg.png');background-size:cover;background-position:center center;}
+#coupleScreen .lovespace-polaroid {top:14px;height:158px;padding-bottom:9px;}
+#coupleScreen .lovespace-polaroid-photo {height:100%;}
+#coupleScreen .lovespace-change-cover {bottom:30px;}
+@media(max-width:360px){#coupleScreen .lovespace-hero{height:185px !important;min-height:185px !important;}#coupleScreen .lovespace-polaroid{height:148px;}#coupleScreen .lovespace-change-cover{bottom:27px;}}
+
+/* V3.3 — wider, calmer hero polaroid; cover upload interface unchanged */
+#coupleScreen .lovespace-hero {
+  height:214px !important;
+  min-height:214px !important;
+}
+#coupleScreen .lovespace-polaroid {
+  left:32%;
+  top:13px;
+  width:168px;
+  height:187px;
+  padding:9px 9px 11px;
+  transform:rotate(-3deg);
+  transform-origin:center center;
+}
+#coupleScreen .lovespace-polaroid-photo {height:100%;}
+#coupleScreen .lovespace-change-cover {
+  left:calc(32% + 128px);
+  right:auto;
+  top:auto;
+  bottom:28px;
+  width:32px;
+  height:32px;
+}
+@media (max-width:360px) {
+  #coupleScreen .lovespace-hero {height:203px !important;min-height:203px !important;}
+  #coupleScreen .lovespace-polaroid {left:29%;top:12px;width:155px;height:177px;}
+  #coupleScreen .lovespace-change-cover {left:calc(29% + 116px);bottom:25px;}
+}

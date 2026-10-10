@@ -1541,6 +1541,8 @@ function renderCharFeed(authorKey) {
   if (nameEl) { nameEl.textContent = name; nameEl.className = 'charfeed-name ' + (actor.nameClass || ''); }
   const subEl = document.getElementById('charFeedSub');
   if (subEl) subEl.textContent = _charFeedSub(authorKey);
+  const quoteEl = document.getElementById('charFeedQuote');
+  if (quoteEl) quoteEl.textContent = authorKey === 'ghost' ? 'Still a ghost. Just married.' : 'His moments, kept here.';
 
   const list = document.getElementById('charFeedList');
   if (!list) return;
