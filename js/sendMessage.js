@@ -475,6 +475,11 @@ async function _commitPendingUserTurn() {
   _pendingUserTurn = [];
   _pendingTurnTimer = null;
 
+  // Bug A 修复：在更新时间戳前计算沉默间隔
+  if (typeof noteUserReturn === 'function') {
+    try { noteUserReturn(); } catch(e) {}
+  }
+
   // tickTurn 只调用一次（一个 semantic turn）
   if (typeof tickTurn === 'function') tickTurn();
 
@@ -529,10 +534,8 @@ async function sendMessage() {
   if (typeof trackUserActivityFromMessage === 'function') {
     try { trackUserActivityFromMessage(text); } catch(e) {}
   }
-  // 沉默间隔：先算出与上一条的间隔（≥4h 记成"刚回来"），再更新时间戳
-  if (typeof noteUserReturn === 'function') {
-    try { noteUserReturn(); } catch(e) {}
-  }
+  // Bug A 修复：noteUserReturn() 移到 _commitPendingUserTurn 内部，确保间隔计算在时间戳更新前完成
+  // 沉默间隔逻辑现在由 _processMergedMessage 顶部处理
 
   // User Turn Batching V1: 加入pending batch
   _addToPendingUserTurn({ type: 'text', content: text, timestamp: Date.now() });
@@ -583,10 +586,9 @@ async function _processMergedMessageWithContent(userContentForModel) {
 
   // Legacy comeback behavior director removed. Elapsed time is provided later as factual context only.
 
-  // 先捕获上一条消息时间戳，再覆盖为现在——_timeGapHint(下方) 要用旧值算间隔，
-  // 否则读到的永远是刚写入的 now，_gapMin 恒为 0，时间流逝提示成了死代码。
-  const _prevUserMessageAt = parseInt(localStorage.getItem('lastUserMessageAt') || '0');
-  localStorage.setItem('lastUserMessageAt', Date.now());
+  // Bug A 修复：移除此处的时间戳读取和更新
+  // _prevUserMessageAt 已在 _commitPendingUserTurn 内部由 noteUserReturn() 处理
+  // 此处重复更新会导致间隔计算失效（_gapMin 恒为 0）
 
   // Return Context V1: 当检测到 ≥1h gap 时，建立"这次回归事实"，
   // 在之后的连续聊天中持续提供，直到下次长间隔覆盖。
@@ -843,15 +845,17 @@ async function _processMergedMessageWithContent(userContentForModel) {
 
     // Return Context V1: 回归事实（描述本段聊天开始前她离开了多久）
     const _timeGapHint = (() => {
-      const _lastAt = _prevUserMessageAt;
-      if (!_lastAt) return '';
-      const _currentGapMin = Math.floor((Date.now() - _lastAt) / 60000);
+      // Bug A 修复：读取 noteUserReturn() 在 _commitPendingUserTurn 中记录的间隔
+      // 不再在此处读 lastUserMessageAt 计算（已被覆盖）
+      let savedGap = 0;
+      try {
+        savedGap = parseInt(sessionStorage.getItem('justReturnedGapMs') || '0');
+      } catch(e) {}
 
       // 检测到新的 ≥1h gap：建立/覆盖 return context
-      if (_currentGapMin >= 60) {
-        const _gapMs = Date.now() - _lastAt;
+      if (savedGap >= 60 * 60 * 1000) {
         localStorage.setItem('returnContext', JSON.stringify({
-          gapMs: _gapMs,
+          gapMs: savedGap,
           returnedAt: Date.now()
         }));
       }
@@ -883,13 +887,16 @@ async function _processMergedMessageWithContent(userContentForModel) {
       }
     })();
 
+    // Bug B 修复：Ghost 时间从 Ghost Time Authority 获取，用户时间从设备本地获取
     // 她直接问时间时，才给他自己那边的精确表（他知道自己几点，但从不知道她那边精确几点）
     const _timeAskHint = (() => {
       if (!/几点|什么时候.*点|现在.*点|what time|the time|time is it|time there|time over there/i.test(text)) return '';
-      const _ukNow = new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false
+      // 使用 Ghost Time Authority 获取 Ghost 所在地时间
+      const _ghostTimeZone = (typeof getGhostTimeZone === 'function') ? getGhostTimeZone() : 'Europe/London';
+      const _ghostNow = new Intl.DateTimeFormat('en-GB', {
+        timeZone: _ghostTimeZone, hour: '2-digit', minute: '2-digit', hour12: false
       }).format(new Date());
-      return `[She's asking about the time. It's ${_ukNow} your side (UK) — you can tell her your own time. You do NOT know her exact clock, only roughly what part of her day it is; don't state a number for her side.]`;
+      return `[She's asking about the time. It's ${_ghostNow} your side — you can tell her your own time. You do NOT know her exact clock, only roughly what part of her day it is; don't state a number for her side.]`;
     })();
 
     // Legacy work/apology and avatar response scripts removed.
@@ -1860,6 +1867,17 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
       .map(m => (m.content || '').trim().split('\n')[0].slice(0, 80))
       .filter(Boolean);
 
+    // Bug B 修复：计算用户时间段（与 persona.js 保持一致）
+    const nowForTime = new Date();
+    const userLocalHour = nowForTime.getHours();
+    const userTimeOfDay = (userLocalHour >= 23 || userLocalHour < 6) ? 'late night'
+      : userLocalHour < 9  ? 'morning'
+      : userLocalHour < 13 ? 'mid-morning'
+      : userLocalHour < 17 ? 'afternoon'
+      : userLocalHour < 21 ? 'evening'
+      : 'night';
+    const _userTimeContext = `\n\nTime context:\nHer current local part of day is ${userTimeOfDay}. Treat this as a shared-reality fact. Do not state a greeting, meal, sleep, or time claim that contradicts the known local time.`;
+
     // Gemini intimate system 职责顺序：
     // 1. Shared Ghost Core (buildSystemPromptParts().fixed) —— 单一 single source of truth
     // 2. runtime intimacy / relationship / emotional state（只真实状态，无 L0-L4 演法）
@@ -1888,8 +1906,8 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
       ? getAvatarNegotiationContext()
       : '';
     const _veniceSys = _dailyMode
-      ? _sharedGhostCore + _dailyContinueNote + '\n' + _intimacyBlock + _wbRecall + (_avatarNegotiationCtx ? '\n' + _avatarNegotiationCtx : '')
-      : _sharedGhostCore + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection + _wbRecall + (_avatarNegotiationCtx ? '\n' + _avatarNegotiationCtx : '');
+      ? _sharedGhostCore + _userTimeContext + _dailyContinueNote + '\n' + _intimacyBlock + _wbRecall + (_avatarNegotiationCtx ? '\n' + _avatarNegotiationCtx : '')
+      : _sharedGhostCore + _userTimeContext + _allowAdult + '\n' + _intimacyBlock + _geminiIntimacyPersona + _memorySection + _wbRecall + (_avatarNegotiationCtx ? '\n' + _avatarNegotiationCtx : '');
     const _veniceUser = recentMsgs + '\nHer: ' + text;
     let geminiReply = await callVeniceForCurrentChar(
       _veniceSys, _veniceUser, 200, _intimateMemoryCtx, _recentGhostRepliesForVenice, _images

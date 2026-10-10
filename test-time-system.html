@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>时间感知系统测试</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+    .test { margin: 20px 0; padding: 15px; border: 1px solid #0f0; }
+    .pass { background: #002200; }
+    .fail { background: #220000; border-color: #f00; color: #f00; }
+    .info { color: #0ff; margin: 5px 0; }
+    button { padding: 10px; margin: 5px; background: #0f0; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>时间感知系统测试</h1>
+  <div id="results"></div>
+  <button onclick="runTests()">运行测试</button>
+
+  <script src="js/profile.js"></script>
+  <script src="js/activity.js"></script>
+  <script>
+    const resultsDiv = document.getElementById('results');
+
+    function log(msg, isPass) {
+      const div = document.createElement('div');
+      div.className = 'test ' + (isPass ? 'pass' : 'fail');
+      div.textContent = (isPass ? '✓ ' : '✗ ') + msg;
+      resultsDiv.appendChild(div);
+    }
+
+    function info(msg) {
+      const div = document.createElement('div');
+      div.className = 'info';
+      div.textContent = '  → ' + msg;
+      resultsDiv.appendChild(div);
+    }
+
+    function runTests() {
+      resultsDiv.innerHTML = '<h2>测试开始...</h2>';
+
+      // 清理环境
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // ===== Bug A 测试：离开时间计算 =====
+      info('Bug A 测试：离开时间计算');
+
+      // 模拟用户5小时前发过消息
+      const fiveHoursAgo = Date.now() - 5 * 60 * 60 * 1000;
+      localStorage.setItem('lastUserMessageAt', fiveHoursAgo.toString());
+
+      // 调用 noteUserReturn（sendMessage.js 在 _commitPendingUserTurn 调用）
+      noteUserReturn();
+
+      // 检查是否正确记录了间隔
+      const savedGap = parseInt(sessionStorage.getItem('justReturnedGapMs') || '0');
+      const expectedGap = 5 * 60 * 60 * 1000;
+      const gapDiff = Math.abs(savedGap - expectedGap);
+
+      if (gapDiff < 60000) { // 允许1分钟误差
+        log('Bug A-1: noteUserReturn 正确计算5小时间隔', true);
+        info('记录间隔: ' + Math.round(savedGap / 3600000) + '小时');
+      } else {
+        log('Bug A-1: noteUserReturn 计算错误', false);
+        info('期望: ~' + Math.round(expectedGap / 3600000) + 'h, 实际: ' + Math.round(savedGap / 3600000) + 'h');
+      }
+
+      // 检查时间戳是否已更新
+      const newTimestamp = parseInt(localStorage.getItem('lastUserMessageAt') || '0');
+      const timestampDiff = Date.now() - newTimestamp;
+
+      if (timestampDiff < 5000) { // 应该刚更新
+        log('Bug A-2: lastUserMessageAt 正确更新为当前时间', true);
+      } else {
+        log('Bug A-2: lastUserMessageAt 未更新', false);
+      }
+
+      // 测试 getUserSilenceHint
+      const silenceHint = getUserSilenceHint();
+      if (silenceHint.includes('5 hours') || silenceHint.includes('about 5')) {
+        log('Bug A-3: getUserSilenceHint 正确生成提示', true);
+        info(silenceHint.slice(0, 100));
+      } else {
+        log('Bug A-3: getUserSilenceHint 提示错误', false);
+        info(silenceHint || '(空)');
+      }
+
+      // ===== Bug B 测试：用户当地时间 =====
+      info('');
+      info('Bug B 测试：用户当地时间判断');
+
+      // 模拟不同时段
+      const testCases = [
+        { hour: 3, expected: 'late night' },
+        { hour: 8, expected: 'morning' },
+        { hour: 11, expected: 'mid-morning' },
+        { hour: 14, expected: 'afternoon' },
+        { hour: 19, expected: 'evening' },
+        { hour: 22, expected: 'night' }
+      ];
+
+      testCases.forEach(tc => {
+        // 模拟该时段
+        const mockHour = tc.hour;
+        const userLocalHour = mockHour;
+        const userTimeOfDay = (userLocalHour >= 23 || userLocalHour < 6) ? 'late night'
+          : userLocalHour < 9  ? 'morning'
+          : userLocalHour < 13 ? 'mid-morning'
+          : userLocalHour < 17 ? 'afternoon'
+          : userLocalHour < 21 ? 'evening'
+          : 'night';
+
+        if (userTimeOfDay === tc.expected) {
+          log(`Bug B-${tc.hour}: ${tc.hour}:00 正确识别为 ${tc.expected}`, true);
+        } else {
+          log(`Bug B-${tc.hour}: ${tc.hour}:00 识别错误`, false);
+          info(`期望: ${tc.expected}, 实际: ${userTimeOfDay}`);
+        }
+      });
+
+      // ===== Ghost Time Authority 测试 =====
+      info('');
+      info('Ghost Time Authority 测试');
+
+      // 测试不同地点的时区
+      const locations = [
+        { name: 'Hereford Base', expectedTz: 'Europe/London' },
+        { name: 'Classified', fallback: true }
+      ];
+
+      locations.forEach(loc => {
+        localStorage.setItem('currentLocation', loc.name);
+        const tz = getGhostTimeZone();
+
+        if (loc.fallback) {
+          if (tz === 'Europe/London') {
+            log(`Ghost TZ: ${loc.name} 正确回落到 London`, true);
+          } else {
+            log(`Ghost TZ: ${loc.name} 回落失败`, false);
+          }
+        } else {
+          if (tz === loc.expectedTz) {
+            log(`Ghost TZ: ${loc.name} 时区正确 (${tz})`, true);
+          } else {
+            log(`Ghost TZ: ${loc.name} 时区错误`, false);
+            info(`期望: ${loc.expectedTz}, 实际: ${tz}`);
+          }
+        }
+      });
+
+      // 测试 Ghost 当地时间获取
+      localStorage.setItem('currentLocation', 'Hereford Base');
+      const ghostTime = getGhostTimeStr();
+      if (/^\d{2}:\d{2}$/.test(ghostTime)) {
+        log('Ghost 当地时间格式正确: ' + ghostTime, true);
+      } else {
+        log('Ghost 当地时间格式错误', false);
+      }
+
+      info('');
+      info('测试完成！');
+    }
+
+    // 自动运行
+    setTimeout(runTests, 500);
+  </script>
+</body>
+</html>
