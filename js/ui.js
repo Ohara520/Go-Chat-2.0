@@ -347,6 +347,15 @@ function appendMessage(role, text, animate = true) {
       thoughtBtn.classList.remove('thought-btn-pulse');
     }
 
+    // 🔊 语音按钮：每条 Ghost 消息自动添加小喇叭（按需生成，不消耗 API）
+    if (typeof addVoiceButtonToMessage === 'function') {
+      try {
+        const messageText = bubble.querySelector('.bubble-en')?.textContent || bubble.textContent;
+        addVoiceButtonToMessage(contentDiv, messageText);
+      } catch(e) {
+        console.warn('[voice] Failed to add voice button:', e);
+      }
+    }
 
   }
 

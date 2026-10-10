@@ -345,7 +345,105 @@ function createVoiceBar(text) {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⑥ 追加语音消息到聊天框
+// ⑥ 为消息添加语音按钮（不主动生成，点击时才调用 TTS）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function addVoiceButtonToMessage(contentDiv, messageText) {
+  if (!contentDiv || !messageText || !messageText.trim()) return;
+
+  // 过滤：超长文本不适合语音
+  if (messageText.length > 300) return;
+
+  const voiceBtn = document.createElement('button');
+  voiceBtn.type = 'button';
+  voiceBtn.className = 'message-voice-btn';
+  voiceBtn.setAttribute('aria-label', '播放语音');
+  voiceBtn.title = '播放语音';
+
+  // 复古线稿小喇叭 SVG（奶油信纸风格）
+  voiceBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+      <path d="M15.5 8.5c.8.8 1.3 2 1.3 3.2s-.5 2.4-1.3 3.2"/>
+      <path d="M18.4 5.6a9 9 0 0 1 0 12.8"/>
+    </svg>
+  `;
+
+  let _url = null;
+  let _audio = null;
+  let _loading = false;
+
+  async function _play() {
+    if (_loading) return;
+    _stopCurrent();
+
+    // 首次点击：生成语音
+    if (!_url) {
+      _loading = true;
+      voiceBtn.classList.add('voice-btn-loading');
+      _url = await generateVoice(messageText);
+      _loading = false;
+      voiceBtn.classList.remove('voice-btn-loading');
+
+      if (!_url) {
+        voiceBtn.classList.add('voice-btn-error');
+        setTimeout(() => voiceBtn.classList.remove('voice-btn-error'), 2000);
+        return;
+      }
+    }
+
+    // 播放
+    _audio = new Audio(_url);
+    _globalAudio = _audio;
+    _globalStopFn = () => {
+      _audio.pause();
+      voiceBtn.classList.remove('voice-btn-playing');
+    };
+
+    voiceBtn.classList.add('voice-btn-playing');
+
+    _audio.onended = () => {
+      voiceBtn.classList.remove('voice-btn-playing');
+      _globalAudio = null;
+      _globalStopFn = null;
+    };
+
+    _audio.onerror = () => {
+      voiceBtn.classList.remove('voice-btn-playing');
+      voiceBtn.classList.add('voice-btn-error');
+      setTimeout(() => voiceBtn.classList.remove('voice-btn-error'), 2000);
+      _globalAudio = null;
+    };
+
+    _audio.play().catch(() => {
+      voiceBtn.classList.remove('voice-btn-playing');
+    });
+  }
+
+  voiceBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (_audio && !_audio.paused) {
+      _audio.pause();
+      voiceBtn.classList.remove('voice-btn-playing');
+    } else {
+      _play();
+    }
+  });
+
+  // 插入到 contentDiv（在 inner-thought 之前）
+  const innerThought = contentDiv.querySelector('.inner-thought');
+  if (innerThought) {
+    contentDiv.insertBefore(voiceBtn, innerThought);
+  } else {
+    contentDiv.appendChild(voiceBtn);
+  }
+}
+
+window.addVoiceButtonToMessage = addVoiceButtonToMessage;
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ⑦ 旧版：追加独立语音消息到聊天框（已废弃，保留向后兼容）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function appendVoiceMessage(text) {

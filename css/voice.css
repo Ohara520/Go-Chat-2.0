@@ -1,14 +1,100 @@
 /* ============================================================
-   voice.css — 语音功能样式 v2.0
+   voice.css — 语音功能样式 v2.1
    配色适配 Go Chat 绿色主题（#5a9a46 / #1e4020）
 
-   § 1  日常聊天：语音条（.vc-bar-wrap）
-   § 2  约会场景：小喇叭按钮（.date-spk-btn）
+   § 1  消息内小喇叭按钮（.message-voice-btn）— 新版
+   § 2  日常聊天：语音条（.vc-bar-wrap）— 旧版保留
+   § 3  约会场景：小喇叭按钮（.date-spk-btn）
 ============================================================ */
 
 
 /* ══════════════════════════════════════════════════════════
-   § 1  日常聊天语音条
+   § 1  消息内小喇叭按钮（每条 Ghost 消息自动添加）
+   ══════════════════════════════════════════════════════════ */
+
+.message-voice-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-top: 6px;
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(60, 110, 40, 0.12);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.message-voice-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: rgba(60, 110, 40, 0.65);
+  transition: stroke 0.2s;
+}
+
+.message-voice-btn:hover {
+  background: rgba(90, 154, 70, 0.08);
+  box-shadow: 0 2px 6px rgba(60, 110, 40, 0.18);
+}
+
+.message-voice-btn:hover svg {
+  stroke: rgba(60, 110, 40, 0.85);
+}
+
+.message-voice-btn:active {
+  transform: scale(0.92);
+}
+
+/* 播放中状态 */
+.message-voice-btn.voice-btn-playing {
+  background: rgba(90, 154, 70, 0.12);
+  box-shadow: 0 2px 8px rgba(60, 110, 40, 0.25);
+}
+
+.message-voice-btn.voice-btn-playing svg {
+  stroke: #5a9a46;
+  animation: voicePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voicePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 加载中状态 */
+.message-voice-btn.voice-btn-loading {
+  background: rgba(90, 154, 70, 0.06);
+  cursor: wait;
+}
+
+.message-voice-btn.voice-btn-loading svg {
+  stroke: rgba(60, 110, 40, 0.4);
+  animation: voiceSpin 1s linear infinite;
+}
+
+@keyframes voiceSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 错误状态 */
+.message-voice-btn.voice-btn-error {
+  background: rgba(200, 80, 80, 0.08);
+  box-shadow: 0 1px 4px rgba(200, 80, 80, 0.15);
+}
+
+.message-voice-btn.voice-btn-error svg {
+  stroke: rgba(200, 80, 80, 0.7);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   § 2  日常聊天语音条（旧版，保留向后兼容）
    ══════════════════════════════════════════════════════════ */
 
 /* 消息行（与 .bot-message 布局并列） */
@@ -171,7 +257,7 @@
 
 
 /* ══════════════════════════════════════════════════════════
-   § 2  约会场景：小喇叭按钮
+   § 3  约会场景：小喇叭按钮
    ══════════════════════════════════════════════════════════ */
 
 /* 约会气泡本身需要留右下角空间 */

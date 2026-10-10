@@ -139,6 +139,9 @@ async function checkAndGenerateInnerThought(replyText, innerThoughtEl) {
     && lastUserMsg.length > 30
     && !isStubborn;
 
+  // 场景9：冷战破冰（预留，V1 暂不实现）
+  const coldWarCracking = false;
+
   // ── 冷却判断（改为基于时间，修复 #074/#075）────────────
   // 旧版用消息计数，换设备后计数归零导致永久冷却
   // 新版用时间戳，绝对值，换设备不受影响
