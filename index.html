@@ -1622,43 +1622,26 @@
       <button class="back-button chat-back-btn" onclick="backToSection('us')">‹</button>
       <div class="screen-title">结婚纪念</div>
     </div>
-    <!-- 特效粒子容器 -->
-    <div id="calendarParticles" style="position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;"></div>
     <div class="calendar-container">
       <div class="marriage-stats">
-        <div class="stat-card">
-          <div class="stat-label">结婚天数</div>
-          <div class="stat-value" id="marriageDays">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label" id="countdownLabel">距离52天</div>
-          <div class="stat-value" id="nextMilestoneDays">—</div>
+        <div class="stat-card calendar-hero">
+          <div class="stat-label">TOGETHER SINCE</div>
+          <div class="stat-value" id="marriageDays">0</div><span class="marriage-hero-unit">天</span>
+          <div class="marriage-date-display"><strong id="marriageDateDisplay">—</strong></div>
         </div>
       </div>
-
-      <div class="milestone-section">
-        <div class="milestone-title">🎉 重要纪念</div>
-        <div id="milestonesContainer"></div>
-      </div>
-
-      <div class="marriage-date-display">
-        结婚日期：<strong id="marriageDateDisplay">—</strong>
-      </div>
-
-      <!-- 签到区域 -->
-      <div class="checkin-section">
-        <div class="checkin-info">
-          <div class="checkin-stat">
+      <div class="calendar-paper-strips">
+        <div class="milestone-section">
+          <div class="milestone-title">重要纪念</div>
+          <div id="milestonesContainer"></div>
+        </div>
+        <div class="checkin-section">
+          <div class="checkin-info"><div class="checkin-stat">
             <span class="checkin-label">连续签到</span>
-            <span class="checkin-value" id="checkinStreak">0</span>
-            <span class="checkin-unit">天</span>
-          </div>
-          <div class="checkin-stat">
-            <span class="checkin-label">余额</span>
-            <span class="checkin-value" id="checkinBalance">£0</span>
-          </div>
+            <span class="checkin-value" id="checkinStreak">0</span><span class="checkin-unit">天</span>
+          </div></div>
+          <div class="checkin-hint" id="checkinHint">点击今天的日期签到</div>
         </div>
-        <div class="checkin-hint" id="checkinHint">点击今天的日期签到 ✨</div>
       </div>
 
       <div class="calendar">

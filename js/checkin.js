@@ -116,24 +116,25 @@ function renderCheckin() {
     const btnText = btnEl.querySelector('#checkinBtnText');
     if (doneToday) {
       btnEl.classList.add('done');
-      if (btnText) btnText.textContent = '✅ 今日已签到';
+      if (btnText) btnText.textContent = '今日已签到';
     } else {
       btnEl.classList.remove('done');
-      if (btnText) btnText.textContent = '📅 今日签到';
+      if (btnText) btnText.textContent = '今日签到';
     }
   }
 
   if (hintEl) {
     if (isNewMonth && !doneToday) {
-      hintEl.textContent = '新的一月开始了，来签到吧 🌙';
+      hintEl.textContent = '新的一月开始了，来签到吧';
     } else if (!doneToday) {
       const bonus = nextMilestone ? CHECKIN_MILESTONES[nextMilestone] : null;
       hintEl.textContent = bonus
-        ? `本月第${monthlyCount + 1}次签到，距里程碑还差${nextMilestone - monthlyCount}次，奖励+${bonus}条 🎯`
-        : '点击今天的日期签到 ✨';
+        ? `本月第${monthlyCount + 1}次签到，距里程碑还差${nextMilestone - monthlyCount}次，奖励+${bonus}条`
+        : '点击今天的日期签到';
     } else {
-      hintEl.textContent = '明天再来签到吧 🌸';
+      hintEl.textContent = '明天再来签到吧';
     }
+    hintEl.textContent = hintEl.textContent.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').trim();
   }
 }
 
@@ -294,7 +295,6 @@ function doCheckin() {
   showCheckinResult(rewardMsg + baristaMsg + milestoneMsg + streakMsg, streak);
   renderCheckin();
   if (typeof initCalendar === 'function') initCalendar();
-  launchCheckinFlowers();
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
@@ -305,60 +305,47 @@ function doCheckin() {
 
 function showCheckinResult(msg, streak) {
   document.getElementById('checkinResultModal')?.remove();
-
-  const lines           = msg.split('\n').filter(Boolean);
-  const mainReward      = lines[0] || '';
-  const baristaReward   = lines.find(l => l.includes('☕')) || '';
-  const milestoneReward = lines.find(l => l.includes('🏆')) || '';
-  const streakReward    = lines.find(l => l.includes('🔥') || l.includes('👑')) || '';
-  const isLucky         = mainReward.includes('🎰');
-  const hasExtra        = baristaReward || milestoneReward || streakReward;
-
+  const lines = msg.split('\n').filter(Boolean);
+  const clean = s => s.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').trim();
   const modal = document.createElement('div');
-  modal.id    = 'checkinResultModal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);';
-  modal.innerHTML = `
-    <div style="background:white;border-radius:24px;padding:28px 24px;width:280px;text-align:center;box-shadow:0 20px 60px rgba(100,0,200,0.15);">
-      <div style="font-size:44px;margin-bottom:8px">${isLucky ? '🎰' : '🌸'}</div>
-      <div style="font-size:15px;font-weight:700;color:#3a1a60;margin-bottom:4px">${isLucky ? '欧气签到！' : '签到成功'}</div>
-      <div style="font-size:12px;color:#b0a0c8;margin-bottom:16px">连续签到第 ${streak} 天</div>
-      <div style="background:${isLucky ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : 'rgba(168,85,247,0.08)'};border:1.5px solid ${isLucky ? 'rgba(251,191,36,0.5)' : 'rgba(168,85,247,0.2)'};border-radius:14px;padding:14px;margin-bottom:${hasExtra ? '10px' : '20px'};">
-        <div style="font-size:20px;font-weight:800;color:${isLucky ? '#b45309' : '#7c3aed'}">${mainReward.replace(/[💰💬🎰]/g, '').trim()}</div>
-      </div>
-      ${baristaReward ? `<div style="background:rgba(139,90,43,0.08);border:1px solid rgba(139,90,43,0.2);border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#8b5a2b;font-weight:600;">${baristaReward}</div>` : ''}
-      ${milestoneReward ? `<div style="background:rgba(236,72,153,0.08);border:1px solid rgba(236,72,153,0.2);border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#be185d;font-weight:600;">${milestoneReward}</div>` : ''}
-      ${streakReward    ? `<div style="background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2);border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#ea580c;font-weight:600;">${streakReward}</div>` : ''}
-      <div style="margin-top:${hasExtra ? '0' : '0'}">
-        <button onclick="document.getElementById('checkinResultModal').remove()" style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:15px;font-weight:600;cursor:pointer;">好的 ✨</button>
-      </div>
-    </div>
-  `;
+  modal.id = 'checkinResultModal';
+  modal.className = 'calendar-checkin-overlay';
+  const paper = document.createElement('section');
+  paper.className = 'calendar-checkin-paper';
+  const kicker = document.createElement('div');
+  kicker.className = 'calendar-checkin-kicker'; kicker.textContent = 'CHECK-IN';
+  const title = document.createElement('h2');
+  title.textContent = lines[0]?.includes('欧气') ? '幸运签到' : '签到成功';
+  const streakText = document.createElement('p');
+  streakText.className = 'calendar-checkin-streak';
+  streakText.textContent = `连续签到第 ${streak} 天`;
+  const reward = document.createElement('div');
+  reward.className = 'calendar-checkin-reward';
+  reward.textContent = clean(lines[0] || '签到完成');
+  paper.append(kicker, title, streakText, reward);
+  if (lines.length > 1) {
+    const details = document.createElement('div');
+    details.className = 'calendar-checkin-details';
+    lines.slice(1).forEach(line => {
+      const p = document.createElement('p');
+      p.textContent = clean(line);
+      details.appendChild(p);
+    });
+    paper.appendChild(details);
+  }
+  const close = document.createElement('button');
+  close.type = 'button'; close.className = 'calendar-checkin-close';
+  close.textContent = '好的';
+  close.onclick = () => modal.remove();
+  paper.appendChild(close);
+  modal.appendChild(paper);
   modal.onclick = e => { if (e.target === modal) modal.remove(); };
   document.body.appendChild(modal);
 }
-
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 花瓣动画（手机/电脑通用）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function launchCheckinFlowers() {
-  const flowers = ['🌸', '🌺', '🌼', '💮', '🌷', '✨'];
-  for (let i = 0; i < 18; i++) {
-    const el = document.createElement('div');
-    el.textContent = flowers[Math.floor(Math.random() * flowers.length)];
-    el.style.cssText = `
-      position: fixed;
-      font-size: ${Math.random() * 14 + 12}px;
-      left: ${Math.random() * 100}%;
-      bottom: -40px;
-      opacity: 1;
-      z-index: 99999;
-      pointer-events: none;
-      animation: flowerRise ${Math.random() * 1.5 + 1.5}s ease-out forwards;
-      animation-delay: ${Math.random() * 0.8}s;
-    `;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 3500);
-  }
-}
+// V2.3: 签到后不再产生任何掉落物或花瓣特效。
+function launchCheckinFlowers() {}

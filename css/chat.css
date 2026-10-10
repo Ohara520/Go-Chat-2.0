@@ -3844,3 +3844,389 @@ body.theme-keegan .it-en { color: rgba(220,240,250,0.95); }
 #chatScreen .plus-action-icon { display:flex; align-items:center; justify-content:center; color:#806650; font-size:0; }
 #chatScreen .plus-action-label { color:#6A5547; font-size:13px; font-weight:500; }
 @media(max-width:768px) { #chatScreen .input-area { padding:9px 12px calc(9px + env(safe-area-inset-bottom)); gap:9px; align-items:center; } #chatScreen .plus-btn,#chatScreen .send-btn { width:40px;height:40px;flex:0 0 40px; } #chatScreen .input-field { padding:9px 13px;font-size:14px; } }
+
+
+/* ==========================================================
+   Calendar V2 — 奶油色结婚纪念手账
+   仅作用于 #calendarScreen；原有签到和纪念日 JS 保持不变
+   图片位于项目 images/calendar-romance-bg.png
+   ========================================================== */
+#calendarScreen {
+  --cal-ink: #654a40;
+  --cal-muted: #a58a7b;
+  --cal-rose: #b77f79;
+  --cal-gold: #c5a17d;
+  background: #f7efe6;
+  color: var(--cal-ink);
+}
+#calendarScreen > .screen-header {
+  position: relative;
+  z-index: 2;
+  background: rgba(252,247,240,.91);
+  border-bottom: 1px solid rgba(192,157,133,.18);
+  color: var(--cal-ink);
+}
+#calendarScreen .screen-title { color: #694b40; font-family: Georgia, "Songti SC", serif; letter-spacing: 3px; }
+#calendarScreen .chat-back-btn { color: #694b40; border-color: rgba(191,154,135,.25); }
+#calendarScreen .calendar-container {
+  min-height: 100%;
+  padding: 22px 14px calc(44px + env(safe-area-inset-bottom));
+  background: linear-gradient(rgba(255,248,241,.30),rgba(255,248,241,.42)),
+              url('../images/calendar-romance-bg.png') center top / cover fixed no-repeat,
+              #f8efe4;
+}
+#calendarScreen .marriage-stats { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+#calendarScreen .marriage-stats .stat-card:first-child {
+  position: relative; padding: 14px 12px 24px;
+  background: transparent; border: none; box-shadow: none;
+}
+#calendarScreen .marriage-stats .stat-card:first-child .stat-label {
+  font-size: 14px; letter-spacing: 3px; color: #80665a; margin-bottom: 0;
+}
+#calendarScreen .marriage-stats .stat-card:first-child .stat-value {
+  display: inline-block; font-family: Georgia, "Cormorant Garamond", serif;
+  font-size: clamp(84px, 24vw, 116px); font-weight: 500; line-height: 1.06;
+  color: #80574c; background: none; -webkit-text-fill-color: currentColor;
+}
+#calendarScreen .marriage-hero-unit { display: inline-block; margin-left: 8px; font-size: 16px; color: #80574c; }
+#calendarScreen .marriage-hero-script { font: italic 25px "Cormorant Garamond", Georgia, serif; color: #bc9786; margin: 2px 0 1px; letter-spacing: 1px; }
+#calendarScreen .marriage-date-display {
+  background: transparent; border: 0; padding: 0; margin: 0; font-size: 12px;
+}
+#calendarScreen .marriage-date-display strong { color: #806458; font-size: 14px; letter-spacing: 2px; font-weight: 500; }
+#calendarScreen .marriage-stats .stat-card:nth-child(2) {
+  display: grid; grid-template-columns: minmax(0, 43%) minmax(0, 1fr);
+  gap: 14px; align-items: center; min-height: 148px; padding: 12px;
+  background: rgba(255,252,248,.88); border: 1px solid rgba(255,255,255,.94);
+  border-radius: 22px; box-shadow: 0 8px 26px rgba(103,68,49,.10);
+  text-align: left; -webkit-text-fill-color: initial;
+}
+#calendarScreen .calendar-book-art {
+  height: 132px; display: flex; align-items: center; justify-content: center;
+  border-radius: 14px; overflow: hidden;
+  background: linear-gradient(135deg,#e6d5c6,#c9a98e 54%,#e5d0ba);
+}
+#calendarScreen .calendar-book-cover {
+  width: 80%; height: 83%; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; gap: 4px; transform: rotate(-8deg);
+  background: linear-gradient(120deg,#986e61,#b38a78 48%,#8d6257);
+  border-left: 7px solid #765348; border-radius: 3px 8px 8px 3px;
+  box-shadow: 8px 8px 15px rgba(80,45,32,.22), inset 1px 0 5px rgba(255,255,255,.12);
+  font: 10px Georgia,serif; letter-spacing: 2px; color: #f4e1c4;
+}
+#calendarScreen .calendar-book-flower { font-size: 24px; margin-top: 5px; }
+#calendarScreen .calendar-next-eyebrow { color: #bc9984; font: 9px Georgia,serif; letter-spacing: 1.2px; margin-bottom: 10px; }
+#calendarScreen .calendar-next-info .stat-label { font-size: 15px; font-weight: 600; line-height: 1.45; color: #725249; }
+#calendarScreen .calendar-next-info .stat-value {
+  font: 500 clamp(25px, 7vw, 36px) Georgia,serif; line-height: 1.2;
+  background: none; -webkit-text-fill-color: #ae766d; color: #ae766d;
+}
+#calendarScreen .milestone-section,
+#calendarScreen .checkin-section,
+#calendarScreen .calendar {
+  background: rgba(255,252,247,.91); border: 1px solid rgba(255,255,255,.95);
+  border-radius: 22px; box-shadow: 0 8px 25px rgba(112,76,57,.09);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+#calendarScreen .milestone-section { padding: 16px 17px; margin-bottom: 14px; }
+#calendarScreen .milestone-title { font: 600 16px Georgia,"Songti SC",serif; color: #735044; margin-bottom: 9px; }
+#calendarScreen .milestone-title span { float: right; font: 9px Georgia,serif; letter-spacing: .6px; color: #c1a395; padding-top: 5px; }
+#calendarScreen .milestone-item { border-bottom-color: rgba(189,149,131,.18); padding: 10px 0; }
+#calendarScreen .milestone-name { color: #75564a; font-size: 13px; }
+#calendarScreen .milestone-date { color: #ae8e80; }
+#calendarScreen .milestone-badge { background: #f3e4dc; color: #a46c66; border-radius: 20px; font-weight: 600; }
+#calendarScreen .milestone-badge.passed { background: #f0e5db; color: #977b6d; }
+#calendarScreen .checkin-section { margin: 0 0 14px; padding: 18px 14px 15px; text-align: center; }
+#calendarScreen .checkin-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 12px; }
+#calendarScreen .checkin-stat { gap: 4px; min-width: 0; }
+#calendarScreen .checkin-stat + .checkin-stat { border-left: 1px solid rgba(178,144,125,.28); }
+#calendarScreen .checkin-label { color: #9a796b; font-size: 12px; letter-spacing: 1px; }
+#calendarScreen .checkin-value { color: #80564c; font: 500 clamp(27px,8vw,38px) Georgia,serif; overflow-wrap: anywhere; }
+#calendarScreen .checkin-unit { color: #ad9083; }
+#calendarScreen .checkin-hint { color: #a08073; font-size: 11px; line-height: 1.6; }
+#calendarScreen .calendar { padding: 18px 12px 20px; }
+#calendarScreen .calendar-title { font: 600 24px Georgia,"Cormorant Garamond",serif; color: #765348; text-align: left; padding-left: 5px; margin-bottom: 12px; }
+#calendarScreen .weekdays,#calendarScreen .days { gap: 4px; }
+#calendarScreen .weekday { color: #ac8d7d; font: 11px Georgia,serif; padding: 6px 0 9px; }
+#calendarScreen .day {
+  aspect-ratio: 1; border-radius: 10px; padding: 2px 1px; gap: 1px;
+  color: #6f5146; background: rgba(250,244,238,.92);
+  border: 1px solid rgba(230,213,202,.42); box-shadow: none;
+  min-width: 0; font-size: 11px;
+}
+#calendarScreen .day-number { color: inherit; font-size: 12px; }
+#calendarScreen .day.today {
+  color: #9b645f; background: #f5e2de; border: 2px solid #bc8982;
+  box-shadow: 0 2px 8px rgba(169,109,100,.12);
+}
+#calendarScreen .day.festival { background: #f7e6e3; color: #a16d69; }
+#calendarScreen .day.payday { background: #f2e7d8; color: #a17e59; }
+#calendarScreen .day.milestone-day { background: #f4deda; color: #955c59; box-shadow: none; }
+#calendarScreen .day.can-checkin {
+  background: #f8e7e1; border: 2px solid #bc8982; border-radius: 10px;
+}
+#calendarScreen .day.checked-in { background: #f5e2de; border-radius: 10px; }
+#calendarScreen .checkin-dot-mark { background: #d7afa3; }
+#calendarScreen .checkin-dot-mark.done { background: #b17a72; box-shadow: none; }
+#calendarScreen .checkin-pulse-dot { background: #bd847d; }
+#calendarScreen .festival-emoji { font-size: 11px; }
+#calendarScreen .festival-label { font-size: 7px; color: inherit; }
+@media (max-width: 360px) {
+  #calendarScreen .calendar-container { padding-left: 9px; padding-right: 9px; }
+  #calendarScreen .calendar { padding-left: 8px; padding-right: 8px; }
+  #calendarScreen .calendar-book-art { height: 115px; }
+  #calendarScreen .marriage-stats .stat-card:nth-child(2) { gap: 9px; }
+  #calendarScreen .milestone-title span { font-size: 8px; }
+}
+
+
+/* Calendar V2.1 — airy ivory / rose-milk-tea refinement.
+   Overrides only the calendar screen. Keep reward/wallet logic untouched. */
+#calendarScreen .calendar-container {
+  background: linear-gradient(rgba(255,252,248,.78),rgba(255,251,246,.84)),
+    url('../images/calendar-romance-bg.png') center top / cover scroll no-repeat,
+    #fffaf5;
+  padding: 10px 14px calc(40px + env(safe-area-inset-bottom));
+}
+#calendarScreen .marriage-stats { gap: 10px; margin-bottom: 12px; }
+#calendarScreen .marriage-stats .stat-card:first-child {
+  padding: 15px 8px 16px; min-height: 0;
+  background: transparent; box-shadow: none; border: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+#calendarScreen .marriage-stats .stat-card:first-child .stat-label {
+  color: #a78b82; font-size: 13px; font-weight: 400; letter-spacing: 3px;
+}
+#calendarScreen .marriage-stats .stat-card:first-child .stat-value {
+  font-size: clamp(70px,21vw,98px); font-weight: 400; line-height: 1.02;
+  color: #b98983; -webkit-text-fill-color: #b98983;
+}
+#calendarScreen .marriage-hero-unit { color: #a9867d; font-size: 14px; }
+#calendarScreen .marriage-hero-script { font-size: 22px; color: #c7a9a0; margin-top: 3px; }
+#calendarScreen .marriage-date-display strong { font-size: 12px; color: #a68b80; letter-spacing: 1.8px; }
+#calendarScreen .marriage-stats .stat-card:nth-child(2) {
+  min-height: 116px; padding: 10px; gap: 12px;
+  grid-template-columns: minmax(0,35%) minmax(0,1fr);
+  border-radius: 19px; background: rgba(255,255,253,.86);
+  border: 1px solid rgba(226,204,192,.45);
+  box-shadow: 0 3px 14px rgba(130,96,79,.055);
+}
+#calendarScreen .calendar-book-art { height: 98px; background: #f5eae2; border-radius: 12px; }
+#calendarScreen .calendar-book-cover {
+  width: 72%; height: 76%; transform: rotate(-6deg);
+  background: linear-gradient(110deg,#b89a8c,#c7aa9b);
+  border-left: 5px solid #a9897c; box-shadow: 4px 5px 9px rgba(100,72,61,.12);
+  font-size: 8px; letter-spacing: 1.2px; color: #fff5e9;
+}
+#calendarScreen .calendar-book-flower { font-size: 17px; margin-top: 0; }
+#calendarScreen .calendar-next-eyebrow { font-size: 8px; color: #bca399; margin-bottom: 6px; }
+#calendarScreen .calendar-next-info .stat-label { font-size: 13px; font-weight: 500; color: #9c7d74; }
+#calendarScreen .calendar-next-info .stat-value {
+  font-size: clamp(24px,7vw,32px); font-weight: 400; color: #b7817b;
+  -webkit-text-fill-color: #b7817b;
+}
+#calendarScreen .milestone-section,
+#calendarScreen .checkin-section,
+#calendarScreen .calendar {
+  background: rgba(255,255,253,.88);
+  border: 1px solid rgba(228,209,199,.48);
+  border-radius: 20px;
+  box-shadow: 0 3px 15px rgba(119,87,74,.055);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+}
+#calendarScreen .milestone-section { padding: 14px 15px; margin-bottom: 12px; }
+#calendarScreen .milestone-title { color: #8e6f65; font-size: 15px; }
+#calendarScreen .milestone-name { font-size: 12px; font-weight: 500; color: #92766d; overflow-wrap: anywhere; }
+#calendarScreen .milestone-icon { font-size: 18px; }
+#calendarScreen .milestone-badge { background: #f9eeea; color: #b3877e; font-size: 11px; }
+#calendarScreen .checkin-section { padding: 14px 12px 13px; margin-bottom: 12px; }
+#calendarScreen .checkin-info { margin-bottom: 8px; }
+#calendarScreen .checkin-label { color: #ac938a; font-size: 11px; }
+#calendarScreen .checkin-value {
+  font: 400 clamp(25px,7.5vw,33px) Georgia,serif;
+  color: #a57d73; line-height: 1.25;
+}
+#calendarScreen .checkin-unit { color: #b59c93; font-size: 11px; }
+#calendarScreen .checkin-hint { color: #b19a90; font-size: 10px; }
+#calendarScreen .calendar { padding: 16px 11px 18px; }
+#calendarScreen .calendar-title { color: #917267; font-size: 22px; font-weight: 500; }
+#calendarScreen .weekday { color: #b5a198; font-weight: 400; }
+#calendarScreen .weekdays,#calendarScreen .days { gap: 4px; }
+#calendarScreen .day {
+  background: rgba(255,255,255,.87); color: #8e756c;
+  border: 1px solid rgba(233,217,207,.58); border-radius: 10px;
+  font-weight: 400; box-shadow: none;
+}
+#calendarScreen .day-number { font-size: 12px; font-weight: 500; }
+#calendarScreen .day.today,
+#calendarScreen .day.can-checkin {
+  background: #fff7f5; color: #ae7e77;
+  border: 1.5px solid #d9ada5; box-shadow: none;
+}
+#calendarScreen .day.festival { background: #fcf0ee; color: #a9827c; }
+#calendarScreen .day.payday { background: #faf3e8; color: #ac9375; }
+#calendarScreen .day.milestone-day { background: #fbece9; color: #a97773; }
+#calendarScreen .day.checked-in { background: #fbefeb; }
+#calendarScreen .checkin-dot-mark.done { background: #c99e96; }
+#calendarScreen .festival-emoji { font-size: 11px; }
+#calendarScreen .festival-label { font-size: 7px; font-weight: 400; }
+@media (max-width: 360px) {
+  #calendarScreen .calendar-container { padding-left: 9px; padding-right: 9px; }
+  #calendarScreen .calendar { padding-left: 8px; padding-right: 8px; }
+  #calendarScreen .calendar-book-art { height: 92px; }
+}
+
+/* Calendar V2.2 — low-profile milestones and single-line check-in */
+#calendarScreen .milestone-section {
+  padding: 9px 13px 7px;
+  margin-bottom: 9px;
+  border-radius: 15px;
+  background: rgba(255,253,250,.70);
+  box-shadow: none;
+}
+#calendarScreen .milestone-title {
+  font-size: 12px; font-weight: 500; margin: 0 0 3px;
+}
+#calendarScreen .milestone-title span { font-size: 8px; padding-top: 2px; }
+#calendarScreen .milestone-item { padding: 5px 0; gap: 8px; }
+#calendarScreen .milestone-icon { font-size: 13px; }
+#calendarScreen .milestone-name { font-size: 11px; line-height: 1.3; }
+#calendarScreen .milestone-badge { padding: 3px 7px; font-size: 10px; }
+#calendarScreen .checkin-section {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 5px 12px; padding: 9px 13px; margin-bottom: 10px;
+  border-radius: 15px; text-align: left;
+  background: rgba(255,253,250,.70); box-shadow: none;
+}
+#calendarScreen .checkin-info { display: block; margin: 0; flex: 0 0 auto; }
+#calendarScreen .checkin-stat { display: flex; align-items: baseline; gap: 5px; }
+#calendarScreen .checkin-label { font-size: 11px; }
+#calendarScreen .checkin-value { font: 500 17px Georgia,serif; line-height: 1.2; }
+#calendarScreen .checkin-unit { font-size: 10px; }
+#calendarScreen .checkin-hint { flex: 1 1 155px; text-align: right; font-size: 10px; line-height: 1.5; }
+@media (max-width: 360px) {
+  #calendarScreen .checkin-hint { flex-basis: 100%; text-align: left; }
+}
+
+/* Calendar V2.3 — light scrapbook paper, ticket strips and receipt popup */
+#calendarScreen .calendar-container {
+  background: linear-gradient(rgba(255,252,247,.47),rgba(255,251,245,.55)),url('../images/calendar-romance-bg.png') center top / cover no-repeat,#faf5ee;
+  padding: 8px 12px 40px;
+}
+#calendarScreen .marriage-stats { gap: 0; margin-bottom: 8px; }
+#calendarScreen .marriage-stats .calendar-hero { padding: 12px 4px 15px; background: transparent; border: 0; box-shadow: none; }
+#calendarScreen .calendar-hero .stat-label { font: 12px Georgia,serif; letter-spacing: 3px; color: #ad8375; }
+#calendarScreen .marriage-stats .calendar-hero .stat-value { font-size: clamp(78px,24vw,108px); color: #b98578; -webkit-text-fill-color: #b98578; font-weight: 400; }
+#calendarScreen .marriage-hero-unit { color: #ad7d70; }
+#calendarScreen .marriage-date-display { margin-top: 2px; }
+#calendarScreen .marriage-stats .calendar-next-note { display: none; }
+#calendarScreen .calendar-paper-strips { display: grid; gap: 9px; margin-bottom: 14px; }
+#calendarScreen .milestone-section, #calendarScreen .checkin-section {
+  position: relative; margin: 0; padding: 12px 18px; border-radius: 2px;
+  border: 0; background: rgba(255,252,247,.91); box-shadow: 0 4px 12px rgba(129,90,68,.07);
+  clip-path: polygon(0 4px,2% 0,5% 4px,8% 0,12% 3px,16% 0,21% 3px,26% 0,31% 3px,36% 0,41% 3px,46% 0,51% 3px,56% 0,61% 3px,66% 0,71% 3px,76% 0,81% 3px,86% 0,91% 3px,96% 0,100% 4px,100% calc(100% - 4px),96% 100%,91% calc(100% - 3px),86% 100%,81% calc(100% - 3px),76% 100%,71% calc(100% - 3px),66% 100%,61% calc(100% - 3px),56% 100%,51% calc(100% - 3px),46% 100%,41% calc(100% - 3px),36% 100%,31% calc(100% - 3px),26% 100%,21% calc(100% - 3px),16% 100%,12% calc(100% - 3px),8% 100%,5% calc(100% - 3px),2% 100%,0 calc(100% - 4px));
+}
+#calendarScreen .milestone-title { font-size: 12px; letter-spacing: 1px; color: #956b60; margin: 0 0 4px; }
+#calendarScreen .milestone-item { padding: 4px 0; gap: 8px; }
+#calendarScreen .milestone-name { font-size: 12px; font-weight: 400; }
+#calendarScreen .milestone-badge { border-radius: 3px; background: #f5e7e0; color: #a4756b; }
+#calendarScreen .checkin-section { display: flex; flex-wrap: wrap; gap: 6px 15px; justify-content: space-between; align-items: center; background: rgba(255,249,243,.90); }
+#calendarScreen .checkin-stat { display: flex; align-items: baseline; gap: 7px; }
+#calendarScreen .checkin-value { font: 400 25px Georgia,serif; color: #a9796d; }
+#calendarScreen .checkin-hint { font-size: 10px; color: #9f8275; text-align: left; flex: 1 1 170px; }
+#calendarScreen .calendar { border: 0; border-radius: 4px; padding: 23px 12px 28px; background: rgba(255,252,248,.92); box-shadow: 0 7px 20px rgba(124,89,71,.10); clip-path: polygon(0 6px,3% 0,7% 5px,11% 0,15% 5px,19% 0,23% 5px,27% 0,31% 5px,35% 0,39% 5px,43% 0,47% 5px,51% 0,55% 5px,59% 0,63% 5px,67% 0,71% 5px,75% 0,79% 5px,83% 0,87% 5px,91% 0,95% 5px,100% 0,100% 100%,0 100%); }
+#calendarScreen .calendar-title { color: #ac776c; font: 400 clamp(23px,6vw,29px) Georgia,serif; }
+#calendarScreen .day { background: rgba(255,250,246,.68); border-color: #ecdcd1; border-radius: 7px; }
+#calendarScreen .day.today { background: #f8e9e5; border: 1.5px solid #bd8b80; }
+#calendarScreen .day.festival,#calendarScreen .day.milestone-day { background: #fae8e5; }
+#calendarScreen .festival-label { font-size: 8px; line-height: 1.15; }
+.calendar-checkin-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(57,39,34,.46); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+.calendar-checkin-paper { position: relative; box-sizing: border-box; width: min(100%,345px); padding: 34px 26px 27px; text-align: center; color: #79554a; background: linear-gradient(145deg,rgba(255,252,247,.97),rgba(250,236,225,.98)); box-shadow: 0 16px 45px rgba(49,32,27,.24); clip-path: polygon(0 7px,4% 0,9% 5px,14% 0,19% 5px,24% 0,29% 5px,34% 0,39% 5px,44% 0,49% 5px,54% 0,59% 5px,64% 0,69% 5px,74% 0,79% 5px,84% 0,89% 5px,94% 0,100% 7px,100% calc(100% - 7px),94% 100%,89% calc(100% - 5px),84% 100%,79% calc(100% - 5px),74% 100%,69% calc(100% - 5px),64% 100%,59% calc(100% - 5px),54% 100%,49% calc(100% - 5px),44% 100%,39% calc(100% - 5px),34% 100%,29% calc(100% - 5px),24% 100%,19% calc(100% - 5px),14% 100%,9% calc(100% - 5px),4% 100%,0 calc(100% - 7px)); }
+.calendar-checkin-paper::before { content: ''; display: block; position: absolute; top: 8px; left: 34%; width: 32%; height: 17px; background: rgba(209,162,147,.24); transform: rotate(-3deg); }
+.calendar-checkin-kicker { font: italic 23px Georgia,serif; color: #b48a7d; margin: 4px 0 9px; letter-spacing: 1px; }
+.calendar-checkin-paper h2 { font: 500 24px Georgia,'Songti SC',serif; margin: 0 0 9px; padding-bottom: 14px; border-bottom: 1px solid #dfc2b5; }
+.calendar-checkin-streak { font-size: 14px; margin: 13px 0; }
+.calendar-checkin-reward { padding: 15px 8px; border: 1px dashed #dfb9a9; background: rgba(246,224,215,.58); font-size: 18px; line-height: 1.5; }
+.calendar-checkin-details { margin-top: 14px; padding: 9px 5px; border-top: 1px dashed #dfc7b9; border-bottom: 1px dashed #dfc7b9; font-size: 12px; line-height: 1.7; }
+.calendar-checkin-details p { margin: 4px 0; }
+.calendar-checkin-close { width: 100%; margin-top: 18px; border: 0; padding: 12px; background: #bc8b7f; color: white; font: 500 15px inherit; letter-spacing: 3px; cursor: pointer; }
+
+
+/* Calendar V2.6 — consolidated ticket layout; supersedes earlier calendar styles */
+#calendarScreen .calendar-container {
+  background:linear-gradient(rgba(255,251,245,.08),rgba(255,250,243,.12)),url('../images/calendar-romance-bg.png') center top / cover no-repeat,#faf1e7 !important;
+}
+#calendarScreen .marriage-stats { display:block !important; margin:0 0 6px !important; }
+#calendarScreen .marriage-stats > .calendar-hero {
+  display:block !important; min-height:0 !important; height:auto !important;
+  padding:8px 0 13px !important; margin:0 !important; background:transparent !important;
+  border:0 !important; border-radius:0 !important; box-shadow:none !important; text-align:center !important;
+}
+#calendarScreen .calendar-hero .stat-label { margin:0 0 3px !important; }
+#calendarScreen .calendar-hero .stat-value { display:inline-block !important; margin:0 !important; line-height:1.05 !important; }
+#calendarScreen .calendar-hero .marriage-date-display { padding:0 !important; margin:0 !important; border:0 !important; background:transparent !important; box-shadow:none !important; }
+#calendarScreen .calendar-paper-strips { display:grid !important; gap:9px !important; margin:0 0 13px !important; }
+#calendarScreen .calendar-paper-strips > .milestone-section,
+#calendarScreen .calendar-paper-strips > .checkin-section {
+  box-sizing:border-box !important; width:100% !important; height:auto !important;
+  margin:0 !important; border:0 !important; border-radius:0 !important;
+  background:#fffaf4 !important; box-shadow:0 3px 9px rgba(112,74,54,.10) !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+}
+#calendarScreen .calendar-paper-strips > .milestone-section {
+  display:grid !important; grid-template-columns:minmax(0,1fr) !important;
+  min-height:66px !important; padding:11px 17px !important; gap:4px !important;
+}
+#calendarScreen .milestone-title { margin:0 !important; padding:0 !important; line-height:1.3 !important; font:500 12px/1.3 'Songti SC',serif !important; color:#81584b !important; }
+#calendarScreen #milestonesContainer { display:block !important; margin:0 !important; padding:0 !important; }
+#calendarScreen .milestone-item { display:flex !important; align-items:center !important; justify-content:space-between !important; gap:7px !important; margin:0 !important; padding:0 !important; min-height:22px !important; border:0 !important; }
+#calendarScreen .milestone-icon { display:none !important; }
+#calendarScreen .milestone-info { flex:1 1 auto !important; min-width:0 !important; }
+#calendarScreen .milestone-name { color:#815c50 !important; font-size:11px !important; font-weight:400 !important; }
+#calendarScreen .milestone-badge { flex:none !important; border-radius:2px !important; background:#f5e4dc !important; color:#955c52 !important; padding:4px 7px !important; font-size:10px !important; }
+/* Keep exactly two centered lines. Avoid inherited grid/column rules. */
+#calendarScreen .calendar-paper-strips > .checkin-section {
+  display:flex !important; flex-direction:column !important; flex-wrap:nowrap !important;
+  justify-content:center !important; align-items:center !important;
+  gap:4px !important; min-height:0 !important; max-height:none !important;
+  padding:11px 12px 12px !important; text-align:center !important;
+}
+#calendarScreen .checkin-info {
+  display:flex !important; flex-direction:row !important; justify-content:center !important;
+  align-items:center !important; flex:0 0 auto !important; width:auto !important;
+  min-height:0 !important; margin:0 !important; padding:0 !important;
+}
+#calendarScreen .checkin-stat {
+  display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important;
+  align-items:baseline !important; justify-content:center !important;
+  gap:7px !important; margin:0 !important; padding:0 !important; white-space:nowrap !important;
+}
+#calendarScreen .checkin-stat::before {
+  content:''; display:inline-block; flex:none; width:15px; height:15px; align-self:center; margin-right:2px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b38a79' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5.5' width='17' height='15' rx='1.2'/%3E%3Cpath d='M3.5 10h17M8 3.5v4M16 3.5v4M8 14h8M12 12v6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+#calendarScreen .checkin-label { display:inline !important; font-size:12px !important; color:#855f52 !important; white-space:nowrap !important; }
+#calendarScreen .checkin-value { display:inline !important; font:400 23px/1 Georgia,serif !important; color:#a16c61 !important; -webkit-text-fill-color:#a16c61 !important; margin:0 !important; }
+#calendarScreen .checkin-unit { display:inline !important; font-size:12px !important; color:#855f52 !important; }
+#calendarScreen .checkin-hint {
+  display:flex !important; flex:0 0 auto !important; flex-direction:row !important;
+  align-items:center !important; justify-content:center !important; gap:9px !important;
+  width:auto !important; max-width:100% !important; min-width:0 !important;
+  margin:0 !important; padding:0 !important; border:0 !important;
+  font-size:10px !important; line-height:1.35 !important; color:#a07e70 !important; text-align:center !important;
+}
+#calendarScreen .checkin-hint::before,#calendarScreen .checkin-hint::after {
+  content:''; display:block; flex:none; width:26px; height:1px;
+  background:linear-gradient(90deg,transparent,#d2aa99);
+}
+#calendarScreen .checkin-hint::after { transform:rotate(180deg); }
+#calendarScreen .calendar { margin:0 !important; background:#fffaf5 !important; }
+#calendarScreen .calendar-title { margin:0 0 13px !important; }
+#calendarScreen .day { background:rgba(255,251,246,.93) !important; }
+#calendarScreen .day.today { background:#f8e9e5 !important; }
+#calendarScreen .day.festival,#calendarScreen .day.milestone-day { background:#fae8e5 !important; }
+@media(max-width:360px) {
+  #calendarScreen .calendar-paper-strips > .milestone-section { padding:10px 12px !important; }
+  #calendarScreen .calendar-paper-strips > .checkin-section { padding:10px 8px 11px !important; }
+  #calendarScreen .checkin-hint { font-size:9px !important; }
+}

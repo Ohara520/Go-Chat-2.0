@@ -1055,7 +1055,7 @@ function initCalendar() {
   const mdEl = document.getElementById('marriageDays');
   if (mdEl) mdEl.textContent = marriageDays;
   const mdDisplayEl = document.getElementById('marriageDateDisplay');
-  if (mdDisplayEl) mdDisplayEl.textContent = marriageDate || '未设置';
+  if (mdDisplayEl) mdDisplayEl.textContent = marriageDate ? marriageDate.slice(0, 10).replace(/-/g, '.') : '未设置';
 
   const nextMilestone = getNextMilestone(marriageDays, marriageDate, today);
   const countdownLabelEl = document.getElementById('countdownLabel');
@@ -1085,13 +1085,13 @@ function initCalendar() {
     if (isToday) {
       cls = checkedInToday ? 'day today checked-in' : 'day today can-checkin';
       extra += checkedInToday
-        ? '<div class="checkin-dot-mark done"></div><div style="font-size:9px;color:#a855f7;margin-top:1px;font-weight:700;">✓</div>'
+        ? '<div class="checkin-dot-mark done"></div>'
         : '<div class="checkin-pulse-dot"></div>';
     }
 
     if (userBirthday) {
       const [bm, bd] = userBirthday.split('-').map(Number);
-      if (month + 1 === bm && d === bd) { cls = 'day milestone-day'; extra = '<div class="festival-emoji">🎂</div><div class="festival-label">生日</div>'; }
+      if (month + 1 === bm && d === bd) { cls = 'day milestone-day'; extra = '<div class="festival-label">生日</div>'; }
     }
 
     if (marriageDate) {
@@ -1099,24 +1099,24 @@ function initCalendar() {
       const thisDate = new Date(year, month, d);
       const daysFromMarriage = Math.floor((thisDate - new Date(marriageDate)) / 86400000);
       if (month + 1 === mm && d === mdd && daysFromMarriage >= 365) {
-        cls = 'day milestone-day'; extra = '<div class="festival-emoji">💍</div><div class="festival-label">纪念日</div>';
+        cls = 'day milestone-day'; extra = '<div class="festival-label">纪念日</div>';
       }
-      if (!extra.includes('festival-emoji')) {
+      if (!extra.includes('festival-label')) {
         if (daysFromMarriage === 52 || (daysFromMarriage > 0 && daysFromMarriage % 100 === 0) || daysFromMarriage === 365) {
           cls = 'day milestone-day';
-          extra = `<div class="festival-emoji">💕</div><div class="festival-label">${daysFromMarriage}天</div>`;
+          extra = `<div class="festival-label">${daysFromMarriage}天</div>`;
         }
       }
     }
 
-    if (!extra.includes('festival-emoji') && FESTIVALS[festKey]) {
+    if (!extra.includes('festival-label') && FESTIVALS[festKey]) {
       cls = cls.includes('today') ? cls + ' festival' : (cls === 'day' ? 'day festival' : cls);
-      extra += `<div class="festival-emoji">${FESTIVALS[festKey].emoji}</div><div class="festival-label">${FESTIVALS[festKey].label}</div>`;
+      extra += `<div class="festival-label">${FESTIVALS[festKey].label}</div>`;
     }
 
-    if (!extra.includes('festival-emoji') && d === 25) {
+    if (!extra.includes('festival-label') && d === 25) {
       cls = 'day payday';
-      extra = '<div class="festival-emoji">💷</div><div class="festival-label">工资日</div>';
+      extra = '<div class="festival-label">工资日</div>';
     }
 
     const clickHandler = isToday && !checkedInToday ? 'onclick="doCheckin()"' : '';
@@ -1126,7 +1126,6 @@ function initCalendar() {
   const calDaysEl = document.getElementById('calendarDays');
   if (calDaysEl) calDaysEl.innerHTML = html;
 
-  if (typeof launchCalendarParticles === 'function') launchCalendarParticles(today, marriageDate, userBirthday, marriageDays);
   updateCalendarCard(today, marriageDate, userBirthday);
 }
 
@@ -1159,7 +1158,7 @@ function renderMilestones(marriageDays, marriageDate, userBirthday, today) {
     const nextAnn = new Date(md);
     while (nextAnn <= today) nextAnn.setFullYear(nextAnn.getFullYear() + 1);
     const annDays = Math.ceil((nextAnn - today) / 86400000);
-    items.push({ icon: '💍', name: `结婚纪念日 · ${marriageDate}`, badge: annDays === 0 ? '就是今天！🎉' : `${annDays}天后` });
+    items.push({ icon: '', name: `结婚纪念日 · ${marriageDate.slice(0, 10).replace(/-/g, '.')}`, badge: annDays === 0 ? '就是今天' : `${annDays}天后` });
   }
 
   if (userBirthday) {
@@ -1167,7 +1166,7 @@ function renderMilestones(marriageDays, marriageDate, userBirthday, today) {
     const nextBday = new Date(today.getFullYear(), bm - 1, bd);
     if (nextBday < today) nextBday.setFullYear(nextBday.getFullYear() + 1);
     const bdayDays = Math.ceil((nextBday - today) / 86400000);
-    items.push({ icon: '🎂', name: '你的生日', badge: bdayDays === 0 ? '今天！🎉' : `${bdayDays}天后` });
+    items.push({ icon: '', name: '你的生日', badge: bdayDays === 0 ? '今天' : `${bdayDays}天后` });
   }
 
   if (items.length === 0) {
@@ -1177,7 +1176,6 @@ function renderMilestones(marriageDays, marriageDate, userBirthday, today) {
 
   container.innerHTML = items.map(item => `
     <div class="milestone-item">
-      <div class="milestone-icon">${item.icon}</div>
       <div class="milestone-info"><div class="milestone-name">${item.name}</div></div>
       <div class="milestone-badge">${item.badge}</div>
     </div>`).join('');
