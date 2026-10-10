@@ -145,6 +145,54 @@ function _vcSet(text, url, userId, voiceId, modelId) {
 // ③ TTS 调用
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// V1.2：智能截断 - 按句子边界截断，避免切断关键情绪词
+function smartTruncate(text, maxLen) {
+  if (!text || text.length <= maxLen) return text;
+
+  // 1. 优先在句号、问号、感叹号截断（保留完整句子）
+  const sentenceEndRegex = /[.!?]+\s*/g;
+  let lastEnd = 0;
+  let match;
+
+  while ((match = sentenceEndRegex.exec(text)) !== null) {
+    if (match.index + match[0].length <= maxLen) {
+      lastEnd = match.index + match[0].length;
+    } else {
+      break;
+    }
+  }
+
+  // 如果找到合理的句子边界（至少截取了 60%）
+  if (lastEnd > maxLen * 0.6) {
+    return text.slice(0, lastEnd).trim();
+  }
+
+  // 2. 否则在逗号、省略号截断
+  const phraseEndRegex = /[,;]\s*|\.\.\.\s*/g;
+  lastEnd = 0;
+
+  while ((match = phraseEndRegex.exec(text)) !== null) {
+    if (match.index + match[0].length <= maxLen) {
+      lastEnd = match.index + match[0].length;
+    } else {
+      break;
+    }
+  }
+
+  if (lastEnd > maxLen * 0.6) {
+    return text.slice(0, lastEnd).trim();
+  }
+
+  // 3. 最后在空格截断（避免切断单词）
+  const spaceIdx = text.slice(0, maxLen).lastIndexOf(' ');
+  if (spaceIdx > maxLen * 0.7) {
+    return text.slice(0, spaceIdx).trim();
+  }
+
+  // 4. 兜底：硬切
+  return text.slice(0, maxLen).trim();
+}
+
 async function generateVoice(text, customVoiceId, customModelId) {
   if (!text || !text.trim()) return null;
 
@@ -179,13 +227,16 @@ async function generateVoice(text, customVoiceId, customModelId) {
     const cached = _vcGet(text, userId, finalVoiceId, finalModelId);
     if (cached) return cached;
 
+    // V1.2：智能截断替代硬切
+    const truncatedText = smartTruncate(text.trim(), 500);
+
     const res = await fetchWithTimeout(VOICE_CONFIG.apiEndpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        text:           text.trim().slice(0, 500),
-        voice_id:       finalVoiceId,
-        model_id:       finalModelId,
+        text: truncatedText,
+        voice_id: finalVoiceId,
+        model_id: finalModelId,
         voice_settings: VOICE_CONFIG.voiceSettings,
       }),
     }, 18000);
@@ -348,11 +399,14 @@ function createVoiceBar(text) {
 // ⑥ 为消息添加语音按钮（不主动生成，点击时才调用 TTS）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function addVoiceButtonToMessage(contentDiv, messageText) {
+function addVoiceButtonToMessage(contentDiv, messageText, voiceText) {
   if (!contentDiv || !messageText || !messageText.trim()) return;
 
   // 过滤：超长文本不适合语音
   if (messageText.length > 300) return;
+
+  // V1.2：优先使用 voiceText（TTS 专用），否则降级到 messageText
+  const textForTTS = voiceText || messageText;
 
   const voiceBtn = document.createElement('button');
   voiceBtn.type = 'button';
@@ -377,11 +431,11 @@ function addVoiceButtonToMessage(contentDiv, messageText) {
     if (_loading) return;
     _stopCurrent();
 
-    // 首次点击：生成语音
+    // 首次点击：生成语音（使用 voiceText）
     if (!_url) {
       _loading = true;
       voiceBtn.classList.add('voice-btn-loading');
-      _url = await generateVoice(messageText);
+      _url = await generateVoice(textForTTS);
       _loading = false;
       voiceBtn.classList.remove('voice-btn-loading');
 

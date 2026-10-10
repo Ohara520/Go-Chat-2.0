@@ -1580,10 +1580,16 @@ Her: ${text}`
     _currentAbortController = null;
     // 清理分隔符后存入 chatHistory（一轮回复仍为一条 assistant item）
     const historyReply = finalParts.join('\n');
+
+    // V1.2：准备 voiceText（TTS 专用文本，保留情绪线索）
+    const voiceText = prepareVoiceText(reply);
+
     chatHistory.push({
       role: 'assistant',
       content: historyReply,
-      _time: Date.now()
+      _time: Date.now(),
+      _voiceText: voiceText,  // V1.2：TTS 文本（保留情绪线索）
+      _voiceState: null,       // V1.2：预留 voice_state 字段
     });
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
@@ -2190,6 +2196,45 @@ function handleKeyPress(event) {
   }
 }
 
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V1.2: Voice Text Preparation
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 准备 TTS 专用文本
+ * 保留情绪线索，移除系统控制标签和第三人称旁白
+ */
+function prepareVoiceText(rawReply) {
+  if (!rawReply || !rawReply.trim()) return '';
+
+  let vt = rawReply;
+
+  // 1. 移除系统控制标签（不应出现在 TTS 中）
+  vt = vt.replace(/\n?(REFUND|\bKEEP\b|COLD_WAR_START|COLD_WAR_RESOLVE|GIVE_MONEY:[^\n]*|SEND_GIFT:[^\n]*)\n?/g, '');
+
+  // 2. 移除第三人称旁白（模型滑落成叙事者）
+  vt = vt.replace(/\[(?:She|He|she|he|Ghost|They|they)[^\]]{0,600}\]/g, '');
+
+  // 3. 移除系统指令方括号（但保留情绪线索如 [pause]、[softly]）
+  vt = vt.replace(/\[(?:系统|System|SYSTEM|Tone|tone|Scene|scene|Context|context|Note|note|Hint|hint|Override|override|RULE|Rule|Weekly|Daily|Transfer|transfer|GIVE_MONEY|COLD_WAR|limit|blocked|available)[^\]]{0,400}\]/g, '');
+
+  // 4. 移除 HTML 标签
+  vt = vt.replace(/<[^>]{0,50}>/g, '');
+  vt = vt.replace(/<[a-zA-Z][a-zA-Z0-9]{0,10}\s[^<\n]{0,200}/g, '');
+
+  // 5. 移除动作描述（异地设定，不应有物理动作）
+  vt = vt.replace(/\*[^*]+\*/g, '');
+
+  // 6. 移除 unlock tag 残留
+  vt = vt.replace(/\{[^}\]]*"unlock"[^\}\]]*[\]]*\}/g, '');
+
+  // 7. 保留情绪线索（不移除）：
+  // [pause]、[softly]、[hesitates]、[sighs] 等
+  // 这些将来可能转换为 Audio Tags
+
+  return vt.trim();
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Continuity V1 Batch 2: Extraction + Validation + Storage

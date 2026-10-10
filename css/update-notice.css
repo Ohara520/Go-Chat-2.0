@@ -1,0 +1,197 @@
+/* ===== 更新公告弹窗 V1 ===== */
+
+/* 遮罩层 */
+.update-notice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: rgba(30, 64, 32, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: overlayFadeIn 0.3s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 公告卡片 */
+.update-notice-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1.5px solid rgba(216, 237, 216, 0.4);
+  border-radius: 24px;
+  box-shadow: 0 12px 48px rgba(60, 120, 45, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  max-width: 420px;
+  width: 100%;
+  overflow: hidden;
+  animation: cardSlideUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+}
+
+@keyframes cardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(32px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 信纸纹理装饰 */
+.update-notice-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 31px,
+      rgba(90, 154, 70, 0.03) 31px,
+      rgba(90, 154, 70, 0.03) 32px
+    );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 头部 */
+.update-notice-header {
+  padding: 28px 24px 20px;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  border-bottom: 1px solid rgba(90, 154, 70, 0.12);
+}
+
+.update-notice-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e4020;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.update-notice-date {
+  font-size: 12px;
+  color: rgba(40, 90, 30, 0.5);
+  letter-spacing: 1px;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+/* 内容区 */
+.update-notice-body {
+  padding: 24px;
+  position: relative;
+  z-index: 2;
+  max-height: 60vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.update-notice-section {
+  margin-bottom: 20px;
+}
+
+.update-notice-section:last-child {
+  margin-bottom: 0;
+}
+
+.update-notice-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d6028;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.update-notice-section-title::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #5a9a46;
+}
+
+.update-notice-content {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #3a5a3c;
+  margin-bottom: 8px;
+}
+
+.update-notice-content:last-child {
+  margin-bottom: 0;
+}
+
+.update-notice-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(60, 120, 45, 0.65);
+  padding: 10px 12px;
+  background: rgba(90, 160, 70, 0.06);
+  border-left: 2px solid rgba(90, 160, 70, 0.25);
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+/* 按钮区 */
+.update-notice-footer {
+  padding: 16px 24px 24px;
+  display: flex;
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.update-notice-btn {
+  flex: 1;
+  padding: 13px 20px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+
+.update-notice-btn:active {
+  transform: scale(0.96);
+}
+
+/* 次要按钮 - 不再提醒 */
+.update-notice-btn-secondary {
+  background: rgba(90, 160, 70, 0.08);
+  color: #5a9a46;
+  border: 1.5px solid rgba(90, 160, 70, 0.2);
+}
+
+.update-notice-btn-secondary:hover {
+  background: rgba(90, 160, 70, 0.12);
+}
+
+/* 主要按钮 - 知道了 */
+.update-notice-btn-primary {
+  background: linear-gradient(135deg, #5a9a46, #7dba5a);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(90, 154, 70, 0.25);
+}
+
+.update-notice-btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(90, 154, 70, 0.35);
+}

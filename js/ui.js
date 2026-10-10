@@ -351,7 +351,29 @@ function appendMessage(role, text, animate = true) {
     if (typeof addVoiceButtonToMessage === 'function') {
       try {
         const messageText = bubble.querySelector('.bubble-en')?.textContent || bubble.textContent;
-        addVoiceButtonToMessage(contentDiv, messageText);
+
+        // V1.2：尝试从 chatHistory 获取对应消息的 _voiceText
+        let voiceText = messageText;
+
+        // 通过时间戳匹配查找对应的 chatHistory 消息
+        if (typeof chatHistory !== 'undefined' && Array.isArray(chatHistory)) {
+          // 从最新消息向前搜索（性能优化）
+          for (let i = chatHistory.length - 1; i >= 0; i--) {
+            const msg = chatHistory[i];
+            if (msg.role === 'assistant' && !msg._recalled && !msg._system) {
+              // 文本匹配（去除空白差异）
+              const historyText = (msg.content || '').replace(/\s+/g, ' ').trim();
+              const currentText = messageText.replace(/\s+/g, ' ').trim();
+
+              if (historyText === currentText) {
+                voiceText = msg._voiceText || messageText;
+                break;
+              }
+            }
+          }
+        }
+
+        addVoiceButtonToMessage(contentDiv, messageText, voiceText);
       } catch(e) {
         console.warn('[voice] Failed to add voice button:', e);
       }

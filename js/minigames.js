@@ -533,7 +533,15 @@ function collectMessage(button) {
     const now = new Date();
     const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
     const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-    collections.unshift({ text: messageText, time: dateStr + ' ' + timeStr });
+
+    // V1.2：扩展收藏结构，预留语音相关字段
+    collections.unshift({
+      text: messageText,
+      time: dateStr + ' ' + timeStr,
+      audioUrl: null,      // 预留：语音 URL（未来按需生成后填入）
+      voiceText: null,     // 预留：TTS 文本（可能与显示文本不同）
+      voiceState: null,    // 预留：语音状态（tone/mood/intensity）
+    });
   }
   localStorage.setItem('collections', JSON.stringify(collections));
   syncCollectionHearts();
