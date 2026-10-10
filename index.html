@@ -605,7 +605,7 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
         <div class="hero-date" id="heroDate"></div>
         <div class="hero-weather" id="heroWeather"></div>
 
-        <!-- Ghost 主卡 + Our Home 并排 -->
+        <!-- Ghost 主卡，Our Home 独立成行 -->
         <div class="hero-entry-row">
           <!-- Ghost 主卡（Chat） -->
           <div class="hero-ghost-card" onclick="openScreen('chatScreen')">
@@ -621,6 +621,8 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
             <div class="hero-chat-btn">Chat&nbsp;→</div>
           </div>
 
+        </div>
+        <div class="hero-home-row">
           <!-- Our Home 卡（Locked） -->
           <div class="hero-home-card is-locked">
             <div class="hero-home-info">
@@ -636,40 +638,57 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
       </div>
     </div>
 
-    <!-- ═══ US — 我们的故事 ═══ -->
-    <section class="home-section us-section">
-      <div class="section-head">
-        <div class="section-head-title"><span class="section-head-en">US</span><span class="section-head-sep">—</span><span class="section-head-zh">我们的故事</span></div>
-        <div class="section-head-chevron">›</div>
-      </div>
-      <div class="us-row">
+
+    <div class="home-editorial-intro"><div class="home-editorial-heading"><h2>Life at Home</h2><span>我们的生活，在这里延续</span></div><p>Same home. Different days. Always us.</p></div>
+    <section class="home-story-section home-story-us">
+      <button type="button" class="home-story-banner" onclick="openHomeStory('us')" aria-label="进入我们的故事详情页">
+        <img src="images/ui-backgrounds/home/home-banner-us.png" alt="" loading="lazy" onerror="this.style.opacity='0'">
+        <span class="home-story-shade"></span>
+        <span class="home-story-copy"><span class="home-story-en"><small>01 /</small> US</span><span class="home-story-zh">我们的故事</span><span class="home-story-sub">日历 · 珍藏 · 纪念 · 日记</span></span>
+      </button>
+    </section>
+    <section class="home-story-section home-story-life">
+      <button type="button" class="home-story-banner" onclick="openHomeStory('life')" aria-label="进入生活日常详情页">
+        <img src="images/ui-backgrounds/home/home-banner-life.png" alt="" loading="lazy" onerror="this.style.opacity='0'">
+        <span class="home-story-shade"></span>
+        <span class="home-story-copy"><span class="home-story-en"><small>02 /</small> LIFE</span><span class="home-story-zh">生活日常</span><span class="home-story-sub">商城 · 外卖 · 快递 · 钱包</span></span>
+      </button>
+    </section>
+    <section class="home-story-section home-story-you">
+      <button type="button" class="home-story-banner" onclick="openHomeStory('you')" aria-label="进入你的世界详情页">
+        <img src="images/ui-backgrounds/home/home-banner-you.png" alt="" loading="lazy" onerror="this.style.opacity='0'">
+        <span class="home-story-shade"></span>
+        <span class="home-story-copy"><span class="home-story-en"><small>03 /</small> YOU</span><span class="home-story-zh">你的世界</span><span class="home-story-sub">关于 · 忆书 · 职业 · 出行</span></span>
+      </button>
+    </section>
+    <!-- 首页栏目独立详情页：沿用原功能卡及其事件，不在首页展开 -->
+    <div id="homeStoryDetail" class="home-story-detail" hidden aria-hidden="true">
+      <header class="home-story-detail-header"><button type="button" class="home-story-back" onclick="closeHomeStory()" aria-label="返回首页">← <span>返回首页</span></button><span class="home-story-detail-brand">GO CHAT</span></header>
+      <div class="home-story-detail-page" data-home-story="us" hidden>
+        <div class="home-story-detail-cover home-story-detail-cover-us"><div class="home-story-detail-cover-shade"></div><div class="home-story-detail-heading"><span>01 / US</span><h2>我们的故事</h2><p>日历 · 珍藏 · 纪念 · 日记</p></div></div>
+        <div id="home-story-menu-us" class="home-story-menu">
+        <div class="us-row">
         <div class="card photo-card" id="calendarCard" onclick="openScreen('calendarScreen');setTimeout(()=>{if(typeof initCalendar==='function')initCalendar();},80);">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-memories.png" alt="">
           <div class="photo-card-text">
-            <div class="photo-card-title">纪念</div>
+            <div class="photo-card-title">日历</div>
             <div class="photo-card-sub">MEMORIES</div>
           </div>
         </div>
         <div class="card photo-card" onclick="openScreen('collectionScreen')">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-saved.png" alt="">
           <div class="photo-card-text">
-            <div class="photo-card-title">收藏</div>
+            <div class="photo-card-title">珍藏</div>
             <div class="photo-card-sub">SAVED</div>
           </div>
         </div>
         <div class="card photo-card achievement-card" onclick="openScreen('achievementScreen');setTimeout(()=>{if(typeof renderLifeEventsAlbum==='function')renderLifeEventsAlbum();},80);">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png" alt="">
           <div class="photo-card-text">
-            <div class="photo-card-title">纪念册</div>
+            <div class="photo-card-title">纪念</div>
             <div class="photo-card-sub">MEMORIES</div>
           </div>
         </div>
-        <div class="card photo-card secret-card" onclick="openScreen('secretScreen')">
-          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-secret.png" alt="">
-          <div class="photo-card-text">
-            <div class="photo-card-title">秘密</div>
-            <div class="photo-card-sub">ONLY GHOST KNOWS</div>
-          </div>
         </div>
         <div class="card photo-card vocab-card" onclick="openScreen('diaryScreen');setTimeout(async()=>{if(typeof generateDiaryEntry==='function')await generateDiaryEntry();if(typeof renderDiary==='function')renderDiary();},80);">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-diary.png" alt="">
@@ -678,16 +697,13 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
             <div class="photo-card-sub">GHOST'S DIARY</div>
           </div>
         </div>
+        </div>
       </div>
-    </section>
-
-    <!-- ═══ LIFE — 生活日常 ═══ -->
-    <section class="home-section life-section">
-      <div class="section-head">
-        <div class="section-head-title"><span class="section-head-en">LIFE</span><span class="section-head-sep">—</span><span class="section-head-zh">生活日常</span></div>
-        <div class="section-head-chevron">›</div>
       </div>
-      <div class="life-row">
+      <div class="home-story-detail-page" data-home-story="life" hidden>
+        <div class="home-story-detail-cover home-story-detail-cover-life"><div class="home-story-detail-cover-shade"></div><div class="home-story-detail-heading"><span>02 / LIFE</span><h2>生活日常</h2><p>商城 · 外卖 · 快递 · 钱包 · 资产</p></div></div>
+        <div id="home-story-menu-life" class="home-story-menu">
+        <div class="life-row">
         <div class="card photo-card" onclick="openScreen('marketScreen')">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-market.png" alt="">
           <div class="photo-card-text">
@@ -723,16 +739,22 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
             <div class="photo-card-sub">ASSETS</div>
           </div>
         </div>
+        </div>
       </div>
-    </section>
-
-    <!-- ═══ YOU — 你的世界 ═══ -->
-    <section class="home-section you-section">
-      <div class="section-head">
-        <div class="section-head-title"><span class="section-head-en">YOU</span><span class="section-head-sep">—</span><span class="section-head-zh">你的世界</span></div>
-        <div class="section-head-chevron">›</div>
       </div>
-      <div class="you-row">
+      <div class="home-story-detail-page" data-home-story="you" hidden>
+        <div class="home-story-detail-cover home-story-detail-cover-you"><div class="home-story-detail-cover-shade"></div><div class="home-story-detail-heading"><span>03 / YOU</span><h2>你的世界</h2><p>关于 · 忆书 · 职业 · 出行</p></div></div>
+        <div id="home-story-menu-you" class="home-story-menu">
+        <div class="you-row">
+        <div class="card photo-card" onclick="openScreen('meScreen')">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-secret.png" alt="">
+          <div class="photo-card-text"><div class="photo-card-title">关于</div><div class="photo-card-sub">ABOUT YOU</div></div>
+        </div>
+        <div class="card photo-card" onclick="openScreen('worldBookScreen');if(typeof renderWorldBook==='function')renderWorldBook();">
+          <img class="photo-card-img" src="images/ui-backgrounds/home/menu-story.png" alt="">
+          <div class="photo-card-text"><div class="photo-card-title">忆书</div><div class="photo-card-sub">WORLD BOOK</div></div>
+        </div>
+        
         <div class="card photo-card" onclick="openScreen('careerScreen');setTimeout(()=>{if(typeof renderCareerSelection==='function')renderCareerSelection();},80);">
           <img class="photo-card-img" src="images/ui-backgrounds/home/menu-career.png" alt="">
           <div class="photo-card-text">
@@ -747,9 +769,10 @@ html:not(.gc-maintenance-unlocked) body > :not(#gc-maintenance-overlay) { visibi
             <div class="photo-card-sub">TRAVEL</div>
           </div>
         </div>
+        </div>
       </div>
-    </section>
-
+      </div>
+    </div>
     <!-- QQ群弹窗 -->
     <div id="qqGroupModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
       <div style="background:white;border-radius:24px;padding:24px 20px;width:85%;max-width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
@@ -3251,6 +3274,26 @@ function _updateMainCharInfo() {
 
 // ── 首页 Hero：用户本地时间的问候/日期/背景 + Ghost 真相源卡 ──
 // 独立于 _updateMainCharInfo，只管 Hero，不碰角色信息条逻辑。
+function openHomeStory(section) {
+  var overlay = document.getElementById('homeStoryDetail');
+  if (!overlay || !['us','life','you'].includes(section)) return;
+  overlay.querySelectorAll('.home-story-detail-page').forEach(function(page) {
+    page.hidden = page.getAttribute('data-home-story') !== section;
+  });
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden', 'false');
+  overlay.scrollTop = 0;
+  var main = document.getElementById('mainScreen');
+  if (main) main.classList.add('home-story-detail-open');
+}
+function closeHomeStory() {
+  var overlay = document.getElementById('homeStoryDetail');
+  if (overlay) { overlay.hidden = true; overlay.setAttribute('aria-hidden','true'); }
+  var main = document.getElementById('mainScreen');
+  if (main) main.classList.remove('home-story-detail-open');
+}
+
+
 function _homeHeroDaypart(hour) {
   if (hour >= 5 && hour < 11) return 'morning';
   if (hour >= 11 && hour < 18) return 'day';
