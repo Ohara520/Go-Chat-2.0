@@ -210,6 +210,21 @@ function _avatarFallbackSrc() {
 
 function _renderGhostAvatar(url) {
   const stamp = localStorage.getItem('ghostAvatarUpdatedAt') || '';
+
+  // 修复 Bug：正式 URL 不存在或为 data: 时，优先渲染待上传的 base64
+  if (!url || url.startsWith('data:')) {
+    const b64 = localStorage.getItem('ghostAvatarBase64');
+    if (b64) {
+      // 待上传头像：用 base64 + 时间戳防缓存
+      const src = `data:image/jpeg;base64,${b64}#t=${stamp || Date.now()}`;
+      document.querySelectorAll('.ghost-avatar-img').forEach(el => {
+        el.src = src;
+      });
+      return;
+    }
+  }
+
+  // 正式 URL 存在：用版本化 URL
   const src = url ? _avatarVersionedUrl(url, stamp) : _avatarFallbackSrc();
   document.querySelectorAll('.ghost-avatar-img').forEach(el => {
     el.onerror = () => {
