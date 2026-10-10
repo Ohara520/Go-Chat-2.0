@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="css/lovespace.css">
 <link rel="stylesheet" href="css/profile.css">
 <link rel="stylesheet" href="css/voice.css">
+<link rel="stylesheet" href="css/me-v2.css">
 <link rel="stylesheet" href="css/delivery-v1.css">
 <link rel="stylesheet" href="css/assets-v1.css">
 <link rel="stylesheet" href="css/takeout-v2.css">
@@ -655,70 +656,32 @@
     <div style="height:72px;flex-shrink:0;"></div>
   </div>
 
-  <!-- ═══ 我的 Tab 页面 ═══ -->
+  <!-- 我的 · 火漆情书 V2：保留原订阅 ID 和真实数据加载 -->
   <div class="screen" id="meScreen" style="display:none;">
-    <div style="padding: calc(16px + env(safe-area-inset-top)) 20px 14px;
-      background: linear-gradient(135deg, rgba(155,205,125,0.5), rgba(185,225,150,0.45));
-      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-      flex-shrink:0; display:flex; align-items:center; gap:12px;">
-      <div style="font-size:17px;font-weight:700;color:#1e3d20;flex:1;">我的</div>
-    </div>
-    <div style="flex:1;overflow-y:auto;padding:20px 16px calc(80px + env(safe-area-inset-bottom));background:rgba(235,248,228,0.12);">
-
-      <!-- 邮箱 -->
-      <div id="me-account-email" style="font-size:12px;color:#9aca9a;text-align:center;margin-bottom:14px;"></div>
-
-      <!-- 订阅卡片 -->
-      <div id="subscribeCard" onclick="openSubscribePage()" style="
-        background: linear-gradient(135deg, rgba(90,160,70,0.1), rgba(120,185,85,0.08));
-        border: 1px solid rgba(90,160,70,0.22); border-radius: 16px;
-        padding: 14px 16px; margin-bottom: 12px; cursor: pointer; text-align:left;">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div>
-            <div id="subPlanName" style="font-size:13px;font-weight:600;color:#2d6028;">✨ 开通会员</div>
-            <div id="subRemaining" style="font-size:11px;color:#7aaa7a;margin-top:2px;">与Ghost无限畅聊</div>
-          </div>
-          <div style="font-size:20px;">💌</div>
-        </div>
+    <header class="me-v2-header"><span class="me-v2-header-label">PRIVATE LETTER · GO CHAT</span><h1>我的</h1><span class="me-v2-header-script">My little corner</span></header>
+    <div class="me-v1-scroll me-v2-scroll">
+      <div class="me-v2-envelope" aria-label="火漆信封装饰"><img src="images/me-wax-envelope.png" alt="" loading="lazy"></div>
+      <div class="me-v2-account me-v1-account"><span class="me-v2-account-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 21c0-4 3-6.5 7.5-6.5s7.5 2.5 7.5 6.5"/></svg></span><div class="me-v2-account-text"><span class="me-v1-account-caption">写给你的私人信笺</span><div id="me-account-email" class="me-v1-email"></div></div></div>
+      <div id="subscribeCard" class="me-v2-plan me-v1-plan">
+        <div class="me-v2-plan-top"><span>ENCLOSURE 01</span><button type="button" class="me-v2-plan-open" onclick="openSubscribePage()" aria-label="查看可选套餐"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 7h18v13H3zM3 7l9 7 9-7M7 4h10"/></svg></button></div>
+        <div class="me-v2-plan-title">我的套餐 <span>My Plan</span></div>
+        <div class="me-v2-plan-rule"></div>
+        <div class="me-v2-plan-stats"><div class="me-v2-plan-stat"><small>剩余条数</small><strong id="subRemaining">读取中…</strong></div><div class="me-v2-plan-stat"><small>当前套餐</small><strong id="subPlanName">读取中…</strong></div></div>
       </div>
-
-      <!-- 福利说明 -->
-      <div style="background:rgba(255,255,255,0.6);backdrop-filter:blur(14px);border-radius:16px;
-        padding:14px 16px;border:1px solid rgba(255,255,255,0.85);margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:700;color:#1e3d20;margin-bottom:10px;">🎁 福利说明</div>
-        <div style="font-size:12px;color:#7aaa7a;line-height:2;">
-          🎁 新用户注册免费赠送100条<br>
-          📅 每日签到随机获得英镑或条数奖励<br>
-          🏆 连续签到达里程碑额外赠条数
-        </div>
+      <div class="me-v2-section-title"><span>信笺目录</span><i></i><small>CONTENTS</small></div>
+      <div class="me-v1-menu me-v2-menu">
+        <button type="button" class="me-v1-menu-item" onclick="openMeDetail('voice')"><span class="me-v1-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 11v2m4-6v10m4-14v18m4-14v10m4-7v4m4-6v8" stroke-linecap="round"/></svg></span><span class="me-v1-menu-copy"><strong>语音设置</strong><small>声音、音色与 API 配置</small></span><span class="me-v1-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="me-v1-menu-item" onclick="openMeDetail('updates')"><span class="me-v1-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 3h8l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M15 3v5h4M9 12h7M9 16h7"/></svg></span><span class="me-v1-menu-copy"><strong>更新日志</strong><small>记录 Go Chat 的每一次改变</small></span><span class="me-v1-chevron" aria-hidden="true">›</span></button>
       </div>
-
-      <!-- 操作区 -->
-      <div style="background:rgba(255,255,255,0.6);backdrop-filter:blur(14px);border-radius:16px;
-        overflow:hidden;border:1px solid rgba(255,255,255,0.85);margin-bottom:12px;">
-        <div onclick="sessionStorage.setItem('worldBookSource','me');openScreen('worldBookScreen'); if(typeof renderWorldBook==='function') renderWorldBook();" style="padding:14px 16px;border-bottom:1px solid rgba(140,190,100,0.15);
-          display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
-          <div style="font-size:13px;font-weight:600;color:#1e3d20;">📖 记忆世界书</div>
-          <div style="font-size:13px;color:#aaa;">›</div>
-        </div>
-        <div onclick="showQQGroup()" style="padding:14px 16px;border-bottom:1px solid rgba(140,190,100,0.15);
-          display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
-          <div style="font-size:13px;font-weight:600;color:#1e3d20;">💬 反馈群</div>
-          <div style="font-size:13px;color:#aaa;">›</div>
-        </div>
-        <div onclick="handleLogout()" style="padding:14px 16px;
-          display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
-          <div style="font-size:13px;font-weight:600;color:#e57373;">退出登录</div>
-          <div style="font-size:13px;color:#aaa;">›</div>
-        </div>
-      </div>
-
-      <!-- ID -->
+      <button type="button" class="me-v1-logout" onclick="handleLogout()">退出登录 <span aria-hidden="true">↗</span></button>
       <div id="main-account-email" style="display:none;"></div>
+      <div class="me-v1-footer">GO CHAT <span>·</span> A LETTER FOR YOU</div>
     </div>
     <div style="height:72px;flex-shrink:0;"></div>
   </div>
-
+  <div class="me-v1-detail" id="meDetailOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="meDetailTitle">
+    <div class="me-v1-detail-panel"><header class="me-v1-detail-head"><button type="button" onclick="closeMeDetail()" aria-label="返回我的页面">‹</button><h2 id="meDetailTitle"></h2><span></span></header><div id="meDetailBody" class="me-v1-detail-body"></div></div>
+  </div>
   <!-- 聊天页 -->
   <div class="screen" id="chatScreen">
     <div class="chat-container">
@@ -2063,60 +2026,55 @@ async function loadSubscribeCard() {
     const card = document.getElementById('subscribeCard');
     if (!planEl) return;
     if (data.subscribed) {
-      planEl.textContent = `💎 ${data.plan_name}`;
-      const _noPeriod = ['free', 'trial', 'permanent'].includes(data.plan_id);
-      if (_noPeriod) {
-        remEl.textContent = `剩余 ${data.remaining} 条`;
-      } else {
-        const endDate = new Date(data.period_end).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
-        remEl.textContent = `剩余 ${data.remaining} 条 · ${endDate}到期`;
-      }
-      card.style.background = 'linear-gradient(135deg, rgba(90,160,70,0.13) 0%, rgba(120,185,85,0.1) 100%)';
+      planEl.textContent = data.plan_name || '当前套餐';
+      remEl.textContent = `${data.remaining ?? '—'} 条`;
+
     }
   } catch(e) {}
 }
 
 function openSubscribePage() {
+  if (document.getElementById('mePlanOverlay')) return;
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  overlay.id = 'mePlanOverlay';
+  overlay.className = 'me-plan-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'mePlanDialogTitle');
+  const packages = [
+    ['轻聊包','150条','¥8.8'],
+    ['日常包','400条','¥19.9'],
+    ['沉浸包','900条','¥42.9'],
+    ['陪伴包','1800条','¥79.9'],
+    ['深度陪伴包','3000条','¥129']
+  ];
   overlay.innerHTML = `
-    <div style="background:linear-gradient(180deg,#f2fce8,#f8fff2);border-radius:24px 24px 0 0;padding:24px;width:100%;max-width:480px;padding-bottom:calc(24px + env(safe-area-inset-bottom));">
-      <div style="width:36px;height:4px;background:rgba(90,160,70,0.28);border-radius:2px;margin:0 auto 20px;"></div>
-      <div style="text-align:center;margin-bottom:20px;">
-        <div style="font-size:18px;font-weight:700;color:#1e4020;margin-bottom:4px;">选择套餐</div>
-        <div style="font-size:13px;color:#7aaa7a;">若需充值请移步交流群寻找管理</div>
+    <div class="me-plan-sheet">
+      <div class="me-plan-paper">
+        <button type="button" class="me-plan-close" aria-label="关闭套餐弹窗">×</button>
+        <div class="me-plan-kicker">GO CHAT · ENCLOSED LETTER</div>
+        <h2 id="mePlanDialogTitle">选择套餐</h2>
+        <p class="me-plan-subtitle">一份写给日常陪伴的小小凭证</p>
+        <div class="me-plan-list">${packages.map(([name,qty,price],i) => `
+          <div class="me-plan-option ${i===3?'me-plan-option-featured':''}">
+            <div class="me-plan-option-name"><strong>${name}</strong><small>${qty}</small></div>
+            <span class="me-plan-price">${price}</span>
+          </div>`).join('')}</div>
+        <p class="me-plan-help">如需购买或充值，请联系交流群管理员。</p>
+        <button type="button" class="me-plan-dismiss">稍后再说</button>
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:16px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);">
-          <div><div style="font-size:14px;font-weight:600;color:#2d6028;">轻聊包</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">150条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥8.8</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:16px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);">
-          <div><div style="font-size:14px;font-weight:600;color:#2d6028;">日常包</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">400条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥19.9</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:16px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);">
-          <div><div style="font-size:14px;font-weight:600;color:#2d6028;">沉浸包</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">900条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥42.9</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(90,160,70,0.16),rgba(120,185,85,0.13));border:1.5px solid rgba(90,160,70,0.35);position:relative;">
-          <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#5a9a46,#7dba5a);color:white;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;">推荐</div>
-          <div><div style="font-size:14px;font-weight:700;color:#2d6028;">陪伴包</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">1800条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥79.9</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:16px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);">
-          <div><div style="font-size:14px;font-weight:600;color:#2d6028;">深度陪伴包</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">3000条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥129</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:16px;background:rgba(90,160,70,0.08);border:1px solid rgba(90,160,70,0.2);">
-          <div><div style="font-size:14px;font-weight:600;color:#2d6028;">长期陪伴包</div><div style="font-size:11px;color:#7aaa7a;margin-top:2px;">4500条</div></div>
-          <div style="font-size:15px;font-weight:700;color:#3a7a2a;">¥168</div>
-        </div>
-      </div>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:14px;padding:12px;border-radius:14px;border:1px solid rgba(90,160,70,0.2);background:transparent;color:#7aaa7a;font-size:13px;cursor:pointer;">稍后再说</button>
-    </div>
-  `;
+    </div>`;
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  overlay.querySelector('.me-plan-close').addEventListener('click', close);
+  overlay.querySelector('.me-plan-dismiss').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', onKey);
   document.body.appendChild(overlay);
+  overlay.querySelector('.me-plan-close').focus();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3769,5 +3727,28 @@ function closePlusPanel() {
     setTimeout(() => location.reload(), 500);
   }
   </script>
+<script>
+// 我的页面 V1：仅导航展示。语音配置和更新记录的数据接入留到下一阶段。
+function openMeDetail(type) {
+  const overlay = document.getElementById('meDetailOverlay');
+  const title = document.getElementById('meDetailTitle');
+  const body = document.getElementById('meDetailBody');
+  if (!overlay || !title || !body) return;
+  if (type === 'voice') {
+    title.textContent = '语音设置';
+    body.innerHTML = '<div class="me-v1-detail-kicker">VOICE STUDIO</div><h3>让文字有声音</h3><p>语音合成（TTS）已具备基础播放模块。接下来将开放服务商选择、个人 API Key 安全配置、音色选择和试听。</p><div class="me-v1-coming"><span>01</span><div><strong>文字转语音</strong><small>配置与试听功能待接入</small></div><em>即将开放</em></div><div class="me-v1-coming"><span>02</span><div><strong>实时语音通话</strong><small>预留未来扩展入口</small></div><em>规划中</em></div><p class="me-v1-detail-note">此页面目前为视觉入口，尚不能保存 API Key 或生成试听音频。</p>';
+  } else if (type === 'updates') {
+    title.textContent = '更新日志';
+    body.innerHTML = '<div class="me-v1-detail-kicker">RELEASE NOTES</div><h3>每一次小小改变</h3><p>这里将记录 Go Chat 的新功能、体验优化与问题修复。</p><div class="me-v1-coming"><span>—</span><div><strong>更新记录即将上线</strong><small>待接入真实版本记录后显示</small></div></div>';
+  } else return;
+  overlay.hidden = false;
+  document.body.classList.add('me-v1-detail-open');
+}
+function closeMeDetail() {
+  const overlay = document.getElementById('meDetailOverlay');
+  if (overlay) overlay.hidden = true;
+  document.body.classList.remove('me-v1-detail-open');
+}
+</script>
 </body>
 </html>
