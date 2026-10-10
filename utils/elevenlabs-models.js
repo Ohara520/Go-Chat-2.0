@@ -6,72 +6,41 @@
 // 模型白名单（仅允许这些模型，服务端强制校验）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const ALLOWED_MODELS = [
-  // Turbo 系列（快速生成，推荐日常使用）
+  // V4（最新生成模型，推荐陪伴场景）
+  'eleven_v4',
+
+  // Flash 系列（超快速生成，低延迟）
+  'eleven_flash_v2_5',
+  'eleven_flash_v2',
+
+  // Turbo 系列（快速生成，质量与速度平衡）
   'eleven_turbo_v2_5',
   'eleven_turbo_v2',
 
-  // Multilingual 系列（支持多语言）
+  // Multilingual 系列（多语言支持）
   'eleven_multilingual_v2',
   'eleven_multilingual_v1',
 
-  // English 系列（英语优化）
+  // English 系列（英语优化，已过时但保留向后兼容）
   'eleven_monolingual_v1',
-
-  // Flash 系列（超快速生成）
-  'eleven_flash_v2_5',
-  'eleven_flash_v2',
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 模型配置（用于前端下拉框显示 + 后端参数兼容性判断）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const MODEL_CONFIGS = {
-  // Turbo v2.5（推荐）
-  'eleven_turbo_v2_5': {
-    displayName: 'Turbo v2.5（推荐）',
+  // V4（最新，情绪表现丰富，适合 AI 伴侣）
+  'eleven_v4': {
+    displayName: 'Eleven v4（推荐）- 情绪表现更丰富，适合角色陪伴',
     supportsVoiceSettings: true,
     supportsStyle: true,
     supportsSpeakerBoost: true,
     maxTextLength: 5000,
   },
 
-  'eleven_turbo_v2': {
-    displayName: 'Turbo v2',
-    supportsVoiceSettings: true,
-    supportsStyle: true,
-    supportsSpeakerBoost: true,
-    maxTextLength: 5000,
-  },
-
-  // Multilingual 系列
-  'eleven_multilingual_v2': {
-    displayName: 'Multilingual v2（多语言）',
-    supportsVoiceSettings: true,
-    supportsStyle: false,
-    supportsSpeakerBoost: true,
-    maxTextLength: 2500,
-  },
-
-  'eleven_multilingual_v1': {
-    displayName: 'Multilingual v1',
-    supportsVoiceSettings: true,
-    supportsStyle: false,
-    supportsSpeakerBoost: false,
-    maxTextLength: 2500,
-  },
-
-  // English 系列
-  'eleven_monolingual_v1': {
-    displayName: 'English v1（英语）',
-    supportsVoiceSettings: true,
-    supportsStyle: false,
-    supportsSpeakerBoost: false,
-    maxTextLength: 2500,
-  },
-
-  // Flash 系列（超快速）
+  // Flash 系列（低延迟，适合快速交互）
   'eleven_flash_v2_5': {
-    displayName: 'Flash v2.5（超快速）',
+    displayName: 'Flash v2.5 - 超快速，适合快速聊天',
     supportsVoiceSettings: true,
     supportsStyle: true,
     supportsSpeakerBoost: true,
@@ -79,11 +48,54 @@ export const MODEL_CONFIGS = {
   },
 
   'eleven_flash_v2': {
-    displayName: 'Flash v2',
+    displayName: 'Flash v2 - 快速生成',
     supportsVoiceSettings: true,
     supportsStyle: true,
     supportsSpeakerBoost: true,
     maxTextLength: 5000,
+  },
+
+  // Turbo 系列（质量与速度平衡）
+  'eleven_turbo_v2_5': {
+    displayName: 'Turbo v2.5 - 质量与速度平衡',
+    supportsVoiceSettings: true,
+    supportsStyle: true,
+    supportsSpeakerBoost: true,
+    maxTextLength: 5000,
+  },
+
+  'eleven_turbo_v2': {
+    displayName: 'Turbo v2 - 稳定可靠',
+    supportsVoiceSettings: true,
+    supportsStyle: true,
+    supportsSpeakerBoost: true,
+    maxTextLength: 5000,
+  },
+
+  // Multilingual 系列（多语言支持）
+  'eleven_multilingual_v2': {
+    displayName: 'Multilingual v2 - 多语言稳定',
+    supportsVoiceSettings: true,
+    supportsStyle: false,
+    supportsSpeakerBoost: true,
+    maxTextLength: 2500,
+  },
+
+  'eleven_multilingual_v1': {
+    displayName: 'Multilingual v1 - 多语言支持',
+    supportsVoiceSettings: true,
+    supportsStyle: false,
+    supportsSpeakerBoost: false,
+    maxTextLength: 2500,
+  },
+
+  // English 系列（已过时，向后兼容）
+  'eleven_monolingual_v1': {
+    displayName: 'English v1 - 英语优化',
+    supportsVoiceSettings: true,
+    supportsStyle: false,
+    supportsSpeakerBoost: false,
+    maxTextLength: 2500,
   },
 };
 
@@ -129,10 +141,11 @@ export function getMaxTextLength(modelId) {
 // 获取前端下拉框选项（按推荐顺序）
 export function getModelOptions() {
   return [
-    { value: 'eleven_turbo_v2_5', label: MODEL_CONFIGS['eleven_turbo_v2_5'].displayName },
+    { value: 'eleven_v4', label: MODEL_CONFIGS['eleven_v4'].displayName },
     { value: 'eleven_flash_v2_5', label: MODEL_CONFIGS['eleven_flash_v2_5'].displayName },
-    { value: 'eleven_turbo_v2', label: MODEL_CONFIGS['eleven_turbo_v2'].displayName },
+    { value: 'eleven_turbo_v2_5', label: MODEL_CONFIGS['eleven_turbo_v2_5'].displayName },
     { value: 'eleven_multilingual_v2', label: MODEL_CONFIGS['eleven_multilingual_v2'].displayName },
+    { value: 'eleven_turbo_v2', label: MODEL_CONFIGS['eleven_turbo_v2'].displayName },
     { value: 'eleven_flash_v2', label: MODEL_CONFIGS['eleven_flash_v2'].displayName },
     { value: 'eleven_multilingual_v1', label: MODEL_CONFIGS['eleven_multilingual_v1'].displayName },
     { value: 'eleven_monolingual_v1', label: MODEL_CONFIGS['eleven_monolingual_v1'].displayName },

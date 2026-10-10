@@ -32,7 +32,7 @@ const VOICE_CONFIG = {
 // 平台默认配置（仅在用户无配置时使用）
 const PLATFORM_DEFAULTS = {
   voiceId: 'QHVs2huJe5wggzgIHMIi',
-  modelId: 'eleven_turbo_v2_5',
+  modelId: 'eleven_v4',  // V1.1 更新为 v4
 };
 
 // 用户配置初始化标志

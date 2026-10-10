@@ -80,6 +80,7 @@ async function verifyToken(req) {
 }
 
 // 辅助：获取用户的语音配置（包括解密密钥）
+// V1.1 改动：用户必须配置自己的 API Key，禁止 fallback 到平台密钥
 async function getUserVoiceConfig(userId) {
   try {
     const { data, error } = await supabase
@@ -93,13 +94,11 @@ async function getUserVoiceConfig(userId) {
       return { error: 'Failed to load voice settings', status: 500 };
     }
 
-    // 没有配置 = 降级到平台密钥
+    // V1.1：不配置用户 Key = 返回 400，不允许使用任何 Key
     if (!data || !data.api_key_ciphertext) {
       return {
-        apiKey: process.env.ELEVENLABS_API_KEY,
-        voiceId: null,
-        modelId: null,
-        isPlatformKey: true,
+        error: '请先配置您的 ElevenLabs API Key',
+        status: 400,
       };
     }
 
@@ -155,14 +154,16 @@ export default async function handler(req, res) {
 
     const { apiKey, voiceId, modelId, isPlatformKey } = config;
 
-    // 如果没有任何可用密钥（平台也没配置）
+    // V1.1：如果用户未配置 API Key，getUserVoiceConfig 已返回 400 错误
+    // 这里只需要校验 apiKey 存在即可（不应该走到这里）
     if (!apiKey) {
       console.error('[tts] No API key available');
-      return res.status(503).json({ error: '语音服务未配置' });
+      return res.status(400).json({ error: '请先配置您的 ElevenLabs API Key' });
     }
 
     // ========== 4. 限流检查 ==========
-    const rateLimitResult = checkRateLimit(user.id, isPlatformKey);
+    // V1.1：移除平台密钥限流，改为用户粒度限流
+    const rateLimitResult = checkRateLimit(user.id, false);
     if (!rateLimitResult.allowed) {
       return res.status(429).json({
         error: `请求过于频繁，请 ${rateLimitResult.retryAfter} 秒后重试`,
@@ -230,30 +231,19 @@ export default async function handler(req, res) {
     if (!upstream.ok) {
       console.warn('[tts] ElevenLabs error:', upstream.status);
 
-      // 用户密钥失效：明确告知，不降级到平台密钥
-      if (!isPlatformKey && upstream.status === 401) {
+      // V1.1：用户密钥失效或其他错误，直接返回给用户
+      if (upstream.status === 401) {
         return res.status(401).json({
           error: '您的 ElevenLabs API Key 无效或已过期',
           hint: '请前往「我的 → 语音设置」更新密钥',
         });
       }
 
-      // 用户密钥额度不足：明确告知，不降级
-      if (!isPlatformKey && upstream.status === 429) {
+      if (upstream.status === 429) {
         return res.status(429).json({
           error: '您的 ElevenLabs API Key 额度不足',
           hint: '请充值或前往「我的 → 语音设置」更换密钥',
         });
-      }
-
-      // 平台密钥失效
-      if (isPlatformKey && upstream.status === 401) {
-        return res.status(503).json({ error: '平台语音服务密钥失效，请联系管理员' });
-      }
-
-      // 平台密钥限流
-      if (isPlatformKey && upstream.status === 429) {
-        return res.status(429).json({ error: '平台语音服务繁忙，请稍后重试' });
       }
 
       // 其他错误

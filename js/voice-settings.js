@@ -6,19 +6,21 @@ let _voiceSettingsState = {
   hasApiKey: false,
   provider: 'elevenlabs',
   voiceId: null,
-  modelId: 'eleven_turbo_v2_5',
+  modelId: 'eleven_v4',  // V1.1 更新为 v4
   autoPlay: false,
 };
 
 // 模型选项（从后端模型配置生成，保持一致）
+// V1.1 更新：v4 作为推荐首选，按使用场景分组
 const MODEL_OPTIONS = [
-  { value: 'eleven_turbo_v2_5', label: 'Turbo v2.5（推荐）' },
-  { value: 'eleven_flash_v2_5', label: 'Flash v2.5（超快速）' },
-  { value: 'eleven_turbo_v2', label: 'Turbo v2' },
-  { value: 'eleven_multilingual_v2', label: 'Multilingual v2（多语言）' },
-  { value: 'eleven_flash_v2', label: 'Flash v2' },
-  { value: 'eleven_multilingual_v1', label: 'Multilingual v1' },
-  { value: 'eleven_monolingual_v1', label: 'English v1（英语）' },
+  { value: 'eleven_v4', label: 'Eleven v4（推荐）- 情绪表现更丰富，适合角色陪伴' },
+  { value: 'eleven_flash_v2_5', label: 'Flash v2.5 - 超快速，适合快速聊天' },
+  { value: 'eleven_turbo_v2_5', label: 'Turbo v2.5 - 质量与速度平衡' },
+  { value: 'eleven_multilingual_v2', label: 'Multilingual v2 - 多语言稳定' },
+  { value: 'eleven_turbo_v2', label: 'Turbo v2 - 稳定可靠' },
+  { value: 'eleven_flash_v2', label: 'Flash v2 - 快速生成' },
+  { value: 'eleven_multilingual_v1', label: 'Multilingual v1 - 多语言支持' },
+  { value: 'eleven_monolingual_v1', label: 'English v1 - 英语优化' },
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -58,7 +60,8 @@ async function renderVoiceSettings() {
           spellcheck="false"
         >
         <div class="voice-settings-hint">
-          未配置时使用平台默认密钥。
+          请配置您的 ElevenLabs API Key 后使用语音功能。<br>
+          API Key 由您自己的 ElevenLabs 账户提供。
           <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer">获取 API Key ↗</a>
         </div>
       </div>
@@ -166,7 +169,7 @@ async function _loadVoiceSettings() {
       document.getElementById('voiceSettingsDeleteBtn').style.display = 'block';
       document.getElementById('voiceApiKeyInput').placeholder = '留空保持不变，填写以更换';
     } else {
-      _showStatus('info', '当前使用平台默认密钥');
+      _showStatus('info', '尚未配置个人 API Key');
       document.getElementById('voiceSettingsDeleteBtn').style.display = 'none';
       document.getElementById('voiceApiKeyInput').placeholder = 'sk-...';
     }

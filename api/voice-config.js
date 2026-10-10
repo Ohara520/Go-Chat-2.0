@@ -61,13 +61,13 @@ async function handleGet(req, res) {
       return res.status(500).json({ error: 'Failed to load voice settings' });
     }
 
-    // 没有记录 = 使用平台默认配置
+    // 没有记录 = 使用 V1.1 新默认配置（eleven_v4）
     if (!data) {
       return res.status(200).json({
         has_api_key: false,
         provider: 'elevenlabs',
         voice_id: null,
-        model_id: 'eleven_turbo_v2_5',
+        model_id: 'eleven_v4',
         auto_play: false,
       });
     }
@@ -77,7 +77,7 @@ async function handleGet(req, res) {
       has_api_key: !!data.api_key_ciphertext,
       provider: data.provider || 'elevenlabs',
       voice_id: data.voice_id || null,
-      model_id: data.model_id || 'eleven_turbo_v2_5',
+      model_id: data.model_id || 'eleven_v4',
       auto_play: data.auto_play || false,
     });
   } catch (err) {
