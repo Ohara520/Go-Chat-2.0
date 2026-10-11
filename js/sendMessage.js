@@ -2256,8 +2256,9 @@ function prepareVoiceText(rawReply) {
 
   let vt = rawReply;
 
-  // V1.3：移除 VOICE_STYLE 标签（不应出现在 TTS 中）
-  vt = vt.replace(/VOICE_STYLE:\s*\{[^}]+\}/g, '');
+  // V1.3 P0：移除内部语音元数据（防止泄露到 TTS）
+  vt = vt.replace(/VOICE_STYLE\s*:\s*\{[\s\S]*?\}/gi, '').trim();
+  vt = vt.replace(/VOICE_STATE\s*:\s*\{[\s\S]*?\}/gi, '').trim();
 
   // 1. 移除系统控制标签（不应出现在 TTS 中）
   vt = vt.replace(/\n?(REFUND|\bKEEP\b|COLD_WAR_START|COLD_WAR_RESOLVE|GIVE_MONEY:[^\n]*|SEND_GIFT:[^\n]*)\n?/g, '');

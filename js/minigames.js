@@ -502,8 +502,14 @@ function getCollectionMessageText(button) {
   if (!bubble) return '';
   const en = bubble.querySelector('.bubble-en');
   const zh = bubble.querySelector('.bubble-zh');
-  return (en ? en.textContent + (zh ? '\n' + zh.textContent : '') :
+  let text = (en ? en.textContent + (zh ? '\n' + zh.textContent : '') :
     (button.dataset.collectText || bubble.textContent)).trim();
+
+  // V1.3 P0：移除内部语音元数据（防止收藏包含控制字段）
+  text = text.replace(/VOICE_STYLE\s*:\s*\{[\s\S]*?\}/gi, '').trim();
+  text = text.replace(/VOICE_STATE\s*:\s*\{[\s\S]*?\}/gi, '').trim();
+
+  return text;
 }
 
 function syncCollectionHearts() {

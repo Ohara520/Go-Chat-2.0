@@ -147,6 +147,10 @@ function cleanBotText(text, scene = 'normal') {
   // 破防检测由各调用方（sendMessage/sticker/photo/money）同步处理
   // cleanBotText 只负责文本清洗，不做破防兜底
 
+  // V1.3 P0：移除内部语音元数据（最高优先级，防止泄露到用户界面）
+  text = text.replace(/VOICE_STYLE\s*:\s*\{[\s\S]*?\}/gi, '').trim();
+  text = text.replace(/VOICE_STATE\s*:\s*\{[\s\S]*?\}/gi, '').trim();
+
   // 1. 去掉Ghost:前缀（Grok偶尔加）
   text = text.replace(/^ghost\s*:\s*/i, '').trim();
 
