@@ -193,7 +193,7 @@ function smartTruncate(text, maxLen) {
   return text.slice(0, maxLen).trim();
 }
 
-async function generateVoice(text, customVoiceId, customModelId) {
+async function generateVoice(text, customVoiceId, customModelId, voiceStyle) {
   if (!text || !text.trim()) return null;
 
   try {
@@ -238,6 +238,7 @@ async function generateVoice(text, customVoiceId, customModelId) {
         voice_id: finalVoiceId,
         model_id: finalModelId,
         voice_settings: VOICE_CONFIG.voiceSettings,
+        voice_style: voiceStyle,  // V1.3：传递 voiceStyle
       }),
     }, 18000);
 
@@ -399,7 +400,7 @@ function createVoiceBar(text) {
 // ⑥ 为消息添加语音按钮（不主动生成，点击时才调用 TTS）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function addVoiceButtonToMessage(contentDiv, messageText, voiceText) {
+function addVoiceButtonToMessage(contentDiv, messageText, voiceText, voiceStyle) {
   if (!contentDiv || !messageText || !messageText.trim()) return;
 
   // 过滤：超长文本不适合语音
@@ -431,11 +432,11 @@ function addVoiceButtonToMessage(contentDiv, messageText, voiceText) {
     if (_loading) return;
     _stopCurrent();
 
-    // 首次点击：生成语音（使用 voiceText）
+    // 首次点击：生成语音（使用 voiceText + voiceStyle）
     if (!_url) {
       _loading = true;
       voiceBtn.classList.add('voice-btn-loading');
-      _url = await generateVoice(textForTTS);
+      _url = await generateVoice(textForTTS, null, null, voiceStyle);  // V1.3：传递 voiceStyle
       _loading = false;
       voiceBtn.classList.remove('voice-btn-loading');
 

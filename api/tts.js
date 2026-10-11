@@ -140,7 +140,7 @@ export default async function handler(req, res) {
 
   try {
     // ========== 2. 参数校验 ==========
-    const { text, voice_id, model_id, voice_settings } = req.body || {};
+    const { text, voice_id, model_id, voice_settings, voice_style } = req.body || {};
 
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid text' });
@@ -192,8 +192,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `文本过长（最大 ${maxTextLength} 字符）` });
     }
 
-    // 根据模型能力构建兼容的 voice_settings
-    const compatibleSettings = buildVoiceSettings(finalModelId, voice_settings);
+    // V1.3：根据模型能力和 voice_style 构建兼容的 voice_settings
+    const compatibleSettings = buildVoiceSettings(finalModelId, voice_settings, voice_style);
 
     // ========== 6. 调用 ElevenLabs ==========
     const controller = new AbortController();

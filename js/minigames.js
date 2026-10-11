@@ -540,7 +540,7 @@ function collectMessage(button) {
       time: dateStr + ' ' + timeStr,
       audioUrl: null,      // 预留：语音 URL（未来按需生成后填入）
       voiceText: null,     // 预留：TTS 文本（可能与显示文本不同）
-      voiceState: null,    // 预留：语音状态（tone/mood/intensity）
+      voiceStyle: null,    // V1.3：语音风格（tone + intensity）
     });
   }
   localStorage.setItem('collections', JSON.stringify(collections));

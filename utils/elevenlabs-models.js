@@ -113,21 +113,40 @@ export function isModelAllowed(modelId) {
   return ALLOWED_MODELS.includes(modelId);
 }
 
-// 构建兼容的 voice_settings（V1 保守策略：仅使用基础参数）
-export function buildVoiceSettings(modelId, baseSettings) {
+// V1.3：构建兼容的 voice_settings（支持 voice_style 映射）
+export function buildVoiceSettings(modelId, baseSettings, voiceStyle) {
   const config = getModelConfig(modelId);
   if (!config || !config.supportsVoiceSettings) {
     return undefined; // 不支持 voice_settings 的模型
   }
 
-  // V1 仅使用稳定的基础参数，避免未来模型更新导致兼容性问题
+  // 基础参数（V1 保守策略）
   const settings = {
     stability: baseSettings?.stability ?? 0.75,
     similarity_boost: baseSettings?.similarity_boost ?? 0.82,
   };
 
-  // V1 不处理 style 和 speaker_boost，待后续版本根据实际需求扩展
-  // 原因：不同模型对这些参数的支持差异较大，V1 优先保证调用稳定
+  // V1.3：根据 voiceStyle 调整 style 参数（仅 eleven_v4 支持）
+  if (modelId === 'eleven_v4' && voiceStyle && voiceStyle.tone) {
+    // tone 到基准 style 值的映射
+    const toneStyleMap = {
+      warm: 0.4,       // 温柔：中等情绪表现
+      cold: 0.1,       // 冷淡：低情绪表现（保持克制）
+      tired: 0.15,     // 疲惫：轻微低沉
+      playful: 0.35,   // 调侃：中等活跃
+      tense: 0.25,     // 紧张：轻微紧绷
+      neutral: 0.0,    // 中性：无额外情绪
+    };
+
+    const baseStyle = toneStyleMap[voiceStyle.tone] ?? 0.0;
+    const intensity = voiceStyle.intensity ?? 0.5;
+
+    // 最终 style = 基准 * (0.5 + 强度)
+    // 强度 0.0 → 乘以 0.5（减半）
+    // 强度 0.5 → 乘以 1.0（不变）
+    // 强度 1.0 → 乘以 1.5（增强 50%）
+    settings.style = Math.min(1.0, baseStyle * (0.5 + intensity));
+  }
 
   return settings;
 }

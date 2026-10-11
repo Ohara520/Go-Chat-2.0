@@ -1581,6 +1581,9 @@ Her: ${text}`
     // 清理分隔符后存入 chatHistory（一轮回复仍为一条 assistant item）
     const historyReply = finalParts.join('\n');
 
+    // V1.3：提取隐藏语音风格标签（Ghost 自主决定）
+    const voiceStyle = extractVoiceStyle(reply);
+
     // V1.2：准备 voiceText（TTS 专用文本，保留情绪线索）
     const voiceText = prepareVoiceText(reply);
 
@@ -1588,8 +1591,8 @@ Her: ${text}`
       role: 'assistant',
       content: historyReply,
       _time: Date.now(),
-      _voiceText: voiceText,  // V1.2：TTS 文本（保留情绪线索）
-      _voiceState: null,       // V1.2：预留 voice_state 字段
+      _voiceText: voiceText,    // V1.2：TTS 文本（保留情绪线索）
+      _voiceStyle: voiceStyle,  // V1.3：语音风格（tone + intensity）
     });
     saveHistory();
     if (typeof saveChatHistoryNow === 'function') saveChatHistoryNow().catch(() => {});
@@ -2198,6 +2201,49 @@ function handleKeyPress(event) {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V1.3: Voice Style Extraction
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 提取隐藏语音风格标签
+ * Ghost 可选择性输出 VOICE_STYLE: {...} 来控制语音表达
+ */
+function extractVoiceStyle(reply) {
+  if (!reply) return null;
+
+  // 匹配 VOICE_STYLE: {...}
+  const match = reply.match(/VOICE_STYLE:\s*(\{[^}]+\})/);
+  if (!match) return null;
+
+  try {
+    const style = JSON.parse(match[1]);
+
+    // 校验必填字段
+    if (!style.tone || typeof style.intensity !== 'number') {
+      return null;
+    }
+
+    // 白名单校验 tone
+    const validTones = ['warm', 'cold', 'tired', 'playful', 'tense', 'neutral'];
+    if (!validTones.includes(style.tone)) {
+      console.warn('[voice] Invalid tone:', style.tone);
+      return null;
+    }
+
+    // 强度钳制到 [0, 1]
+    style.intensity = Math.max(0, Math.min(1, style.intensity));
+
+    return {
+      tone: style.tone,
+      intensity: style.intensity,
+    };
+  } catch (e) {
+    console.warn('[voice] Failed to parse VOICE_STYLE:', e);
+    return null;
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // V1.2: Voice Text Preparation
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -2209,6 +2255,9 @@ function prepareVoiceText(rawReply) {
   if (!rawReply || !rawReply.trim()) return '';
 
   let vt = rawReply;
+
+  // V1.3：移除 VOICE_STYLE 标签（不应出现在 TTS 中）
+  vt = vt.replace(/VOICE_STYLE:\s*\{[^}]+\}/g, '');
 
   // 1. 移除系统控制标签（不应出现在 TTS 中）
   vt = vt.replace(/\n?(REFUND|\bKEEP\b|COLD_WAR_START|COLD_WAR_RESOLVE|GIVE_MONEY:[^\n]*|SEND_GIFT:[^\n]*)\n?/g, '');

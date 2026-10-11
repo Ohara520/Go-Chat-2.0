@@ -353,7 +353,9 @@ function appendMessage(role, text, animate = true) {
         const messageText = bubble.querySelector('.bubble-en')?.textContent || bubble.textContent;
 
         // V1.2：尝试从 chatHistory 获取对应消息的 _voiceText
+        // V1.3：同时获取 _voiceStyle
         let voiceText = messageText;
+        let voiceStyle = null;
 
         // 通过时间戳匹配查找对应的 chatHistory 消息
         if (typeof chatHistory !== 'undefined' && Array.isArray(chatHistory)) {
@@ -367,13 +369,14 @@ function appendMessage(role, text, animate = true) {
 
               if (historyText === currentText) {
                 voiceText = msg._voiceText || messageText;
+                voiceStyle = msg._voiceStyle || null;  // V1.3
                 break;
               }
             }
           }
         }
 
-        addVoiceButtonToMessage(contentDiv, messageText, voiceText);
+        addVoiceButtonToMessage(contentDiv, messageText, voiceText, voiceStyle);
       } catch(e) {
         console.warn('[voice] Failed to add voice button:', e);
       }
