@@ -21,6 +21,42 @@
   // localStorage 键名
   const STORAGE_KEY = 'go_chat_update_notice';
 
+  // 更新日志数据（最新的放最前面）
+  const UPDATE_LOGS = [
+    {
+      version: '20261011_voice',
+      date: '2026.10.11',
+      title: 'Update Letter',
+      image: 'images/update-notice/dev-cat-bugfix.png',
+      sections: [
+        {
+          title: '语音功能上线',
+          content: [
+            '新增 AI 语音播放功能。',
+            '支持用户接入自己的 ElevenLabs API Key。',
+            '支持自定义声音与模型选择。'
+          ],
+          note: '注：部分模型需要对应权限的 API Key，调试不同模型时可能需要重新配置 Key。'
+        },
+        {
+          title: '界面优化',
+          content: [
+            '优化「我的」页面及设置界面。',
+            '调整部分页面布局和视觉细节。'
+          ]
+        },
+        {
+          title: '问题修复',
+          content: [
+            '修复头像更换后异常回退问题。',
+            '优化时间感知逻辑。',
+            '提升整体稳定性。'
+          ]
+        }
+      ]
+    }
+  ];
+
   /**
    * 初始化更新公告系统
    */
@@ -63,47 +99,38 @@
    * 显示更新公告
    */
   function showUpdateNotice() {
+    const latestUpdate = UPDATE_LOGS[0];
+
     // 创建遮罩和弹窗
     const overlay = document.createElement('div');
     overlay.className = 'update-notice-overlay';
     overlay.id = 'updateNoticeOverlay';
 
+    // 构建内容区
+    const sectionsHTML = latestUpdate.sections.map(section => {
+      const contentHTML = section.content.map(line => line).join('<br>');
+      const noteHTML = section.note ? `<div class="update-notice-note">${section.note}</div>` : '';
+
+      return `
+        <div class="update-notice-section">
+          <div class="update-notice-section-title">${section.title}</div>
+          <div class="update-notice-content">${contentHTML}</div>
+          ${noteHTML}
+        </div>
+      `;
+    }).join('');
+
     overlay.innerHTML = `
       <div class="update-notice-card">
         <div class="update-notice-header">
-          <div class="update-notice-title">Go Chat 更新</div>
-          <div class="update-notice-date">2026.10.11</div>
+          <div class="update-notice-brand">GO CHAT</div>
+          <div class="update-notice-title">${latestUpdate.title}</div>
+          <div class="update-notice-date">${latestUpdate.date}</div>
+          <img class="dev-cat" src="${latestUpdate.image}" alt="KK fan art">
         </div>
 
         <div class="update-notice-body">
-          <div class="update-notice-section">
-            <div class="update-notice-section-title">语音功能上线</div>
-            <div class="update-notice-content">
-              新增 AI 语音播放功能。<br>
-              支持用户接入自己的 ElevenLabs API Key。<br>
-              支持自定义声音与模型选择。
-            </div>
-            <div class="update-notice-note">
-              注：部分模型需要对应权限的 API Key，调试不同模型时可能需要重新配置 Key。
-            </div>
-          </div>
-
-          <div class="update-notice-section">
-            <div class="update-notice-section-title">界面优化</div>
-            <div class="update-notice-content">
-              优化「我的」页面及设置界面。<br>
-              调整部分页面布局和视觉细节。
-            </div>
-          </div>
-
-          <div class="update-notice-section">
-            <div class="update-notice-section-title">问题修复</div>
-            <div class="update-notice-content">
-              修复头像更换后异常回退问题。<br>
-              优化时间感知逻辑。<br>
-              提升整体稳定性。
-            </div>
-          </div>
+          ${sectionsHTML}
         </div>
 
         <div class="update-notice-footer">
@@ -176,7 +203,8 @@
   window.updateNoticeModule = {
     init: initUpdateNotice,
     acknowledge: acknowledge,
-    dismiss: dismiss
+    dismiss: dismiss,
+    getAllLogs: () => UPDATE_LOGS
   };
 
   // 页面加载完成后自动初始化

@@ -524,25 +524,6 @@
 
   <!-- 主页 -->
 
-  <!-- 未成年警告弹窗 -->
-<div id="ageWarningModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(30,80,20,0.3);backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center;">
-  <div style="background:rgba(255,255,255,0.94);border:1px solid rgba(120,185,90,0.35);border-radius:20px;padding:32px 24px;max-width:320px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(60,130,40,0.14);">
-    <div style="font-size:36px;margin-bottom:12px;">🔞</div>
-    <div style="font-size:18px;font-weight:700;color:#1e4020;margin-bottom:16px;">年龄确认</div>
-    <div style="font-size:14px;line-height:1.7;color:#3a5a3c;margin-bottom:24px;">
-      本应用包含成人向内容，包括亲密关系模拟、情感互动等内容。<br><br>
-      <strong style="color:#b91c1c;">未满18岁请立即离开。</strong><br><br>
-      继续使用即代表您确认已年满18周岁，并自愿承担相应责任。本应用不对未成年人使用承担任何责任。
-    </div>
-    <button onclick="confirmAge()" style="width:100%;padding:14px;background:linear-gradient(135deg,#5a9a46,#7dba5a);border:none;border-radius:12px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px;">
-      我已年满18岁，继续
-    </button>
-    <button onclick="denyAge()" style="width:100%;padding:12px;background:transparent;border:1px solid rgba(90,160,70,0.25);border-radius:12px;color:#9ca3af;font-size:14px;cursor:pointer;">
-      我未满18岁，离开
-    </button>
-  </div>
-</div>
-
 <div class="screen" id="mainScreen">
 
     <!-- ═══ 首页 Hero（独立于卡片 grid）═══ -->
@@ -3581,24 +3562,6 @@ window.openScreen = function(screenId) {
 </script>
 
 <script>
-function checkAgeWarning() {
-  if (!localStorage.getItem('ageConfirmed')) {
-    document.getElementById('ageWarningModal').style.display = 'flex';
-  }
-}
-function confirmAge() {
-  localStorage.setItem('ageConfirmed', '1');
-  document.getElementById('ageWarningModal').style.display = 'none';
-}
-function denyAge() {
-  window.location.href = '/underage.html';
-}
-// 页面加载后检查
-window.addEventListener('load', function() {
-  setTimeout(checkAgeWarning, 300);
-});
-</script>
-<script>
 function showQQGroup() {
   const modal = document.getElementById('qqGroupModal');
   if (modal) modal.style.display = 'flex';
@@ -3759,15 +3722,62 @@ function openMeDetail(type) {
     }, 100);
   } else if (type === 'updates') {
     title.textContent = '更新日志';
-    body.innerHTML = '<div class="me-v1-detail-kicker">RELEASE NOTES</div><h3>每一次小小改变</h3><p>这里将记录 Go Chat 的新功能、体验优化与问题修复。</p><div class="me-v1-coming"><span>—</span><div><strong>更新记录即将上线</strong><small>待接入真实版本记录后显示</small></div></div>';
+    body.innerHTML = '<p style="text-align:center;padding:40px 20px;color:#a89179;">加载中...</p>';
     overlay.hidden = false;
     document.body.classList.add('me-v1-detail-open');
+    // 延迟渲染，确保 overlay 已显示
+    setTimeout(() => {
+      if (typeof window.updateNoticeModule !== 'undefined' && window.updateNoticeModule.getAllLogs) {
+        renderUpdateLogs();
+      } else {
+        body.innerHTML = '<div class="me-v1-detail-kicker">RELEASE NOTES</div><h3>每一次小小改变</h3><p>这里将记录 Go Chat 的新功能、体验优化与问题修复。</p><div class="me-v1-coming"><span>—</span><div><strong>更新记录加载失败</strong><small>请刷新页面重试</small></div></div>';
+      }
+    }, 100);
   } else return;
 }
 function closeMeDetail() {
   const overlay = document.getElementById('meDetailOverlay');
   if (overlay) overlay.hidden = true;
   document.body.classList.remove('me-v1-detail-open');
+}
+
+function renderUpdateLogs() {
+  const body = document.getElementById('meDetailBody');
+  if (!body) return;
+
+  const logs = window.updateNoticeModule.getAllLogs();
+  if (!logs || logs.length === 0) {
+    body.innerHTML = '<div class="me-v1-detail-kicker">RELEASE NOTES</div><h3>每一次小小改变</h3><p>这里将记录 Go Chat 的新功能、体验优化与问题修复。</p><div class="me-v1-coming"><span>—</span><div><strong>暂无更新记录</strong><small>敬请期待</small></div></div>';
+    return;
+  }
+
+  let html = '<div class="me-v1-detail-kicker">RELEASE NOTES</div><h3>每一次小小改变</h3><p style="margin-bottom:24px;">记录 Go Chat 的新功能、体验优化与问题修复。</p>';
+
+  logs.forEach((log, index) => {
+    html += `<div class="update-log-entry" style="margin-bottom:${index === logs.length - 1 ? '0' : '32px'};">`;
+    html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">`;
+    html += `<h4 style="font-size:18px;font-weight:600;color:#5b4035;margin:0;">${log.date}</h4>`;
+    html += `<span style="font-size:12px;color:#a89179;font-weight:500;">${log.version}</span>`;
+    html += `</div>`;
+
+    log.sections.forEach(section => {
+      html += `<div style="margin-bottom:16px;">`;
+      html += `<div style="font-size:14px;font-weight:600;color:#8b6255;margin-bottom:8px;">${section.title}</div>`;
+      html += `<div style="font-size:13px;line-height:1.6;color:#49372f;">`;
+      section.content.forEach(line => {
+        html += `<div style="margin-bottom:4px;">• ${line}</div>`;
+      });
+      html += `</div>`;
+      if (section.note) {
+        html += `<div style="font-size:12px;color:#7d5b4d;background:rgba(164,123,107,0.08);padding:8px 12px;border-radius:8px;margin-top:8px;">${section.note}</div>`;
+      }
+      html += `</div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  body.innerHTML = html;
 }
 </script>
 </body>
