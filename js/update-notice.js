@@ -16,13 +16,44 @@
   'use strict';
 
   // 当前公告版本（每次更新需修改此值）
-  const UPDATE_NOTICE_VERSION = '20261011_voice';
+  const UPDATE_NOTICE_VERSION = '20261024_memory';
 
   // localStorage 键名
   const STORAGE_KEY = 'go_chat_update_notice';
 
   // 更新日志数据（最新的放最前面）
   const UPDATE_LOGS = [
+    {
+      version: '20261024_memory',
+      date: '2024.10.24',
+      title: 'Update Letter',
+      image: 'images/update-notice/dev-cat-bugfix.png',
+      sections: [
+        {
+          title: '记忆系统优化',
+          items: [
+            '优化长期记忆匹配机制，修复了无关高重要性记忆被错误召回的问题，现在只有真正相关的记忆才会参与对话。',
+            '修复记忆重复注入问题，解决了同一条记忆通过"长期记忆"和"世界书"两个通道重复注入的问题，显著减少上下文空间浪费。',
+            '优化记忆时间戳管理，修复了通过世界书注入的记忆未正确更新召回时间的问题，改善了记忆轮换机制，让对话更加连贯自然。'
+          ]
+        },
+        {
+          title: '时间感知修复',
+          items: [
+            '修复云端时间信息丢失，解决了部分聊天记录在云端保存时丢失时间信息的问题，重新登录后 Simon 的时间感知更加准确。'
+          ]
+        },
+        {
+          title: '重要说明',
+          items: [
+            '本次更新为底层逻辑优化，不影响现有聊天记录及已保存的记忆。',
+            '无需手动清除数据或重新登录。',
+            '更新后可能会注意到对话中的重复信息减少，这是正常现象。'
+          ]
+        }
+      ],
+      footer: '后续还会继续优化聊天体验，感谢大家的反馈与支持。💙'
+    },
     {
       version: '20261011_voice',
       date: '2026.10.11',

@@ -35,6 +35,105 @@
 //   - 如果是"语气/情绪/表现不对"——那不在这里，去 persona.js 的动态块找。
 // ===================================================
 
+/**
+ * 长期记忆与世界书去重
+ * 严格三重校验：source==='auto' AND Memory.wbId===WorldBook.id AND WorldBook.memId===Memory.id
+ * @param {Object} memoryResult - { formatted, memories: [{id, wbId, content}] }
+ * @param {Object} worldBookResult - { formatted, entries: [{id, memId, source, content}] }
+ * @returns {{ longTermMemory: string, worldBookRecall: string, usedMemoryIds: string[] }}
+ */
+function _deduplicateMemoryAndWorldBook(memoryResult, worldBookResult) {
+  const memories = memoryResult.memories || [];
+  const wbEntries = worldBookResult.entries || [];
+
+  // 空结果直接返回
+  if (memories.length === 0 && wbEntries.length === 0) {
+    return {
+      longTermMemory: '',
+      worldBookRecall: '',
+      usedMemoryIds: []
+    };
+  }
+
+  // ===== 去重核心：严格三重校验 =====
+  const usedMemoryIds = [];
+  const deduplicatedMemories = [];
+
+  memories.forEach(mem => {
+    let isDuplicate = false;
+
+    if (mem.wbId) {
+      // Memory 声称关联某个 WorldBook，查找该 WorldBook
+      const claimedWb = wbEntries.find(wb => wb.id === mem.wbId);
+
+      if (claimedWb) {
+        // WorldBook 存在，严格三重校验
+        if (claimedWb.source === 'auto' && claimedWb.memId === mem.id) {
+          // ✅ 三重校验通过：source=auto, 双向关联一致 → 确认重复
+          isDuplicate = true;
+        } else {
+          // ⚠️ 不满足三重校验：
+          // - source=manual（手动世界书不触发去重）
+          // - memId 不一致（关联冲突）
+          // - memId 为 null（单向关联）
+          isDuplicate = false;
+          if (claimedWb.source === 'auto' && claimedWb.memId && claimedWb.memId !== mem.id) {
+            console.warn('[Memory Dedup] 关联冲突检测:', {
+              memoryId: mem.id,
+              memoryClaimedWbId: mem.wbId,
+              worldBookActualMemId: claimedWb.memId
+            });
+          }
+        }
+      }
+    }
+
+    if (!isDuplicate) {
+      deduplicatedMemories.push(mem);
+      usedMemoryIds.push(mem.id);
+    }
+  });
+
+  // WorldBook 关联的 Memory 标记为已使用（通过 wb 注入了相同事实）
+  // 仅限 auto 类型，且必须经过双向关联验证
+  // 注意：需要从 localStorage 读取完整数据，因为关联的 Memory 可能未通过本轮筛选
+  let allMemories = null;  // 延迟加载，避免不必要的读取
+  wbEntries.forEach(wb => {
+    if (wb.source === 'auto' && wb.memId) {
+      // 延迟加载完整 Memory 数据
+      if (allMemories === null) {
+        try {
+          allMemories = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+          if (!Array.isArray(allMemories)) allMemories = [];
+        } catch (e) {
+          allMemories = [];
+          console.warn('[Memory Dedup] 读取 longTermMemories 失败:', e);
+        }
+      }
+
+      // 验证反向关联：从完整数据中查找
+      const relatedMem = allMemories.find(m => m.id === wb.memId);
+      if (relatedMem && relatedMem.wbId === wb.id) {
+        // ✅ 双向关联一致，标记为已使用
+        usedMemoryIds.push(wb.memId);
+      }
+    }
+  });
+
+  // 格式化输出
+  const longTermMemory = deduplicatedMemories.length > 0
+    ? `\n[LONG-TERM MEMORY]\nThings you remember about her:\n${deduplicatedMemories.map(m => `- ${m.content}`).join('\n')}\n`
+    : '';
+
+  const worldBookRecall = wbEntries.length > 0 ? worldBookResult.formatted : '';
+
+  return {
+    longTermMemory: longTermMemory,
+    worldBookRecall: worldBookRecall,
+    usedMemoryIds: [...new Set(usedMemoryIds)]  // 去重
+  };
+}
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // buildGhostContextBlock — 本轮事实资料夹
@@ -69,16 +168,47 @@ function buildGhostContextBlock(opts) {
   // —— Ghost 所在地此刻真实天气 ——
   const weather = (localStorage.getItem('lastWeatherDisplay') || '').replace(/^undefined$/i, '').trim();
 
-  // —— 本轮相关召回（基于她最后一条消息）——
+  // —— 本轮相关召回（调用核心函数获取结构化结果）——
   const userLastMsg = (typeof chatHistory !== 'undefined')
     ? (chatHistory.filter(m => m.role === 'user').slice(-1)[0]?.content || '')
     : '';
-  const longTermMemory = (typeof recallLongTermMemory === 'function')
-    ? recallLongTermMemory(userLastMsg, 3) : '';
-  const worldBookRecall = (!_skipWorldBook && typeof recallWorldBook === 'function')
-    ? recallWorldBook(userLastMsg, 4) : '';
+
+  const memoryResult = (typeof _recallLongTermMemoryCore === 'function')
+    ? _recallLongTermMemoryCore(userLastMsg, 3)
+    : { formatted: '', memories: [] };
+
+  const worldBookResult = (!_skipWorldBook && typeof _recallWorldBookCore === 'function')
+    ? _recallWorldBookCore(userLastMsg, 4)
+    : { formatted: '', entries: [] };
+
   const relationshipUnderstanding = (typeof recallRelationshipUnderstanding === 'function')
     ? recallRelationshipUnderstanding(userLastMsg, 3) : '';
+
+  // —— 去重 ——
+  const deduped = _deduplicateMemoryAndWorldBook(memoryResult, worldBookResult);
+
+  // —— 更新 lastRecalled（仅实际注入的 Memory）——
+  if (deduped.usedMemoryIds.length > 0) {
+    try {
+      const memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
+      if (Array.isArray(memories)) {
+        const now = Date.now();
+        deduped.usedMemoryIds.forEach(memId => {
+          const idx = memories.findIndex(m => m.id === memId);
+          if (idx !== -1) {
+            memories[idx].lastRecalled = now;
+          }
+        });
+        localStorage.setItem('longTermMemories', JSON.stringify(memories));
+      }
+    } catch (e) {
+      console.warn('[Memory] 更新 lastRecalled 失败:', e);
+    }
+  }
+
+  // 使用去重后的结果
+  const longTermMemory = deduped.longTermMemory;
+  const worldBookRecall = deduped.worldBookRecall;
 
   // ===== 组装（纯事实陈述，无任何表现指令）=====
   const lines = [];

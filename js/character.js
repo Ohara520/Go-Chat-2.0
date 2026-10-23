@@ -79,7 +79,7 @@ const CHARACTER_KEYS = [
   'ghostUnlocked_height', 'ghostUnlocked_weight',
   'ghostUnlocked_blood_type', 'ghostUnlocked_hometown',
   // 朋友圈 / 商城
-  'feedPosts', 'coupleFeedHistory', 'coupleFeedDate', 'lastFeedPostAt',
+  'feedPosts', 'coupleFeedDate', 'lastFeedPostAt',
   'organicFeedCount',
   'marketTriggered', 'purchasedItems', 'purchaseCounts',
   'purchaseFacts',

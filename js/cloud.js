@@ -895,6 +895,7 @@ async function saveChatHistoryNow() {
       .filter(m => !m._system && !m._recalled)
       .slice(-300)
       .map(m => ({ role: m.role, content: m.content,
+        ...(m._time ? { _time: m._time } : {}),
         ...(m._transfer ? { _transfer: m._transfer } : {}),
         ...(m._userTransfer ? { _userTransfer: m._userTransfer } : {}),
         ...(m._payCard ? { _payCard: m._payCard } : {}),
@@ -1081,7 +1082,7 @@ async function saveToCloud() {
       ? JSON.parse(chatHistoryRaw)
           .filter(m => !m._system && !m._recalled)
           .slice(-300)
-          .map(m => ({ role: m.role, content: m.content, ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}), ...(m._payCard ? {_payCard: m._payCard} : {}), ...(m._product ? {_product: m._product} : {}), ...(m._house ? {_house: m._house} : {}) }))
+          .map(m => ({ role: m.role, content: m.content, ...(m._time ? {_time: m._time} : {}), ...(m._transfer ? {_transfer: m._transfer} : {}), ...(m._userTransfer ? {_userTransfer: m._userTransfer} : {}), ...(m._payCard ? {_payCard: m._payCard} : {}), ...(m._product ? {_product: m._product} : {}), ...(m._house ? {_house: m._house} : {}) }))
       : [];
     const stateSnapshot = {
       attachmentPull: getAttachmentPull(),

@@ -188,23 +188,33 @@ function linkAutoWorldBookMemories() {
 
 // 核心：按用户消息检索命中的世界书条目，返回注入 prompt 的文本。
 // CJK 无空格，用双向 includes：关键词在消息里，或消息里出现关键词。
-function recallWorldBook(userMessage, limit = 4) {
+/**
+ * 世界书召回核心逻辑（内部函数）
+ * 返回结构化对象，供去重使用
+ * @returns {{ formatted: string, entries: Array<{id, memId, source, content}> }}
+ */
+function _recallWorldBookCore(userMessage, limit = 4) {
   const arr = _wbLoad();
-  if (arr.length === 0 || !userMessage) return '';
-  const msg = userMessage.toLowerCase();
+  if (arr.length === 0 || !userMessage) {
+    return { formatted: '', entries: [] };
+  }
 
+  const msg = userMessage.toLowerCase();
   const hits = [];
   for (const e of arr) {
     if (e.enabled === false) continue;
     const matched = (e.keywords || []).some(k => k && msg.includes(k));
     if (matched) hits.push(e);
   }
-  if (hits.length === 0) return '';
+  if (hits.length === 0) {
+    return { formatted: '', entries: [] };
+  }
 
   // 最近命中过的排后面，给较少出现的设定让位，避免每轮都是同几条
   hits.sort((a, b) => (a.lastHit || 0) - (b.lastHit || 0));
   const picked = hits.slice(0, limit);
 
+  // 更新 lastHit（保持原有逻辑）
   const now = Date.now();
   picked.forEach(p => {
     const ref = arr.find(x => x.id === p.id);
@@ -212,8 +222,30 @@ function recallWorldBook(userMessage, limit = 4) {
   });
   _wbSave(arr);
 
+  // 格式化字符串
   const lines = picked.map(p => `- ${p.content}`).join('\n');
-  return `\n[WORLD BOOK — recalled by keyword]\nRelevant things you know, brought up by what she just said. Weave in naturally only if it fits — do not recite:\n${lines}\n`;
+  const formatted = `\n[WORLD BOOK — recalled by keyword]\nRelevant things you know, brought up by what she just said. Weave in naturally only if it fits — do not recite:\n${lines}\n`;
+
+  // 返回结构化对象
+  return {
+    formatted: formatted,
+    entries: picked.map(p => ({
+      id: p.id,
+      memId: p.memId || null,
+      source: p.source,
+      content: p.content
+    }))
+  };
+}
+
+/**
+ * 世界书召回（对外接口，向后兼容）
+ * 调用核心函数并返回格式化字符串
+ * @returns {string} 格式化的世界书字符串
+ */
+function recallWorldBook(userMessage, limit = 4) {
+  const result = _recallWorldBookCore(userMessage, limit);
+  return result.formatted;
 }
 
 // ===================================================

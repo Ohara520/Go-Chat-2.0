@@ -380,10 +380,17 @@ function updateLongTermMemoryContent(memId, content) {
  * @param {number} limit 返回记忆数量，默认3条
  * @returns {string} 格式化的记忆文本
  */
-function recallLongTermMemory(userMessage, limit = 3) {
+/**
+ * 长期记忆召回核心逻辑（内部函数）
+ * 返回结构化对象，供去重使用
+ * @returns {{ formatted: string, memories: Array<{id, wbId, content}> }}
+ */
+function _recallLongTermMemoryCore(userMessage, limit = 3) {
   let memories;
   try { memories = JSON.parse(localStorage.getItem('longTermMemories') || '[]'); } catch(e) { memories = []; }
-  if (!Array.isArray(memories) || memories.length === 0) return '';
+  if (!Array.isArray(memories) || memories.length === 0) {
+    return { formatted: '', memories: [] };
+  }
 
   const userLower = userMessage.toLowerCase();
 
@@ -399,7 +406,9 @@ function recallLongTermMemory(userMessage, limit = 3) {
     }
   } catch (e) {}
   const candidates = mutedMemIds.size ? memories.filter(m => !mutedMemIds.has(m.id)) : memories;
-  if (candidates.length === 0) return '';
+  if (candidates.length === 0) {
+    return { formatted: '', memories: [] };
+  }
 
   // 计算相关性分数
   const scored = candidates.map(m => {
@@ -418,8 +427,10 @@ function recallLongTermMemory(userMessage, limit = 3) {
       if (word.length > 3 && userLower.includes(word)) score += 2;
     });
 
-    // 重要性权重
-    score += m.importance;
+    // 重要性权重：只有已匹配的记忆才计入 importance，避免无关高重要性记忆被召回
+    if (score > 0) {
+      score += m.importance;
+    }
 
     // 时间衰减（越久远的记忆，权重略降）
     const daysPassed = (Date.now() - m.timestamp) / (1000 * 60 * 60 * 24);
@@ -439,20 +450,34 @@ function recallLongTermMemory(userMessage, limit = 3) {
   scored.sort((a, b) => b.score - a.score);
   const relevant = scored.slice(0, limit).filter(m => m.score > 0);
 
-  if (relevant.length === 0) return '';
+  if (relevant.length === 0) {
+    return { formatted: '', memories: [] };
+  }
 
-  // 更新最后调用时间
-  relevant.forEach(m => {
-    const idx = memories.findIndex(mem => mem.id === m.id);
-    if (idx !== -1) {
-      memories[idx].lastRecalled = Date.now();
-    }
-  });
-  localStorage.setItem('longTermMemories', JSON.stringify(memories));
+  // 注意：不在此更新 lastRecalled，由 ghostContext 去重后统一更新
 
-  // 格式化返回
-  const formatted = relevant.map(m => `- ${m.content}`).join('\n');
-  return `\n[LONG-TERM MEMORY]\nThings you remember about her:\n${formatted}\n`;
+  // 格式化字符串
+  const formatted = `\n[LONG-TERM MEMORY]\nThings you remember about her:\n${relevant.map(m => `- ${m.content}`).join('\n')}\n`;
+
+  // 返回结构化对象
+  return {
+    formatted: formatted,
+    memories: relevant.map(m => ({
+      id: m.id,
+      wbId: m.wbId || null,
+      content: m.content
+    }))
+  };
+}
+
+/**
+ * 长期记忆召回（对外接口，向后兼容）
+ * 调用核心函数并返回格式化字符串
+ * @returns {string} 格式化的记忆字符串
+ */
+function recallLongTermMemory(userMessage, limit = 3) {
+  const result = _recallLongTermMemoryCore(userMessage, limit);
+  return result.formatted;
 }
 
 
