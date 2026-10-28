@@ -1782,15 +1782,15 @@ Break the pattern NOW.]`;
 // ===== 失败回滚：撤销本轮 intimate 请求在 user 消息上留下的临时标记 =====
 // 只处理"最新一条 user 消息"——即本轮请求对应的那条（_handleIntimateReply 期间
 // 只会 push assistant 消息，不会 push user，故最新 user 始终是本轮这条）。
-// 删除 _intimate 与 _time：这两个字段在本轮之前对 user 消息必为空
-// （user 消息 push 时不带 _time），是 isIntimate 分支本轮刚写入的，删除即干净回滚。
+// 只删除 _intimate：它是 isIntimate 分支本轮刚写入的临时标记，删除即干净回滚。
+// _time 不删：它是用户消息发送时（push 进 chatHistory 时）记录的真实发送时间，
+// 与调情通道无关；通道失败不改变她发消息的时刻，时间间隔计算依赖它。
 // 绝不遍历/清理历史其它 user 或 assistant 的 intimate 状态——真正成功的历史必须保留。
 function _rollbackFailedIntimateTurn() {
   try {
     const lastUserMsg = chatHistory.filter(m => m.role === 'user').slice(-1)[0];
     if (lastUserMsg && lastUserMsg._intimate) {
       delete lastUserMsg._intimate;
-      delete lastUserMsg._time;
     }
   } catch (e) {}
 }
@@ -2135,8 +2135,8 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     hideTyping();
     sessionStorage.removeItem('intimateSafeReplyCount');
     // 精确 rollback：本轮 intimate 请求最终失败，撤销"本轮这条 user 消息"上刚打的
-    // _intimate/_time（写于上方主流程 isIntimate 分支）。只动最新一条 user——就是本轮这条，
-    // _time 本轮之前必为空(user push 时不带 _time)，删除即干净回滚。
+    // _intimate 标记（写于上方主流程 isIntimate 分支）。只动最新一条 user——就是本轮这条。
+    // _time 不删：它是发送时就记录的真实时间，与调情通道无关。
     // 失败的 intimate turn 不应成为后续 continuation 判断的有效历史证据。
     // 注意：本失败路径从未 push 过 assistant._intimate（成功分支都已提前 return），
     // 所以不再粗暴清理最近 N 条 assistant 标记——那只会误删之前真正成功的 intimate 历史。
@@ -2148,7 +2148,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     hideTyping();
     console.warn('[intimate] 调情回复失败:', e);
     sessionStorage.removeItem('intimateSafeReplyCount');
-    // 同上：只精确 rollback 本轮 user 消息的 _intimate/_time，不清理历史成功的 assistant 标记
+    // 同上：只精确 rollback 本轮 user 消息的 _intimate（保留 _time），不清理历史成功的 assistant 标记
     _rollbackFailedIntimateTurn();
     // 显示临时通讯状态（不进入 chatHistory，不保存云端，刷新后消失）
     _showTransientCommStatus('异国信号差 · 回复没有送达，请再试一次');

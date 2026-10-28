@@ -14,6 +14,13 @@ const BASE_URLS = [
 // SDK 默认超时是 10 分钟，必须显式覆盖
 const PER_NODE_TIMEOUT_MS = 8000;
 
+// Haiku 与 Sonnet 在中转站不能共用同一分组，按模型名分流 Key：
+//   claude-haiku-*  → HAIKU_API_KEY（独立，未配置时直接报错，绝不回退到主聊天 Key）
+//   其他 Claude 模型 → ANTHROPIC_API_KEY（原有主聊天 Key）
+function _isHaikuModel(model) {
+  return typeof model === 'string' && model.toLowerCase().startsWith('claude-haiku-');
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -32,13 +39,26 @@ export default async function handler(req, res) {
       ? Math.max(PER_NODE_TIMEOUT_MS, Math.min(timeout_ms, 25000))
       : PER_NODE_TIMEOUT_MS;
 
+    // Haiku/Sonnet Key 分流：Haiku 必须有独立 Key，否则明确报错
+    const isHaiku = _isHaikuModel(model);
+    const apiKey = isHaiku ? process.env.HAIKU_API_KEY : process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+      const keyName = isHaiku ? 'HAIKU_API_KEY' : 'ANTHROPIC_API_KEY';
+      console.error(`[api/chat] ${keyName} 未配置，模型：${model}`);
+      return res.status(500).json({
+        error: 'Server configuration error',
+        code: 'missing_api_key'
+      });
+    }
+
     let lastErr = null;
     let lastStatus = null;
 
     for (const baseURL of BASE_URLS) {
       try {
         const client = new Anthropic({
-          apiKey: process.env.ANTHROPIC_API_KEY,
+          apiKey,
           baseURL,
           timeout: perNodeTimeout,
           maxRetries: 0, // SDK 自带重试关掉，避免叠加延迟

@@ -1,15 +1,14 @@
+import OpenAI from 'openai';
+
 const BASE_URLS = [
   'https://api.yunjintao.com/v1',
 ];
 
 // 调情通道 intimate engine。抽成常量：模型抖动时一处切换全局生效
-// transport 已从 OpenAI Chat（/v1/chat/completions）迁移到中转站 Gemini Native
-// （/v1/models/<model>:generateContent）。frontend /api/venice contract 不变。
 const VENICE_MODEL = 'gemini-3.8-flash';
 
-// Gemini Native 裸测正常响应约 11–20s；Vercel maxDuration=45s。
-// 取 30s：高于正常区间、低于 45s、给 handler 留兜底时间，用 AbortController 真正中断 fetch。
-const GEMINI_UPSTREAM_TIMEOUT_MS = 30000;
+// 单节点超时 8 秒（OpenAI 格式 Gemini 响应快，3 秒左右）
+const PER_NODE_TIMEOUT_MS = 8000;
 
 // ── 服务端补空格：修复模型偶发的整句连字（含缩写/破折号）──
 const _DEGLUE_WORDS = new Set((
@@ -161,69 +160,59 @@ function _classifyErr(err) {
   return { result, errName: name, errCode: code, status };
 }
 
-// 从 Gemini Native response 安全提取正文：拼接 candidates[0].content.parts 里所有 text part，
-// 忽略非 text part（如 functionCall / inlineData）。没有任何 text 时返回空串。
-function _extractGeminiText(data) {
-  const parts = data?.candidates?.[0]?.content?.parts;
-  if (!Array.isArray(parts)) return '';
-  return parts
-    .map((p) => (p && typeof p.text === 'string') ? p.text : '')
-    .join('')
-    .trim();
+// 从 OpenAI Chat response 安全提取正文。content 可能是字符串，也可能是 parts 数组
+// （部分中转站对 Gemini 返回数组），只拼接其中的 text。没有任何 text 时返回空串。
+function _extractChatText(data) {
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .map((p) => (p && typeof p.text === 'string') ? p.text : '')
+      .join('')
+      .trim();
+  }
+  return '';
 }
 
-// Gemini Native transport：POST /v1/models/<model>:generateContent
-// 用 AbortController 施加真正可中断的 upstream 超时（GEMINI_UPSTREAM_TIMEOUT_MS）。
-async function callGeminiNative(system, user, model = VENICE_MODEL, diag = null, images = []) {
+// OpenAI Chat transport：POST /v1/chat/completions
+// 带图请求体积大、耗时长，单节点超时放宽到 20s；纯文字仍走 8s。
+async function callGeminiChat(system, user, model = VENICE_MODEL, diag = null, images = []) {
   let lastErr = null;
   let lastStatus = null;
 
   const imageParts = (Array.isArray(images) ? images : [])
     .filter(img => typeof img === 'string' && img.trim())
     .slice(0, 4)
-    .map(img => {
-      const m = img.match(/^data:([^;]+);base64,(.+)$/s);
-      return { inlineData: { mimeType: m?.[1] || 'image/jpeg', data: m?.[2] || img } };
-    });
+    .map(img => ({
+      type: 'image_url',
+      image_url: { url: /^data:/.test(img) ? img : `data:image/jpeg;base64,${img}` },
+    }));
 
-  const body = {
-    contents: [
-      { role: 'user', parts: [...imageParts, { text: user }] },
-    ],
-    generationConfig: { temperature: 0.7 },
-    systemInstruction: { parts: [{ text: system }] },
-  };
+  const userContent = imageParts.length > 0
+    ? [...imageParts, { type: 'text', text: user }]
+    : user;
+
+  const timeoutMs = imageParts.length > 0 ? 20000 : PER_NODE_TIMEOUT_MS;
 
   for (const baseURL of BASE_URLS) {
     const _attemptStart = Date.now();
-    const endpoint = `${baseURL}/models/${model}:generateContent`;
-    const _ac = new AbortController();
-    const _timer = setTimeout(() => _ac.abort(), GEMINI_UPSTREAM_TIMEOUT_MS);
     try {
-      const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: _ac.signal,
+      const client = new OpenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        baseURL,
+        timeout: timeoutMs,
+        maxRetries: 0,
       });
-
-      if (!resp.ok) {
-        const _errText = await resp.text().catch(() => '');
-        const e = new Error(`upstream ${resp.status}`);
-        e.status = resp.status;
-        e._detail = _errText;
-        throw e;
-      }
-
-      const data = await resp.json();
-      clearTimeout(_timer);
-      return data;
+      const response = await client.chat.completions.create({
+        model,
+        temperature: 0.7,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userContent },
+        ],
+      });
+      return response;
     } catch (err) {
-      clearTimeout(_timer);
-      const _isAbort = err?.name === 'AbortError';
       console.warn(`[api/venice] node failed: ${baseURL}`, {
         msg: err.message,
         status: err.status,
@@ -233,7 +222,7 @@ async function callGeminiNative(system, user, model = VENICE_MODEL, diag = null,
       const _c = _classifyErr(err);
       console.warn('[GrokDiag]', {
         reqId: diag?.reqId,
-        result: _isAbort ? 'TIMEOUT' : _c.result,
+        result: _c.result,
         elapsedMs: Date.now() - _attemptStart,
         model,
         host: _hostOf(baseURL),
@@ -243,12 +232,11 @@ async function callGeminiNative(system, user, model = VENICE_MODEL, diag = null,
       });
       lastErr = err;
       lastStatus = err.status;
-      if (_isAbort) { lastStatus = 504; break; }
       if (err.status === 401 || err.status === 403 || err.status === 400) break;
     }
   }
 
-  const e = new Error(lastErr?.name === 'AbortError' ? 'upstream timeout' : (lastErr?.message || 'all nodes failed'));
+  const e = new Error(lastErr?.message || 'all nodes failed');
   e.status = lastStatus;
   throw e;
 }
@@ -283,7 +271,7 @@ export default async function handler(req, res) {
     const fullSystem = safeSystem + memoryBlock;
 
     const _diag = { reqId: _diagReqId(), start: Date.now() };
-    const response = await callGeminiNative(
+    const response = await callGeminiChat(
       fullSystem,
       user,
       VENICE_MODEL,
@@ -291,15 +279,14 @@ export default async function handler(req, res) {
       safeImages
     );
 
-    // ── 诊断日志：upstream 成功后、抹平前，观测 Gemini Native 响应结构 ──
+    // ── 诊断日志：upstream 成功后、抹平前，观测 OpenAI Chat 响应结构 ──
     // 只看结构与长度，绝不打印 text 本身。区分 OK / UPSTREAM_EMPTY / BAD_RESPONSE_SHAPE。
-    const _cand = response?.candidates?.[0];
-    const _parts = _cand?.content?.parts;
-    const _hasCandidates = Array.isArray(response?.candidates) && response.candidates.length > 0;
-    const _hasParts = Array.isArray(_parts) && _parts.length > 0;
-    const _extracted = _extractGeminiText(response);
+    const _choice = response?.choices?.[0];
+    const _hasChoices = Array.isArray(response?.choices) && response.choices.length > 0;
+    const _hasMessage = !!_choice?.message;
+    const _extracted = _extractChatText(response);
     const _contentLen = _extracted.length;
-    const _diagResult = (!_hasCandidates || !_hasParts) ? 'BAD_RESPONSE_SHAPE'
+    const _diagResult = (!_hasChoices || !_hasMessage) ? 'BAD_RESPONSE_SHAPE'
       : (_contentLen > 0 ? 'OK' : 'UPSTREAM_EMPTY');
     // 仅 BAD_RESPONSE_SHAPE 时附加"结构层"信息：只记字段名/类型/布尔，绝不记任何 value
     let _shape;
@@ -309,10 +296,9 @@ export default async function handler(req, res) {
         responseType: typeof response,
         isArray: Array.isArray(response),
         topLevelKeys: _isPlainObj ? Object.keys(response) : undefined,
-        candidatesType: typeof response?.candidates,
-        candidatesIsArray: Array.isArray(response?.candidates),
+        choicesType: typeof response?.choices,
+        choicesIsArray: Array.isArray(response?.choices),
         errorObjectPresent: _isPlainObj ? ('error' in response) : false,
-        promptFeedbackPresent: _isPlainObj ? ('promptFeedback' in response) : false,
       };
       // error 元数据：先判类型，仅 plain object 才读纯技术字段。
       // 绝不读 message/detail/data，绝不 stringify —— 这些可能回显用户正文。
@@ -334,14 +320,14 @@ export default async function handler(req, res) {
       elapsedMs: Date.now() - _diag.start,
       model: VENICE_MODEL,
       host: _hostOf(BASE_URLS[0]),
-      hasCandidates: _hasCandidates,
-      hasParts: _hasParts,
+      hasChoices: _hasChoices,
+      hasMessage: _hasMessage,
       contentLen: _contentLen,
-      finishReason: _cand?.finishReason,
+      finishReason: _choice?.finish_reason,
       ...(_shape ? { shape: _shape } : {}),
     });
 
-    // Gemini Native：从 candidates[0].content.parts 提取正文。
+    // OpenAI Chat：从 choices[0].message.content 提取正文。
     const text = _extracted;
 
     // 检测严重吞空格 → 标记需要重试
