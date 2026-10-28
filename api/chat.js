@@ -1,22 +1,21 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
 // 中转站官方节点列表（来自站长文档）
-//   主站：HTTPS 域名，海外/部分国内可达
-//   加速子节点 ④：稳定加速，中低并发（国内常驻）
-//   全球协同节点 ③：CDN 加速，主要给海外用户兜底
-// 顺序：国内最快的优先，海外节点垫底
 const BASE_URLS = [
   'https://api.yunjintao.com',
 ];
 
-// 单节点超时：8 秒
-// 原因：Sonnet 大部分回复 5-15 秒，但如果 8 秒还没回响应头说明节点本身堵了，立刻切
-// SDK 默认超时是 10 分钟，必须显式覆盖
-const PER_NODE_TIMEOUT_MS = 8000;
+// 单节点超时：Haiku 8秒快速切换，Sonnet 20秒匹配主聊天前端调用（Vercel maxDuration=45s）
+const PER_NODE_TIMEOUT_HAIKU = 8000;
+const PER_NODE_TIMEOUT_SONNET = 20000;
 
 // Haiku 与 Sonnet 在中转站不能共用同一分组，按模型名分流 Key：
 //   claude-haiku-*  → HAIKU_API_KEY（独立，未配置时直接报错，绝不回退到主聊天 Key）
 //   其他 Claude 模型 → ANTHROPIC_API_KEY（原有主聊天 Key）
+//
+// 协议统一（2026-10-28）：两个分组在中转站的 Anthropic 协议都 Failed to fetch，
+// 统一改用 OpenAI Chat (/v1/chat/completions)。后端把 OpenAI 响应转回前端期望的
+// Anthropic 格式（content[0].text），前端无需改动。
 function _isHaikuModel(model) {
   return typeof model === 'string' && model.toLowerCase().startsWith('claude-haiku-');
 }
@@ -33,12 +32,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid request' });
     }
 
-    // 看图(vision)请求体积大、耗时长，允许调用方按需调高超时（钳制在 8s~25s）。
-    // 普通文字聊天不传 timeout_ms，仍走默认 8s 快速切换。
-    const perNodeTimeout = (typeof timeout_ms === 'number')
-      ? Math.max(PER_NODE_TIMEOUT_MS, Math.min(timeout_ms, 25000))
-      : PER_NODE_TIMEOUT_MS;
-
     // Haiku/Sonnet Key 分流：Haiku 必须有独立 Key，否则明确报错
     const isHaiku = _isHaikuModel(model);
     const apiKey = isHaiku ? process.env.HAIKU_API_KEY : process.env.ANTHROPIC_API_KEY;
@@ -52,49 +45,127 @@ export default async function handler(req, res) {
       });
     }
 
+    // 超时：Haiku 固定 8s 快速失败，Sonnet 20s（用户传 timeout_ms 可覆盖，钳制在 20s~25s）
+    let effectiveTimeout = isHaiku ? PER_NODE_TIMEOUT_HAIKU : PER_NODE_TIMEOUT_SONNET;
+    if (!isHaiku && typeof timeout_ms === 'number') {
+      effectiveTimeout = Math.max(PER_NODE_TIMEOUT_SONNET, Math.min(timeout_ms, 25000));
+    }
+
     let lastErr = null;
     let lastStatus = null;
 
     for (const baseURL of BASE_URLS) {
       try {
-        const client = new Anthropic({
+        const client = new OpenAI({
           apiKey,
           baseURL,
-          timeout: perNodeTimeout,
-          maxRetries: 0, // SDK 自带重试关掉，避免叠加延迟
+          timeout: effectiveTimeout,
+          maxRetries: 0,
         });
 
-        const response = await client.messages.create(
-          { model, max_tokens, system, messages },
-          {}
-        );
+        // 请求转换：Anthropic → OpenAI Chat
+        const chatMessages = [];
+        if (system && typeof system === 'string') {
+          chatMessages.push({ role: 'system', content: system });
+        }
+        for (const msg of messages) {
+          if (msg.role === 'user' && Array.isArray(msg.content)) {
+            // 图片块转换：{type:'image', source:{base64}} → {type:'image_url', image_url:{url}}
+            const converted = msg.content.map(block => {
+              if (block.type === 'image' && block.source?.type === 'base64') {
+                const mimeType = block.source.media_type || 'image/jpeg';
+                const data = block.source.data;
+                return {
+                  type: 'image_url',
+                  image_url: { url: `data:${mimeType};base64,${data}` }
+                };
+              }
+              return block;
+            });
+            chatMessages.push({ role: msg.role, content: converted });
+          } else {
+            chatMessages.push({ role: msg.role, content: msg.content });
+          }
+        }
 
-        return res.status(200).json(response);
+        const chatResponse = await client.chat.completions.create({
+          model,
+          max_tokens,
+          messages: chatMessages,
+        });
+
+        // 响应转换：OpenAI Chat → Anthropic 格式（前端期望的 content[0].text 结构）
+        // 参考 venice.js _extractChatText：content 可能是字符串或包含 text 的对象数组
+        const rawContent = chatResponse.choices?.[0]?.message?.content;
+        let text = '';
+        if (typeof rawContent === 'string') {
+          text = rawContent.trim();
+        } else if (Array.isArray(rawContent)) {
+          text = rawContent
+            .map((p) => (p && typeof p.text === 'string') ? p.text : '')
+            .join('')
+            .trim();
+        }
+
+        // 结构异常（无 choices / 无 message / content 既不是字符串也不是数组）→ 按上游失败处理，不伪装成功。
+        // 结构正常但正文为空 → 原样返回空文本：与原 Anthropic 路径一致，前端会走"空回复重试一次 → Gemini 日常接续"，
+        // 若改成 502 会跳过这条恢复链，直接显示"网络波动"。
+        const _choice = chatResponse?.choices?.[0];
+        const _shapeOk = !!_choice?.message &&
+          (typeof rawContent === 'string' || Array.isArray(rawContent));
+        if (!_shapeOk) {
+          const err = new Error('BAD_RESPONSE_SHAPE');
+          err.status = 502;
+          err._badShape = true;
+          throw err;
+        }
+
+        const anthropicResponse = {
+          id: chatResponse.id || `msg_${Date.now()}`,
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'text', text }],
+          model: chatResponse.model || model,
+          stop_reason: chatResponse.choices[0].finish_reason === 'length' ? 'max_tokens' : 'end_turn',
+          usage: chatResponse.usage ? {
+            input_tokens: chatResponse.usage.prompt_tokens || 0,
+            output_tokens: chatResponse.usage.completion_tokens || 0,
+          } : undefined,
+        };
+
+        // 诊断日志：区分 Haiku/Sonnet，记录成功或失败类型，不打印内容和Key
+        const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
+        console.log(`[api/chat] ${modelLabel} OpenAI success: ${baseURL}`, {
+          model,
+          hasChoices: Array.isArray(chatResponse.choices) && chatResponse.choices.length > 0,
+          textLen: text.length,
+          finishReason: chatResponse.choices?.[0]?.finish_reason,
+        });
+
+        return res.status(200).json(anthropicResponse);
 
       } catch (err) {
-        // 只记日志到后端，不暴露给用户
-        console.warn(`[api/chat] node failed: ${baseURL}`, {
+        const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
+        const errType = err._badShape ? 'BAD_RESPONSE_SHAPE' :
+                        err.status ? 'HTTP_ERROR' :
+                        (err.message?.includes('timeout') || err.message?.includes('timed out') || err.message?.includes('aborted')) ? 'TIMEOUT' :
+                        'NETWORK_ERROR';
+        console.warn(`[api/chat] ${modelLabel} OpenAI node failed: ${baseURL}`, {
+          type: errType,
           msg: err.message,
           status: err.status,
         });
         lastErr = err;
         lastStatus = err.status;
 
-        // 如果是认证错误（key 失效），所有节点都救不了，立刻退出
-        if (err.status === 401 || err.status === 403) {
+        // 认证错误、请求格式错误立刻退出（重试也是错）
+        if (err.status === 401 || err.status === 403 || err.status === 400) {
           break;
         }
-
-        // 如果是请求格式错误，也立刻退出（重试也是错）
-        if (err.status === 400) {
-          break;
-        }
-
-        // 其他错误：继续尝试下一个节点
       }
     }
 
-    // 所有节点都失败 → 给前端返回脱敏的友好错误
+    // 所有节点失败
     console.error('[api/chat] all nodes failed:', lastErr?.message);
 
     let userMessage = '网络繁忙，请稍后再试';
@@ -106,7 +177,7 @@ export default async function handler(req, res) {
     } else if (lastStatus === 401 || lastStatus === 403) {
       userMessage = '服务暂不可用，请联系管理员';
       statusCode = 503;
-    } else if (lastErr?.message?.includes('timeout') || lastErr?.message?.includes('aborted')) {
+    } else if (lastErr?.message?.includes('timeout') || lastErr?.message?.includes('timed out') || lastErr?.message?.includes('aborted')) {
       userMessage = '所有节点响应超时，请稍后重试';
       statusCode = 504;
     } else if (lastStatus >= 500) {
