@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 
 // 中转站官方节点列表（来自站长文档）
 const BASE_URLS = [
-  'https://api.yunjintao.com',
+  'https://api.yunjintao.com/v1',  // OpenAI Chat 兼容路径需要 /v1 后缀
 ];
 
 // 单节点超时：Haiku 8秒快速切换，Sonnet 20秒匹配主聊天前端调用（Vercel maxDuration=45s）
