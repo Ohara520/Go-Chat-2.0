@@ -1264,7 +1264,7 @@ Lowercase. English only. Two to three lines.${_noRepeatHint}]`;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  model: 'claude-haiku-4-5-20251001',
+                  model: 'claude-haiku-5-5',
                   max_tokens: 80,
                   system: _takeoutSystem,
                   messages: [

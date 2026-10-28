@@ -735,7 +735,7 @@ Return JSON only: {"en":"...","zh":"..."}`;
     } else {
       const res = await fetchWithTimeout('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 150, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+        body: JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 150, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
       }, 8000);
       const d = await res.json();
       raw = d.content?.[0]?.text || '';

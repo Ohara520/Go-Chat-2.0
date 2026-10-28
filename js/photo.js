@@ -630,7 +630,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-5-5',
         max_tokens: 10,
         system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires: (1) wife explicitly asked about using it as avatar this turn, AND (2) husband clearly agrees. Simple evaluations like "looks good" or "decent" without commitment are UNRESOLVED. Generic agreement like "yeah alright" when she only asked "how is it" (not "use it as avatar") is UNRESOLVED. Only ACCEPT when he commits to the avatar change action.`,
         messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
