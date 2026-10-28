@@ -114,6 +114,15 @@ export default async function handler(req, res) {
         const _shapeOk = !!_choice?.message &&
           (typeof rawContent === 'string' || Array.isArray(rawContent));
         if (!_shapeOk) {
+          // 临时诊断：打印中转站原始响应结构（不含正文），帮助排查为什么结构不对
+          console.error('[api/chat] BAD_RESPONSE_SHAPE from upstream:', {
+            hasChoices: Array.isArray(chatResponse?.choices),
+            choicesLen: chatResponse?.choices?.length,
+            hasMessage: !!_choice?.message,
+            contentType: typeof rawContent,
+            isContentArray: Array.isArray(rawContent),
+            topLevelKeys: chatResponse ? Object.keys(chatResponse) : null,
+          });
           const err = new Error('BAD_RESPONSE_SHAPE');
           err.status = 502;
           err._badShape = true;
