@@ -94,9 +94,26 @@ export default async function handler(req, res) {
           messages: chatMessages,
         });
 
+        // 中转站可能返回字符串而不是对象（Content-Type 不是 application/json）
+        // OpenAI SDK 不会自动解析，需要手动处理
+        let parsedResponse = chatResponse;
+        if (typeof chatResponse === 'string') {
+          try {
+            parsedResponse = JSON.parse(chatResponse);
+          } catch (parseErr) {
+            console.error('[api/chat] Failed to parse string response:', {
+              strLen: chatResponse.length,
+              prefix: chatResponse.substring(0, 200),
+            });
+            const err = new Error('UPSTREAM_RETURNED_UNPARSEABLE_STRING');
+            err.status = 502;
+            throw err;
+          }
+        }
+
         // 响应转换：OpenAI Chat → Anthropic 格式（前端期望的 content[0].text 结构）
         // 参考 venice.js _extractChatText：content 可能是字符串或包含 text 的对象数组
-        const rawContent = chatResponse.choices?.[0]?.message?.content;
+        const rawContent = parsedResponse.choices?.[0]?.message?.content;
         let text = '';
         if (typeof rawContent === 'string') {
           text = rawContent.trim();
@@ -110,18 +127,18 @@ export default async function handler(req, res) {
         // 结构异常（无 choices / 无 message / content 既不是字符串也不是数组）→ 按上游失败处理，不伪装成功。
         // 结构正常但正文为空 → 原样返回空文本：与原 Anthropic 路径一致，前端会走"空回复重试一次 → Gemini 日常接续"，
         // 若改成 502 会跳过这条恢复链，直接显示"网络波动"。
-        const _choice = chatResponse?.choices?.[0];
+        const _choice = parsedResponse?.choices?.[0];
         const _shapeOk = !!_choice?.message &&
           (typeof rawContent === 'string' || Array.isArray(rawContent));
         if (!_shapeOk) {
           // 临时诊断：打印中转站原始响应结构（不含正文），帮助排查为什么结构不对
           console.error('[api/chat] BAD_RESPONSE_SHAPE from upstream:', {
-            hasChoices: Array.isArray(chatResponse?.choices),
-            choicesLen: chatResponse?.choices?.length,
+            hasChoices: Array.isArray(parsedResponse?.choices),
+            choicesLen: parsedResponse?.choices?.length,
             hasMessage: !!_choice?.message,
             contentType: typeof rawContent,
             isContentArray: Array.isArray(rawContent),
-            topLevelKeys: chatResponse ? Object.keys(chatResponse) : null,
+            topLevelKeys: parsedResponse ? Object.keys(parsedResponse).slice(0, 20) : null,
           });
           const err = new Error('BAD_RESPONSE_SHAPE');
           err.status = 502;
@@ -130,15 +147,15 @@ export default async function handler(req, res) {
         }
 
         const anthropicResponse = {
-          id: chatResponse.id || `msg_${Date.now()}`,
+          id: parsedResponse.id || `msg_${Date.now()}`,
           type: 'message',
           role: 'assistant',
           content: [{ type: 'text', text }],
-          model: chatResponse.model || model,
-          stop_reason: chatResponse.choices[0].finish_reason === 'length' ? 'max_tokens' : 'end_turn',
-          usage: chatResponse.usage ? {
-            input_tokens: chatResponse.usage.prompt_tokens || 0,
-            output_tokens: chatResponse.usage.completion_tokens || 0,
+          model: parsedResponse.model || model,
+          stop_reason: parsedResponse.choices[0].finish_reason === 'length' ? 'max_tokens' : 'end_turn',
+          usage: parsedResponse.usage ? {
+            input_tokens: parsedResponse.usage.prompt_tokens || 0,
+            output_tokens: parsedResponse.usage.completion_tokens || 0,
           } : undefined,
         };
 
