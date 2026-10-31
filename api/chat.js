@@ -114,6 +114,13 @@ export default async function handler(req, res) {
         // 响应转换：OpenAI Chat → Anthropic 格式（前端期望的 content[0].text 结构）
         // 参考 venice.js _extractChatText：content 可能是字符串或包含 text 的对象数组
         const rawContent = parsedResponse.choices?.[0]?.message?.content;
+
+        // ── 临时诊断：记录响应结构，排查偶发英文粘连 ──
+        const _diagType = typeof rawContent === 'string' ? 'string' :
+                          Array.isArray(rawContent) ? 'array' :
+                          rawContent === null ? 'null' : 'other';
+        const _diagParts = Array.isArray(rawContent) ? rawContent.length : 0;
+
         let text = '';
         if (typeof rawContent === 'string') {
           text = rawContent.trim();
@@ -123,6 +130,20 @@ export default async function handler(req, res) {
             .join('')
             .trim();
         }
+
+        // ── 空格统计（不记录内容，只统计数字）──
+        const _countSpaces = (s) => (s.match(/\s/g) || []).length;
+        const _longestWord = (s) => Math.max(0, ...s.split(/\s+/).map(w => w.length));
+        const _spacesIn = typeof rawContent === 'string' ? _countSpaces(rawContent) :
+                          Array.isArray(rawContent) ? rawContent.reduce((n, p) => n + (p?.text ? _countSpaces(p.text) : 0), 0) :
+                          0;
+        const _spacesOut = _countSpaces(text);
+        const _diff = _spacesIn - _spacesOut;
+        const _longest = _longestWord(text);
+
+        // ── 记录到 Vercel 日志（不记录正文、Key、提示词）──
+        const _flag = (_diff !== 0 || _diagType !== 'string' || _longest > 20) ? ' ⚠️' : '';
+        console.log(`[SPACING_DIAG]${_flag} model=${model} type=${_diagType} parts=${_diagParts} len=${text.length} spaces_in=${_spacesIn} spaces_out=${_spacesOut} diff=${_diff} longest=${_longest}`);
 
         // 结构异常（无 choices / 无 message / content 既不是字符串也不是数组）→ 按上游失败处理，不伪装成功。
         // 结构正常但正文为空 → 原样返回空文本：与原 Anthropic 路径一致，前端会走"空回复重试一次 → Gemini 日常接续"，
