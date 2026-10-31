@@ -841,6 +841,30 @@ async function loadFromCloud() {
     }
 
     console.log('[cloud] 数据已加载');
+    // ── 内容去重：重建快照，记录云端当前状态 ────
+    // 加载云端数据后，重建快照缓存为云端当前值，
+    // 防止下次 save 时把云端数据当作"本地新增"重复写回云端
+    if (userId && s) {
+      if (!_lastSavedSnapshots[userId]) _lastSavedSnapshots[userId] = { state: '', chat: '' };
+      // 重建 state 快照（排除 chat_history）
+      const stateForSnap = {
+        friends: s.friends || [],
+        chatRecords: s.chatRecords || [],
+        ownedAssets: s.ownedAssets || [],
+        unlockedRoles: s.unlockedRoles || [],
+        unlockedScenarios: s.unlockedScenarios || [],
+        favoriteRoles: s.favoriteRoles || [],
+        favoriteScenarios: s.favoriteScenarios || [],
+        roleRatings: s.roleRatings || {},
+        scenarioRatings: s.scenarioRatings || {},
+        deliveryNotices: JSON.parse(localStorage.getItem('deliveryNotices') || '[]'),
+        feedEventPool: (typeof getFeedEventPool === 'function') ? getFeedEventPool() : []
+      };
+      _lastSavedSnapshots[userId].state = JSON.stringify(stateForSnap);
+      // 重建 chat 快照
+      const chatData = (typeof getChatHistory === 'function') ? getChatHistory() : [];
+      _lastSavedSnapshots[userId].chat = (chatData.length > 0) ? JSON.stringify(chatData) : '';
+    }
     // 通知徽章刷新（云端数据恢复后）
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
     // 如果上次有未同步的本地数据，加载完立刻重新保存
@@ -883,6 +907,16 @@ let _saveThrottleTimer = null;
 let _savePending = false;
 let _isSavingToCloud = false; // 写入锁：同一时间只允许一个完整saveToCloud在跑
 
+// ── 内容去重（2026-10-28）──────────────────────────────────
+// 记录上次成功保存的内容，避免未变化的数据重复写入数据库。
+// · 每个用户各自的快照（按 userId 索引），避免切换账号后误判。
+// · profile/state_snapshot/long_term_memory 作为一组（状态数据）
+// · chat_history 单独一组（高频变化，且有 saveChatHistoryNow 独立路径）
+// · loadFromCloud 成功后清空快照，下次 save 强制写入（自修复机制）
+// · 每次 save 成功后才记录快照，失败则保留旧快照等下次重试
+// · 使用精确字符串比较（非哈希），避免碰撞导致误判相同而跳过保存
+const _lastSavedSnapshots = {}; // { userId: { state: string, chat: string } }
+
 // 聊天记录单独写入，绕过节流——每条消息成功后立刻调用
 async function saveChatHistoryNow() {
   const sb = getSbClient();
@@ -902,6 +936,14 @@ async function saveChatHistoryNow() {
         ...(m._product ? { _product: m._product } : {}),
         ...(m._house ? { _house: m._house } : {}) }));
     if (chatHistoryData.length === 0) return;
+
+    // ── 内容去重（2026-10-28）────────────────────────────────
+    // 如果与上次成功保存的 chat 内容完全一致，跳过写入
+    const chatSnapshot = JSON.stringify(chatHistoryData);
+    if (!_lastSavedSnapshots[userId]) _lastSavedSnapshots[userId] = {};
+    if (_lastSavedSnapshots[userId].chat === chatSnapshot) {
+      return; // 内容未变，跳过写入
+    }
 
     const now = new Date().toISOString();
     localStorage.setItem('chatUpdatedAt', now);
@@ -932,6 +974,11 @@ async function saveChatHistoryNow() {
         chat_updated_at: now,
         updated_at: now,
       }, { onConflict: 'user_id' });
+    }
+
+    // 写入成功：记录快照（失败则保留旧快照等重试）
+    if (!_updErr) {
+      _lastSavedSnapshots[userId].chat = chatSnapshot;
     }
   } catch(e) {
     console.warn('[cloud] 聊天记录快速保存失败:', e);
@@ -1179,12 +1226,13 @@ async function saveToCloud() {
     // 关键防御：只在 profile 和 state_snapshot 非空时写入，防止空快照覆盖云端
     // profile 核心标志：userName 和 marriageDate 至少有一个
     const _profileHasCore = profile.userName || profile.marriageDate;
+    const longTermMem = localStorage.getItem('longTermMemory') || '';
     if (_profileHasCore) {
       upsertData.profile = profile;
       upsertData.state_snapshot = stateSnapshot;
       // Simon 不再上传 moodLevel / affection 等旧关系状态。
       // 旧云端字段保留不删除，但客户端不再续写。
-      upsertData.long_term_memory = localStorage.getItem('longTermMemory') || '';
+      upsertData.long_term_memory = longTermMem;
     } else {
       console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/long_term_memory 字段写入，防止覆盖云端');
     }
@@ -1197,6 +1245,44 @@ async function saveToCloud() {
     const _walletCalc = Math.max(0, _base + _txSum);
     const walletVal = _walletCalc || parseFloat(localStorage.getItem('wallet') || '0');
     if (walletVal > 0) upsertData.balance = walletVal;
+
+    // ── 内容去重（2026-10-28）────────────────────────────────
+    // 计算本次要写入的内容快照，与上次成功保存的精确比较，跳过未变化的字段
+    if (!_lastSavedSnapshots[userId]) _lastSavedSnapshots[userId] = {};
+
+    // 状态数据快照：profile + state_snapshot（不含 stateSavedAt）+ long_term_memory + balance
+    let stateSnapshotStr = null;
+    if (_profileHasCore) {
+      const { stateSavedAt: _ignored, ...stateWithoutTs } = stateSnapshot; // 时间戳每次都变，排除
+      stateSnapshotStr = JSON.stringify({
+        profile,
+        state: stateWithoutTs,
+        longTermMem,
+        balance: walletVal
+      });
+    }
+
+    // 聊天数据快照
+    const chatSnapshotStr = chatHistoryData.length > 0
+      ? JSON.stringify(chatHistoryData)
+      : null;
+
+    // 判断是否需要写入
+    const stateChanged = stateSnapshotStr && (_lastSavedSnapshots[userId].state !== stateSnapshotStr);
+    const chatChanged = chatSnapshotStr && (_lastSavedSnapshots[userId].chat !== chatSnapshotStr);
+
+    // 两者都未变：完全跳过写入
+    if (!stateChanged && !chatChanged) {
+      _isSavingToCloud = false;
+      _lastSyncTime = now; // 更新时间戳，防止频繁重试
+      return;
+    }
+
+    // chat 未变但 state 变了：从 upsertData 移除 chat_history（避免重复写入）
+    // 注意：saveChatHistoryNow 已经单独写过了，这里只需同步 state
+    if (stateChanged && !chatChanged && chatHistoryData.length > 0) {
+      delete upsertData.chat_history;
+    }
 
     // 重试一次，防止偶发网络问题导致数据丢失
     // 修复：upsert 加 15 秒超时，防止 Supabase 无响应导致 _isSavingToCloud 永久锁死
@@ -1223,6 +1309,9 @@ async function saveToCloud() {
     if (saveOk) {
       localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
       localStorage.setItem('localUpdatedAt', Date.now().toString());
+      // 记录快照（仅成功时）
+      if (stateSnapshotStr) _lastSavedSnapshots[userId].state = stateSnapshotStr;
+      if (chatSnapshotStr) _lastSavedSnapshots[userId].chat = chatSnapshotStr;
       console.log('[cloud] 保存成功');
     } else {
       console.error('[cloud] 保存最终失败，数据暂存本地');

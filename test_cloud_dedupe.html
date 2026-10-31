@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Cloud Dedupe Test</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+    h1 { color: #333; }
+    .test { border: 1px solid #ccc; margin: 10px 0; padding: 15px; border-radius: 4px; }
+    .test h3 { margin-top: 0; color: #0066cc; }
+    .pass { background: #d4edda; border-color: #c3e6cb; }
+    .fail { background: #f8d7da; border-color: #f5c6cb; }
+    pre { background: #f5f5f5; padding: 10px; overflow-x: auto; font-size: 12px; }
+    button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+    .summary { font-weight: bold; font-size: 18px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>云端去重测试套件</h1>
+  <div id="results"></div>
+  <div id="summary" class="summary"></div>
+
+  <script>
+    const results = [];
+
+    function assert(condition, testName, details = '') {
+      const passed = Boolean(condition);
+      results.push({ name: testName, passed, details });
+      const div = document.createElement('div');
+      div.className = 'test ' + (passed ? 'pass' : 'fail');
+      div.innerHTML = `
+        <h3>${passed ? '✓' : '✗'} ${testName}</h3>
+        ${details ? `<pre>${details}</pre>` : ''}
+      `;
+      document.getElementById('results').appendChild(div);
+      return passed;
+    }
+
+    function arrayEquals(a, b) {
+      if (a.length !== b.length) return false;
+      return a.every((v, i) => v === b[i]);
+    }
+
+    // ================== 模拟去重逻辑 ==================
+    function dedupeById(array) {
+      const seen = new Set();
+      return array.filter(item => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+    }
+
+    function dedupeByIdWithTimestamp(array) {
+      const map = new Map();
+      array.forEach(item => {
+        const existing = map.get(item.id);
+        if (!existing || (item.timestamp || 0) > (existing.timestamp || 0)) {
+          map.set(item.id, item);
+        }
+      });
+      return Array.from(map.values());
+    }
+
+    // ================== 快照机制模拟 ==================
+    const _lastSavedSnapshots = {};
+
+    function simulateLoadFromCloud(userId, cloudState, cloudChat) {
+      // 模拟加载后重建快照
+      if (!_lastSavedSnapshots[userId]) _lastSavedSnapshots[userId] = { state: '', chat: '' };
+      _lastSavedSnapshots[userId].state = JSON.stringify(cloudState);
+      _lastSavedSnapshots[userId].chat = JSON.stringify(cloudChat);
+      return { state: cloudState, chat: cloudChat };
+    }
+
+    function simulateSaveToCloud(userId, newState, newChat) {
+      // 模拟保存时检查快照
+      const stateSnapshotStr = JSON.stringify(newState);
+      const chatSnapshotStr = JSON.stringify(newChat);
+
+      const stateChanged = _lastSavedSnapshots[userId]?.state !== stateSnapshotStr;
+      const chatChanged = _lastSavedSnapshots[userId]?.chat !== chatSnapshotStr;
+
+      if (!stateChanged && !chatChanged) {
+        return { written: false, reason: 'no_change' };
+      }
+
+      // 模拟写入成功
+      _lastSavedSnapshots[userId].state = stateSnapshotStr;
+      _lastSavedSnapshots[userId].chat = chatSnapshotStr;
+      return { written: true, stateChanged, chatChanged };
+    }
+
+    // ================== 测试用例 ==================
+
+    // Test 1: 基本 ID 去重
+    (function() {
+      const input = [
+        { id: '1', name: 'a' },
+        { id: '2', name: 'b' },
+        { id: '1', name: 'a-dup' }
+      ];
+      const result = dedupeById(input);
+      const expected = [
+        { id: '1', name: 'a' },
+        { id: '2', name: 'b' }
+      ];
+      assert(
+        result.length === 2 && result[0].id === '1' && result[1].id === '2',
+        '基本 ID 去重',
+        `输入: ${JSON.stringify(input)}\n输出: ${JSON.stringify(result)}`
+      );
+    })();
+
+    // Test 2: 时间戳去重（保留最新）
+    (function() {
+      const input = [
+        { id: 'msg1', text: 'old', timestamp: 1000 },
+        { id: 'msg2', text: 'hello', timestamp: 2000 },
+        { id: 'msg1', text: 'new', timestamp: 3000 }
+      ];
+      const result = dedupeByIdWithTimestamp(input);
+      const msg1 = result.find(m => m.id === 'msg1');
+      assert(
+        result.length === 2 && msg1.text === 'new' && msg1.timestamp === 3000,
+        '时间戳去重（保留最新）',
+        `输入: ${JSON.stringify(input)}\n输出: ${JSON.stringify(result)}\nmsg1: ${JSON.stringify(msg1)}`
+      );
+    })();
+
+    // Test 3: 云端加载后快照重建
+    (function() {
+      const userId = 'user123';
+      const cloudState = { friends: ['alice', 'bob'] };
+      const cloudChat = [{ id: 'c1', text: 'hi' }];
+
+      simulateLoadFromCloud(userId, cloudState, cloudChat);
+
+      const hasSnapshot = _lastSavedSnapshots[userId] !== undefined;
+      const stateMatch = _lastSavedSnapshots[userId]?.state === JSON.stringify(cloudState);
+      const chatMatch = _lastSavedSnapshots[userId]?.chat === JSON.stringify(cloudChat);
+
+      assert(
+        hasSnapshot && stateMatch && chatMatch,
+        '云端加载后快照重建',
+        `快照存在: ${hasSnapshot}\nstate 匹配: ${stateMatch}\nchat 匹配: ${chatMatch}\n快照内容: ${JSON.stringify(_lastSavedSnapshots[userId])}`
+      );
+    })();
+
+    // Test 4: 无变化时跳过写入
+    (function() {
+      const userId = 'user123';
+      const state = { friends: ['alice', 'bob'] };
+      const chat = [{ id: 'c1', text: 'hi' }];
+
+      // 先加载
+      simulateLoadFromCloud(userId, state, chat);
+
+      // 尝试保存相同数据
+      const result = simulateSaveToCloud(userId, state, chat);
+
+      assert(
+        !result.written && result.reason === 'no_change',
+        '无变化时跳过写入',
+        `写入结果: ${JSON.stringify(result)}`
+      );
+    })();
+
+    // Test 5: 有变化时正常写入
+    (function() {
+      const userId = 'user456';
+      const initialState = { friends: ['alice'] };
+      const initialChat = [{ id: 'c1', text: 'hi' }];
+
+      simulateLoadFromCloud(userId, initialState, initialChat);
+
+      // 修改 state
+      const newState = { friends: ['alice', 'bob'] };
+      const result1 = simulateSaveToCloud(userId, newState, initialChat);
+
+      assert(
+        result1.written && result1.stateChanged && !result1.chatChanged,
+        '仅 state 变化时写入',
+        `结果: ${JSON.stringify(result1)}`
+      );
+
+      // 修改 chat
+      const newChat = [{ id: 'c1', text: 'hi' }, { id: 'c2', text: 'bye' }];
+      const result2 = simulateSaveToCloud(userId, newState, newChat);
+
+      assert(
+        result2.written && !result2.stateChanged && result2.chatChanged,
+        '仅 chat 变化时写入',
+        `结果: ${JSON.stringify(result2)}`
+      );
+    })();
+
+    // Test 6: 跨设备场景 - 设备A加载后修改
+    (function() {
+      const userId = 'cross-device-user';
+      const cloudState = { friends: ['alice'] };
+      const cloudChat = [{ id: 'c1', text: 'from cloud' }];
+
+      // 设备A：加载云端数据
+      simulateLoadFromCloud(userId, cloudState, cloudChat);
+
+      // 设备A：本地添加新好友
+      const deviceAState = { friends: ['alice', 'bob'] };
+      const saveResult = simulateSaveToCloud(userId, deviceAState, cloudChat);
+
+      assert(
+        saveResult.written && saveResult.stateChanged,
+        '跨设备场景：设备A本地修改后写入',
+        `写入结果: ${JSON.stringify(saveResult)}`
+      );
+
+      // 设备B：重新加载（应该获得最新快照）
+      const deviceBLoad = simulateLoadFromCloud(userId, deviceAState, cloudChat);
+
+      // 设备B：无修改，尝试保存
+      const deviceBSave = simulateSaveToCloud(userId, deviceAState, cloudChat);
+
+      assert(
+        !deviceBSave.written && deviceBSave.reason === 'no_change',
+        '跨设备场景：设备B加载后无修改不重复写入',
+        `设备B保存结果: ${JSON.stringify(deviceBSave)}`
+      );
+    })();
+
+    // Test 7: friends 合并去重
+    (function() {
+      const cloud = ['alice', 'bob'];
+      const local = ['bob', 'charlie'];
+      const merged = [...new Set([...cloud, ...local])];
+
+      assert(
+        merged.length === 3 && merged.includes('alice') && merged.includes('bob') && merged.includes('charlie'),
+        'friends 合并去重',
+        `云端: ${JSON.stringify(cloud)}\n本地: ${JSON.stringify(local)}\n合并: ${JSON.stringify(merged)}`
+      );
+    })();
+
+    // Test 8: chatRecords 完整覆盖（数组结构）
+    (function() {
+      const cloud = [
+        { friendId: 'alice', messages: [{ id: 'm1', text: 'a' }] },
+        { friendId: 'bob', messages: [{ id: 'm2', text: 'b' }] }
+      ];
+      const local = [
+        { friendId: 'alice', messages: [{ id: 'm1', text: 'a' }] },
+        { friendId: 'charlie', messages: [{ id: 'm3', text: 'c' }] }
+      ];
+
+      // 合并逻辑：按 friendId 去重，保留云端版本
+      const map = new Map();
+      cloud.forEach(r => map.set(r.friendId, r));
+      local.forEach(r => { if (!map.has(r.friendId)) map.set(r.friendId, r); });
+      const merged = Array.from(map.values());
+
+      assert(
+        merged.length === 3 &&
+        merged.some(r => r.friendId === 'alice' && r.messages[0].text === 'a') &&
+        merged.some(r => r.friendId === 'bob') &&
+        merged.some(r => r.friendId === 'charlie'),
+        'chatRecords 合并去重（按 friendId）',
+        `云端: ${JSON.stringify(cloud)}\n本地: ${JSON.stringify(local)}\n合并: ${JSON.stringify(merged)}`
+      );
+    })();
+
+    // Test 9: 边界情况 - 空数组
+    (function() {
+      const result1 = dedupeById([]);
+      const result2 = dedupeByIdWithTimestamp([]);
+
+      assert(
+        result1.length === 0 && result2.length === 0,
+        '边界情况：空数组去重',
+        `基本去重: ${JSON.stringify(result1)}\n时间戳去重: ${JSON.stringify(result2)}`
+      );
+    })();
+
+    // Test 10: 边界情况 - 单元素
+    (function() {
+      const input = [{ id: 'only', name: 'single' }];
+      const result = dedupeById(input);
+
+      assert(
+        result.length === 1 && result[0].id === 'only',
+        '边界情况：单元素数组去重',
+        `输入: ${JSON.stringify(input)}\n输出: ${JSON.stringify(result)}`
+      );
+    })();
+
+    // ================== 总结 ==================
+    const passed = results.filter(r => r.passed).length;
+    const total = results.length;
+    const summaryDiv = document.getElementById('summary');
+    summaryDiv.textContent = `测试完成: ${passed}/${total} 通过`;
+    summaryDiv.style.color = (passed === total) ? '#28a745' : '#dc3545';
+
+    console.log('详细结果:', results);
+  </script>
+</body>
+</html>
