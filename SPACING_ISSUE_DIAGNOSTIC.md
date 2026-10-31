@@ -55,9 +55,13 @@ if (typeof rawContent === 'string') {
 }
 ```
 
-**如果中转站返回的 content 是数组**（`[{text:"hello"}, {text:"world"}]`），join('') 会变成 "helloworld"。
+**如果中转站返回的 content 是数组**（`[{text:"hello"}, {text:"world"}]`），join('') 可能导致粘连，**也可能不会**（取决于各段内部是否已包含空格）。
 
-但理论上 OpenAI Chat API 的 content 应该是字符串，不是数组。需要验证中转站实际返回的格式。
+需要通过诊断日志中的 `array edges` 判断：
+- 如果各段都是 `{start:'N', end:'N'}`（前后都无空格），`.join('')` **疑似**会导致粘连
+- 如果有 `{end:'Y'}` 或 `{start:'Y'}`，说明段内已有空格，`.join('')` 不会丢空格
+
+**不能直接改成 `.join(' ')`**，因为如果段内已有空格，会变成双空格。
 
 **风险点2：中转站兼容层可能的bug**  
 OpenAI Chat API 标准返回：

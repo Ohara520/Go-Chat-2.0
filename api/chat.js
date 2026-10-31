@@ -115,35 +115,64 @@ export default async function handler(req, res) {
         // 参考 venice.js _extractChatText：content 可能是字符串或包含 text 的对象数组
         const rawContent = parsedResponse.choices?.[0]?.message?.content;
 
-        // ── 临时诊断：记录响应结构，排查偶发英文粘连 ──
+        // ── 临时诊断 V2：记录响应结构和字符类别分布（完全脱敏）──
+        // 目的：排查偶发英文粘连，标记疑似异常供人工分析，不记录任何原始内容
         const _diagType = typeof rawContent === 'string' ? 'string' :
                           Array.isArray(rawContent) ? 'array' :
                           rawContent === null ? 'null' : 'other';
         const _diagParts = Array.isArray(rawContent) ? rawContent.length : 0;
 
+        // 采样：前30字符，彻底脱敏（L=字母 D=数字 P=标点/中文/其他 空格保留）
+        const _maskText = (s) => {
+          return s.substring(0, 30).split('').map(c => {
+            if (/\s/.test(c)) return c;           // 空白保留
+            if (/[a-zA-Z]/.test(c)) return 'L';   // 字母 → L
+            if (/[0-9]/.test(c)) return 'D';      // 数字 → D
+            return 'P';                            // 其他 → P
+          }).join('');
+        };
+        const _sample = typeof rawContent === 'string'
+          ? _maskText(rawContent)
+          : Array.isArray(rawContent)
+            ? rawContent.slice(0, 3).map(p => _maskText(p?.text || '')).join('|')
+            : '';
+
         let text = '';
+        let _arrayEdgeInfo = null;
+
         if (typeof rawContent === 'string') {
           text = rawContent.trim();
         } else if (Array.isArray(rawContent)) {
-          text = rawContent
-            .map((p) => (p && typeof p.text === 'string') ? p.text : '')
-            .join('')
-            .trim();
+          // 提取各段，保持原逻辑：直接拼接（不修改，只诊断）
+          const parts = rawContent.map((p) => (p && typeof p.text === 'string') ? p.text : '');
+          text = parts.join('').trim();
+
+          // 诊断：记录各段边界空格（用于人工判断是否应该加空格）
+          _arrayEdgeInfo = parts.map((p, i) => ({
+            i,
+            start: /^\s/.test(p) ? 'Y' : 'N',
+            end: /\s$/.test(p) ? 'Y' : 'N',
+            len: p.length
+          }));
         }
 
-        // ── 空格统计（不记录内容，只统计数字）──
+        // 统计
         const _countSpaces = (s) => (s.match(/\s/g) || []).length;
         const _longestWord = (s) => Math.max(0, ...s.split(/\s+/).map(w => w.length));
-        const _spacesIn = typeof rawContent === 'string' ? _countSpaces(rawContent) :
-                          Array.isArray(rawContent) ? rawContent.reduce((n, p) => n + (p?.text ? _countSpaces(p.text) : 0), 0) :
-                          0;
-        const _spacesOut = _countSpaces(text);
-        const _diff = _spacesIn - _spacesOut;
+        const _spaces = _countSpaces(text);
         const _longest = _longestWord(text);
 
-        // ── 记录到 Vercel 日志（不记录正文、Key、提示词）──
-        const _flag = (_diff !== 0 || _diagType !== 'string' || _longest > 20) ? ' ⚠️' : '';
-        console.log(`[SPACING_DIAG]${_flag} model=${model} type=${_diagType} parts=${_diagParts} len=${text.length} spaces_in=${_spacesIn} spaces_out=${_spacesOut} diff=${_diff} longest=${_longest}`);
+        // 疑似异常标记：type 非 string 或 存在超长"单词"（需人工判断是否真的粘连）
+        const _hasLongWord = _longest > 20;
+        const _flag = (_diagType !== 'string' || _hasLongWord) ? ' ⚠️SUSPECT' : '';
+
+        // 主日志（⚠️SUSPECT 表示疑似异常，非确定结论）
+        console.log(`[SPACING_DIAG]${_flag} model=${model} type=${_diagType} parts=${_diagParts} sample="${_sample}" len=${text.length} spaces=${_spaces} longest=${_longest}`);
+
+        // array 边界详情（供人工判断 join('') 是否合适）
+        if (_arrayEdgeInfo && _arrayEdgeInfo.length > 0) {
+          console.log(`[SPACING_DIAG] array edges:`, JSON.stringify(_arrayEdgeInfo));
+        }
 
         // 结构异常（无 choices / 无 message / content 既不是字符串也不是数组）→ 按上游失败处理，不伪装成功。
         // 结构正常但正文为空 → 原样返回空文本：与原 Anthropic 路径一致，前端会走"空回复重试一次 → Gemini 日常接续"，
