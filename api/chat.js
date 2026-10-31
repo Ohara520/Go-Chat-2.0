@@ -124,6 +124,39 @@ export default async function handler(req, res) {
             .trim();
         }
 
+        // 临时空格诊断：只记录统计值，不记录任何聊天正文、提示词或 API Key。
+        // 注意：此处只能判断转换是否改变空格，不能凭空格数量判断自然语言是否正确。
+        const _spaceStats = (value) => ({
+          length: value.length,
+          asciiSpaces: (value.match(/ /g) || []).length,
+          tabs: (value.match(/\t/g) || []).length,
+          newlines: (value.match(/\n/g) || []).length,
+        });
+        const _rawPieces = typeof rawContent === 'string'
+          ? [rawContent]
+          : Array.isArray(rawContent)
+            ? rawContent.map(p => (p && typeof p.text === 'string') ? p.text : '')
+            : [];
+        const _rawJoined = _rawPieces.join('');
+        const _beforeStats = _spaceStats(_rawJoined);
+        const _afterStats = _spaceStats(text);
+        console.log('[api/chat] spacing diagnostic', {
+          model,
+          contentType: Array.isArray(rawContent) ? 'array' : typeof rawContent,
+          pieceCount: _rawPieces.length,
+          nonemptyPieces: _rawPieces.filter(p => p.length > 0).length,
+          before: _beforeStats,
+          after: _afterStats,
+          conversionMatchesTrim: text === _rawJoined.trim(),
+          // 只统计片段边界是否有显式空白；不打印片段本身。
+          arrayBoundariesWithoutWhitespace: Array.isArray(rawContent)
+            ? _rawPieces.slice(0, -1).filter((p, i) =>
+                p.length > 0 && _rawPieces[i + 1].length > 0 &&
+                !/\s$/.test(p) && !/^\s/.test(_rawPieces[i + 1])
+              ).length
+            : 0,
+        });
+
         // 结构异常（无 choices / 无 message / content 既不是字符串也不是数组）→ 按上游失败处理，不伪装成功。
         // 结构正常但正文为空 → 原样返回空文本：与原 Anthropic 路径一致，前端会走"空回复重试一次 → Gemini 日常接续"，
         // 若改成 502 会跳过这条恢复链，直接显示"网络波动"。
