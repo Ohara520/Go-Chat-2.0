@@ -1,14 +1,14 @@
 // ===================================================
 // api/gemini-extractor.js — Gemini 3.1 Flash Lite for background cognition tasks
 // Used by: state.js (Long-term Memory extraction), relationship.js (Relationship Understanding extraction)
-// Model: gemini-3.1-flash-lite-preview
+// Model: gemini-3.1-flash-lite
 // ===================================================
 
 const BASE_URLS = [
   'https://api.yunjintao.com/v1',
 ];
 
-const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 const GEMINI_UPSTREAM_TIMEOUT_MS = 15000;
 
 // 从 Gemini Native response 安全提取正文
