@@ -1,8 +1,9 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
-// 中转站官方节点列表（来自站长文档）
+// 中转站节点（Anthropic 原生协议）
+// baseURL 不加 /v1，SDK 自动拼接 /v1/messages
 const BASE_URLS = [
-  'https://api.yunjintao.com/v1',  // OpenAI Chat 兼容路径需要 /v1 后缀
+  'https://api.yunjintao.com',
 ];
 
 // 单节点超时：Haiku 8秒快速切换，Sonnet 20秒匹配主聊天前端调用（Vercel maxDuration=45s）
@@ -12,10 +13,6 @@ const PER_NODE_TIMEOUT_SONNET = 20000;
 // Haiku 与 Sonnet 在中转站不能共用同一分组，按模型名分流 Key：
 //   claude-haiku-*  → HAIKU_API_KEY（独立，未配置时直接报错，绝不回退到主聊天 Key）
 //   其他 Claude 模型 → ANTHROPIC_API_KEY（原有主聊天 Key）
-//
-// 协议统一（2026-10-28）：两个分组在中转站的 Anthropic 协议都 Failed to fetch，
-// 统一改用 OpenAI Chat (/v1/chat/completions)。后端把 OpenAI 响应转回前端期望的
-// Anthropic 格式（content[0].text），前端无需改动。
 function _isHaikuModel(model) {
   return typeof model === 'string' && model.toLowerCase().startsWith('claude-haiku-');
 }
@@ -56,105 +53,58 @@ export default async function handler(req, res) {
 
     for (const baseURL of BASE_URLS) {
       try {
-        const client = new OpenAI({
+        const client = new Anthropic({
           apiKey,
           baseURL,
           timeout: effectiveTimeout,
           maxRetries: 0,
+          defaultHeaders: { 'anthropic-version': '2023-06-01' },
         });
 
-        // 请求转换：Anthropic → OpenAI Chat
-        const chatMessages = [];
-        if (system && typeof system === 'string') {
-          chatMessages.push({ role: 'system', content: system });
-        }
-        for (const msg of messages) {
+        // 消息结构：前端已经是 Anthropic 格式，直接传递
+        // 图片块已经是 {type:'image', source:{type:'base64', media_type, data}}，原生格式，无需转换
+        const anthropicMessages = messages.map(msg => {
           if (msg.role === 'user' && Array.isArray(msg.content)) {
-            // 图片块转换：{type:'image', source:{base64}} → {type:'image_url', image_url:{url}}
-            const converted = msg.content.map(block => {
-              if (block.type === 'image' && block.source?.type === 'base64') {
-                const mimeType = block.source.media_type || 'image/jpeg';
-                const data = block.source.data;
-                return {
-                  type: 'image_url',
-                  image_url: { url: `data:${mimeType};base64,${data}` }
-                };
-              }
-              return block;
-            });
-            chatMessages.push({ role: msg.role, content: converted });
-          } else {
-            chatMessages.push({ role: msg.role, content: msg.content });
+            // vision blocks 已经是 Anthropic 原生格式，直接用
+            return { role: msg.role, content: msg.content };
           }
-        }
-
-        const chatResponse = await client.chat.completions.create({
-          model,
-          max_tokens,
-          messages: chatMessages,
+          return { role: msg.role, content: msg.content };
         });
 
-        // 中转站可能返回字符串而不是对象（Content-Type 不是 application/json）
-        // OpenAI SDK 不会自动解析，需要手动处理
-        let parsedResponse = chatResponse;
-        if (typeof chatResponse === 'string') {
-          try {
-            parsedResponse = JSON.parse(chatResponse);
-          } catch (parseErr) {
-            console.error('[api/chat] Failed to parse string response:', {
-              strLen: chatResponse.length,
-              prefix: chatResponse.substring(0, 200),
-            });
-            const err = new Error('UPSTREAM_RETURNED_UNPARSEABLE_STRING');
-            err.status = 502;
-            throw err;
-          }
+        const params = {
+          model,
+          max_tokens: max_tokens || 1024,
+          messages: anthropicMessages,
+        };
+        if (system && typeof system === 'string') {
+          params.system = system;
         }
 
-        // 响应转换：OpenAI Chat → Anthropic 格式（前端期望的 content[0].text 结构）
-        // 参考 venice.js _extractChatText：content 可能是字符串或包含 text 的对象数组
-        const rawContent = parsedResponse.choices?.[0]?.message?.content;
+        const anthropicResponse = await client.messages.create(params);
+
+        // Anthropic 原生响应结构：content 是 [{type:'text', text:'...'}, ...]
+        // 提取所有 text block 拼成完整文本（正常只有一个 text block）
+        const text = (anthropicResponse.content || [])
+          .filter(block => block.type === 'text')
+          .map(block => block.text)
+          .join('')
+          .trim();
 
         // ── 临时诊断 V2：记录响应结构和字符类别分布（完全脱敏）──
-        // 目的：排查偶发英文粘连，标记疑似异常供人工分析，不记录任何原始内容
-        const _diagType = typeof rawContent === 'string' ? 'string' :
-                          Array.isArray(rawContent) ? 'array' :
-                          rawContent === null ? 'null' : 'other';
-        const _diagParts = Array.isArray(rawContent) ? rawContent.length : 0;
+        // 目的：恢复原生协议后验证粘字是否消失，标记疑似异常供人工分析
+        const _diagBlocks = (anthropicResponse.content || []).length;
+        const _diagTextBlocks = (anthropicResponse.content || []).filter(b => b.type === 'text').length;
 
         // 采样：前30字符，彻底脱敏（L=字母 D=数字 P=标点/中文/其他 空格保留）
         const _maskText = (s) => {
           return s.substring(0, 30).split('').map(c => {
-            if (/\s/.test(c)) return c;           // 空白保留
-            if (/[a-zA-Z]/.test(c)) return 'L';   // 字母 → L
-            if (/[0-9]/.test(c)) return 'D';      // 数字 → D
-            return 'P';                            // 其他 → P
+            if (/\s/.test(c)) return c;
+            if (/[a-zA-Z]/.test(c)) return 'L';
+            if (/[0-9]/.test(c)) return 'D';
+            return 'P';
           }).join('');
         };
-        const _sample = typeof rawContent === 'string'
-          ? _maskText(rawContent)
-          : Array.isArray(rawContent)
-            ? rawContent.slice(0, 3).map(p => _maskText(p?.text || '')).join('|')
-            : '';
-
-        let text = '';
-        let _arrayEdgeInfo = null;
-
-        if (typeof rawContent === 'string') {
-          text = rawContent.trim();
-        } else if (Array.isArray(rawContent)) {
-          // 提取各段，保持原逻辑：直接拼接（不修改，只诊断）
-          const parts = rawContent.map((p) => (p && typeof p.text === 'string') ? p.text : '');
-          text = parts.join('').trim();
-
-          // 诊断：记录各段边界空格（用于人工判断是否应该加空格）
-          _arrayEdgeInfo = parts.map((p, i) => ({
-            i,
-            start: /^\s/.test(p) ? 'Y' : 'N',
-            end: /\s$/.test(p) ? 'Y' : 'N',
-            len: p.length
-          }));
-        }
+        const _sample = _maskText(text);
 
         // 统计
         const _countSpaces = (s) => (s.match(/\s/g) || []).length;
@@ -162,71 +112,39 @@ export default async function handler(req, res) {
         const _spaces = _countSpaces(text);
         const _longest = _longestWord(text);
 
-        // 疑似异常标记：type 非 string 或 存在超长"单词"（需人工判断是否真的粘连）
-        const _hasLongWord = _longest > 20;
-        const _flag = (_diagType !== 'string' || _hasLongWord) ? ' ⚠️SUSPECT' : '';
+        // 疑似异常标记（需人工判断，非确定结论）
+        const _flag = _longest > 20 ? ' ⚠️SUSPECT' : '';
+        const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
 
-        // 主日志（⚠️SUSPECT 表示疑似异常，非确定结论）
-        console.log(`[SPACING_DIAG]${_flag} model=${model} type=${_diagType} parts=${_diagParts} sample="${_sample}" len=${text.length} spaces=${_spaces} longest=${_longest}`);
+        console.log(`[SPACING_DIAG]${_flag} model=${model} protocol=anthropic blocks=${_diagBlocks} textBlocks=${_diagTextBlocks} sample="${_sample}" len=${text.length} spaces=${_spaces} longest=${_longest}`);
+        console.log(`[api/chat] ${modelLabel} Anthropic success: ${baseURL}`, {
+          model,
+          textLen: text.length,
+          stopReason: anthropicResponse.stop_reason,
+        });
 
-        // array 边界详情（供人工判断 join('') 是否合适）
-        if (_arrayEdgeInfo && _arrayEdgeInfo.length > 0) {
-          console.log(`[SPACING_DIAG] array edges:`, JSON.stringify(_arrayEdgeInfo));
-        }
-
-        // 结构异常（无 choices / 无 message / content 既不是字符串也不是数组）→ 按上游失败处理，不伪装成功。
-        // 结构正常但正文为空 → 原样返回空文本：与原 Anthropic 路径一致，前端会走"空回复重试一次 → Gemini 日常接续"，
-        // 若改成 502 会跳过这条恢复链，直接显示"网络波动"。
-        const _choice = parsedResponse?.choices?.[0];
-        const _shapeOk = !!_choice?.message &&
-          (typeof rawContent === 'string' || Array.isArray(rawContent));
-        if (!_shapeOk) {
-          // 临时诊断：打印中转站原始响应结构（不含正文），帮助排查为什么结构不对
-          console.error('[api/chat] BAD_RESPONSE_SHAPE from upstream:', {
-            hasChoices: Array.isArray(parsedResponse?.choices),
-            choicesLen: parsedResponse?.choices?.length,
-            hasMessage: !!_choice?.message,
-            contentType: typeof rawContent,
-            isContentArray: Array.isArray(rawContent),
-            topLevelKeys: parsedResponse ? Object.keys(parsedResponse).slice(0, 20) : null,
-          });
-          const err = new Error('BAD_RESPONSE_SHAPE');
-          err.status = 502;
-          err._badShape = true;
-          throw err;
-        }
-
-        const anthropicResponse = {
-          id: parsedResponse.id || `msg_${Date.now()}`,
+        // 返回给前端：保持与原来相同的结构（content[0].text），前端无需改动
+        return res.status(200).json({
+          id: anthropicResponse.id,
           type: 'message',
           role: 'assistant',
           content: [{ type: 'text', text }],
-          model: parsedResponse.model || model,
-          stop_reason: parsedResponse.choices[0].finish_reason === 'length' ? 'max_tokens' : 'end_turn',
-          usage: parsedResponse.usage ? {
-            input_tokens: parsedResponse.usage.prompt_tokens || 0,
-            output_tokens: parsedResponse.usage.completion_tokens || 0,
-          } : undefined,
-        };
-
-        // 诊断日志：区分 Haiku/Sonnet，记录成功或失败类型，不打印内容和Key
-        const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
-        console.log(`[api/chat] ${modelLabel} OpenAI success: ${baseURL}`, {
-          model,
-          hasChoices: Array.isArray(chatResponse.choices) && chatResponse.choices.length > 0,
-          textLen: text.length,
-          finishReason: chatResponse.choices?.[0]?.finish_reason,
+          model: anthropicResponse.model || model,
+          stop_reason: anthropicResponse.stop_reason,
+          usage: anthropicResponse.usage,
         });
-
-        return res.status(200).json(anthropicResponse);
 
       } catch (err) {
         const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
-        const errType = err._badShape ? 'BAD_RESPONSE_SHAPE' :
-                        err.status ? 'HTTP_ERROR' :
-                        (err.message?.includes('timeout') || err.message?.includes('timed out') || err.message?.includes('aborted')) ? 'TIMEOUT' :
-                        'NETWORK_ERROR';
-        console.warn(`[api/chat] ${modelLabel} OpenAI node failed: ${baseURL}`, {
+        const errType =
+          (err.status === 401 || err.status === 403) ? 'AUTH_ERROR' :
+          err.status === 400 ? 'BAD_REQUEST' :
+          err.status === 429 ? 'RATE_LIMIT' :
+          (err.message?.includes('timeout') || err.message?.includes('timed out') || err.message?.includes('aborted')) ? 'TIMEOUT' :
+          err.status >= 500 ? 'UPSTREAM_ERROR' :
+          'NETWORK_ERROR';
+
+        console.warn(`[api/chat] ${modelLabel} Anthropic node failed: ${baseURL}`, {
           type: errType,
           msg: err.message,
           status: err.status,
