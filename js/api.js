@@ -554,7 +554,7 @@ async function callDeepSeekWithSystem(system, user, maxTokens = 200) {
  * @returns {Response} 原始fetch Response（调用方自己.json()）
  */
 async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 1000, signal = null) {
-  // 构造 Anthropic 原生 system 数组：稳定层(fixed)标记缓存，动态层(dynamic)追加
+  // 构造 Anthropic 原生 system 数组：稳定层(fixed)标记缓存，动态层(dynamic + 额外提示)追加
   const systemBlocks = [];
 
   if (parts && parts.fixed) {
@@ -566,9 +566,18 @@ async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 10
   }
 
   if (parts && parts.dynamic) {
+    // 动态层：从 finalSystem 中提取 _baseSystem 之外的额外提示
+    // finalSystem = _baseSystem + antiCountHint + multiBubbleHint + ... + langHint
+    // parts 来自 buildSystemPromptParts(_baseSystem)，所以 parts.fixed + parts.dynamic = _baseSystem
+    // 额外提示 = finalSystem - _baseSystem
+    const baseSystemLength = (parts.fixed + '\n\n' + parts.dynamic).length;
+    const extraHints = finalSystem.substring(baseSystemLength).trim();
+
+    const dynamicText = extraHints ? parts.dynamic + '\n' + extraHints : parts.dynamic;
+
     systemBlocks.push({
       type: 'text',
-      text: parts.dynamic
+      text: dynamicText
     });
   }
 
