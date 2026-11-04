@@ -115,15 +115,18 @@ Extract changes ([] if none):`;
         // 为 done/ongoing 创建朋友圈候选事件
         if ((c.type === 'done' || c.type === 'ongoing') && typeof pushFeedEvent === 'function') {
           const item = plannedItems.find(p => p.id === c.itemId);
-          if (item && !item.feedEventCreated) {
+          if (item) {
             const schedDate = (typeof getGhostDateStr === 'function' ? getGhostDateStr() : '') || '';
             const stableSourceId = schedDate ? `sched_${schedDate}_${item.id.replace(/^sched_/, '')}` : item.id;
+
+            // 不同状态有不同 sourceId，不会互相阻止
+            const statusSpecificSourceId = `${stableSourceId}_${c.type}`;
 
             const eventId = pushFeedEvent({
               type: c.type === 'done' ? 'schedule_completed' : 'schedule_ongoing',
               actor: 'ghost',
               source: 'schedule',
-              sourceId: stableSourceId,
+              sourceId: statusSpecificSourceId,  // ← 包含状态类型
               occurredAt: Date.now(),
               createdAt: Date.now(),
               meta: {
@@ -131,7 +134,8 @@ Extract changes ([] if none):`;
                 startTime: item.startTime,
                 location: item.location || null,
                 evidence: c.evidence || '',
-                scheduleDate: schedDate
+                scheduleDate: schedDate,
+                scheduleItemId: item.id  // ← 保留原始 ID 用于验证
               },
               shareability: 0.4,
               privacy: 'semi',
@@ -140,9 +144,7 @@ Extract changes ([] if none):`;
             });
 
             if (eventId) {
-              item.feedEventCreated = true;
-              item.feedEventId = eventId;
-              console.log(`[ScheduleExtractor] Created feed event: ${eventId}`);
+              console.log(`[ScheduleExtractor] Created feed event: ${eventId} for ${c.type}`);
             }
           }
         }
@@ -166,10 +168,14 @@ Extract changes ([] if none):`;
           const item = plannedItems.find(p => p.id === c.itemId);
           if (item) {
             const schedDate = (typeof getGhostDateStr === 'function' ? getGhostDateStr() : '') || '';
-            const stableSourceId = schedDate ? `sched_${schedDate}_${item.id.replace(/^sched_/, '')}` : item.id;
+            const baseSourceId = schedDate ? `sched_${schedDate}_${item.id.replace(/^sched_/, '')}` : item.id;
 
+            // 清理所有状态的候选事件（ongoing/done）
             pool.forEach(evt => {
-              if (evt.source === 'schedule' && evt.sourceId === stableSourceId && !evt.consumed) {
+              if (evt.source === 'schedule' &&
+                  evt.sourceId &&
+                  evt.sourceId.startsWith(baseSourceId) &&
+                  !evt.consumed) {
                 console.log(`[ScheduleExtractor] Cancelling feed event due to ${c.type}: ${evt.id}`);
                 evt.judgeState = 'skip';
                 if (typeof consumeFeedEvent === 'function') {

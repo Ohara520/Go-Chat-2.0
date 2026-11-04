@@ -847,10 +847,12 @@ function recordPublished(evt, postId) {
       sourceId: evt.sourceId
     };
 
-    // 清理 30 天前的记录
-    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    // 不清理 30 天前的记录，永久保留
+    // 只清理明显无效的测试数据（发布时间为 0 或未来）
+    const now = Date.now();
     Object.keys(history).forEach(k => {
-      if (history[k].publishedAt < cutoff) {
+      const pub = history[k];
+      if (!pub.publishedAt || pub.publishedAt <= 0 || pub.publishedAt > now + 86400000) {
         delete history[k];
       }
     });
@@ -870,9 +872,24 @@ function validateScheduleEvent(evt) {
     return false;
   }
 
-  const item = sched.plan ? sched.plan.find(p => p.id === evt.sourceId || evt.sourceId.includes(p.id)) : null;
+  // 使用 meta.scheduleItemId 精确匹配原始日程项
+  const itemId = evt.meta?.scheduleItemId;
+  if (!itemId) {
+    console.warn('[Feed] No scheduleItemId in event meta');
+    return false;
+  }
+
+  const item = sched.plan ? sched.plan.find(p => p.id === itemId) : null;
   if (!item) {
-    console.warn('[Feed] Schedule item not found:', evt.sourceId);
+    console.warn('[Feed] Schedule item not found:', itemId);
+    return false;
+  }
+
+  // 验证日期匹配
+  const eventDate = evt.meta?.scheduleDate;
+  const schedDate = sched.meta?.date;
+  if (eventDate && schedDate && eventDate !== schedDate) {
+    console.warn('[Feed] Date mismatch:', eventDate, schedDate);
     return false;
   }
 
@@ -888,7 +905,6 @@ function validateScheduleEvent(evt) {
   // 2. 时间合理性
   if (expectedStatus === 'done' && item.startTime) {
     const now = Date.now();
-    const schedDate = sched.meta?.date || '';
     if (schedDate) {
       try {
         const [h, m] = item.startTime.split(':').map(Number);
@@ -905,7 +921,7 @@ function validateScheduleEvent(evt) {
   // 3. 证据验证（done/ongoing 必须有证据）
   if (expectedStatus === 'done' || expectedStatus === 'ongoing') {
     const change = (sched.changes || []).find(c =>
-      (c.itemId === item.id || evt.sourceId.includes(c.itemId)) &&
+      c.itemId === itemId &&
       (c.type === 'done' || c.type === 'ongoing')
     );
 
@@ -931,11 +947,11 @@ function validateScheduleEvent(evt) {
   // 4. 检查后续修正
   if (expectedStatus === 'done') {
     const doneChange = (sched.changes || []).find(c =>
-      (c.itemId === item.id || evt.sourceId.includes(c.itemId)) && c.type === 'done'
+      c.itemId === itemId && c.type === 'done'
     );
 
     const laterCancel = (sched.changes || []).find(c =>
-      (c.itemId === item.id || evt.sourceId.includes(c.itemId)) &&
+      c.itemId === itemId &&
       c.type === 'cancel' &&
       c.recordedAt > (doneChange?.recordedAt || 0)
     );
@@ -1002,18 +1018,33 @@ async function askModelShouldPost(evt) {
   // 调用模型
   try {
     const recentPosts = getFeedPosts().slice(0, 3).map(p => p.en).join('; ');
+    const ghostTime = (typeof getGhostTimeStr === 'function') ? getGhostTimeStr() : '';
+    const ghostLocation = (typeof getGhostCurrentLocation === 'function') ? getGhostCurrentLocation() : '';
 
     const systemPrompt = `You are Simon Riley deciding whether to post on social media.
 You can:
 - POST: you want to share this
-- SKIP: you don't want to share this
+- SKIP: you don't want to share this (too routine, too private, or just not in the mood)
 - DEFER: not now, maybe later (event stays in pool)
 
 Return JSON only: {"decision":"POST|SKIP|DEFER","reason":"short internal note"}`;
 
-    const userPrompt = `Event: ${evt.type}
-Activity: ${evt.meta?.activity || 'N/A'}
-Privacy level: ${evt.privacy}
+    let contextDetails = '';
+    if (evt.type === 'schedule_completed') {
+      contextDetails = `\nYou just finished: ${evt.meta?.activity || 'something'}`;
+      if (evt.meta?.evidence) {
+        contextDetails += `\nWhat you said: "${evt.meta.evidence.slice(0, 100)}"`;
+      }
+    } else if (evt.type === 'schedule_ongoing') {
+      contextDetails = `\nYou're currently doing: ${evt.meta?.activity || 'something'}`;
+    } else if (evt.type === 'continuity_completed') {
+      contextDetails = `\nYou completed something you promised: ${evt.meta?.subject || 'something'}`;
+    }
+
+    const userPrompt = `Event: ${evt.type}${contextDetails}
+Privacy: ${evt.privacy}
+Your location: ${ghostLocation || 'unknown'}
+Time: ${ghostTime}
 Recent posts: ${recentPosts || 'none'}
 
 Do you want to post about this?`;
@@ -1121,10 +1152,14 @@ async function _maybeTriggerFeedPostInner(triggerSource) {
   }
 
   // 存入历史
-  insertFeedPost(result);
+  const inserted = insertFeedPost(result);
+  if (!inserted) {
+    console.warn('[Feed] Failed to insert post, not recording as published');
+    return null;
+  }
 
-  // 记录永久发布历史
-  recordPublished(chosen, result.id);
+  // 记录永久发布历史（只有成功写入后）
+  recordPublished(chosen, inserted.id);
 
   consumeFeedEvent(chosen.id);
   localStorage.setItem('lastFeedPostAt', String(now));
@@ -1784,7 +1819,7 @@ Your post must reflect how much time has actually passed since the event occurre
 
 // ----- 插入帖子（新 flat 结构，feedPosts key）-----
 function insertFeedPost(post) {
-  if (!post || (!post.en && !post.photo)) return; // BUG-6：允许纯图片帖（无正文）
+  if (!post || (!post.en && !post.photo)) return null; // BUG-6：允许纯图片帖（无正文）
   if (!post.id) post.id = 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   if (!post.ts) post.ts = Date.now();
 
@@ -1800,7 +1835,7 @@ function insertFeedPost(post) {
     );
     if (isDupe) {
       console.log('[feed] 跳过重复帖子:', post.author, newEn.slice(0, 20));
-      return;
+      return null;
     }
   }
 
@@ -1808,6 +1843,8 @@ function insertFeedPost(post) {
   saveFeedPosts(list); // saveFeedPosts 内部截断 + 写 coupleFeedSummary
   // 标记"本次会话真发过帖"——给红点检查用，区分"刚发的新帖"和"换设备/清缓存的旧帖"
   try { sessionStorage.setItem('feedPostedThisSession', '1'); } catch(e) {}
+
+  return post; // ← 返回成功插入的帖子
 }
 
 // ----- 旧版"用户草稿弹窗"已退役 -----

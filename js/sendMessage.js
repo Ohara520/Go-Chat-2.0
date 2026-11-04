@@ -2398,36 +2398,32 @@ async function _extractAndProcessContinuity(userMsg, simonReply) {
 
         updateContinuity(validated.targetId, updates);
       } else if (validated.action === 'complete') {
+        // ⚠️ 先读取数据，再调用 completeContinuity（完成后可能从活跃列表移除）
+        const ctItem = getActiveContinuity().find(c => c.id === validated.targetId);
+
         completeContinuity(validated.targetId, validated.summary);
 
         // 为 Continuity 完成创建朋友圈候选事件
-        if (typeof pushFeedEvent === 'function') {
-          const ctItem = getActiveContinuity().find(c => c.id === validated.targetId);
-          if (ctItem && !ctItem.feedEventCreated) {
-            const eventId = pushFeedEvent({
-              type: 'continuity_completed',
-              actor: 'ghost',
-              source: 'continuity',
-              sourceId: validated.targetId,
-              occurredAt: Date.now(),
-              createdAt: Date.now(),
-              meta: {
-                subject: ctItem.subject,
-                completionSummary: validated.summary
-              },
-              shareability: 0.35,
-              privacy: 'semi',
-              dueAt: Date.now() + (20 + Math.floor(Math.random() * 70)) * 60 * 1000,
-              expiresAt: Date.now() + 8 * 3600 * 1000
-            });
+        if (ctItem && typeof pushFeedEvent === 'function') {
+          const eventId = pushFeedEvent({
+            type: 'continuity_completed',
+            actor: 'ghost',
+            source: 'continuity',
+            sourceId: validated.targetId,
+            occurredAt: Date.now(),
+            createdAt: Date.now(),
+            meta: {
+              subject: ctItem.subject,
+              completionSummary: validated.summary
+            },
+            shareability: 0.35,
+            privacy: 'semi',
+            dueAt: Date.now() + (20 + Math.floor(Math.random() * 70)) * 60 * 1000,
+            expiresAt: Date.now() + 8 * 3600 * 1000
+          });
 
-            if (eventId && typeof updateContinuity === 'function') {
-              updateContinuity(validated.targetId, {
-                feedEventCreated: true,
-                feedEventId: eventId
-              });
-              console.log('[Continuity] Created feed event:', eventId);
-            }
+          if (eventId) {
+            console.log('[Continuity] Created feed event:', eventId);
           }
         }
       } else if (validated.action === 'cancel') {

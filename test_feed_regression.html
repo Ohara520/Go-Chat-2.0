@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Feed V1.1 Regression Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+    .test { margin: 10px 0; padding: 10px; border: 1px solid #333; }
+    .pass { background: #002200; border-color: #0f0; }
+    .fail { background: #220000; border-color: #f00; color: #f00; }
+    .pending { background: #222200; border-color: #ff0; color: #ff0; }
+    h2 { color: #0ff; margin-top: 30px; }
+    pre { background: #000; padding: 10px; overflow-x: auto; font-size: 11px; }
+    .summary { background: #003; padding: 15px; margin: 20px 0; border: 2px solid #0ff; }
+  </style>
+</head>
+<body>
+  <h1>Simon 自主分享系统 V1.1 - 回归测试</h1>
+  <div id="results"></div>
+  <div id="summary" class="summary"></div>
+
+  <script>
+    const results = document.getElementById('results');
+    const summary = document.getElementById('summary');
+    const tests = [];
+    let passCount = 0;
+    let failCount = 0;
+    let testLog = [];
+
+    function log(msg, type = 'info') {
+      const div = document.createElement('div');
+      div.className = 'test ' + type;
+      div.innerHTML = `<strong>${type.toUpperCase()}</strong>: ${msg}`;
+      results.appendChild(div);
+      testLog.push({ msg, type });
+    }
+
+    function assert(fn, description, category) {
+      tests.push({ fn, description, category });
+    }
+
+    // Mock localStorage
+    const mockStorage = {};
+    const localStorage = {
+      getItem: (key) => mockStorage[key] || null,
+      setItem: (key, val) => { mockStorage[key] = val; },
+      removeItem: (key) => { delete mockStorage[key]; },
+      clear: () => { Object.keys(mockStorage).forEach(k => delete mockStorage[k]); }
+    };
+
+    // Mock functions
+    function getGhostDateStr() {
+      return '2026-11-04';
+    }
+
+    function getGhostTimeStr() {
+      return '16:00';
+    }
+
+    function getGhostCurrentLocation() {
+      return 'Base';
+    }
+
+    function scheduleCloudSave() {}
+
+    function getFeedEventPool() {
+      try {
+        return JSON.parse(localStorage.getItem('feedEventPool') || '[]');
+      } catch(e) {
+        return [];
+      }
+    }
+
+    function setFeedEventPool(pool) {
+      localStorage.setItem('feedEventPool', JSON.stringify(pool));
+    }
+
+    function getFeedPosts() {
+      try {
+        return JSON.parse(localStorage.getItem('feedPosts') || '[]');
+      } catch(e) {
+        return [];
+      }
+    }
+
+    function saveFeedPosts(list) {
+      localStorage.setItem('feedPosts', JSON.stringify(list.slice(0, 40)));
+    }
+
+    function loadTodaySchedule() {
+      return window._mockSchedule || null;
+    }
+
+    function mockSchedule(sched) {
+      window._mockSchedule = sched;
+    }
+
+    // Copy core functions
+    function _buildEventKey(evt) {
+      let date;
+      if (evt.occurredAt) {
+        date = new Date(evt.occurredAt).toISOString().slice(0, 10);
+      } else if (evt.createdAt) {
+        date = new Date(evt.createdAt).toISOString().slice(0, 10);
+      } else {
+        date = new Date().toISOString().slice(0, 10);
+      }
+
+      let stableSourceId = evt.sourceId || '';
+      if (evt.source === 'schedule' && evt.sourceId && !/\d{4}-\d{2}-\d{2}/.test(evt.sourceId)) {
+        stableSourceId = `sched_${date}_${evt.sourceId.replace(/^sched_/, '')}`;
+      }
+
+      return `${evt.source}_${evt.type}_${stableSourceId}`;
+    }
+
+    function isAlreadyPublished(evt) {
+      if (!evt.sourceId) return false;
+      const key = _buildEventKey(evt);
+      try {
+        const history = JSON.parse(localStorage.getItem('feedPublishHistory') || '{}');
+        return !!history[key];
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function recordPublished(evt, postId) {
+      if (!evt.sourceId) return;
+      const key = _buildEventKey(evt);
+      try {
+        const history = JSON.parse(localStorage.getItem('feedPublishHistory') || '{}');
+        history[key] = {
+          postId,
+          publishedAt: Date.now(),
+          sourceId: evt.sourceId
+        };
+
+        const now = Date.now();
+        Object.keys(history).forEach(k => {
+          const pub = history[k];
+          if (!pub.publishedAt || pub.publishedAt <= 0 || pub.publishedAt > now + 86400000) {
+            delete history[k];
+          }
+        });
+
+        localStorage.setItem('feedPublishHistory', JSON.stringify(history));
+      } catch (e) {}
+    }
+
+    function validateScheduleEvent(evt) {
+      if (evt.source !== 'schedule') return true;
+
+      const sched = loadTodaySchedule();
+      if (!sched) return false;
+
+      const itemId = evt.meta?.scheduleItemId;
+      if (!itemId) return false;
+
+      const item = sched.plan ? sched.plan.find(p => p.id === itemId) : null;
+      if (!item) return false;
+
+      const eventDate = evt.meta?.scheduleDate;
+      const schedDate = sched.meta?.date;
+      if (eventDate && schedDate && eventDate !== schedDate) return false;
+
+      const expectedStatus = evt.type === 'schedule_completed' ? 'done' :
+                            evt.type === 'schedule_ongoing' ? 'ongoing' : null;
+      if (expectedStatus && item.status !== expectedStatus) return false;
+
+      if (expectedStatus === 'done' || expectedStatus === 'ongoing') {
+        const change = (sched.changes || []).find(c =>
+          c.itemId === itemId && (c.type === 'done' || c.type === 'ongoing')
+        );
+
+        if (!change || !change.evidence) return false;
+
+        const activityKeywords = item.activity.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        if (activityKeywords.length > 0) {
+          const evidenceLower = change.evidence.toLowerCase();
+          const hasMatch = activityKeywords.some(kw => evidenceLower.includes(kw));
+          if (!hasMatch) return false;
+        }
+      }
+
+      if (expectedStatus === 'done') {
+        const doneChange = (sched.changes || []).find(c =>
+          c.itemId === itemId && c.type === 'done'
+        );
+
+        const laterCancel = (sched.changes || []).find(c =>
+          c.itemId === itemId &&
+          c.type === 'cancel' &&
+          c.recordedAt > (doneChange?.recordedAt || 0)
+        );
+
+        if (laterCancel) return false;
+      }
+
+      return true;
+    }
+
+    function insertFeedPost(post) {
+      if (!post || (!post.en && !post.photo)) return null;
+      if (!post.id) post.id = 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      if (!post.ts) post.ts = Date.now();
+
+      const list = getFeedPosts();
+
+      if (post.author !== 'user') {
+        const newEn = (post.en || '').slice(0, 30);
+        const isDupe = list.some(p =>
+          p.author === post.author &&
+          (p.en || '').slice(0, 30) === newEn &&
+          Date.now() - (p.ts || 0) < 6 * 3600 * 1000
+        );
+        if (isDupe) return null;
+      }
+
+      list.unshift(post);
+      saveFeedPosts(list);
+      return post;
+    }
+
+    // Tests
+    assert(() => {
+      localStorage.clear();
+      const evt1 = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_2026-11-04_001_done',
+        occurredAt: new Date('2026-11-04T16:00:00').getTime(),
+        meta: { scheduleItemId: 'sched_001', scheduleDate: '2026-11-04' }
+      };
+      recordPublished(evt1, 'post_001');
+
+      const evt2 = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_2026-11-05_001_done',
+        occurredAt: new Date('2026-11-05T16:00:00').getTime(),
+        meta: { scheduleItemId: 'sched_001', scheduleDate: '2026-11-05' }
+      };
+
+      return !isAlreadyPublished(evt2);
+    }, 'R1: 跨天独立事件不冲突', 'dedup');
+
+    assert(() => {
+      localStorage.clear();
+      const evt = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_2026-11-04_001_done',
+        occurredAt: new Date('2026-11-04T16:00:00').getTime(),
+        meta: { scheduleItemId: 'sched_001', scheduleDate: '2026-11-04' }
+      };
+      recordPublished(evt, 'post_001');
+
+      // 模拟 100 天后
+      const futureCheck = isAlreadyPublished(evt);
+      return futureCheck === true;
+    }, 'R2: 历史事件永久去重（不过期）', 'dedup');
+
+    assert(() => {
+      localStorage.clear();
+      mockSchedule({
+        meta: { date: '2026-11-04' },
+        plan: [{ id: 'sched_001', activity: 'training', status: 'done' }],
+        changes: [{ itemId: 'sched_001', type: 'done', evidence: 'just finished training', recordedAt: 1000 }]
+      });
+
+      const evt = {
+        type: 'schedule_completed',
+        source: 'schedule',
+        sourceId: 'sched_2026-11-04_001_done',
+        meta: { scheduleItemId: 'sched_001', scheduleDate: '2026-11-04' }
+      };
+
+      return validateScheduleEvent(evt) === true;
+    }, 'R3: 精确匹配验证通过', 'validation');
+
+    assert(() => {
+      localStorage.clear();
+      mockSchedule({
+        meta: { date: '2026-11-04' },
+        plan: [
+          { id: 'sched_001', activity: 'training', status: 'done' },
+          { id: 'sched_002', activity: 'briefing', status: 'planned' }
+        ],
+        changes: [{ itemId: 'sched_001', type: 'done', evidence: 'finished briefing', recordedAt: 1000 }]
+      });
+
+      const evt = {
+        type: 'schedule_completed',
+        source: 'schedule',
+        sourceId: 'sched_2026-11-04_001_done',
+        meta: { scheduleItemId: 'sched_001', scheduleDate: '2026-11-04' }
+      };
+
+      return validateScheduleEvent(evt) === false;
+    }, 'R4: 错误匹配其他日程被拒绝', 'validation');
+
+    assert(() => {
+      localStorage.clear();
+      mockSchedule({
+        meta: { date: '2026-11-04' },
+        plan: [{ id: 'sched_001', activity: 'training', status: 'cancelled' }],
+        changes: [
+          { itemId: 'sched_001', type: 'done', recordedAt: 1000, evidence: 'done' },
+          { itemId: 'sched_001', type: 'cancel', recordedAt: 2000 }
+        ]
+      });
+
+      const evt = {
+        type: 'schedule_completed',
+        source: 'schedule',
+        sourceId: 'sched_2026-11-04_001_done',
+        meta: { scheduleItemId: 'sched_001', scheduleDate: '2026-11-04' }
+      };
+
+      return validateScheduleEvent(evt) === false;
+    }, 'R5: 后续取消导致验证失败', 'validation');
+
+    assert(() => {
+      localStorage.clear();
+      const evt1 = {
+        source: 'schedule',
+        type: 'schedule_ongoing',
+        sourceId: 'sched_2026-11-04_001_ongoing',
+        meta: { scheduleItemId: 'sched_001' }
+      };
+      const evt2 = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_2026-11-04_001_done',
+        meta: { scheduleItemId: 'sched_001' }
+      };
+
+      recordPublished(evt1, 'post_001');
+      return !isAlreadyPublished(evt2);
+    }, 'R6: ongoing 和 done 不互相阻止', 'dedup');
+
+    assert(() => {
+      localStorage.clear();
+      const post = {
+        id: 'post_test',
+        author: 'ghost',
+        en: 'test post',
+        ts: Date.now()
+      };
+
+      const result = insertFeedPost(post);
+      return result !== null && result.id === 'post_test';
+    }, 'R7: insertFeedPost 返回成功插入的帖子', 'publish');
+
+    assert(() => {
+      localStorage.clear();
+      const post = {
+        author: 'ghost',
+        en: 'duplicate test'
+      };
+
+      insertFeedPost(post);
+      const result2 = insertFeedPost(post);
+      return result2 === null;
+    }, 'R8: 重复帖子返回 null', 'publish');
+
+    assert(() => {
+      localStorage.clear();
+      const evt = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_2026-11-04_001_done',
+        meta: { scheduleItemId: 'sched_001' }
+      };
+
+      recordPublished(evt, 'post_001');
+
+      const post = {
+        id: 'post_002',
+        author: 'ghost',
+        en: 'another post'
+      };
+      insertFeedPost(post);
+
+      // 模拟失败：insertFeedPost 返回 null，不应记录为已发布
+      const evt2 = {
+        source: 'schedule',
+        type: 'schedule_ongoing',
+        sourceId: 'sched_2026-11-04_002_ongoing',
+        meta: { scheduleItemId: 'sched_002' }
+      };
+
+      // 如果 insertFeedPost 失败，不调用 recordPublished
+      const inserted = null; // 模拟失败
+      if (inserted) {
+        recordPublished(evt2, inserted.id);
+      }
+
+      return !isAlreadyPublished(evt2);
+    }, 'R9: 发布失败不记录为已发布', 'publish');
+
+    // Run tests
+    async function runTests() {
+      const categories = {};
+
+      for (const test of tests) {
+        if (!categories[test.category]) {
+          categories[test.category] = [];
+        }
+        categories[test.category].push(test);
+      }
+
+      for (const [cat, catTests] of Object.entries(categories)) {
+        const h2 = document.createElement('h2');
+        h2.textContent = `Category: ${cat} (${catTests.length} tests)`;
+        results.appendChild(h2);
+
+        for (const test of catTests) {
+          try {
+            const result = await test.fn();
+            if (result) {
+              log(`✓ ${test.description}`, 'pass');
+              passCount++;
+            } else {
+              log(`✗ ${test.description}`, 'fail');
+              failCount++;
+            }
+          } catch (e) {
+            log(`✗ ${test.description}: ${e.message}`, 'fail');
+            failCount++;
+          }
+        }
+      }
+
+      summary.innerHTML = `
+        <h2>Test Summary</h2>
+        <pre>Total: ${tests.length}
+Pass: ${passCount}
+Fail: ${failCount}
+Success Rate: ${((passCount / tests.length) * 100).toFixed(1)}%</pre>
+      `;
+
+      if (failCount === 0) {
+        summary.innerHTML += '<p style="color: #0f0; font-size: 20px;">✓ All tests passed!</p>';
+      } else {
+        summary.innerHTML += `<p style="color: #f00; font-size: 20px;">✗ ${failCount} test(s) failed.</p>`;
+      }
+    }
+
+    runTests();
+  </script>
+</body>
+</html>

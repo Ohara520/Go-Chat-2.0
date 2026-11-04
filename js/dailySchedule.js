@@ -238,11 +238,17 @@ function applyScheduleChange(change) {
   const item = sched.plan.find(p => p.id === change.itemId);
   if (!item) return false;
 
-  // 幂等：同一 itemId + type 的变更已存在则跳过
-  const alreadyRecorded = sched.changes.some(
-    c => c.itemId === change.itemId && c.type === change.type
-  );
-  if (alreadyRecorded) return false;
+  // 幂等检查：done/ongoing/cancel 只能一次，postpone/modify 可多次
+  if (change.type === 'done' || change.type === 'ongoing' || change.type === 'cancel') {
+    const alreadyRecorded = sched.changes.some(
+      c => c.itemId === change.itemId && c.type === change.type
+    );
+    if (alreadyRecorded) {
+      console.log(`[Schedule] ${change.type} already recorded for ${change.itemId}`);
+      return false;
+    }
+  }
+  // postpone/modify 可多次，每次都记录
 
   sched.changes.push({
     itemId:      change.itemId,
