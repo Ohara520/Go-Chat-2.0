@@ -252,6 +252,16 @@ function buildGhostContextBlock(opts) {
     }
   }
 
+  // —— Today's Schedule (V1) ——
+  // 注入当天计划事实，位于 [CURRENT STATE] 动态层，不进固定缓存
+  const scheduleBlock = (typeof buildScheduleContextBlock === 'function')
+    ? buildScheduleContextBlock()
+    : '';
+  if (scheduleBlock) {
+    lines.push('');
+    lines.push(scheduleBlock);
+  }
+
   // —— Continuity V1 (Batch 1) ——
   // 注入"仍然影响现在"的近期事实（pending / ongoing / recently completed）
   const continuityBlock = (typeof buildContinuityContext === 'function')

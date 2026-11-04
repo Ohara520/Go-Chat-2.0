@@ -250,6 +250,15 @@ window.onload = async function() {
       try { initLifeEventsView(); } catch (e) { console.warn('[Life Events] view init failed', e); }
     }
 
+    // Simon 自主日程 V1：云端加载完成后触发按需生成
+    // cloudLoadFailed=1 表示云端加载失败，传 false 以防止覆盖云端数据
+    if (typeof checkAndGenerateSchedule === 'function') {
+      const _cloudOk = sessionStorage.getItem('cloudLoadFailed') !== '1';
+      setTimeout(() => {
+        checkAndGenerateSchedule(_cloudOk).catch(e => console.warn('[DailySchedule]', e));
+      }, 600);
+    }
+
     // 恢复约会 session：如果有进行中的约会，直接恢复约会界面而不是主页
     const _activeDate = localStorage.getItem('activeDateSession');
     if (_activeDate) {

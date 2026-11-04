@@ -1287,8 +1287,7 @@ Her: ${text}`
     // finalSystem 在此处拼装：只注入必要的事实/能力/一致性提示；普通情绪反应交给 Simon 自己判断
     // _baseSystem 在此构建（而非函数顶部）：Claude 路径才需要它，其世界书召回在此只发生一次。
     const _baseSystem = buildSystemPrompt();
-    const finalSystem = [
-      _baseSystem,
+    const _extraHints = [
       antiCountHint,
       multiBubbleHint,
       _cardHint,
@@ -1304,8 +1303,8 @@ Her: ${text}`
     ].filter(Boolean).join('\n');
     const _abortCtrl = _currentAbortController;
     const response = await fetchSonnetWithCache(
-      finalSystem,
       buildSystemPromptParts(_baseSystem),
+      _extraHints,
       messagesForRequest,
       1000,
       _abortCtrl?.signal
@@ -1612,6 +1611,17 @@ Her: ${text}`
         });
       }, 500);
     }
+
+    // ── 日程变更提取（Simon 自主日程 V1）────────────────────────
+    // 在 Continuity 提取 800ms 后触发，避免并发；失败静默跳过
+    if (typeof extractScheduleChanges === 'function' && typeof reply === 'string' && reply.trim()) {
+      setTimeout(() => {
+        extractScheduleChanges(reply, text).catch(e => {
+          console.warn('[ScheduleExtractor] Failed:', e);
+        });
+      }, 800);
+    }
+
 
     // ── 租赁 AA 判断（纯本地，仅读 Ghost 真实回复）──────────────
     if (typeof checkHomeAADeal === 'function') checkHomeAADeal(reply);

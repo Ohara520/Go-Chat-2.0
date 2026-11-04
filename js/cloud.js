@@ -867,6 +867,10 @@ async function loadFromCloud() {
     }
     // 通知徽章刷新（云端数据恢复后）
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
+    // Simon 自主日程 V1：恢复云端日程数据（生成触发由 app.js 统一管理）
+    if (typeof restoreSchedulesFromSnapshot === 'function' && s && s.simonSchedules) {
+      try { restoreSchedulesFromSnapshot(s.simonSchedules); } catch(e) {}
+    }
     // 如果上次有未同步的本地数据，加载完立刻重新保存
     if (localStorage.getItem('cloudSavePending') === '1') {
       localStorage.removeItem('cloudSavePending');
@@ -1195,6 +1199,8 @@ async function saveToCloud() {
       userDislikesMoney: localStorage.getItem('userDislikesMoney') || '',
       sassyPost: localStorage.getItem('sassyPost') || '',
       ghostCard: JSON.parse(localStorage.getItem('ghostCard') || 'null'),
+      // Simon 自主日程 V1：当天 + 最近 2 天，按 userId+charId+date 隔离
+      simonSchedules: (typeof getSchedulesForSnapshot === 'function') ? getSchedulesForSnapshot() : {},
       // 关键：记录 state 保存时间，loadFromCloud 用它精确判断 cloudIsNewer
       // 不被 saveChatHistoryNow 频繁更新 updated_at 所影响
       stateSavedAt: Date.now(),
