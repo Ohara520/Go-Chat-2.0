@@ -262,6 +262,12 @@ function applyScheduleChange(change) {
   } else if (change.type === 'modify') {
     if (change.newActivity) item.activity = change.newActivity;
     if (change.newTime)     item.startTime = change.newTime;
+  } else if (change.type === 'done') {
+    item.status = 'done';
+    item.completedAt = Date.now();
+  } else if (change.type === 'ongoing') {
+    item.status = 'ongoing';
+    item.startedAt = Date.now();
   }
   item.updatedAt = Date.now();
 

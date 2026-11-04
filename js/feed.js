@@ -504,17 +504,24 @@ function setFeedEventPool(list) {
 function pushFeedEvent(event) {
   const pool = getFeedEventPool();
 
+  // 检查永久发布记录
+  if (isAlreadyPublished(event)) {
+    console.log('[feed] Event already published:', event.source, event.sourceId);
+    return null;
+  }
+
   // 幂等：如果已存在相同 source + sourceId，不重复创建
   if (event.source && event.sourceId) {
     const exists = pool.some(e => e.source === event.source && e.sourceId === event.sourceId);
     if (exists) {
-      console.log('[feed] Event already exists:', event.source, event.sourceId);
-      return;
+      console.log('[feed] Event already exists in pool:', event.source, event.sourceId);
+      return null;
     }
   }
 
+  const eventId = 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   pool.unshift({
-    id: 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    id: eventId,
     type: event.type,
     actor: event.actor || 'ghost',
     intensity: event.intensity ?? 2,
@@ -528,9 +535,14 @@ function pushFeedEvent(event) {
     consumed: false,
     source: event.source || null,
     sourceId: event.sourceId || null,
-    meta: event.meta || {}
+    meta: event.meta || {},
+    judgeState: null,
+    attemptCount: 0,
+    lastJudgedAt: null,
+    nextJudgeAt: null
   });
   setFeedEventPool(pool.slice(0, 30));
+  return eventId;
 }
 function consumeFeedEvent(id) {
   const pool = getFeedEventPool().map(e => e.id === id ? { ...e, consumed: true } : e);
@@ -778,6 +790,257 @@ Return JSON only: {"en":"...","zh":"..."}`;
   }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Simon 自主分享系统 V1.1 (2026-11-04)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// 新增功能：
+//   - 日程完成/进行中可自主分享
+//   - Continuity 完成事件可自主分享
+//   - 模型真正决定是否发布（非随机概率）
+//
+// 已知限制：
+//   ⚠️ 普通聊天自主分享尚未修复（无提取器）
+//   ⚠️ 跨设备并发去重：已同步 100% 可靠，未同步可能重复
+//   ⚠️ 日程提取器误判：标记但不阻止，由模型二次判断
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// ----- 事件唯一键（含日期） -----
+function _buildEventKey(evt) {
+  let date;
+  if (evt.occurredAt) {
+    date = new Date(evt.occurredAt).toISOString().slice(0, 10);
+  } else if (evt.createdAt) {
+    date = new Date(evt.createdAt).toISOString().slice(0, 10);
+  } else {
+    date = new Date().toISOString().slice(0, 10);
+  }
+
+  let stableSourceId = evt.sourceId || '';
+  if (evt.source === 'schedule' && evt.sourceId && !/\d{4}-\d{2}-\d{2}/.test(evt.sourceId)) {
+    stableSourceId = `sched_${date}_${evt.sourceId.replace(/^sched_/, '')}`;
+  }
+
+  return `${evt.source}_${evt.type}_${stableSourceId}`;
+}
+
+// ----- 永久发布记录（30天） -----
+function isAlreadyPublished(evt) {
+  if (!evt.sourceId) return false;
+  const key = _buildEventKey(evt);
+  try {
+    const history = JSON.parse(localStorage.getItem('feedPublishHistory') || '{}');
+    return !!history[key];
+  } catch (e) {
+    return false;
+  }
+}
+
+function recordPublished(evt, postId) {
+  if (!evt.sourceId) return;
+  const key = _buildEventKey(evt);
+  try {
+    const history = JSON.parse(localStorage.getItem('feedPublishHistory') || '{}');
+    history[key] = {
+      postId,
+      publishedAt: Date.now(),
+      sourceId: evt.sourceId
+    };
+
+    // 清理 30 天前的记录
+    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    Object.keys(history).forEach(k => {
+      if (history[k].publishedAt < cutoff) {
+        delete history[k];
+      }
+    });
+
+    localStorage.setItem('feedPublishHistory', JSON.stringify(history));
+    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+  } catch (e) {}
+}
+
+// ----- 日程事实验证（安全检查） -----
+function validateScheduleEvent(evt) {
+  if (evt.source !== 'schedule') return true;
+
+  const sched = (typeof loadTodaySchedule === 'function') ? loadTodaySchedule() : null;
+  if (!sched) {
+    console.warn('[Feed] Schedule not found for validation');
+    return false;
+  }
+
+  const item = sched.plan ? sched.plan.find(p => p.id === evt.sourceId || evt.sourceId.includes(p.id)) : null;
+  if (!item) {
+    console.warn('[Feed] Schedule item not found:', evt.sourceId);
+    return false;
+  }
+
+  // 1. 状态匹配
+  const expectedStatus = evt.type === 'schedule_completed' ? 'done' :
+                        evt.type === 'schedule_ongoing' ? 'ongoing' :
+                        evt.type === 'schedule_plan' ? 'planned' : null;
+  if (expectedStatus && item.status !== expectedStatus) {
+    console.warn(`[Feed] Status mismatch: expected ${expectedStatus}, got ${item.status}`);
+    return false;
+  }
+
+  // 2. 时间合理性
+  if (expectedStatus === 'done' && item.startTime) {
+    const now = Date.now();
+    const schedDate = sched.meta?.date || '';
+    if (schedDate) {
+      try {
+        const [h, m] = item.startTime.split(':').map(Number);
+        const itemStart = new Date(schedDate + 'T00:00:00');
+        itemStart.setHours(h, m, 0, 0);
+        if (now < itemStart.getTime()) {
+          console.warn('[Feed] Event claims done before start time');
+          return false;
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 3. 证据验证（done/ongoing 必须有证据）
+  if (expectedStatus === 'done' || expectedStatus === 'ongoing') {
+    const change = (sched.changes || []).find(c =>
+      (c.itemId === item.id || evt.sourceId.includes(c.itemId)) &&
+      (c.type === 'done' || c.type === 'ongoing')
+    );
+
+    if (!change || !change.evidence) {
+      console.warn('[Feed] No evidence found for', expectedStatus);
+      return false;
+    }
+
+    // 证据与活动关键词匹配（保守检查）
+    const activityKeywords = item.activity.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    if (activityKeywords.length > 0) {
+      const evidenceLower = change.evidence.toLowerCase();
+      const hasMatch = activityKeywords.some(kw => evidenceLower.includes(kw));
+
+      if (!hasMatch) {
+        console.warn('[Feed] Evidence does not mention activity keywords');
+        // ❌ 保守跳过，不允许发布
+        return false;
+      }
+    }
+  }
+
+  // 4. 检查后续修正
+  if (expectedStatus === 'done') {
+    const doneChange = (sched.changes || []).find(c =>
+      (c.itemId === item.id || evt.sourceId.includes(c.itemId)) && c.type === 'done'
+    );
+
+    const laterCancel = (sched.changes || []).find(c =>
+      (c.itemId === item.id || evt.sourceId.includes(c.itemId)) &&
+      c.type === 'cancel' &&
+      c.recordedAt > (doneChange?.recordedAt || 0)
+    );
+
+    if (laterCancel) {
+      console.warn('[Feed] Completion was later cancelled');
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ----- 模型判断是否发布 -----
+async function askModelShouldPost(evt) {
+  // 前置检查
+  const now = Date.now();
+
+  // 已消费
+  if (evt.consumed) return null;
+
+  // 已决定 POST
+  if (evt.judgeState === 'post') return { decision: 'POST', reason: 'cached' };
+
+  // 已决定 SKIP
+  if (evt.judgeState === 'skip') {
+    consumeFeedEvent(evt.id);
+    return null;
+  }
+
+  // DEFER 未到期
+  if (evt.judgeState === 'defer' && evt.nextJudgeAt && now < evt.nextJudgeAt) {
+    return null;
+  }
+
+  // 超过 3 次尝试
+  if (evt.attemptCount >= 3) {
+    console.log('[Feed] Max attempts reached, forcing SKIP');
+    evt.judgeState = 'skip';
+    consumeFeedEvent(evt.id);
+    return null;
+  }
+
+  // 事件过期
+  if (evt.expiresAt && now > evt.expiresAt) {
+    console.log('[Feed] Event expired, skipping');
+    evt.judgeState = 'skip';
+    consumeFeedEvent(evt.id);
+    return null;
+  }
+
+  // 验证日程状态
+  if (!validateScheduleEvent(evt)) {
+    console.log('[Feed] Schedule validation failed, skipping');
+    evt.judgeState = 'skip';
+    consumeFeedEvent(evt.id);
+    return null;
+  }
+
+  // 增加尝试计数
+  evt.attemptCount = (evt.attemptCount || 0) + 1;
+  evt.lastJudgedAt = now;
+
+  // 调用模型
+  try {
+    const recentPosts = getFeedPosts().slice(0, 3).map(p => p.en).join('; ');
+
+    const systemPrompt = `You are Simon Riley deciding whether to post on social media.
+You can:
+- POST: you want to share this
+- SKIP: you don't want to share this
+- DEFER: not now, maybe later (event stays in pool)
+
+Return JSON only: {"decision":"POST|SKIP|DEFER","reason":"short internal note"}`;
+
+    const userPrompt = `Event: ${evt.type}
+Activity: ${evt.meta?.activity || 'N/A'}
+Privacy level: ${evt.privacy}
+Recent posts: ${recentPosts || 'none'}
+
+Do you want to post about this?`;
+
+    const result = await callHaiku(systemPrompt, userPrompt, 80);
+    const parsed = JSON.parse(result);
+
+    evt.judgeState = parsed.decision.toLowerCase();
+
+    if (evt.judgeState === 'defer') {
+      evt.nextJudgeAt = now + (30 + Math.floor(Math.random() * 60)) * 60 * 1000;
+    }
+
+    // 更新事件池
+    const pool = getFeedEventPool();
+    const index = pool.findIndex(e => e.id === evt.id);
+    if (index >= 0) pool[index] = evt;
+    setFeedEventPool(pool);
+
+    return parsed;
+
+  } catch (e) {
+    console.warn('[Feed] Model judgment failed:', e);
+    return null;
+  }
+}
+
 // ----- 调度器核心 -----
 let _feedPostLock = false;
 async function maybeTriggerFeedPost(triggerSource = 'unknown') {
@@ -817,15 +1080,27 @@ async function _maybeTriggerFeedPostInner(triggerSource) {
   const chosen = selectBestFeedEvent(pool, triggerSource);
   if (!chosen) return null;
 
-  // 判断现在像不像会发
-  if (!shouldEventBecomePost(chosen)) {
-    // 不发就重新调度：延迟30-90分钟再试
-    const updated = getFeedEventPool().map(e =>
-      e.id === chosen.id ? { ...e, dueAt: now + randMinutes(30, 90) } : e
-    );
-    setFeedEventPool(updated);
+  // 检查是否已发布
+  if (isAlreadyPublished(chosen)) {
+    console.log('[Feed] Event already published, consuming');
+    consumeFeedEvent(chosen.id);
     return null;
   }
+
+  // 模型判断是否发布
+  const decision = await askModelShouldPost(chosen);
+  if (!decision) return null;
+
+  if (decision.decision === 'SKIP') {
+    consumeFeedEvent(chosen.id);
+    return null;
+  }
+
+  if (decision.decision === 'DEFER') {
+    return null;
+  }
+
+  // POST → 继续生成
 
   // 用户侧事件：旧版"系统主动弹窗让用户选文案发布"机制已退役。
   // 新版 Feed 已有完整的用户自主发帖入口，这里只消费掉事件、不再弹窗。
@@ -838,8 +1113,19 @@ async function _maybeTriggerFeedPostInner(triggerSource) {
   const result = await generateFeedPostFromEvent(chosen);
   if (!result) return null;
 
+  // 再次验证（防止生成过程中状态变化）
+  if (!validateScheduleEvent(chosen)) {
+    console.warn('[Feed] Schedule invalidated during generation, skipping');
+    consumeFeedEvent(chosen.id);
+    return null;
+  }
+
   // 存入历史
   insertFeedPost(result);
+
+  // 记录永久发布历史
+  recordPublished(chosen, result.id);
+
   consumeFeedEvent(chosen.id);
   localStorage.setItem('lastFeedPostAt', String(now));
   scheduleCloudSave();
@@ -1356,6 +1642,27 @@ Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}
     she_is_back: `You are Simon Riley. She was away/offline for ${evt.meta?.absentHours || 'a while'} hours. She just came back.
 One line, lowercase English. Do NOT say "she's back" or "missed you". Post something that only makes sense if you were waiting — but frame it as something else entirely. A dry observation, a small thing you noticed, the shift in atmosphere.
 Examples of good posts: "phone's useful again." / "right. where was i." / "louder in here all of a sudden."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    schedule_completed: `You are Simon Riley. You finished "${evt.meta?.activity || 'an activity'}" today.
+One line, lowercase English. This is something you ALREADY DID (past tense is OK). Post it like you'd mention it casually — matter-of-fact, no dramatics.
+Examples: "wrapped at the range. shoulder's complaining." / "done with briefing. longer than expected." / "finished PT. still standing."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    schedule_ongoing: `You are Simon Riley. You are CURRENTLY doing "${evt.meta?.activity || 'something'}" right now.
+One line, lowercase English. Use present continuous or "in the middle of". Do NOT use past tense. This is happening NOW.
+Examples: "in the middle of briefing. running long." / "PT session. not enjoying this." / "still at the range."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    schedule_plan: `You are Simon Riley. You have "${evt.meta?.activity || 'something'}" planned for ${evt.meta?.startTime || 'later today'}.
+One line, lowercase English. This is a PLAN, not something that already happened. Use future tense, modal verbs (might/will), or "later".
+Do NOT use past tense. Do NOT say it's done.
+Examples: "range session later." / "might actually make it to PT this time." / "briefing at 1400. long one."
+Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
+
+    continuity_completed: `You are Simon Riley. You completed something you promised or planned: "${evt.meta?.subject || 'something'}".
+One line, lowercase English. This is something you ALREADY DID (past tense is OK). Post it matter-of-factly — no need to announce "promise kept" or "did what i said".
+Examples: "wrapped that thing." / "sorted." / "done with it."
 Add Chinese translation. Return JSON only: {"en":"...","zh":"..."}${_antiRepeat}`,
 
     daily_moment: (() => {

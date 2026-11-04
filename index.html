@@ -3776,6 +3776,10 @@ function renderUpdateLogs() {
       html += `</div>`;
     });
 
+    if (log.footer) {
+      html += `<div style="font-size:12px;color:#7d5b4d;font-style:italic;margin-top:12px;padding-top:12px;border-top:1px solid rgba(164,123,107,0.15);">${log.footer}</div>`;
+    }
+
     html += `</div>`;
   });
 

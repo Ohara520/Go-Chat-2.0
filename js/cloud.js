@@ -732,6 +732,21 @@ async function loadFromCloud() {
         }
       }
       mergeArrays('feedPosts', s.feedPosts, 40);
+
+      // 合并永久发布记录（取并集）
+      if (s.feedPublishHistory) {
+        try {
+          const localHist = JSON.parse(localStorage.getItem('feedPublishHistory') || '{}');
+          const cloudHist = typeof s.feedPublishHistory === 'string'
+            ? JSON.parse(s.feedPublishHistory)
+            : s.feedPublishHistory;
+          const mergedHist = { ...localHist, ...cloudHist };
+          localStorage.setItem('feedPublishHistory', JSON.stringify(mergedHist));
+        } catch (e) {
+          console.warn('[cloud] Failed to merge feedPublishHistory:', e);
+        }
+      }
+
       mergeArrays('deliveryHistory', s.deliveryHistory, 50);
       mergeArrays('takeoutHistory', s.takeoutHistory, 50);
 
@@ -1178,6 +1193,7 @@ async function saveToCloud() {
       dateMemories: JSON.parse(localStorage.getItem('dateMemories') || '[]').slice(0, 50),
       giftRecords: JSON.parse(localStorage.getItem('giftRecords') || '[]').slice(0, 100),
       feedPosts: JSON.parse(localStorage.getItem('feedPosts') || '[]').slice(0, 40),
+      feedPublishHistory: localStorage.getItem('feedPublishHistory') || '{}',
       organicFeedCount: localStorage.getItem('organicFeedCount_' + getTodayDateStr()) || '0',
       organicFeedCountKey: 'organicFeedCount_' + getTodayDateStr(),
       feedEventPool: (typeof getFeedEventPool === 'function' ? getFeedEventPool() : []).filter(e => !e.consumed).slice(0, 20),

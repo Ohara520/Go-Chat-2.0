@@ -1692,7 +1692,7 @@ Her: ${text}`
     // 每轮 30% 概率跑反寄/情绪判断（原为 0.85，与"惊喜才珍贵"的设计冲突，且注释谎称 25%）
     // 副作用检测（地点特产触发）
     if (Math.random() < 0.30) try { checkTriggersAndEmotion(text, reply); } catch(e) {}
-    if (Math.random() < 0.22) setTimeout(() => { try { checkOrganicFeedPost(text, reply); } catch(e) {} }, 4000);
+    // checkOrganicFeedPost 已删除（函数不存在）
     setTimeout(() => { try { maybeTriggerFeedPost('after_chat_turn'); } catch(e) {} }, 6000);
     const _currentTurn = typeof getGlobalTurnCount === 'function' ? getGlobalTurnCount() : parseInt(localStorage.getItem('globalTurnCount') || '0');
 
@@ -2399,6 +2399,37 @@ async function _extractAndProcessContinuity(userMsg, simonReply) {
         updateContinuity(validated.targetId, updates);
       } else if (validated.action === 'complete') {
         completeContinuity(validated.targetId, validated.summary);
+
+        // 为 Continuity 完成创建朋友圈候选事件
+        if (typeof pushFeedEvent === 'function') {
+          const ctItem = getActiveContinuity().find(c => c.id === validated.targetId);
+          if (ctItem && !ctItem.feedEventCreated) {
+            const eventId = pushFeedEvent({
+              type: 'continuity_completed',
+              actor: 'ghost',
+              source: 'continuity',
+              sourceId: validated.targetId,
+              occurredAt: Date.now(),
+              createdAt: Date.now(),
+              meta: {
+                subject: ctItem.subject,
+                completionSummary: validated.summary
+              },
+              shareability: 0.35,
+              privacy: 'semi',
+              dueAt: Date.now() + (20 + Math.floor(Math.random() * 70)) * 60 * 1000,
+              expiresAt: Date.now() + 8 * 3600 * 1000
+            });
+
+            if (eventId && typeof updateContinuity === 'function') {
+              updateContinuity(validated.targetId, {
+                feedEventCreated: true,
+                feedEventId: eventId
+              });
+              console.log('[Continuity] Created feed event:', eventId);
+            }
+          }
+        }
       } else if (validated.action === 'cancel') {
         if (typeof cancelContinuity === 'function') {
           cancelContinuity(validated.targetId, validated.summary, 'Simon confirmed cancellation');

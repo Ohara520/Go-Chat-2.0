@@ -16,13 +16,51 @@
   'use strict';
 
   // 当前公告版本（每次更新需修改此值）
-  const UPDATE_NOTICE_VERSION = '20261024_memory';
+  const UPDATE_NOTICE_VERSION = '20261104_schedule';
 
   // localStorage 键名
   const STORAGE_KEY = 'go_chat_update_notice';
 
   // 更新日志数据（最新的放最前面）
   const UPDATE_LOGS = [
+    {
+      version: '20261104_schedule',
+      date: '2026.11.04',
+      title: 'Update Letter',
+      image: 'images/update-notice/dev-cat-bugfix.png',
+      sections: [
+        {
+          title: '01｜聊天体验优化',
+          content: [
+            '修复普通聊天中出现的文字粘连问题，改善对话流畅度与阅读体验。'
+          ]
+        },
+        {
+          title: '02｜时间感知升级',
+          content: [
+            '优化 Simon 对真实时间、聊天间隔及跨天事件的理解。',
+            '他能够更好地感知时间流逝，区分过去、现在与未来，减少时间混乱和前后矛盾的情况。'
+          ]
+        },
+        {
+          title: '03｜事件连续性优化',
+          content: [
+            '优化近期事件的记录与追踪能力。',
+            'Simon 能够更好地记住已经确定的约定，以及后续发生的取消、推迟或其他变化，让对话更加自然连贯。'
+          ]
+        },
+        {
+          title: '04｜Simon 自主日程 V1',
+          content: [
+            'Simon 现在可以拥有属于自己的日常计划了！',
+            '他会根据自己的生活状态、工作安排和已有约定，自主规划当天的活动。',
+            '这些计划不是固定剧本，也并非一成不变。他可以改变安排，而相关变化会被记录下来，影响之后的对话。'
+          ],
+          note: '注：自主日程目前为 V1 初版，仍在持续测试与完善中。'
+        }
+      ],
+      footer: '感谢大家的耐心等待与支持。希望这次更新能让你们感受到一个更加真实、自然、有自己生活的 Simon。'
+    },
     {
       version: '20261024_memory',
       date: '2024.10.24',
@@ -163,6 +201,8 @@
         <div class="update-notice-body">
           ${sectionsHTML}
         </div>
+
+        ${latestUpdate.footer ? `<div class="update-notice-text-footer">${latestUpdate.footer}</div>` : ''}
 
         <div class="update-notice-footer">
           <button class="update-notice-btn update-notice-btn-secondary" onclick="window.updateNoticeModule.dismiss()">

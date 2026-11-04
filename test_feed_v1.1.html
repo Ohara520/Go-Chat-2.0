@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Feed V1.1 Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+    .test { margin: 10px 0; padding: 10px; border: 1px solid #333; }
+    .pass { background: #002200; border-color: #0f0; }
+    .fail { background: #220000; border-color: #f00; color: #f00; }
+    .pending { background: #222200; border-color: #ff0; color: #ff0; }
+    h2 { color: #0ff; }
+    pre { background: #000; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Simon 自主分享系统 V1.1 - 本地测试</h1>
+  <div id="results"></div>
+
+  <script>
+    const results = document.getElementById('results');
+    const tests = [];
+    let passCount = 0;
+    let failCount = 0;
+
+    function assert(fn, description) {
+      tests.push({ fn, description });
+    }
+
+    function log(msg, type = 'info') {
+      const div = document.createElement('div');
+      div.className = 'test ' + type;
+      div.innerHTML = `<strong>${type.toUpperCase()}</strong>: ${msg}`;
+      results.appendChild(div);
+    }
+
+    // Mock functions
+    function mockSchedule(sched) {
+      window._mockSchedule = sched;
+    }
+
+    function loadTodaySchedule() {
+      return window._mockSchedule || null;
+    }
+
+    function getGhostDateStr() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function getGhostTimeStr() {
+      return new Date().toTimeString().slice(0, 5);
+    }
+
+    function scheduleCloudSave() {}
+
+    function getFeedEventPool() {
+      try {
+        return JSON.parse(localStorage.getItem('feedEventPool') || '[]');
+      } catch(e) {
+        return [];
+      }
+    }
+
+    function setFeedEventPool(pool) {
+      localStorage.setItem('feedEventPool', JSON.stringify(pool));
+    }
+
+    function getFeedPosts() {
+      try {
+        return JSON.parse(localStorage.getItem('feedPosts') || '[]');
+      } catch(e) {
+        return [];
+      }
+    }
+
+    // Copy core functions from feed.js
+    function _buildEventKey(evt) {
+      let date;
+      if (evt.occurredAt) {
+        date = new Date(evt.occurredAt).toISOString().slice(0, 10);
+      } else if (evt.createdAt) {
+        date = new Date(evt.createdAt).toISOString().slice(0, 10);
+      } else {
+        date = new Date().toISOString().slice(0, 10);
+      }
+
+      let stableSourceId = evt.sourceId || '';
+      if (evt.source === 'schedule' && evt.sourceId && !/\d{4}-\d{2}-\d{2}/.test(evt.sourceId)) {
+        stableSourceId = `sched_${date}_${evt.sourceId.replace(/^sched_/, '')}`;
+      }
+
+      return `${evt.source}_${evt.type}_${stableSourceId}`;
+    }
+
+    function isAlreadyPublished(evt) {
+      if (!evt.sourceId) return false;
+      const key = _buildEventKey(evt);
+      try {
+        const history = JSON.parse(localStorage.getItem('feedPublishHistory') || '{}');
+        return !!history[key];
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function recordPublished(evt, postId) {
+      if (!evt.sourceId) return;
+      const key = _buildEventKey(evt);
+      try {
+        const history = JSON.parse(localStorage.getItem('feedPublishHistory') || '{}');
+        history[key] = {
+          postId,
+          publishedAt: Date.now(),
+          sourceId: evt.sourceId
+        };
+
+        const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+        Object.keys(history).forEach(k => {
+          if (history[k].publishedAt < cutoff) {
+            delete history[k];
+          }
+        });
+
+        localStorage.setItem('feedPublishHistory', JSON.stringify(history));
+      } catch (e) {}
+    }
+
+    function validateScheduleEvent(evt) {
+      if (evt.source !== 'schedule') return true;
+
+      const sched = loadTodaySchedule();
+      if (!sched) {
+        console.warn('[Test] Schedule not found');
+        return false;
+      }
+
+      const item = sched.plan ? sched.plan.find(p => p.id === evt.sourceId || evt.sourceId.includes(p.id)) : null;
+      if (!item) {
+        console.warn('[Test] Schedule item not found:', evt.sourceId);
+        return false;
+      }
+
+      const expectedStatus = evt.type === 'schedule_completed' ? 'done' :
+                            evt.type === 'schedule_ongoing' ? 'ongoing' :
+                            evt.type === 'schedule_plan' ? 'planned' : null;
+      if (expectedStatus && item.status !== expectedStatus) {
+        console.warn('[Test] Status mismatch:', expectedStatus, item.status);
+        return false;
+      }
+
+      if (expectedStatus === 'done' || expectedStatus === 'ongoing') {
+        const change = (sched.changes || []).find(c =>
+          (c.itemId === item.id || evt.sourceId.includes(c.itemId)) &&
+          (c.type === 'done' || c.type === 'ongoing')
+        );
+
+        if (!change || !change.evidence) {
+          console.warn('[Test] No evidence');
+          return false;
+        }
+
+        const activityKeywords = item.activity.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        if (activityKeywords.length > 0) {
+          const evidenceLower = change.evidence.toLowerCase();
+          const hasMatch = activityKeywords.some(kw => evidenceLower.includes(kw));
+
+          if (!hasMatch) {
+            console.warn('[Test] Evidence does not match activity');
+            return false;
+          }
+        }
+      }
+
+      if (expectedStatus === 'done') {
+        const doneChange = (sched.changes || []).find(c =>
+          (c.itemId === item.id || evt.sourceId.includes(c.itemId)) && c.type === 'done'
+        );
+
+        const laterCancel = (sched.changes || []).find(c =>
+          (c.itemId === item.id || evt.sourceId.includes(c.itemId)) &&
+          c.type === 'cancel' &&
+          c.recordedAt > (doneChange?.recordedAt || 0)
+        );
+
+        if (laterCancel) {
+          console.warn('[Test] Later cancelled');
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function pushFeedEvent(event) {
+      const pool = getFeedEventPool();
+
+      if (isAlreadyPublished(event)) {
+        console.log('[Test] Already published');
+        return null;
+      }
+
+      if (event.source && event.sourceId) {
+        const exists = pool.some(e => e.source === event.source && e.sourceId === event.sourceId);
+        if (exists) {
+          console.log('[Test] Already in pool');
+          return null;
+        }
+      }
+
+      const eventId = 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      pool.unshift({
+        id: eventId,
+        ...event,
+        consumed: false,
+        judgeState: null,
+        attemptCount: 0
+      });
+      setFeedEventPool(pool.slice(0, 30));
+      return eventId;
+    }
+
+    // Tests
+    assert(() => {
+      localStorage.clear();
+      const evt1 = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_001',
+        occurredAt: new Date('2026-11-04T16:00:00').getTime()
+      };
+      recordPublished(evt1, 'post_001');
+
+      const evt2 = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_001',
+        occurredAt: new Date('2026-11-05T16:00:00').getTime()
+      };
+
+      return !isAlreadyPublished(evt2);
+    }, 'T1: Same activity on different days are distinct');
+
+    assert(() => {
+      localStorage.clear();
+      const evt = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_001',
+        occurredAt: new Date('2026-11-04T16:00:00').getTime()
+      };
+      recordPublished(evt, 'post_001');
+
+      return isAlreadyPublished(evt);
+    }, 'T2: Same event is not republished');
+
+    assert(() => {
+      localStorage.clear();
+      const sched = {
+        meta: { date: '2026-11-04' },
+        plan: [{ id: 'sched_001', activity: 'training', status: 'done' }],
+        changes: [{ itemId: 'sched_001', type: 'done', evidence: 'just finished training' }]
+      };
+      mockSchedule(sched);
+
+      const evt = {
+        type: 'schedule_completed',
+        source: 'schedule',
+        sourceId: 'sched_2026-11-04_001',
+        occurredAt: new Date('2026-11-04T16:00:00').getTime()
+      };
+
+      return validateScheduleEvent(evt) === true;
+    }, 'T3: Strong evidence passes validation');
+
+    assert(() => {
+      localStorage.clear();
+      const sched = {
+        meta: { date: '2026-11-04' },
+        plan: [{ id: 'sched_001', activity: 'training', status: 'done' }],
+        changes: [{ itemId: 'sched_001', type: 'done', evidence: 'finished reading her message' }]
+      };
+      mockSchedule(sched);
+
+      const evt = {
+        type: 'schedule_completed',
+        source: 'schedule',
+        sourceId: 'sched_2026-11-04_001'
+      };
+
+      return validateScheduleEvent(evt) === false;
+    }, 'T4: Weak evidence fails validation');
+
+    assert(() => {
+      localStorage.clear();
+      const sched = {
+        meta: { date: '2026-11-04' },
+        plan: [{ id: 'sched_001', activity: 'training', status: 'cancelled' }],
+        changes: [
+          { itemId: 'sched_001', type: 'done', recordedAt: 1000 },
+          { itemId: 'sched_001', type: 'cancel', recordedAt: 2000 }
+        ]
+      };
+      mockSchedule(sched);
+
+      const evt = {
+        type: 'schedule_completed',
+        source: 'schedule',
+        sourceId: 'sched_2026-11-04_001'
+      };
+
+      return validateScheduleEvent(evt) === false;
+    }, 'T5: Later cancellation invalidates completion');
+
+    assert(() => {
+      localStorage.clear();
+      const evt = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_001',
+        occurredAt: new Date('2026-11-04T16:00:00').getTime()
+      };
+
+      const id1 = pushFeedEvent(evt);
+      const id2 = pushFeedEvent(evt);
+
+      return id1 !== null && id2 === null;
+    }, 'T6: Duplicate candidate is rejected');
+
+    assert(() => {
+      localStorage.clear();
+      const evt = {
+        source: 'schedule',
+        type: 'schedule_completed',
+        sourceId: 'sched_001',
+        occurredAt: new Date('2026-11-04T16:00:00').getTime()
+      };
+
+      recordPublished(evt, 'post_001');
+      const id = pushFeedEvent(evt);
+
+      return id === null;
+    }, 'T7: Already published event is rejected');
+
+    // Run tests
+    async function runTests() {
+      log('Running ' + tests.length + ' tests...', 'info');
+
+      for (const test of tests) {
+        try {
+          const result = await test.fn();
+          if (result) {
+            log(`✓ ${test.description}`, 'pass');
+            passCount++;
+          } else {
+            log(`✗ ${test.description}`, 'fail');
+            failCount++;
+          }
+        } catch (e) {
+          log(`✗ ${test.description}: ${e.message}`, 'fail');
+          failCount++;
+        }
+      }
+
+      log(`\nTotal: ${tests.length}, Pass: ${passCount}, Fail: ${failCount}`, passCount === tests.length ? 'pass' : 'fail');
+
+      if (failCount === 0) {
+        log('All tests passed! ✓', 'pass');
+      } else {
+        log(`${failCount} test(s) failed.`, 'fail');
+      }
+    }
+
+    runTests();
+  </script>
+</body>
+</html>

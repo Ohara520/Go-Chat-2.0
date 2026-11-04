@@ -112,6 +112,41 @@ Extract changes ([] if none):`;
       if (applied) {
         console.log(`[ScheduleExtractor] Applied change: ${c.itemId} → ${c.type}`);
 
+        // 为 done/ongoing 创建朋友圈候选事件
+        if ((c.type === 'done' || c.type === 'ongoing') && typeof pushFeedEvent === 'function') {
+          const item = plannedItems.find(p => p.id === c.itemId);
+          if (item && !item.feedEventCreated) {
+            const schedDate = (typeof getGhostDateStr === 'function' ? getGhostDateStr() : '') || '';
+            const stableSourceId = schedDate ? `sched_${schedDate}_${item.id.replace(/^sched_/, '')}` : item.id;
+
+            const eventId = pushFeedEvent({
+              type: c.type === 'done' ? 'schedule_completed' : 'schedule_ongoing',
+              actor: 'ghost',
+              source: 'schedule',
+              sourceId: stableSourceId,
+              occurredAt: Date.now(),
+              createdAt: Date.now(),
+              meta: {
+                activity: item.activity,
+                startTime: item.startTime,
+                location: item.location || null,
+                evidence: c.evidence || '',
+                scheduleDate: schedDate
+              },
+              shareability: 0.4,
+              privacy: 'semi',
+              dueAt: Date.now() + (15 + Math.floor(Math.random() * 75)) * 60 * 1000,
+              expiresAt: Date.now() + 6 * 3600 * 1000
+            });
+
+            if (eventId) {
+              item.feedEventCreated = true;
+              item.feedEventId = eventId;
+              console.log(`[ScheduleExtractor] Created feed event: ${eventId}`);
+            }
+          }
+        }
+
         // 仅在取消/推迟时写入 Continuity（避免双重事实）
         if ((c.type === 'cancel' || c.type === 'postpone') && typeof cancelContinuity === 'function') {
           // 找对应的 Continuity 事件（若有）
@@ -122,6 +157,26 @@ Extract changes ([] if none):`;
           );
           if (ctEvent && c.type === 'cancel') {
             cancelContinuity(ctEvent.id, `${item.activity} cancelled.`, 'schedule_change');
+          }
+        }
+
+        // 取消/推迟时清理相关候选事件
+        if ((c.type === 'cancel' || c.type === 'postpone') && typeof getFeedEventPool === 'function') {
+          const pool = getFeedEventPool();
+          const item = plannedItems.find(p => p.id === c.itemId);
+          if (item) {
+            const schedDate = (typeof getGhostDateStr === 'function' ? getGhostDateStr() : '') || '';
+            const stableSourceId = schedDate ? `sched_${schedDate}_${item.id.replace(/^sched_/, '')}` : item.id;
+
+            pool.forEach(evt => {
+              if (evt.source === 'schedule' && evt.sourceId === stableSourceId && !evt.consumed) {
+                console.log(`[ScheduleExtractor] Cancelling feed event due to ${c.type}: ${evt.id}`);
+                evt.judgeState = 'skip';
+                if (typeof consumeFeedEvent === 'function') {
+                  consumeFeedEvent(evt.id);
+                }
+              }
+            });
           }
         }
       }
