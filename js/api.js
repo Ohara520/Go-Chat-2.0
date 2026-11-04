@@ -546,14 +546,14 @@ async function callDeepSeekWithSystem(system, user, maxTokens = 200) {
 /**
  * fetchSonnetWithCache
  * 主聊天回复调用，支持 Anthropic prompt caching
- * @param {string} finalSystem        完整动态system（含状态/hint等）
  * @param {{fixed:string, dynamic:string}} parts  buildSystemPromptParts的结果
+ * @param {string} extraHints         额外动态提示（antiCountHint等12个hint拼接）
  * @param {Array}  messages           已处理好的消息数组
  * @param {number} maxTokens          默认1000
  * @param {AbortSignal|null} signal   外部abort信号
  * @returns {Response} 原始fetch Response（调用方自己.json()）
  */
-async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 1000, signal = null) {
+async function fetchSonnetWithCache(parts, extraHints, messages, maxTokens = 1000, signal = null) {
   // 构造 Anthropic 原生 system 数组：稳定层(fixed)标记缓存，动态层(dynamic + 额外提示)追加
   const systemBlocks = [];
 
@@ -566,23 +566,15 @@ async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 10
   }
 
   if (parts && parts.dynamic) {
-    // 动态层：从 finalSystem 中提取 _baseSystem 之外的额外提示
-    // finalSystem = _baseSystem + antiCountHint + multiBubbleHint + ... + langHint
-    // parts 来自 buildSystemPromptParts(_baseSystem)，所以 parts.fixed + parts.dynamic = _baseSystem
-    // 额外提示 = finalSystem - _baseSystem
-    const baseSystemLength = (parts.fixed + '\n\n' + parts.dynamic).length;
-    const extraHints = finalSystem.substring(baseSystemLength).trim();
-
     const dynamicText = extraHints ? parts.dynamic + '\n' + extraHints : parts.dynamic;
-
     systemBlocks.push({
       type: 'text',
       text: dynamicText
     });
   }
 
-  // 兜底：若parts未提供或为空，回退到字符串system（保持向后兼容）
-  const system = systemBlocks.length > 0 ? systemBlocks : finalSystem;
+  // 兜底：若parts未提供，回退到字符串system（仅用于兼容性，正常不应走到此处）
+  const system = systemBlocks.length > 0 ? systemBlocks : parts.fixed + '\n\n' + parts.dynamic + (extraHints ? '\n' + extraHints : '');
 
   const body = {
     model: MODEL_OPUS,
