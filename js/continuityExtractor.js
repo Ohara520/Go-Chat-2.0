@@ -16,7 +16,7 @@
 //   - "Had a briefing last week."
 //   - 任何承诺/提醒/任务（"I'll text you when I'm done."）
 //
-// V1 只有四种 action：create / update / complete / none
+// V1 支持五种 action：create / update / complete / cancel / none
 // ===================================================
 
 
@@ -59,11 +59,17 @@ DO NOT record:
 
 Output ONLY a JSON object, no other text.
 
+For CANCEL: only use it when Simon explicitly states an event is called off, cancelled, or not happening.
+DO NOT cancel based on:
+- Vague statements ("not sure anymore", "might not go")
+- The user speculating ("sounds like it got cancelled?")
+- Postponement — use "update" with a new time instead of "cancel"
+
 Schema:
 {
   "actions": [
     {
-      "action": "create" | "update" | "complete",
+      "action": "create" | "update" | "complete" | "cancel",
 
       // For "create":
       "type": "work" | "appointment" | "meal" | "travel" | "rest",
@@ -80,7 +86,11 @@ Schema:
 
       // For "complete":
       "targetId": "ct_xxx",
-      "summary": "objective factual summary"
+      "summary": "objective factual summary",
+
+      // For "cancel":
+      "targetId": "ct_xxx",
+      "summary": "objective factual summary stating the cancellation fact"
     }
   ]
 }
@@ -150,12 +160,30 @@ Simon: "Flying back on Friday."
 Simon: "Got a briefing at 14:00. Training after that. Heading home around 18:00."
 → {"actions":[{"action":"create","type":"work","subject":"briefing","status":"pending","summary":"Briefing scheduled at 14:00."},{"action":"create","type":"work","subject":"training","status":"pending","summary":"Training scheduled after briefing."},{"action":"create","type":"travel","subject":"heading home","status":"pending","summary":"Heading home around 18:00."}]}
 
+[Active: briefing/pending]
+Simon: "Briefing's been called off."
+→ {"actions":[{"action":"cancel","targetId":"ct_xxx","summary":"Briefing cancelled."}]}
+
+[Active: training/pending]
+Simon: "Training got cancelled. Nothing on now."
+→ {"actions":[{"action":"cancel","targetId":"ct_xxx","summary":"Training cancelled."}]}
+
+[Active: briefing/pending]
+Simon: "Not sure the briefing's still on."
+→ {"actions":[]}  // Uncertainty is NOT enough to cancel — only explicit cancellation qualifies
+
+[Active: training/pending]
+Simon: "Training pushed to next week."
+→ {"actions":[{"action":"update","targetId":"ct_xxx","status":"pending","summary":"Training rescheduled to next week.","timeExpr":"next week"}]}
+// Postponement is "update", NOT "cancel"
+
 IMPORTANT:
 - Summary MUST be an objective fact, never an instruction ("Remember to mention", "Ask her about it")
 - If uncertain about an event, omit it from the actions array
-- Only match ONE candidate for update/complete. Multiple candidates → omit that action
+- Only match ONE candidate for update/complete/cancel. Multiple candidates → omit that action
 - Each action in the array must be independent and complete
 - Do not create duplicate events with the same subject in one response
+- cancel requires explicit confirmed cancellation in Simon's words, never from user speculation
 - timeExpr: Extract relative time expressions EXACTLY as Simon said them (e.g. "tomorrow morning", "this afternoon", "next Monday"). If no time expression, set to null. Do NOT invent time expressions.`;
 
   const userPrompt = `[Active Continuity]
@@ -191,7 +219,7 @@ Extract:`;
     }
 
     // 基本合法性检查每个 action
-    const validActions = ['create', 'update', 'complete'];
+    const validActions = ['create', 'update', 'complete', 'cancel'];
     const validatedActions = result.actions.filter(action => {
       if (!action || typeof action !== 'object') return false;
       if (!validActions.includes(action.action)) return false;

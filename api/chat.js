@@ -76,8 +76,13 @@ export default async function handler(req, res) {
           max_tokens: max_tokens || 1024,
           messages: anthropicMessages,
         };
-        if (system && typeof system === 'string') {
-          params.system = system;
+        // 支持 Anthropic 原生 system：字符串或带 cache_control 的 text block 数组
+        if (system) {
+          if (typeof system === 'string') {
+            params.system = system;
+          } else if (Array.isArray(system)) {
+            params.system = system;
+          }
         }
 
         const anthropicResponse = await client.messages.create(params);

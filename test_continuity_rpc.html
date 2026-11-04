@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Continuity RPC 测试套件</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    .test-section { margin: 20px 0; padding: 15px; border: 1px solid #444; border-radius: 4px; }
+    .test-pass { color: #4ec9b0; }
+    .test-fail { color: #f48771; }
+    .test-skip { color: #ce9178; }
+    button { margin: 5px; padding: 8px 16px; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #1177bb; }
+    button:disabled { background: #3c3c3c; cursor: not-allowed; }
+    pre { background: #252526; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    .warning { color: #dcdcaa; }
+    .error { color: #f48771; }
+  </style>
+</head>
+<body>
+  <h1>Continuity RPC 测试套件</h1>
+  <div class="warning">
+    ⚠️ 警告：本测试需要连接 Supabase 开发环境。<br>
+    请确认已部署迁移文件，且当前连接的不是生产数据库。<br>
+    <strong>如果没有隔离测试环境，请勿运行测试。</strong>
+  </div>
+
+  <div class="test-section">
+    <h2>环境检查</h2>
+    <button onclick="checkEnvironment()">检查环境</button>
+    <pre id="env-output">未检查</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>测试 1: 并发新增不同事件</h2>
+    <p>模拟两台设备同时创建不同事件，验证都能保留</p>
+    <button onclick="testConcurrentCreate()">运行测试</button>
+    <pre id="test1-output">未运行</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>测试 2: 并发更新同一事件</h2>
+    <p>模拟两台设备同时修改同一事件，验证版本号控制</p>
+    <button onclick="testConcurrentUpdate()">运行测试</button>
+    <pre id="test2-output">未运行</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>测试 3: 终态保护</h2>
+    <p>验证已完成事件不会被旧设备复活为 pending</p>
+    <button onclick="testTerminalStateProtection()">运行测试</button>
+    <pre id="test3-output">未运行</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>测试 4: 墓碑防复活</h2>
+    <p>验证已删除事件不会被旧设备重新上传</p>
+    <button onclick="testTombstoneResurrection()">运行测试</button>
+    <pre id="test4-output">未运行</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>测试 5: 角色隔离</h2>
+    <p>验证 Ghost 和 Keegan 的 Continuity 数据完全隔离</p>
+    <button onclick="testCharacterIsolation()">运行测试</button>
+    <pre id="test5-output">未运行</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>测试 6: 网络失败重试</h2>
+    <p>验证 RPC 调用幂等性和重试机制</p>
+    <button onclick="testNetworkRetry()">运行测试</button>
+    <pre id="test6-output">未运行</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>测试 7: 超长期离线设备</h2>
+    <p>验证过时事件被拒绝，不会复活旧数据</p>
+    <button onclick="testOldDeviceRecovery()">运行测试</button>
+    <pre id="test7-output">未运行</pre>
+  </div>
+
+  <div class="test-section">
+    <h2>批量运行</h2>
+    <button onclick="runAllTests()">运行全部测试</button>
+    <pre id="summary-output">未运行</pre>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Supabase 配置
+    const SUPABASE_URL = 'https://siahkenfoofkjrgevgma.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_FNPLr9vwPZPrB4ifHBncXg_83CWekPD';
+    let sb = null;
+    let testUserId = null;
+
+    // 初始化
+    function initSupabase() {
+      if (!sb) {
+        sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+      return sb;
+    }
+
+    function log(elementId, message, isError = false) {
+      const el = document.getElementById(elementId);
+      const timestamp = new Date().toLocaleTimeString();
+      const prefix = isError ? '❌' : '✓';
+      el.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+    }
+
+    function clearLog(elementId) {
+      document.getElementById(elementId).textContent = '';
+    }
+
+    // 环境检查
+    async function checkEnvironment() {
+      clearLog('env-output');
+      try {
+        const sb = initSupabase();
+        log('env-output', 'Supabase 客户端初始化成功');
+
+        // 检查用户登录状态
+        const { data: { user }, error: authError } = await sb.auth.getUser();
+        if (authError || !user) {
+          log('env-output', '未登录或登录失效，尝试使用测试账号...', true);
+          log('env-output', '请先在主页登录，或提供测试用户 ID');
+          return;
+        }
+
+        testUserId = user.id;
+        log('env-output', `当前用户 ID: ${testUserId}`);
+
+        // 检查表是否存在
+        const { data: eventsCheck, error: e1 } = await sb.from('continuity_events').select('event_id').limit(1);
+        if (e1 && e1.code === '42P01') {
+          log('env-output', '❌ continuity_events 表不存在，请先部署迁移文件', true);
+          return;
+        }
+        log('env-output', 'continuity_events 表存在');
+
+        const { data: tombstonesCheck, error: e2 } = await sb.from('continuity_tombstones').select('event_id').limit(1);
+        if (e2 && e2.code === '42P01') {
+          log('env-output', '❌ continuity_tombstones 表不存在，请先部署迁移文件', true);
+          return;
+        }
+        log('env-output', 'continuity_tombstones 表存在');
+
+        // 检查 RPC 函数
+        const { data: rpcTest, error: e3 } = await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId,
+          p_character_id: 'ghost',
+          p_events: [],
+          p_tombstones: []
+        });
+        if (e3) {
+          log('env-output', `❌ RPC 函数调用失败: ${e3.message}`, true);
+          return;
+        }
+        log('env-output', 'RPC 函数 atomic_merge_continuity 可用');
+        log('env-output', '✅ 环境检查通过，可以运行测试');
+
+      } catch (e) {
+        log('env-output', `检查失败: ${e.message}`, true);
+      }
+    }
+
+    // 测试 1: 并发新增
+    async function testConcurrentCreate() {
+      clearLog('test1-output');
+      try {
+        const sb = initSupabase();
+        if (!testUserId) {
+          log('test1-output', '请先运行环境检查', true);
+          return;
+        }
+
+        const eventId1 = 'ct_test1_' + Date.now();
+        const eventId2 = 'ct_test2_' + Date.now();
+
+        log('test1-output', '模拟两台设备同时创建不同事件...');
+
+        // 并发提交
+        const [result1, result2] = await Promise.all([
+          sb.rpc('atomic_merge_continuity', {
+            p_user_id: testUserId,
+            p_character_id: 'ghost',
+            p_events: [{
+              id: eventId1, type: 'work', subject: 'briefing', status: 'pending',
+              updatedAt: Date.now(), version: 1, summary: 'Test briefing'
+            }],
+            p_tombstones: []
+          }),
+          sb.rpc('atomic_merge_continuity', {
+            p_user_id: testUserId,
+            p_character_id: 'ghost',
+            p_events: [{
+              id: eventId2, type: 'work', subject: 'training', status: 'pending',
+              updatedAt: Date.now(), version: 1, summary: 'Test training'
+            }],
+            p_tombstones: []
+          })
+        ]);
+
+        if (result1.error) throw result1.error;
+        if (result2.error) throw result2.error;
+
+        log('test1-output', '两次 RPC 调用均成功');
+
+        // 验证云端数据
+        const { data: events, error } = await sb.from('continuity_events')
+          .select('event_id, subject')
+          .eq('user_id', testUserId)
+          .eq('character_id', 'ghost')
+          .in('event_id', [eventId1, eventId2]);
+
+        if (error) throw error;
+
+        if (events.length === 2) {
+          log('test1-output', `✅ 测试通过：云端保留了两个事件`);
+          log('test1-output', `  - ${events[0].event_id}: ${events[0].subject}`);
+          log('test1-output', `  - ${events[1].event_id}: ${events[1].subject}`);
+        } else {
+          log('test1-output', `❌ 测试失败：期望 2 个事件，实际 ${events.length} 个`, true);
+        }
+
+        // 清理测试数据
+        await sb.from('continuity_events').delete()
+          .eq('user_id', testUserId).in('event_id', [eventId1, eventId2]);
+
+      } catch (e) {
+        log('test1-output', `测试异常: ${e.message}`, true);
+      }
+    }
+
+    // 测试 2: 并发更新同一事件
+    async function testConcurrentUpdate() {
+      clearLog('test2-output');
+      try {
+        const sb = initSupabase();
+        if (!testUserId) {
+          log('test2-output', '请先运行环境检查', true);
+          return;
+        }
+
+        const eventId = 'ct_test_update_' + Date.now();
+        log('test2-output', '1. 创建初始事件 (pending)');
+
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId,
+          p_character_id: 'ghost',
+          p_events: [{
+            id: eventId, type: 'work', subject: 'test', status: 'pending',
+            updatedAt: 100, version: 1, summary: 'Initial'
+          }],
+          p_tombstones: []
+        });
+
+        log('test2-output', '2. 模拟两台设备同时更新为不同状态...');
+
+        const [r1, r2] = await Promise.all([
+          sb.rpc('atomic_merge_continuity', {
+            p_user_id: testUserId, p_character_id: 'ghost',
+            p_events: [{ id: eventId, status: 'ongoing', updatedAt: 200, version: 2, summary: 'Device1' }],
+            p_tombstones: []
+          }),
+          sb.rpc('atomic_merge_continuity', {
+            p_user_id: testUserId, p_character_id: 'ghost',
+            p_events: [{ id: eventId, status: 'completed', updatedAt: 210, version: 2, summary: 'Device2' }],
+            p_tombstones: []
+          })
+        ]);
+
+        log('test2-output', '3. 检查最终状态...');
+
+        const { data: finalEvent } = await sb.from('continuity_events')
+          .select('status, version, summary')
+          .eq('user_id', testUserId).eq('event_id', eventId).single();
+
+        log('test2-output', `最终状态: ${finalEvent.status}, 版本: ${finalEvent.version}, 摘要: ${finalEvent.summary}`);
+
+        if (finalEvent.version >= 2 && (finalEvent.status === 'ongoing' || finalEvent.status === 'completed')) {
+          log('test2-output', '✅ 测试通过：版本号递增，状态保留其中一个');
+        } else {
+          log('test2-output', '❌ 测试失败：状态或版本异常', true);
+        }
+
+        await sb.from('continuity_events').delete().eq('user_id', testUserId).eq('event_id', eventId);
+
+      } catch (e) {
+        log('test2-output', `测试异常: ${e.message}`, true);
+      }
+    }
+
+    // 测试 3: 终态保护
+    async function testTerminalStateProtection() {
+      clearLog('test3-output');
+      try {
+        const sb = initSupabase();
+        if (!testUserId) {
+          log('test3-output', '请先运行环境检查', true);
+          return;
+        }
+
+        const eventId = 'ct_test_terminal_' + Date.now();
+        log('test3-output', '1. 创建并完成事件');
+
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [{ id: eventId, type: 'work', subject: 'test', status: 'pending', updatedAt: 100, version: 1 }],
+          p_tombstones: []
+        });
+
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [{ id: eventId, status: 'completed', updatedAt: 200, version: 2 }],
+          p_tombstones: []
+        });
+
+        log('test3-output', '2. 旧设备尝试降级为 pending');
+
+        const { data: result } = await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [{ id: eventId, status: 'pending', updatedAt: 150, version: 1 }],
+          p_tombstones: []
+        });
+
+        log('test3-output', `冲突信息: ${JSON.stringify(result.conflicts)}`);
+
+        const { data: cloudEvent } = await sb.from('continuity_events')
+          .select('status').eq('user_id', testUserId).eq('event_id', eventId).single();
+
+        if (cloudEvent.status === 'completed' && result.conflicts.length > 0) {
+          log('test3-output', '✅ 测试通过：终态保护生效，状态仍为 completed');
+        } else {
+          log('test3-output', '❌ 测试失败：终态被降级', true);
+        }
+
+        await sb.from('continuity_events').delete().eq('user_id', testUserId).eq('event_id', eventId);
+
+      } catch (e) {
+        log('test3-output', `测试异常: ${e.message}`, true);
+      }
+    }
+
+    // 测试 4: 墓碑防复活
+    async function testTombstoneResurrection() {
+      clearLog('test4-output');
+      try {
+        const sb = initSupabase();
+        if (!testUserId) {
+          log('test4-output', '请先运行环境检查', true);
+          return;
+        }
+
+        const eventId = 'ct_test_tomb_' + Date.now();
+        log('test4-output', '1. 创建并完成事件');
+
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [{ id: eventId, type: 'work', subject: 'test', status: 'completed', updatedAt: Date.now(), version: 1 }],
+          p_tombstones: []
+        });
+
+        log('test4-output', '2. 删除事件（写墓碑）');
+
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [],
+          p_tombstones: [{ event_id: eventId, deleted_at: Date.now() }]
+        });
+
+        log('test4-output', '3. 旧设备尝试重新上传');
+
+        const { data: result } = await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [{ id: eventId, status: 'pending', updatedAt: Date.now() + 1000, version: 1 }],
+          p_tombstones: []
+        });
+
+        const { data: cloudEvent } = await sb.from('continuity_events')
+          .select('*').eq('user_id', testUserId).eq('event_id', eventId).maybeSingle();
+
+        if (!cloudEvent && result.conflicts.some(c => c.reason === 'event_deleted')) {
+          log('test4-output', '✅ 测试通过：墓碑防复活生效，事件未被重新插入');
+        } else {
+          log('test4-output', '❌ 测试失败：已删除事件被复活', true);
+        }
+
+        await sb.from('continuity_tombstones').delete().eq('user_id', testUserId).eq('event_id', eventId);
+
+      } catch (e) {
+        log('test4-output', `测试异常: ${e.message}`, true);
+      }
+    }
+
+    // 测试 5: 角色隔离
+    async function testCharacterIsolation() {
+      clearLog('test5-output');
+      try {
+        const sb = initSupabase();
+        if (!testUserId) {
+          log('test5-output', '请先运行环境检查', true);
+          return;
+        }
+
+        const ghostEventId = 'ct_ghost_' + Date.now();
+        const keeganEventId = 'ct_keegan_' + Date.now();
+
+        log('test5-output', '1. Ghost 创建事件');
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [{ id: ghostEventId, type: 'work', subject: 'Ghost briefing', status: 'pending', updatedAt: Date.now(), version: 1 }],
+          p_tombstones: []
+        });
+
+        log('test5-output', '2. Keegan 创建事件');
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'keegan',
+          p_events: [{ id: keeganEventId, type: 'work', subject: 'Keegan training', status: 'pending', updatedAt: Date.now(), version: 1 }],
+          p_tombstones: []
+        });
+
+        log('test5-output', '3. 验证隔离性');
+        const { data: ghostEvents } = await sb.from('continuity_events')
+          .select('*').eq('user_id', testUserId).eq('character_id', 'ghost');
+        const { data: keeganEvents } = await sb.from('continuity_events')
+          .select('*').eq('user_id', testUserId).eq('character_id', 'keegan');
+
+        const ghostHasKeegan = ghostEvents.some(e => e.event_id === keeganEventId);
+        const keeganHasGhost = keeganEvents.some(e => e.event_id === ghostEventId);
+
+        if (!ghostHasKeegan && !keeganHasGhost) {
+          log('test5-output', `✅ 测试通过：Ghost ${ghostEvents.length} 个事件，Keegan ${keeganEvents.length} 个事件，完全隔离`);
+        } else {
+          log('test5-output', '❌ 测试失败：角色数据混淆', true);
+        }
+
+        await sb.from('continuity_events').delete().eq('user_id', testUserId).in('event_id', [ghostEventId, keeganEventId]);
+
+      } catch (e) {
+        log('test5-output', `测试异常: ${e.message}`, true);
+      }
+    }
+
+    // 测试 6: 网络失败重试
+    async function testNetworkRetry() {
+      clearLog('test6-output');
+      try {
+        const sb = initSupabase();
+        if (!testUserId) {
+          log('test6-output', '请先运行环境检查', true);
+          return;
+        }
+
+        const eventId = 'ct_retry_' + Date.now();
+        log('test6-output', '模拟同一事件重复提交（幂等性测试）');
+
+        const event = { id: eventId, type: 'work', subject: 'retry test', status: 'pending', updatedAt: Date.now(), version: 1 };
+
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [event], p_tombstones: []
+        });
+
+        log('test6-output', '重复提交 3 次...');
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [event], p_tombstones: []
+        });
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [event], p_tombstones: []
+        });
+        await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [event], p_tombstones: []
+        });
+
+        const { data: events } = await sb.from('continuity_events')
+          .select('*').eq('user_id', testUserId).eq('event_id', eventId);
+
+        if (events.length === 1) {
+          log('test6-output', `✅ 测试通过：重复提交幂等，仅保留 1 条记录`);
+        } else {
+          log('test6-output', `❌ 测试失败：产生重复记录 ${events.length} 条`, true);
+        }
+
+        await sb.from('continuity_events').delete().eq('user_id', testUserId).eq('event_id', eventId);
+
+      } catch (e) {
+        log('test6-output', `测试异常: ${e.message}`, true);
+      }
+    }
+
+    // 测试 7: 超长期离线设备
+    async function testOldDeviceRecovery() {
+      clearLog('test7-output');
+      try {
+        const sb = initSupabase();
+        if (!testUserId) {
+          log('test7-output', '请先运行环境检查', true);
+          return;
+        }
+
+        const oldEventId = 'ct_old_' + Date.now();
+        const ninetyDaysAgo = Date.now() - 91 * 24 * 60 * 60 * 1000;
+
+        log('test7-output', '模拟设备上传 91 天前的旧事件');
+
+        const { data: result } = await sb.rpc('atomic_merge_continuity', {
+          p_user_id: testUserId, p_character_id: 'ghost',
+          p_events: [{ id: oldEventId, type: 'work', subject: 'old event', status: 'pending', updatedAt: ninetyDaysAgo, version: 1 }],
+          p_tombstones: []
+        });
+
+        const { data: cloudEvent } = await sb.from('continuity_events')
+          .select('*').eq('user_id', testUserId).eq('event_id', oldEventId).maybeSingle();
+
+        if (!cloudEvent && result.conflicts.some(c => c.reason === 'event_too_old')) {
+          log('test7-output', '✅ 测试通过：过时事件被拒绝');
+        } else if (cloudEvent) {
+          log('test7-output', '❌ 测试失败：过时事件被接受', true);
+          await sb.from('continuity_events').delete().eq('user_id', testUserId).eq('event_id', oldEventId);
+        } else {
+          log('test7-output', '⚠️ 事件被拒绝但原因不明', true);
+        }
+
+      } catch (e) {
+        log('test7-output', `测试异常: ${e.message}`, true);
+      }
+    }
+
+    // 批量运行
+    async function runAllTests() {
+      clearLog('summary-output');
+      log('summary-output', '开始批量测试...');
+
+      await checkEnvironment();
+      if (!testUserId) {
+        log('summary-output', '环境检查失败，停止测试', true);
+        return;
+      }
+
+      const tests = [
+        { name: '并发新增', fn: testConcurrentCreate },
+        { name: '并发更新', fn: testConcurrentUpdate },
+        { name: '终态保护', fn: testTerminalStateProtection },
+        { name: '墓碑防复活', fn: testTombstoneResurrection },
+        { name: '角色隔离', fn: testCharacterIsolation },
+        { name: '网络重试', fn: testNetworkRetry },
+        { name: '超长期离线', fn: testOldDeviceRecovery }
+      ];
+
+      for (const test of tests) {
+        log('summary-output', `运行: ${test.name}...`);
+        await test.fn();
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      log('summary-output', '✅ 全部测试完成');
+    }
+  </script>
+</body>
+</html>

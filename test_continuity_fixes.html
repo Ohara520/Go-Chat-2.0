@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Continuity Fixes Test — B1/B3/B4</title>
+  <style>
+    body { font-family: monospace; max-width: 1000px; margin: 20px auto; padding: 0 20px; font-size: 13px; }
+    h1 { font-size: 16px; }
+    h2 { font-size: 14px; margin-top: 24px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+    .pass { background: #d4edda; border-left: 4px solid #28a745; padding: 6px 10px; margin: 4px 0; }
+    .fail { background: #f8d7da; border-left: 4px solid #dc3545; padding: 6px 10px; margin: 4px 0; }
+    .info { background: #f5f5f5; padding: 4px 8px; margin: 2px 0; color: #555; }
+    .summary { font-size: 15px; font-weight: bold; padding: 12px; margin-top: 20px; }
+    .pass-s { color: #28a745; } .fail-s { color: #dc3545; }
+  </style>
+</head>
+<body>
+<h1>Continuity Fixes — B1 / B3 / B4 回归测试</h1>
+<div id="out"></div>
+<div id="summary" class="summary"></div>
+<script>
+
+// ─── 测试框架 ───────────────────────────────────
+let pass = 0, fail = 0;
+function log(msg, cls='info') {
+  document.getElementById('out').insertAdjacentHTML('beforeend',
+    `<div class="${cls}">${msg}</div>`);
+}
+function assert(cond, label, detail='') {
+  if (cond) { pass++; log(`✓ ${label}${detail?' · '+detail:''}`, 'pass'); }
+  else       { fail++; log(`✗ ${label}${detail?' · '+detail:''}`, 'fail'); }
+}
+function section(title) {
+  log(``, 'info');
+  document.getElementById('out').insertAdjacentHTML('beforeend', `<h2>${title}</h2>`);
+}
+
+// ─── 最小 stub：Time Authority ──────────────────
+// 假设今天是 2026-11-07（周五），测试相对日期解析
+const FAKE_TODAY = '2026-11-07'; // Saturday（已用 node 验证）
+const FAKE_WEEKDAY = 'Saturday'; // 2026-11-07 的真实星期
+
+function getGhostDateStr()  { return FAKE_TODAY; }
+function getGhostWeekday()  { return FAKE_WEEKDAY; }
+function getGhostTimeStr()  { return '14:30'; }
+function getGhostTimeZone() { return 'Europe/London'; }
+
+// ─── 加载被测模块 ────────────────────────────────
+// continuityTime.js 依赖上面的 stub，直接内联关键函数
+function weekdayToNumber(weekday) {
+  return {sunday:0,monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6}[weekday.toLowerCase()]??0;
+}
+function formatDateYYYYMMDD(d) {
+  return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+}
+function parseRelativeDateToGhostLocal(timeExpr) {
+  if (!timeExpr) return null;
+  const expr = timeExpr.toLowerCase().trim();
+  const ghostDateStr = getGhostDateStr();
+  const ghostDate = new Date(ghostDateStr + 'T00:00:00Z');
+  if (expr.includes('today')||expr.includes('this morning')||expr.includes('this afternoon')||expr.includes('this evening')||expr.includes('tonight')) return ghostDateStr;
+  if (expr.includes('tomorrow')) { const t=new Date(ghostDate); t.setUTCDate(t.getUTCDate()+1); return formatDateYYYYMMDD(t); }
+  const nwm = expr.match(/next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/);
+  if (nwm) {
+    const td=weekdayToNumber(nwm[1]), cd=weekdayToNumber(getGhostWeekday().toLowerCase());
+    let d=td-cd; if(d<=0)d+=7;
+    const t=new Date(ghostDate); t.setUTCDate(t.getUTCDate()+d); return formatDateYYYYMMDD(t);
+  }
+  const twm = expr.match(/this\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/);
+  if (twm) {
+    const td=weekdayToNumber(twm[1]), cd=weekdayToNumber(getGhostWeekday().toLowerCase());
+    let d=td-cd; if(d<0)d+=7;
+    const t=new Date(ghostDate); t.setUTCDate(t.getUTCDate()+d); return formatDateYYYYMMDD(t);
+  }
+  const dm = expr.match(/(\d+)\s+days?\s+(from\s+now|later)/);
+  if (dm) { const t=new Date(ghostDate); t.setUTCDate(t.getUTCDate()+parseInt(dm[1])); return formatDateYYYYMMDD(t); }
+  return null;
+}
+function extractDayPart(timeExpr) {
+  if (!timeExpr) return null;
+  const e = timeExpr.toLowerCase();
+  if (e.includes('morning'))   return 'morning';
+  if (e.includes('afternoon')) return 'afternoon';
+  if (e.includes('evening'))   return 'evening';
+  if (e.includes('night')||e.includes('tonight')) return 'night';
+  return null;
+}
+function isEventExpired(plannedDate, status) {
+  if (!plannedDate) return false;
+  if (status === 'completed') return false;
+  if (status === 'cancelled') return false; // cancelled 同样不算"过期"
+  const gd = new Date(getGhostDateStr()+'T00:00:00Z');
+  const pd = new Date(plannedDate+'T00:00:00Z');
+  return pd < gd;
+}
+
+// ─── continuity.js 核心逻辑（内联，避免 localStorage 污染主应用）─
+const _STORE_KEY = '_TEST_continuityV1';
+const _COMPLETED_TTL = 7 * 24 * 60 * 60 * 1000;
+const _testStorage = {};
+function _testLoad() {
+  try { const r=_testStorage[_STORE_KEY]; return r?JSON.parse(r):[]; } catch(e){ return []; }
+}
+function _pruneContinuity(items) {
+  const now = Date.now();
+  return items.filter(it => {
+    if (it.status !== 'completed') return true;
+    if (!it.completedAt) return true;
+    return (now - it.completedAt) <= _COMPLETED_TTL;
+  });
+}
+function _testSave(items) {
+  _testStorage[_STORE_KEY] = JSON.stringify(_pruneContinuity(items));
+}
+function _genId() { return 'ct_'+Date.now().toString(36)+Math.random().toString(36).slice(2,9); }
+
+function recordContinuity(opts, planDate=null, planPart=null) {
+  const {type,subject,summary,source='chat',sourceId=null}=opts;
+  if(!type||!subject||!summary) return null;
+  const item={id:_genId(),type,subject,status:'pending',summary,source,sourceId,
+    mentionedAt:Date.now(),startedAt:0,updatedAt:Date.now(),completedAt:null,
+    plannedDate:planDate,plannedDayPart:planPart};
+  const items=_testLoad(); items.push(item); _testSave(items);
+  return item;
+}
+function completeContinuity(id) {
+  const items=_testLoad();
+  const idx=items.findIndex(it=>it.id===id); if(idx<0)return null;
+  items[idx].status='completed'; items[idx].completedAt=Date.now(); items[idx].updatedAt=Date.now();
+  _testSave(items);
+  return items[idx];
+}
+function getActiveContinuity() {
+  return _testLoad().filter(it=>it.status==='pending'||it.status==='ongoing');
+}
+function getAllContinuity() { return _testLoad(); }
+
+// ─── B3 去重判断（更新版，反映修正后的保守规则）──────────
+function _crossBatchDupeCheck(type, subject, plannedDate) {
+  // 修正：只有新事件有具体日期时才查重；无日期时不去重（保守原则）
+  if (!plannedDate) return false;
+  const norm = (s) => (s || '').trim().toLowerCase();
+  const existing = getAllActiveFn().find(c =>
+    c.type === type &&
+    norm(c.subject) === norm(subject) &&
+    c.plannedDate === plannedDate
+  );
+  return !!existing;
+}
+// 使测试环境的 active 查询指向测试存储
+function getAllActiveFn() {
+  return _testLoad().filter(it => it.status === 'pending' || it.status === 'ongoing');
+}
+
+// ─── B1：_validateContinuityProposal 关键返回行（内联模拟）──
+function _validateCreate(action) {
+  const {type,subject,summary,status,timeExpr} = action;
+  if(!type||!subject||!summary) return null;
+  if(status!=='pending'&&status!=='ongoing') return null;
+  // B1 修复后的返回
+  return { action:'create', type, subject, summary, status,
+    ...(timeExpr ? {timeExpr} : {}) };
+}
+function _validateUpdate(action) {
+  const {targetId,status,summary,timeExpr} = action;
+  if(!targetId||!summary) return null;
+  // B1 修复后的返回
+  return { action:'update', targetId, status: status||'pending', summary,
+    ...(timeExpr ? {timeExpr} : {}) };
+}
+
+// ─── 测试 B1: timeExpr 透传 ─────────────────────────
+
+section('B1 — timeExpr 透传修复');
+
+(function() {
+  // 修复前：timeExpr 会丢失
+  // 修复后：timeExpr 必须出现在返回值里
+
+  const a1 = _validateCreate({
+    action:'create', type:'work', subject:'training',
+    summary:'Training scheduled for tomorrow morning.',
+    status:'pending', timeExpr:'tomorrow morning'
+  });
+  assert(a1 !== null, 'create action 校验通过');
+  assert(a1?.timeExpr === 'tomorrow morning', 'create: timeExpr 保留', `got: ${a1?.timeExpr}`);
+
+  const a2 = _validateCreate({
+    action:'create', type:'work', subject:'briefing',
+    summary:'Briefing scheduled for next Monday.',
+    status:'pending', timeExpr:'next Monday'
+  });
+  assert(a2?.timeExpr === 'next Monday', 'create: timeExpr next Monday 保留', `got: ${a2?.timeExpr}`);
+
+  const a3 = _validateCreate({
+    action:'create', type:'work', subject:'paperwork',
+    summary:'Paperwork this afternoon.',
+    status:'pending'
+    // 无 timeExpr
+  });
+  assert(a3 !== null, 'create: 无 timeExpr 不报错');
+  assert(!('timeExpr' in a3), 'create: 无 timeExpr 时不添加字段', `got: ${JSON.stringify(a3)}`);
+
+  const a4 = _validateUpdate({
+    action:'update', targetId:'ct_abc', status:'pending',
+    summary:'Briefing rescheduled to tomorrow.',
+    timeExpr:'tomorrow'
+  });
+  assert(a4?.timeExpr === 'tomorrow', 'update: timeExpr 保留', `got: ${a4?.timeExpr}`);
+
+  const a5 = _validateUpdate({
+    action:'update', targetId:'ct_abc', status:'ongoing',
+    summary:'Briefing in progress.'
+    // 无 timeExpr
+  });
+  assert(!('timeExpr' in a5), 'update: 无 timeExpr 时不添加字段', `got: ${JSON.stringify(a5)}`);
+})();
+
+// ─── 测试 B1 + continuityTime 集成：时间解析 ─────────
+
+section('B1 集成 — 时间解析正确性');
+
+(function() {
+  // 今天是 2026-11-07 Saturday（已用 node -e 验证真实日历）
+  // next Monday = Saturday+2 = 2026-11-09（Monday 正确）
+  // next Friday = Saturday+6 = 2026-11-13（Friday 正确）
+  // this Friday = 今天是 Saturday，this Friday daysToAdd = 5-6=-1 → +7=6 → Saturday+6 = 2026-11-13
+  // this Sunday  = Saturday+1 = 2026-11-08（明天）
+  // next Saturday = Saturday→ 0 → +7 = 2026-11-14（下周六）
+
+  const tomorrow = parseRelativeDateToGhostLocal('tomorrow morning');
+  assert(tomorrow === '2026-11-08', 'tomorrow morning → 2026-11-08 (Sunday)', `got: ${tomorrow}`);
+
+  const tmPart = extractDayPart('tomorrow morning');
+  assert(tmPart === 'morning', 'tomorrow morning → dayPart=morning', `got: ${tmPart}`);
+
+  const nextMon = parseRelativeDateToGhostLocal('next Monday');
+  assert(nextMon === '2026-11-09', 'next Monday → 2026-11-09 (Monday, Saturday+2)', `got: ${nextMon}`);
+
+  const nextFri = parseRelativeDateToGhostLocal('next Friday');
+  assert(nextFri === '2026-11-13', 'next Friday → 2026-11-13 (Friday, Saturday+6)', `got: ${nextFri}`);
+
+  const thisFri = parseRelativeDateToGhostLocal('this Friday');
+  // this Friday from Saturday: daysToAdd = 5-6 = -1 → +7 = 6 → Saturday+6 = 11-13
+  assert(thisFri === '2026-11-13', 'this Friday → 2026-11-13 (next occurrence from Saturday)', `got: ${thisFri}`);
+
+  const thisSun = parseRelativeDateToGhostLocal('this Sunday');
+  // this Sunday from Saturday: daysToAdd = 0-6 = -6 → +7 = 1 → Saturday+1 = 11-08
+  assert(thisSun === '2026-11-08', 'this Sunday → 2026-11-08 (tomorrow)', `got: ${thisSun}`);
+
+  const nextSat = parseRelativeDateToGhostLocal('next Saturday');
+  // next Saturday from Saturday: daysToAdd = 6-6=0 → <=0 → +7 → Saturday+7 = 11-14
+  assert(nextSat === '2026-11-14', 'next Saturday → 2026-11-14 (Saturday+7)', `got: ${nextSat}`);
+
+  const in3days = parseRelativeDateToGhostLocal('3 days from now');
+  assert(in3days === '2026-11-10', '3 days from now → 2026-11-10 (Tuesday)', `got: ${in3days}`);
+
+  // 无日期的 timeExpr
+  const none = parseRelativeDateToGhostLocal(null);
+  assert(none === null, 'null timeExpr → null', `got: ${none}`);
+
+  const evePart = extractDayPart('this evening');
+  assert(evePart === 'evening', 'this evening → dayPart=evening', `got: ${evePart}`);
+})();
+
+// ─── 测试 B3: 跨批次去重 ────────────────────────────
+
+section('B3 — 跨批次去重（保守规则）');
+
+(function() {
+  // 清空测试存储
+  delete _testStorage[_STORE_KEY];
+
+  // 创建一条 training/pending，无日期
+  const t1 = recordContinuity({type:'work',subject:'training',summary:'Training pending.'});
+  assert(t1 !== null, 'B3: 第一条记录创建成功');
+
+  // 无日期同名事件 → 不去重（修正后：无法确认是否同一场，保留原始记录）
+  const dupe1 = _crossBatchDupeCheck('work', 'training', null);
+  assert(dupe1 === false, 'B3: 无日期同名事件 → 不去重（保守原则，不误合并）', `dupe: ${dupe1}`);
+
+  // 不同 subject → 不去重
+  const dupe2 = _crossBatchDupeCheck('work', 'briefing', '2026-11-08');
+  assert(dupe2 === false, 'B3: 不同 subject → 不去重', `dupe: ${dupe2}`);
+
+  // 相同 subject 但新事件无日期 → 和已有日期的不冲突（不去重）
+  const dupe3 = _crossBatchDupeCheck('work', 'training', null);
+  assert(dupe3 === false, 'B3: 新事件无日期 → 不去重，即使存在有日期的同类', `dupe: ${dupe3}`);
+
+  // 清空，测试带日期的情况
+  delete _testStorage[_STORE_KEY];
+
+  // 创建一条 training，plannedDate = tomorrow
+  const t2 = recordContinuity({type:'work',subject:'training',summary:'Training tomorrow.'}, '2026-11-08', 'morning');
+  assert(t2?.plannedDate === '2026-11-08', 'B3: 带日期记录创建成功，date写入', `got: ${t2?.plannedDate}`);
+
+  // 同 type+subject+同日期 → 去重
+  const dupe4 = _crossBatchDupeCheck('work', 'training', '2026-11-08');
+  assert(dupe4 === true, 'B3: 同日期同事件 → 去重', `dupe: ${dupe4}`);
+
+  // 不同日期 → 不去重（今天的训练和明天的训练是两件事）
+  const dupe5 = _crossBatchDupeCheck('work', 'training', '2026-11-09');
+  assert(dupe5 === false, 'B3: 不同日期同类事件 → 不去重 ✓', `dupe: ${dupe5}`);
+
+  // 大小写差异：Training vs training → 视为同一 subject（避免重复创建）
+  const dupeCase = _crossBatchDupeCheck('work', 'Training', '2026-11-08');
+  assert(dupeCase === true, 'B3: subject 大小写不敏感比较（Training=training）', `dupe: ${dupeCase}`);
+
+  // 首尾空格差异：training vs ' training ' → 视为同一 subject
+  const dupeSpace = _crossBatchDupeCheck('work', '  training  ', '2026-11-08');
+  assert(dupeSpace === true, 'B3: subject 首尾空格不敏感比较', `dupe: ${dupeSpace}`);
+
+  // 无日期 → 不去重（即使已存在有日期的）
+  const dupe6 = _crossBatchDupeCheck('work', 'training', null);
+  assert(dupe6 === false, 'B3: 新事件无日期 → 不去重（保守）', `dupe: ${dupe6}`);
+
+  // 完成后，同 type+subject+date 应可以重新创建（已 completed 不在 active 中）
+  completeContinuity(t2.id);
+  const dupe7 = _crossBatchDupeCheck('work', 'training', '2026-11-08');
+  assert(dupe7 === false, 'B3: 已完成事件不阻止新建同类', `dupe: ${dupe7}`);
+
+  // 每周重复——连续两周的训练不应合并（日期不同）
+  delete _testStorage[_STORE_KEY];
+  recordContinuity({type:'work',subject:'training',summary:'Training this week.'}, '2026-11-10', null);
+  const dupeWeekly = _crossBatchDupeCheck('work', 'training', '2026-11-17');
+  assert(dupeWeekly === false, 'B3: 下周训练不被本周训练去重', `dupe: ${dupeWeekly}`);
+})();
+
+// ─── 测试 B4: 清理过期已完成事件 ────────────────────
+
+section('B4 — 已完成事件清理');
+
+(function() {
+  delete _testStorage[_STORE_KEY];
+
+  // 创建一条事件并完成，设置 completedAt 为 8 天前
+  const t1 = recordContinuity({type:'work',subject:'briefing',summary:'Briefing done.'});
+  const loaded = _testLoad();
+  const idx = loaded.findIndex(it => it.id === t1.id);
+  loaded[idx].status = 'completed';
+  loaded[idx].completedAt = Date.now() - 8 * 24 * 60 * 60 * 1000; // 8天前
+  _testStorage[_STORE_KEY] = JSON.stringify(loaded); // 直接写，绕过 prune
+
+  // 创建一条正常事件
+  const t2 = recordContinuity({type:'work',subject:'training',summary:'Training tomorrow.'});
+
+  // 创建一条完成但只有 2 天的事件
+  const t3 = recordContinuity({type:'meal',subject:'lunch',summary:'Lunch done.'});
+  completeContinuity(t3.id); // completedAt = now，在 7 天内
+
+  // 创建一条 expired pending（日期过去但未完成）
+  const t4 = recordContinuity({type:'work',subject:'paperwork',summary:'Paperwork pending.'}, '2026-11-01', null);
+  // 手动设 plannedDate 为过去
+  const loaded2 = _testLoad();
+  const idx4 = loaded2.findIndex(it => it.id === t4.id);
+  loaded2[idx4].plannedDate = '2026-11-01';
+  _testStorage[_STORE_KEY] = JSON.stringify(loaded2);
+
+  // 现在触发一次保存（通过 recordContinuity 触发 _saveContinuity → _pruneContinuity）
+  const dummy = recordContinuity({type:'rest',subject:'sleep',summary:'Resting.'});
+  // _saveContinuity 在 recordContinuity 里调用，会触发 prune
+
+  const after = getAllContinuity();
+  const ids = after.map(it => it.id);
+
+  assert(!ids.includes(t1.id), 'B4: 8天前完成的事件已清理', `剩余ids: ${JSON.stringify(ids)}`);
+  assert(ids.includes(t2.id), 'B4: pending 事件保留', `剩余ids: ${JSON.stringify(ids)}`);
+  assert(ids.includes(t3.id), 'B4: 2天前完成的事件保留（未到7天）', `剩余ids: ${JSON.stringify(ids)}`);
+  assert(ids.includes(t4.id), 'B4: 过期 pending 不被清理（仅完成才删）', `剩余ids: ${JSON.stringify(ids)}`);
+  assert(ids.includes(dummy.id), 'B4: 新创建事件保留', `剩余ids: ${JSON.stringify(ids)}`);
+
+  // 验证 _pruneContinuity 不删 completedAt 缺失的旧数据
+  delete _testStorage[_STORE_KEY];
+  const t5 = recordContinuity({type:'work',subject:'old',summary:'Old completed.'});
+  const loaded3 = _testLoad();
+  const idx5 = loaded3.findIndex(it=>it.id===t5.id);
+  loaded3[idx5].status = 'completed';
+  loaded3[idx5].completedAt = null; // 旧格式，无 completedAt
+  _testStorage[_STORE_KEY] = JSON.stringify(loaded3);
+  // 触发 prune
+  recordContinuity({type:'rest',subject:'nap',summary:'Napping.'});
+  const after5 = getAllContinuity();
+  assert(after5.some(it=>it.id===t5.id), 'B4: 无 completedAt 的旧数据不被误删');
+})();
+
+// ─── 回归测试：现有功能未破坏 ──────────────────────
+
+section('回归 — 现有 Continuity 功能未破坏');
+
+(function() {
+  delete _testStorage[_STORE_KEY];
+
+  // updateContinuity 基本功能
+  const t1 = recordContinuity({type:'work',subject:'briefing',summary:'Briefing pending.'}, '2026-11-08', 'morning');
+  assert(t1 !== null && t1.plannedDate === '2026-11-08', '回归: recordContinuity 返回正确记录');
+
+  // completeContinuity
+  const c1 = completeContinuity(t1.id);
+  assert(c1?.status === 'completed', '回归: completeContinuity 状态更新');
+
+  // getActiveContinuity 不包含 completed
+  const active = getActiveContinuity();
+  assert(!active.some(it=>it.id===t1.id), '回归: completed 不进入 active');
+
+  // isEventExpired 不影响 completed
+  assert(isEventExpired('2026-11-01', 'completed') === false, '回归: completed 不算过期');
+  assert(isEventExpired('2026-11-01', 'pending') === true,    '回归: 过去的 pending 算过期');
+  assert(isEventExpired('2026-11-10', 'pending') === false,   '回归: 未来的 pending 不过期');
+  assert(isEventExpired(null, 'pending') === false,           '回归: 无日期不算过期');
+
+  // 时区不受影响（Time Authority 仍是唯一来源）
+  assert(typeof getGhostTimeZone === 'function', '回归: getGhostTimeZone 存在');
+  assert(getGhostTimeZone() === 'Europe/London', '回归: Time Authority 正常返回时区');
+
+  // isEventExpired 现在也排除 cancelled 状态
+  assert(isEventExpired('2026-11-01', 'cancelled') === false, '回归: cancelled 不算过期');
+})();
+
+// ─── Cancel 功能测试 ──────────────────────────────────
+
+section('Cancel 功能 (B5)');
+
+// 补充 cancelContinuity 和 getRecentCancelledContinuity 的测试版本
+function cancelContinuityTest(id, summary, reason) {
+  const items = _testLoad();
+  const idx = items.findIndex(it => it.id === id);
+  if (idx < 0) return null;
+  const item = items[idx];
+  if (item.status === 'completed') return null; // 终态保护
+  if (item.status === 'cancelled') return null;
+  if (summary && summary !== item.summary) {
+    if (!item.changes) item.changes = [];
+    item.changes.push({ at: Date.now(), from: item.summary, to: summary, reason: reason || 'cancelled' });
+    if (item.changes.length > 3) item.changes = item.changes.slice(-3);
+    item.summary = summary;
+  }
+  item.status = 'cancelled';
+  item.cancelledAt = Date.now();
+  item.updatedAt = Date.now();
+  items[idx] = item;
+  _testSave(items);
+  return item;
+}
+function getRecentCancelledTest() {
+  const now = Date.now();
+  const WINDOW = 24 * 60 * 60 * 1000;
+  return _testLoad().filter(it => it.status === 'cancelled' && it.cancelledAt && (now - it.cancelledAt) <= WINDOW);
+}
+
+// _validateCancel 逻辑内联
+function _validateCancel(action, activeFn) {
+  const { targetId, summary } = action;
+  if (!targetId) return null;
+  const active = activeFn();
+  const target = active.find(c => c.id === targetId);
+  if (!target) return null;
+  if (target.status === 'completed') return null;
+  if (target.status === 'cancelled') return null;
+  return { action: 'cancel', targetId, summary: summary || (target.subject + ' cancelled.') };
+}
+
+(function() {
+  delete _testStorage[_STORE_KEY];
+
+  // 创建一个 pending 事件
+  const t1 = recordContinuity({type:'work', subject:'briefing', summary:'Briefing scheduled tomorrow.'}, '2026-11-08', 'morning');
+  assert(t1?.status === 'pending', 'Cancel: pending 事件创建成功');
+
+  // 正常取消
+  const c1 = cancelContinuityTest(t1.id, 'Briefing cancelled.', 'Simon confirmed');
+  assert(c1?.status === 'cancelled', 'Cancel: pending → cancelled', `status: ${c1?.status}`);
+  assert(c1?.cancelledAt > 0, 'Cancel: cancelledAt 已记录', `cancelledAt: ${c1?.cancelledAt}`);
+
+  // 已取消事件不进入 active
+  const active1 = getAllActiveFn();
+  assert(!active1.find(it => it.id === t1.id), 'Cancel: cancelled 事件不进入 active');
+
+  // 已取消事件在最近 24h 内进入 recent cancelled
+  const recent1 = getRecentCancelledTest();
+  assert(recent1.find(it => it.id === t1.id), 'Cancel: 刚取消的事件进入 recent cancelled');
+
+  // 已取消不能被重复取消
+  const c2 = cancelContinuityTest(t1.id, 'Briefing cancelled again.', 'test');
+  assert(c2 === null, 'Cancel: 已取消事件不能重复取消', `result: ${c2}`);
+
+  // 已完成事件不能被取消
+  const t2 = recordContinuity({type:'work', subject:'training', summary:'Training done.'});
+  completeContinuity(t2.id);
+  const c3 = cancelContinuityTest(t2.id, 'Training cancelled.', 'test');
+  assert(c3 === null, 'Cancel: 已完成事件不能被取消（终态保护）', `result: ${c3}`);
+
+  // _validateCancel：targetId 在 active 里才通过
+  const t3 = recordContinuity({type:'work', subject:'meeting', summary:'Meeting pending.'});
+  const v1 = _validateCancel({ action: 'cancel', targetId: t3.id }, getAllActiveFn);
+  assert(v1?.action === 'cancel', 'Cancel 校验: active 事件通过', `result: ${JSON.stringify(v1)}`);
+  assert(v1?.targetId === t3.id, 'Cancel 校验: targetId 正确保留');
+
+  // _validateCancel：不存在的 targetId 拒绝
+  const v2 = _validateCancel({ action: 'cancel', targetId: 'ct_fake' }, getAllActiveFn);
+  assert(v2 === null, 'Cancel 校验: 不存在的 targetId 拒绝');
+
+  // 取消后历史记录完整
+  const c4 = cancelContinuityTest(t3.id, 'Meeting cancelled.');
+  assert(c4?.changes?.length > 0, 'Cancel: 变化历史已记录', `changes: ${JSON.stringify(c4?.changes)}`);
+  assert(c4?.changes?.[0]?.reason === 'cancelled', 'Cancel: changes.reason 正确');
+
+  // 区分 cancel vs complete vs expired
+  delete _testStorage[_STORE_KEY];
+  const tComp = recordContinuity({type:'meal', subject:'lunch', summary:'Lunch pending.'});
+  completeContinuity(tComp.id);
+  const tCancel = recordContinuity({type:'work', subject:'ops', summary:'Ops pending.'});
+  cancelContinuityTest(tCancel.id, 'Ops cancelled.');
+  const tExpired = recordContinuity({type:'work', subject:'report', summary:'Report pending.'}, '2026-11-01', null);
+
+  const allItems = _testLoad();
+  const compItem = allItems.find(it => it.id === tComp.id);
+  const cancelItem = allItems.find(it => it.id === tCancel.id);
+  const expiredItem = allItems.find(it => it.id === tExpired.id);
+
+  assert(compItem?.status === 'completed', 'Cancel vs complete: completed 状态正确');
+  assert(cancelItem?.status === 'cancelled', 'Cancel vs complete: cancelled 状态正确');
+  assert(expiredItem?.status === 'pending',   'Cancel vs expired: expired pending 状态仍是 pending（不被清理）');
+  assert(compItem?.completedAt > 0, 'Cancel vs complete: completedAt 存在');
+  assert(cancelItem?.cancelledAt > 0, 'Cancel vs complete: cancelledAt 存在');
+  assert(expiredItem?.completedAt === null, 'Cancel vs expired: expired pending 无 completedAt');
+})();
+
+// ─── 汇总 ─────────────────────────────────────────
+const total = pass + fail;
+const summaryEl = document.getElementById('summary');
+summaryEl.textContent = `测试完成: ${pass}/${total} 通过`;
+summaryEl.className = 'summary ' + (fail === 0 ? 'pass-s' : 'fail-s');
+if (fail > 0) {
+  summaryEl.textContent += ` — ${fail} 项失败，见上方红色标注`;
+}
+
+</script>
+</body>
+</html>

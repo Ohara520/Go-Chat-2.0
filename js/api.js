@@ -554,12 +554,31 @@ async function callDeepSeekWithSystem(system, user, maxTokens = 200) {
  * @returns {Response} 原始fetch Response（调用方自己.json()）
  */
 async function fetchSonnetWithCache(finalSystem, parts, messages, maxTokens = 1000, signal = null) {
-  // 中转节点不透传 anthropic-beta header，暂时不用 cache_control
-  // 等中转支持透传后再开启缓存
+  // 构造 Anthropic 原生 system 数组：稳定层(fixed)标记缓存，动态层(dynamic)追加
+  const systemBlocks = [];
+
+  if (parts && parts.fixed) {
+    systemBlocks.push({
+      type: 'text',
+      text: parts.fixed,
+      cache_control: { type: 'ephemeral' }
+    });
+  }
+
+  if (parts && parts.dynamic) {
+    systemBlocks.push({
+      type: 'text',
+      text: parts.dynamic
+    });
+  }
+
+  // 兜底：若parts未提供或为空，回退到字符串system（保持向后兼容）
+  const system = systemBlocks.length > 0 ? systemBlocks : finalSystem;
+
   const body = {
     model: MODEL_OPUS,
     max_tokens: maxTokens,
-    system: finalSystem,
+    system: system,
     messages: messages,
   };
 

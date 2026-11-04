@@ -111,12 +111,13 @@ function extractDayPart(timeExpr) {
 /**
  * 判断事件是否过期
  * @param {string} plannedDate - 计划日期（YYYY-MM-DD）
- * @param {string} status - 事件状态（pending/ongoing/completed）
+ * @param {string} status - 事件状态（pending/ongoing/completed/cancelled）
  * @returns {boolean} - 是否过期
  */
 function isEventExpired(plannedDate, status) {
   if (!plannedDate) return false; // 无计划日期，永不过期
   if (status === 'completed') return false; // 已完成，不算过期
+  if (status === 'cancelled') return false; // 已取消，不算"过期"（另行处理）
 
   const ghostDateStr = getGhostDateStr(); // YYYY-MM-DD
   const ghostDate = new Date(ghostDateStr + 'T00:00:00Z');

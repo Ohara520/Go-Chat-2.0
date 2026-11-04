@@ -55,10 +55,40 @@ function _loadContinuity() {
 
 function _saveContinuity(items) {
   try {
-    localStorage.setItem(CONTINUITY_STORAGE_KEY, JSON.stringify(items));
+    // B4：写入前先清理超期已完成事件，避免无限累积
+    const pruned = _pruneContinuity(items);
+    localStorage.setItem(CONTINUITY_STORAGE_KEY, JSON.stringify(pruned));
   } catch (e) {
     console.error('[Continuity] Save error:', e);
   }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// B4: 清理过期已完成/已取消事件
+// 规则：status === 'completed' 或 'cancelled' 且对应时间戳距今超过 7 天 → 可安全删除
+// 绝不删除：未完成（pending/ongoing）、过期但未确认完成（expired pending）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const _CONTINUITY_COMPLETED_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
+
+function _pruneContinuity(items) {
+  const now = Date.now();
+  const before = items.length;
+  const pruned = items.filter(it => {
+    // 只清理已结束（completed/cancelled）且超过 7 天的记录
+    if (it.status === 'completed') {
+      if (!it.completedAt) return true; // 无完成时间，保留（旧数据兼容）
+      return (now - it.completedAt) <= _CONTINUITY_COMPLETED_TTL_MS;
+    }
+    if (it.status === 'cancelled') {
+      if (!it.cancelledAt) return true; // 无取消时间，保留（旧数据兼容）
+      return (now - it.cancelledAt) <= _CONTINUITY_COMPLETED_TTL_MS;
+    }
+    return true; // 未完成，保留
+  });
+  if (pruned.length !== before) {
+    console.log(`[Continuity] Pruned ${before - pruned.length} ended events older than 7d`);
+  }
+  return pruned;
 }
 
 function _generateId() {
@@ -286,6 +316,80 @@ function getRecentCompletedContinuity() {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// API: cancelContinuity (Batch Cancel)
+// 将一个 Continuity 记录标记为 cancelled（终态，不可被 update/complete 重开）
+// 区别于 complete：cancel 表示安排被取消、不会发生
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function cancelContinuity(id, cancelSummary, reason) {
+  const items = _loadContinuity();
+  const idx = items.findIndex(it => it.id === id);
+  if (idx < 0) {
+    console.warn('[Continuity] cancelContinuity: id not found:', id);
+    return null;
+  }
+
+  const item = items[idx];
+
+  // 终态保护：completed 和 cancelled 都不能再被取消
+  if (item.status === 'completed') {
+    console.warn('[Continuity] cancelContinuity: cannot cancel completed thread:', id);
+    return null;
+  }
+  if (item.status === 'cancelled') {
+    console.warn('[Continuity] cancelContinuity: thread already cancelled:', id);
+    return null;
+  }
+
+  // 记录变化历史
+  if (cancelSummary && cancelSummary !== item.summary) {
+    if (!item.changes) item.changes = [];
+    const lastChange = item.changes[item.changes.length - 1];
+    if (!lastChange || lastChange.to !== cancelSummary) {
+      item.changes.push({
+        at: Date.now(),
+        from: item.summary,
+        to: cancelSummary,
+        reason: reason || 'cancelled'
+      });
+      if (item.changes.length > 3) {
+        item.changes = item.changes.slice(-3);
+      }
+    }
+    item.summary = cancelSummary;
+  }
+
+  item.status = 'cancelled';
+  item.cancelledAt = Date.now();
+  item.updatedAt = Date.now();
+
+  items[idx] = item;
+  _saveContinuity(items);
+
+  return item;
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// API: getRecentCancelledContinuity
+// 返回所有 Recently cancelled（cancelledAt 距当前 <= 24h）记录
+// 短期进入 Context，避免 Simon 刚取消就忘记
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function getRecentCancelledContinuity() {
+  const items = _loadContinuity();
+  const now = Date.now();
+  const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  return items.filter(it => {
+    if (it.status !== 'cancelled') return false;
+    if (!it.cancelledAt) return false;
+    return (now - it.cancelledAt) <= WINDOW_MS;
+  });
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // API: buildContinuityContext
 // 构建当前 Continuity 的只读事实 block
 // 返回纯文本，供 ghostContext.js 注入
@@ -294,6 +398,7 @@ function getRecentCompletedContinuity() {
 function buildContinuityContext() {
   const active = getActiveContinuity();
   const recent = getRecentCompletedContinuity();
+  const recentCancelled = getRecentCancelledContinuity();
 
   const pending = active.filter(it => it.status === 'pending');
   const ongoing = active.filter(it => it.status === 'ongoing');
@@ -313,7 +418,7 @@ function buildContinuityContext() {
   });
 
   // 如果没有任何有效 Continuity，返回空字符串（不输出空 block）
-  if (!currentPending.length && !ongoing.length && !recent.length && !expiredPending.length) {
+  if (!currentPending.length && !ongoing.length && !recent.length && !expiredPending.length && !recentCancelled.length) {
     return '';
   }
 
@@ -339,7 +444,7 @@ function buildContinuityContext() {
         lines.push(`  (Originally: ${it.changes[0].from})`);
       }
     });
-    if (ongoing.length || recent.length) lines.push('');
+    if (ongoing.length || recent.length || recentCancelled.length) lines.push('');
   }
 
   if (ongoing.length) {
@@ -360,13 +465,30 @@ function buildContinuityContext() {
         lines.push(`  (Originally: ${it.changes[0].from})`);
       }
     });
-    if (recent.length) lines.push('');
+    if (recent.length || recentCancelled.length) lines.push('');
   }
 
   if (recent.length) {
     lines.push('Recently completed:');
     recent.forEach(it => {
       // 完成事件显示简洁的变化历史（如果有）
+      let line = `- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`;
+
+      if (it.changes && it.changes.length > 0) {
+        const changeDesc = it.changes.map(c => c.from.replace(/\.$/, '')).join(' → ');
+        line += `. (Was: ${changeDesc})`;
+      }
+
+      lines.push(line);
+    });
+    if (expiredPending.length || recentCancelled.length) lines.push('');
+  }
+
+  // Recently cancelled 段：短期进入 Context，避免刚取消就忘记
+  // cancelled 是终态，与 completed 区分：completed 表示已发生，cancelled 表示不会发生
+  if (recentCancelled.length) {
+    lines.push('Recently cancelled:');
+    recentCancelled.forEach(it => {
       let line = `- ${it.summary}${_formatElapsedTime(it.mentionedAt)}`;
 
       if (it.changes && it.changes.length > 0) {

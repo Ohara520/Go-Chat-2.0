@@ -2335,6 +2335,29 @@ async function _extractAndProcessContinuity(userMsg, simonReply) {
           plannedDayPart = extractDayPart(validated.timeExpr);
         }
 
+        // B3 跨批次去重：查找 active 记录中是否已有相同事件
+        // 规则：type + subject 相同（大小写不敏感、忽略首尾空格），
+        //       且两者都有具体 plannedDate 且日期相同 → 视为同一事件，跳过
+        // 保守原则：任意一方无日期时不去重，因为无法确认是否同一场活动
+        // 示例：今天训练(11-07) vs 明天训练(11-08) → 不去重 ✓
+        //        同一天同一场训练被重复提及 → 去重 ✓
+        //        无日期事件 vs 任意 → 不去重（宁可多记录，不要误合并）✓
+        // 格式容错：subject 由 LLM 生成，"training" / "Training" / "training "
+        //           视为同一 subject，避免大小写/首尾空格导致重复创建
+        const _normSubject = (s) => (s || '').trim().toLowerCase();
+        const existing = plannedDate
+          ? getActiveContinuity().find(c =>
+              c.type === validated.type &&
+              _normSubject(c.subject) === _normSubject(validated.subject) &&
+              c.plannedDate === plannedDate
+            )
+          : null; // 新事件无日期 → 保守不去重
+        if (existing) {
+          console.warn('[Continuity] Skipping cross-batch duplicate:', key,
+            'plannedDate:', plannedDate, 'matches existing:', existing.id);
+          continue;
+        }
+
         const newItem = recordContinuity({
           type: validated.type,
           subject: validated.subject,
@@ -2366,6 +2389,10 @@ async function _extractAndProcessContinuity(userMsg, simonReply) {
         updateContinuity(validated.targetId, updates);
       } else if (validated.action === 'complete') {
         completeContinuity(validated.targetId, validated.summary);
+      } else if (validated.action === 'cancel') {
+        if (typeof cancelContinuity === 'function') {
+          cancelContinuity(validated.targetId, validated.summary, 'Simon confirmed cancellation');
+        }
       }
     }
   } catch (e) {
@@ -2387,7 +2414,7 @@ function _validateContinuityProposal(action) {
   const { action: actionType } = action;
 
   // 1. action 合法性
-  const validActions = ['create', 'update', 'complete'];
+  const validActions = ['create', 'update', 'complete', 'cancel'];
   if (!validActions.includes(actionType)) {
     return null;
   }
@@ -2414,7 +2441,9 @@ function _validateContinuityProposal(action) {
       return null;
     }
 
-    return { action: 'create', type, subject, summary, status };
+    // B1 修复：透传 timeExpr，使下游时间解析能拿到模型提取的时间表达
+    return { action: 'create', type, subject, summary, status,
+      ...(action.timeExpr ? { timeExpr: action.timeExpr } : {}) };
   }
 
   // 3. update 校验
@@ -2453,7 +2482,9 @@ function _validateContinuityProposal(action) {
       return null;
     }
 
-    return { action: 'update', targetId, status: status || target.status, summary };
+    // B1 修复：透传 timeExpr，使下游能解析新的计划时间
+    return { action: 'update', targetId, status: status || target.status, summary,
+      ...(action.timeExpr ? { timeExpr: action.timeExpr } : {}) };
   }
 
   // 4. complete 校验
@@ -2487,6 +2518,43 @@ function _validateContinuityProposal(action) {
     }
 
     return { action: 'complete', targetId, summary: summary || target.summary };
+  }
+
+  // 5. cancel 校验
+  if (actionType === 'cancel') {
+    const { targetId, summary } = action;
+
+    // 必填字段
+    if (!targetId) {
+      console.warn('[Continuity] cancel: missing targetId');
+      return null;
+    }
+
+    // targetId 必须存在于 active continuity
+    const activeForCancel = getActiveContinuity();
+    const cancelTarget = activeForCancel.find(c => c.id === targetId);
+    if (!cancelTarget) {
+      console.warn('[Continuity] cancel: targetId not found in active continuity', targetId);
+      return null;
+    }
+
+    // 终态不能被取消：completed 和 cancelled 均保护
+    if (cancelTarget.status === 'completed') {
+      console.warn('[Continuity] cancel: cannot cancel completed thread', targetId);
+      return null;
+    }
+    if (cancelTarget.status === 'cancelled') {
+      console.warn('[Continuity] cancel: thread already cancelled', targetId);
+      return null;
+    }
+
+    // summary 安全检查（如果有）
+    if (summary && !_isSafeSummary(summary)) {
+      console.warn('[Continuity] cancel: unsafe summary');
+      return null;
+    }
+
+    return { action: 'cancel', targetId, summary: summary || `${cancelTarget.subject} cancelled.` };
   }
 
   return null;
