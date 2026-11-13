@@ -1489,6 +1489,10 @@ Her: ${text}`
       } catch(e) {}
     }
 
+    // ── 最终文本清理（移除控制标签）──
+    // 必须在 appendMessage 之前调用，移除 VOICE_STYLE 等控制标签
+    reply = cleanBotText(reply);
+
     const finalParts = reply.split('\n---\n').filter(p => p.trim());
     if (finalParts.length === 0) finalParts.push('...');
 
