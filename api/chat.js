@@ -95,33 +95,7 @@ export default async function handler(req, res) {
           .join('')
           .trim();
 
-        // ── 临时诊断 V2：记录响应结构和字符类别分布（完全脱敏）──
-        // 目的：恢复原生协议后验证粘字是否消失，标记疑似异常供人工分析
-        const _diagBlocks = (anthropicResponse.content || []).length;
-        const _diagTextBlocks = (anthropicResponse.content || []).filter(b => b.type === 'text').length;
-
-        // 采样：前30字符，彻底脱敏（L=字母 D=数字 P=标点/中文/其他 空格保留）
-        const _maskText = (s) => {
-          return s.substring(0, 30).split('').map(c => {
-            if (/\s/.test(c)) return c;
-            if (/[a-zA-Z]/.test(c)) return 'L';
-            if (/[0-9]/.test(c)) return 'D';
-            return 'P';
-          }).join('');
-        };
-        const _sample = _maskText(text);
-
-        // 统计
-        const _countSpaces = (s) => (s.match(/\s/g) || []).length;
-        const _longestWord = (s) => Math.max(0, ...s.split(/\s+/).map(w => w.length));
-        const _spaces = _countSpaces(text);
-        const _longest = _longestWord(text);
-
-        // 疑似异常标记（需人工判断，非确定结论）
-        const _flag = _longest > 20 ? ' ⚠️SUSPECT' : '';
         const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
-
-        console.log(`[SPACING_DIAG]${_flag} model=${model} protocol=anthropic blocks=${_diagBlocks} textBlocks=${_diagTextBlocks} sample="${_sample}" len=${text.length} spaces=${_spaces} longest=${_longest}`);
         console.log(`[api/chat] ${modelLabel} Anthropic success: ${baseURL}`, {
           model,
           textLen: text.length,
