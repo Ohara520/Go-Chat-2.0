@@ -21,7 +21,7 @@ const MAX_RETRY_COUNT   = 3;
 // ── 脏标记（按 userId + charId 隔离）──────────────────────
 function _dirtyKey() {
   const uid = (typeof getSbUserId === 'function' ? getSbUserId() : '') || 'anon';
-  const cid = (typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : '') || 'ghost';
+  const cid = 'ghost';
   return `_continuityDirty_${uid}_${cid}`;
 }
 
@@ -75,7 +75,7 @@ async function saveContinuity(retryCount) {
   try {
     const sb     = (typeof getSbClient        === 'function') ? getSbClient()        : null;
     const userId = (typeof getSbUserId        === 'function') ? getSbUserId()        : null;
-    const charId = (typeof getCurrentCharacter === 'function') ? getCurrentCharacter() : 'ghost';
+    const charId = 'ghost';
 
     if (!sb || !userId) {
       _syncInProgress = false;
@@ -211,7 +211,7 @@ function _applyConflictResolutions(conflicts) {
 async function loadContinuityFromCloud() {
   const sb     = (typeof getSbClient         === 'function') ? getSbClient()        : null;
   const userId = (typeof getSbUserId         === 'function') ? getSbUserId()        : null;
-  const charId = (typeof getCurrentCharacter  === 'function') ? getCurrentCharacter() : 'ghost';
+  const charId = 'ghost';
 
   if (!sb || !userId) return;
 
