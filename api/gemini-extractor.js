@@ -9,7 +9,7 @@ const BASE_URLS = [
 ];
 
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
-const GEMINI_UPSTREAM_TIMEOUT_MS = 15000;
+const GEMINI_UPSTREAM_TIMEOUT_MS = 20000;
 
 // 从 Gemini Native response 安全提取正文
 function _extractGeminiText(data) {
