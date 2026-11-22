@@ -269,12 +269,12 @@ async function loadFromCloud() {
       setIfMissing('ghostUnlocked_hometown', p.ghostUnlocked_hometown);
 
       // ── 多角色：恢复各角色存档到前缀 key ──────────────
-      if (p.currentCharacter) {
-        localStorage.setItem('currentCharacter', p.currentCharacter);
-      }
+      // 单角色过渡：旧云端可能记着 Keegan，但不再让它切换当前角色。
+      // 旧角色数据仍保留在备份/云端，直到 Ghost 迁移验证完成。
+      localStorage.setItem('currentCharacter', 'ghost');
       if (p.characters && typeof p.characters === 'object') {
         const _charKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
-        const _currentChar = localStorage.getItem('currentCharacter') || 'ghost';
+        const _currentChar = 'ghost';
         Object.keys(p.characters).forEach(charId => {
           const charData = p.characters[charId];
           if (!charData || typeof charData !== 'object') return;
@@ -968,7 +968,7 @@ async function saveChatHistoryNow() {
     localStorage.setItem('chatUpdatedAt', now);
 
     // 聊天记录也存到前缀 key，供多角色切换时保留
-    const _chatChar = localStorage.getItem('currentCharacter') || 'ghost';
+    const _chatChar = 'ghost';
     localStorage.setItem(`${_chatChar}_chatHistory`, JSON.stringify(chatHistoryData));
 
     // ── 磁盘 IO 优化（2026-06-16）──────────────────────────────
