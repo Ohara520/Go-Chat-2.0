@@ -1126,8 +1126,8 @@ async function _processMergedMessageWithContent(userContentForModel) {
           .slice(-6)
           .some(m => m._intimate && (m._time || 0) > Date.now() - 10 * 60 * 1000);
         const _timeoutDefault = _hasRecentIntimateForTimeout
-          ? '{“flirt”:true,”suggestive”:false,”affectionate”:false}'
-          : '{“flirt”:false,”suggestive”:false,”affectionate”:false}';
+          ? '{"flirt":true,"suggestive":false,"affectionate":false}'
+          : '{"flirt":false,"suggestive":false,"affectionate":false}';
 
         // 最近5条上下文（排除当前这句）——供双关/暗示判断”最近是否暧昧”
         const _routingCtx = chatHistory
@@ -1142,7 +1142,7 @@ async function _processMergedMessageWithContent(userContentForModel) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               user: `You are a message classifier. Analyze the user's message and return JSON only.
-Format: {“flirt”:false,”suggestive”:false,”affectionate”:false}
+Format: {"flirt":false,"suggestive":false,"affectionate":false}
 
 flirt: explicit sexual content only (sex acts, genitals, sex toys, explicit invitations like “ride you”). Default false for anything unclear.
 suggestive: sexual innuendo, double meanings, or follow-up questions in an already sexual context (e.g. “what about you?” after a sexual question). Context-aware, not keyword-based.
@@ -1379,16 +1379,10 @@ Her: ${text}`
         reply = '___NETWORK_ERROR___';
         await new Promise(r => setTimeout(r, 400));
         try {
-          const retryRes = await fetchWithTimeout('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: getMainModel(),
-              max_tokens: 300,
-              system: finalSystem,
-              messages: messagesForRequest
-            })
-          }, 20000);
+          const retryRes = await fetchSonnetWithCache(
+            buildSystemPromptParts(_baseSystem), _extraHints, messagesForRequest, 300, _abortCtrl?.signal
+          );
+          if (!retryRes.ok) throw new Error('Claude retry failed');
           const retryData = await retryRes.json();
           const retryReply = retryData.content?.[0]?.text?.trim() || '';
           if (retryReply && !isBreakout(retryReply)) reply = retryReply;
