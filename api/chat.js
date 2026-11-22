@@ -1,3 +1,4 @@
+import { requireActiveAccount } from './_active-account.js';
 import Anthropic from '@anthropic-ai/sdk';
 
 // 中转站节点（Anthropic 原生协议）
@@ -18,6 +19,7 @@ function _isHaikuModel(model) {
 }
 
 export default async function handler(req, res) {
+  if (!(await requireActiveAccount(req, res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
