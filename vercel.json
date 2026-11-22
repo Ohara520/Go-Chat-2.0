@@ -1,15 +1,13 @@
 {
-  "regions": ["hkg1"],
+  "regions": [
+    "hkg1"
+  ],
   "functions": {
     "api/chat.js": {
       "memory": 512,
       "maxDuration": 45
     },
     "api/venice.js": {
-      "memory": 256,
-      "maxDuration": 45
-    },
-    "api/venice-keegan.js": {
       "memory": 256,
       "maxDuration": 45
     },
