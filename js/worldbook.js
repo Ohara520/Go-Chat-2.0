@@ -16,11 +16,11 @@ function _wbLoad() {
 }
 
 function _wbSave(arr) {
-  // 上限 200 条，但锁定的条目永不淘汰
+  // 上限 500 条，但锁定的条目永不淘汰
   if (!Array.isArray(arr)) arr = [];
   const locked = arr.filter(e => e.locked);
   const unlocked = arr.filter(e => !e.locked);
-  const trimmed = [...locked, ...unlocked.slice(0, Math.max(0, 200 - locked.length))];
+  const trimmed = [...locked, ...unlocked.slice(0, Math.max(0, 500 - locked.length))];
   localStorage.setItem('worldBook', JSON.stringify(trimmed));
   if (typeof touchLocalState === 'function') touchLocalState();
 }
