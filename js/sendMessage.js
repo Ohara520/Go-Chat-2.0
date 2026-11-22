@@ -1109,9 +1109,11 @@ async function _processMergedMessageWithContent(userContentForModel) {
     // 修复：最近6条有调情记录时，即使触发日常关键词也不走 Sonnet
     // 原因：调情进行中用户说"好饿"/"在干嘛"，应该留在 Grok，让 Grok 自然切换语气
     // Grok 的 CONTEXT SHIFT 指引负责接住这类切换，不需要路由给 Sonnet
-    const _isClearlyNormal = !_recentHasIntimate &&
-      ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text)))
-      || _angryForceExit;
+    // 每轮独立判断：明确切换到日常时，立即给 Claude 尝试机会；
+    // 最近的亲密记录只用于承接语境，不锁定 Gemini。
+    const _isClearlyNormal = _forcedExitIntimate || _angryForceExit ||
+      ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) &&
+        !INTIMATE_PATTERNS.some(p => p.test(text)) && !_recentHasIntimate);
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
     // 明确日常消息跳过此步骤
@@ -1855,22 +1857,13 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 因此是 rawHistory 的最后一条。这里 slice(-30, -1) 排除它，只取历史；
     // 当前这轮由下面 '\nHer: ' + text 显式追加一次，避免当前消息重复两遍。
     const _rawSlice = rawHistory.slice(-30, -1);
-    const _seenOpenings = new Set();
+    // 保留真实消息顺序；相同开头不代表重复消息，删除会破坏跨模型连续性。
     const recentMsgs = _rawSlice.map(m => {
       const who = m.role === 'user' ? 'Her' : 'Ghost';
-      const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return `${who}: [sent a photo]`;
-      const content = (m.content || '').slice(0, 150);
-      // Ghost 的回复：检查开头是否重复
-      if (m.role === 'assistant') {
-        const opening = content.toLowerCase().split(/[\s.,!?]+/).slice(0, 3).join(' ');
-        if (_seenOpenings.has(opening)) {
-          return null; // 跳过重复开头的回复，Grok 不看到就不会抄
-        }
-        _seenOpenings.add(opening);
-      }
-      return `${who}: ${content}`;
-    }).filter(Boolean).join('\n');
+      const hasPhoto = m._photoBase64?.length || Array.isArray(m.content);
+      const content = typeof m.content === 'string' ? m.content.slice(0, 500) : '';
+      return `${who}: ${hasPhoto ? '[sent a photo] ' : ''}${content}`;
+    }).join('\n');
 
     // 只保留成人 capability / safety boundary。
     // autonomy / 不servile / 有preferences 等人格文案已交给 Gemini Intimacy Persona，不在此重复。
