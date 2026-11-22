@@ -105,30 +105,6 @@ async function loadFromCloud() {
     // · 本地有数据 + 云端无 stateSavedAt（旧格式兼容）→ 保守处理，不覆盖本地
     const cloudIsNewer = localTs === 0 || (cloudStateTs > 0 && cloudStateTs > localTs + 500);
 
-    // ── 单角色过渡：旧用户可能最后停留在 Keegan ────────────
-    // 先恢复 Ghost 前缀存档，再进入常规云端合并。
-    // 严禁把 Keegan 的标准 key 直接当成 Simon 的数据上传。
-    const _legacySelectedChar = localStorage.getItem('currentCharacter');
-    const _legacyWasKeegan = _legacySelectedChar === 'keegan';
-    if (_legacyWasKeegan) {
-      const _ghostSnapshot = data.profile && data.profile.characters && data.profile.characters.ghost;
-      const _legacyKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
-      _legacyKeys.forEach(key => {
-        let raw = localStorage.getItem('ghost_' + key);
-        if (raw === null && _ghostSnapshot && _ghostSnapshot[key] != null) {
-          const value = _ghostSnapshot[key];
-          raw = typeof value === 'string' ? value : JSON.stringify(value);
-        }
-        // 无 Ghost 来源时移除当前 Keegan 值，避免串档。
-        if (raw !== null) localStorage.setItem(key, raw);
-        else localStorage.removeItem(key);
-      });
-      localStorage.setItem('currentCharacter', 'ghost');
-      // 聊天主列可能是 Keegan 的，后续不能无条件合并进 Ghost。
-      // 仅在旧 Ghost 存档完全没有聊天时保留空记录，等待人工核对。
-      console.log('[cloud] 已从旧角色存档恢复 Ghost 本地数据');
-    }
-
     // ── 1. 聊天记录：合并云端和本地，保留更多 ────────────────
     // 重置标记：用户刚重置了对话，云端已在重置时同步，跳过 merge 防止旧数据被恢复
     if (localStorage.getItem('chatResetConfirmed') === '1') {
@@ -141,7 +117,7 @@ async function loadFromCloud() {
         const cleanedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
         await sb.from('user_data').update({ chat_history: cleanedHistory }).eq('user_id', userId);
       } catch(e) {}
-    } else if (!_legacyWasKeegan && data.chat_history && data.chat_history.length > 0) {
+    } else if (data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
       if (localHistory.length === 0) {
@@ -292,83 +268,37 @@ async function loadFromCloud() {
       setIfMissing('ghostUnlocked_blood_type', p.ghostUnlocked_blood_type);
       setIfMissing('ghostUnlocked_hometown', p.ghostUnlocked_hometown);
 
-      // ── 多角色：恢复各角色存档到前缀 key ──────────────
-      // 单角色过渡：旧云端可能记着 Keegan，但不再让它切换当前角色。
-      // 旧角色数据仍保留在备份/云端，直到 Ghost 迁移验证完成。
+      // 兼容旧 Ghost 云端快照：只读取 ghost，不再恢复 Keegan 或写前缀 key。
+      // 聊天以 chat_history 主列为准；旧快照仅在主列和本地都为空时兜底。
       localStorage.setItem('currentCharacter', 'ghost');
-      if (p.characters && typeof p.characters === 'object') {
-        const _charKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
-        const _currentChar = 'ghost';
-        Object.keys(p.characters).forEach(charId => {
-          const charData = p.characters[charId];
-          if (!charData || typeof charData !== 'object') return;
-          _charKeys.forEach(key => {
-            if (charData[key] !== undefined && charData[key] !== null) {
-              // purchaseFacts 特殊处理（Phase 1.5）：按 purchaseId 并集去重，
-              // 不做 last-write-wins 覆盖。云端快照 + 本地前缀 key 合并写回前缀 key；
-              // 当前角色再把 前缀 + 标准 key 一起并集写回标准 key。
-              // 并集不会丢数据，因此无视 cloudIsNewer，始终合并。
-              if (key === 'purchaseFacts') {
-                const _cloudFacts = charData[key];
-                const _localPrefixed = localStorage.getItem(`${charId}_purchaseFacts`);
-                const _mergedPrefixed = _mergePurchaseFacts(_localPrefixed, _cloudFacts);
-                localStorage.setItem(`${charId}_purchaseFacts`,
-                  JSON.stringify(_mergedPrefixed));
-                if (charId === _currentChar) {
-                  const _localStd = localStorage.getItem('purchaseFacts');
-                  const _mergedStd = _mergePurchaseFacts(_localStd, _mergedPrefixed);
-                  localStorage.setItem('purchaseFacts', JSON.stringify(_mergedStd));
-                }
-                return;
-              }
-              // chatHistory 特殊处理（修复退出重进丢记录）：
-              // profile.characters 快照只在节流 saveToCloud 时更新，是陈旧的；
-              // 第1步已把最新的 chat_history 列合并进标准 chatHistory。
-              // 当前角色绝不能用陈旧快照覆盖标准 key，否则刚合并的最新消息被冲掉，
-              // 下次 saveChatHistoryNow 再写回云端 → 永久丢失。
-              if (key === 'chatHistory' && charId === _currentChar) {
-                const mergedNow = localStorage.getItem('chatHistory');
-                let mergedArr = [];
-                try { mergedArr = JSON.parse(mergedNow || '[]'); } catch(e) {}
-                if (mergedArr.length > 0) {
-                  // 第1步已产出最新记录：回写前缀 key 保持一致，跳过快照覆盖
-                  localStorage.setItem(`${charId}_chatHistory`, mergedNow);
-                  return;
-                }
-                // 标准 key 为空（异常）：允许快照兜底恢复，继续往下写
-              }
-              // 头像是独立版本化状态，角色快照不能覆盖更新的标准头像。
-              // 同时回写前缀，避免切角色时再恢复旧头像。
-              if (charId === _currentChar && (key === 'ghostAvatarUrl' || key === 'ghostAvatarUpdatedAt' || key === 'ghostAvatarBase64')) {
-                const localAt = Number(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
-                const snapshotAt = Number(charData.ghostAvatarUpdatedAt || '0');
-                if (localAt > snapshotAt) {
-                  const latest = localStorage.getItem(key);
-                  if (latest !== null) localStorage.setItem(`${charId}_${key}`, latest);
-                  else localStorage.removeItem(`${charId}_${key}`);
-                  return;
-                }
-              }
-              const val = typeof charData[key] === 'string'
-                ? charData[key]
-                : JSON.stringify(charData[key]);
-              localStorage.setItem(`${charId}_${key}`, val);
-              // 当前角色的数据同时写进标准 key
-              if (charId === _currentChar) {
-                // 修复 #5（新动态忽闪 / 实时数据被冲）：
-                // p.characters 是节流 saveToCloud 时的快照，往往比本地旧。
-                // 若无条件用它覆盖标准 key，会把刚生成、还没来得及上云的实时
-                // 数据（coupleFeedHistory 朋友圈动态 / deliveries 快递 / affection 等）
-                // 冲掉，表现为"出现又消失"。只有云端更新、或本地标准 key 为空
-                // （换设备恢复）时才覆盖。chatHistory 已在上方单独保护，保持原行为。
-                if (key === 'chatHistory' || cloudIsNewer || !localStorage.getItem(key)) {
-                  localStorage.setItem(key, val);
-                }
-              }
-            }
-          });
+      const _legacyGhost = p.characters && p.characters.ghost;
+      if (_legacyGhost && typeof _legacyGhost === 'object') {
+        const _keys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
+        _keys.forEach(key => {
+          const value = _legacyGhost[key];
+          if (value == null) return;
+          if (key === 'purchaseFacts') {
+            localStorage.setItem(key, JSON.stringify(_mergePurchaseFacts(
+              localStorage.getItem(key), value)));
+            return;
+          }
+          if (key === 'chatHistory') {
+            let existing = [];
+            try { existing = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+            if (Array.isArray(existing) && existing.length) return;
+            // 有独立聊天主列时，绝不从旧角色快照覆盖。
+            if (Array.isArray(data.chat_history) && data.chat_history.length) return;
+          }
+          if (key === 'ghostAvatarUrl' || key === 'ghostAvatarBase64' || key === 'ghostAvatarUpdatedAt') {
+            const localAt = Number(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
+            const legacyAt = Number(_legacyGhost.ghostAvatarUpdatedAt || '0');
+            if (localAt > legacyAt) return;
+          } else if (localStorage.getItem(key) && !cloudIsNewer) {
+            return;
+          }
+          const raw = typeof value === 'string' ? value : JSON.stringify(value);
+          if (!localStorage.getItem(key) || cloudIsNewer) localStorage.setItem(key, raw);
         });
-        console.log('[cloud] 多角色数据已恢复');
       }
     }
 
@@ -1137,37 +1067,10 @@ async function saveToCloud() {
       monthlyCheckinKey: 'monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1),
       monthlyCheckinCount: localStorage.getItem('monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1)) || '0',
       // ── 多角色：当前角色标记 ──
-      currentCharacter: localStorage.getItem('currentCharacter') || 'ghost',
+      currentCharacter: 'ghost',
     };
 
-    // ── 多角色：保存各角色的专属数据 ──────────────────────
-    // 先把当前角色数据刷进前缀 key，再统一读取存云端
-    const _currentChar = localStorage.getItem('currentCharacter') || 'ghost';
-    const _charKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
-    const _allChars = ['ghost', 'keegan'];
-
-    // 确保当前角色的数据已同步到前缀 key
-    if (_charKeys.length > 0) {
-      _charKeys.forEach(key => {
-        const val = localStorage.getItem(key);
-        if (val !== null) localStorage.setItem(`${_currentChar}_${key}`, val);
-      });
-    }
-
-    // 读取每个角色的存档
-    const _charactersData = {};
-    _allChars.forEach(charId => {
-      const charState = {};
-      _charKeys.forEach(key => {
-        const val = localStorage.getItem(`${charId}_${key}`);
-        if (val !== null) {
-          try { charState[key] = JSON.parse(val); } catch(e) { charState[key] = val; }
-        }
-      });
-      _charactersData[charId] = charState;
-    });
-    profile.characters = _charactersData;
-    const chatHistoryRaw = localStorage.getItem('chatHistory');
+    // 单角色：不再复制 Ghost/Keegan 全量数据到 profile.characters。\n    const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw
       ? JSON.parse(chatHistoryRaw)
           .filter(m => !m._system && !m._recalled)
