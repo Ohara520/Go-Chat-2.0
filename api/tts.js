@@ -1,3 +1,4 @@
+import { requireActiveAccount } from './_active-account.js';
 // api/tts.js — ElevenLabs 语音合成代理 V2（BYOK 安全版 + 模型白名单 + 限流）
 // 前端 voice.js 调用 /api/tts，验证身份后使用用户配置的 Key 或平台降级 Key
 // 环境变量：
@@ -128,6 +129,7 @@ async function getUserVoiceConfig(userId) {
 }
 
 export default async function handler(req, res) {
+  if (!(await requireActiveAccount(req, res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
