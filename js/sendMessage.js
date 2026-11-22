@@ -1135,7 +1135,7 @@ async function _processMergedMessageWithContent(userContentForModel) {
           .join('\n') || '(none)';
 
         const routingRaw = await Promise.race([
-          fetch('/api/gemini-extractor', {
+          fetchWithTimeout('/api/gemini-extractor', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
