@@ -46,7 +46,8 @@ function getCheckinStreak() {
   if (!isCheckedInToday()) {
     const yesterdayDone = !!localStorage.getItem('checkin_' + getYesterdayDateStr());
     if (!yesterdayDone && raw > 1) {
-      localStorage.setItem('visitStreak', '1');
+      // 只负责显示，不能在打开签到页面时改写持久记录。
+      // 真实断签由 doCheckin() 在下一次签到时确定。
       return 1;
     }
   }
