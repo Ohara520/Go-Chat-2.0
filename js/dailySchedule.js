@@ -24,7 +24,7 @@ function _scheduleKey(userId, charId, date) {
 
 function _currentScheduleKey() {
   const userId = (typeof getSbUserId === 'function' ? getSbUserId() : '') || 'anon';
-  const charId = (typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : '') || 'ghost';
+  const charId = 'ghost';
   const date   = (typeof getGhostDateStr === 'function' ? getGhostDateStr() : '') || _fallbackDate();
   return _scheduleKey(userId, charId, date);
 }
@@ -59,7 +59,7 @@ function _saveSchedule(schedObj) {
 // 清理 7 天前的旧日程
 function _cleanOldSchedules() {
   const userId = (typeof getSbUserId === 'function' ? getSbUserId() : '') || 'anon';
-  const charId = (typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : '') || 'ghost';
+  const charId = 'ghost';
   const prefix = `simonSchedule_${userId}_${charId}_`;
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
@@ -79,7 +79,7 @@ function _cleanOldSchedules() {
 // cloudLoadDone: bool，是否已完成 loadFromCloud
 async function checkAndGenerateSchedule(cloudLoadDone) {
   // 仅主角色（ghost）V1 支持
-  const charId = (typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : '') || 'ghost';
+  const charId = 'ghost';
   if (charId !== 'ghost') return;
 
   const existing = loadTodaySchedule();
@@ -112,7 +112,7 @@ async function checkAndGenerateSchedule(cloudLoadDone) {
 // ── 生成日程 ──────────────────────────────────────────────
 async function _generateTodaySchedule() {
   const userId  = (typeof getSbUserId === 'function' ? getSbUserId() : '') || 'anon';
-  const charId  = (typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : '') || 'ghost';
+  const charId  = 'ghost';
   const date    = (typeof getGhostDateStr === 'function' ? getGhostDateStr() : '') || _fallbackDate();
   const weekday = (typeof getGhostWeekday === 'function' ? getGhostWeekday() : '') || '';
   const time    = (typeof getGhostTimeStr === 'function' ? getGhostTimeStr() : '') || '';
@@ -318,7 +318,7 @@ function buildScheduleContextBlock() {
 // ── 供 cloud.js stateSnapshot 使用 ────────────────────────
 function getSchedulesForSnapshot() {
   const userId = (typeof getSbUserId === 'function' ? getSbUserId() : '') || 'anon';
-  const charId = (typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : '') || 'ghost';
+  const charId = 'ghost';
   const today  = (typeof getGhostDateStr === 'function' ? getGhostDateStr() : '') || _fallbackDate();
 
   const result = {};

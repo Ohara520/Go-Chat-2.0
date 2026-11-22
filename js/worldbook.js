@@ -16,11 +16,11 @@ function _wbLoad() {
 }
 
 function _wbSave(arr) {
-  // 上限 200 条，但锁定的条目永不淘汰
+  // 上限 500 条，但锁定的条目永不淘汰
   if (!Array.isArray(arr)) arr = [];
   const locked = arr.filter(e => e.locked);
   const unlocked = arr.filter(e => !e.locked);
-  const trimmed = [...locked, ...unlocked.slice(0, Math.max(0, 200 - locked.length))];
+  const trimmed = [...locked, ...unlocked.slice(0, Math.max(0, 500 - locked.length))];
   localStorage.setItem('worldBook', JSON.stringify(trimmed));
   if (typeof touchLocalState === 'function') touchLocalState();
 }
@@ -86,6 +86,12 @@ function addWorldBookEntry({ keywords, content, source = 'manual', id = null, lo
   };
   arr.push(entry);
   _wbSave(arr);
+  // 达到容量上限时，_wbSave 可能淘汰刚加入的未锁定条目。
+  // 只有确实保存在本地的条目才能返回成功并建立 Memory 关联。
+  if (!_wbLoad().some(e => e.id === entry.id)) {
+    console.warn('[worldbook] 新条目因容量限制未保存:', entry.id);
+    return null;
+  }
   return entry;
 }
 

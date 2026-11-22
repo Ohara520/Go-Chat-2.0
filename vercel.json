@@ -1,5 +1,7 @@
 {
-  "regions": ["hkg1"],
+  "regions": [
+    "hkg1"
+  ],
   "functions": {
     "api/chat.js": {
       "memory": 512,
@@ -9,11 +11,11 @@
       "memory": 256,
       "maxDuration": 45
     },
-    "api/venice-keegan.js": {
-      "memory": 256,
-      "maxDuration": 45
-    },
     "api/gemini.js": {
+      "memory": 256,
+      "maxDuration": 30
+    },
+    "api/gemini-extractor.js": {
       "memory": 256,
       "maxDuration": 30
     },

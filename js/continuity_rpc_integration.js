@@ -39,7 +39,7 @@
   function _init() {
     _patchMutations();
     _patchPrune();
-    _patchCharacterSwitch();
+    // 单角色版本不再包装角色切换。
     _patchCloudSave();
     _patchCloudLoad();
     _patchLogout();
@@ -118,28 +118,6 @@
     }
   }
 
-  // ── F-INT-3: 角色切换时清除旧角色脏标记 ──────────────────────
-  function _patchCharacterSwitch() {
-    if (typeof window.switchCharacter !== 'function') return;
-
-    var origSwitch = window.switchCharacter;
-    window.switchCharacter = async function(newCharId) {
-      // 切换前：清除旧角色脏标记（旧角色数据已由 _saveCharacterData 持久化）
-      // 注意：此时 getCurrentCharacter() 仍返回旧角色
-      var oldDirtyKey = '_continuityDirty_'
-        + ((typeof getSbUserId === 'function' ? getSbUserId() : '') || 'anon')
-        + '_' + ((typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : '') || 'ghost');
-      sessionStorage.removeItem(oldDirtyKey);
-
-      // 执行原切换逻辑
-      await origSwitch.call(this, newCharId);
-
-      // 切换后：新角色本地数据刚加载，与云端一致性未知，标记脏数据等待同步
-      // （如果云端有更新，下次 loadContinuityFromCloud 会合并）
-      markContinuityDirty();
-    };
-  }
-
   // ── F-INT-5: 包装 saveToCloud（检查 userId 防止串账号）──────────
   function _patchCloudSave() {
     if (typeof window.saveToCloud !== 'function') return;
@@ -156,7 +134,6 @@
         // 账号已切换，不上传前账号的脏数据
         console.warn('[ContinuityRPC] User changed, skip continuity sync');
         sessionStorage.removeItem('_continuityDirty_' + _lastSyncUserId + '_ghost');
-        sessionStorage.removeItem('_continuityDirty_' + _lastSyncUserId + '_keegan');
         _lastSyncUserId = currentUserId;
         return;
       }
@@ -226,7 +203,7 @@
       sb.auth.onAuthStateChange(function(event) {
         if (event === 'SIGNED_OUT') {
           // 清除当前用户的所有脏标记（已退出，无法再同步）
-          ['ghost', 'keegan'].forEach(function(cid) {
+          ['ghost'].forEach(function(cid) {
             var uid = (typeof getSbUserId === 'function' ? getSbUserId() : '') || '';
             sessionStorage.removeItem('_continuityDirty_' + uid + '_' + cid);
           });

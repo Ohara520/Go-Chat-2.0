@@ -671,7 +671,7 @@
       <div class="chat-header">
         <div class="chat-header-left">
           <button class="chat-back-btn" onclick="openScreen('mainScreen')" title="返回">‹</button>
-          <div class="ghost-avatar" onclick="if(typeof getCurrentCharacter==='function'&&getCurrentCharacter()==='keegan'){if(typeof showToast==='function')showToast('🔒 Keegan 资料即将开放～');return;}openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);" style="background:none;padding:0;overflow:visible;">
+          <div class="ghost-avatar" onclick="openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);" style="background:none;padding:0;overflow:visible;">
             <img src="images/ghost-avatar.jpg" class="ghost-avatar-img" style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.7);">
             <div class="online-indicator"></div>
           </div>
@@ -811,7 +811,7 @@
   <div class="screen" id="coupleScreen">
 
     <div class="couple-page-header lovespace-minimal-header">
-      <button class="couple-back-btn" onclick="if(typeof getCurrentCharacter==='function'&&getCurrentCharacter()==='keegan'){if(typeof showToast==='function')showToast('🔒 Keegan 资料即将开放～');return;}openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);">‹</button>
+      <button class="couple-back-btn" onclick="openScreen('profileScreen');setTimeout(()=>{if(typeof renderPhoneProfile==='function')renderPhoneProfile();},80);">‹</button>
     </div>
 
     <!-- Love Space V3：桌面照片是固定装饰，用户封面独立叠在拍立得中 -->
@@ -2077,7 +2077,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script src="js/character.js"></script>
-<script src="js/keegan_persona.js"></script>
+<!-- Keegan persona removed from single-character runtime -->
 <script src="js/api.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/voice-settings.js"></script>
@@ -2124,94 +2124,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="js/dates.js"></script>
 <script src="js/update-notice.js"></script>
 
-<!-- ═══ 选角弹窗 ═══ -->
-<div id="charSelectOverlay" style="
-  display:none;position:fixed;inset:0;z-index:9998;
-  background:rgba(0,0,0,0.45);backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px);"
-  onclick="if(event.target===this)closeCharacterSelect()">
-</div>
 
-<div id="charSelectModal" style="
-  display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);
-  width:100%;max-width:480px;z-index:9999;
-  background:linear-gradient(160deg,#d8edd8,#e8f5e0);
-  border-radius:28px 28px 0 0;
-  padding:20px 20px calc(32px + env(safe-area-inset-bottom));
-  box-shadow:0 -8px 36px rgba(80,140,55,0.18);
-  border-top:1px solid rgba(255,255,255,0.85);
-  animation:slideUpModal 0.3s ease;">
-
-  <div style="width:36px;height:4px;background:rgba(120,180,90,0.35);
-    border-radius:2px;margin:0 auto 20px;"></div>
-
-  <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-    color:rgba(40,80,35,0.4);text-align:center;margin-bottom:6px;">切换角色</div>
-  <div style="font-family:'Georgia',serif;font-size:18px;font-weight:400;
-    color:#1e3d20;text-align:center;margin-bottom:20px;">选择你的伴侣</div>
-
-  <!-- Ghost 卡片 -->
-  <div onclick="selectCharacterAndClose('ghost')" id="charCard-ghost" style="
-    background:linear-gradient(135deg,rgba(155,210,125,0.35),rgba(185,228,150,0.28));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-    border-radius:20px;padding:14px 16px;margin-bottom:12px;
-    border:1.5px solid rgba(120,180,90,0.35);cursor:pointer;
-    box-shadow:0 4px 16px rgba(80,140,55,0.1);
-    display:flex;align-items:center;gap:14px;
-    transition:transform 0.15s;" ontouchstart=""
-    onmousedown="this.style.transform='scale(0.98)'"
-    onmouseup="this.style.transform=''">
-    <img id="charSelectGhostAva" src="" style="width:48px;height:48px;border-radius:50%;
-      object-fit:cover;border:2px solid rgba(255,255,255,0.9);flex-shrink:0;display:none;">
-    <div id="charSelectGhostAvaFallback" style="width:48px;height:48px;border-radius:50%;
-      background:linear-gradient(135deg,rgba(155,205,125,0.5),rgba(90,154,70,0.4));
-      display:flex;align-items:center;justify-content:center;font-size:22px;
-      border:2px solid rgba(255,255,255,0.9);flex-shrink:0;">👤</div>
-    <div style="flex:1;">
-      <div style="font-size:16px;font-weight:700;color:#1e3d20;">Ghost</div>
-      <div style="font-size:11px;color:rgba(40,80,35,0.5);margin-top:2px;">Simon Riley · Manchester, UK</div>
-      <div id="charDays-ghost" style="font-size:10px;color:rgba(40,80,35,0.38);margin-top:3px;"></div>
-    </div>
-    <div id="charCheck-ghost" style="font-size:18px;display:none;">✅</div>
-    <div style="font-size:16px;color:rgba(40,80,35,0.3);">›</div>
-  </div>
-
-  <!-- Keegan 卡片 — 即将上线 -->
-  <div id="charCard-keegan" style="
-    background:linear-gradient(135deg,rgba(100,165,205,0.15),rgba(130,190,220,0.12));
-    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-    border-radius:20px;padding:14px 16px;margin-bottom:12px;
-    border:1.5px solid rgba(100,160,195,0.2);
-    box-shadow:0 4px 16px rgba(40,100,140,0.05);
-    display:flex;align-items:center;gap:14px;
-    opacity:0.6;filter:grayscale(30%);cursor:default;">
-    <img src="images/keegan-avatar.png" style="width:48px;height:48px;border-radius:50%;
-      object-fit:cover;border:2px solid rgba(255,255,255,0.7);flex-shrink:0;"
-      onerror="this.style.display='none'">
-    <div style="flex:1;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div style="font-size:16px;font-weight:700;color:#1a3a50;">Keegan</div>
-        <div style="font-size:9px;font-weight:700;color:white;
-          background:linear-gradient(135deg,#3a7a96,#5aaac6);
-          padding:2px 8px;border-radius:10px;letter-spacing:1px;">即将上线</div>
-      </div>
-      <div style="font-size:11px;color:rgba(26,58,80,0.4);margin-top:2px;">Keegan P. Russ · Texas, USA</div>
-      <div style="font-size:10px;color:rgba(26,58,80,0.3);margin-top:3px;">敬请期待</div>
-    </div>
-    <div style="font-size:16px;color:rgba(26,58,80,0.2);">›</div>
-  </div>
-
-  <button onclick="closeCharacterSelect()" style="
-    width:100%;padding:13px;border:none;border-radius:14px;
-    background:rgba(120,180,90,0.15);color:rgba(40,80,35,0.5);
-    font-size:13px;cursor:pointer;font-family:inherit;">取消</button>
-</div>
-
-<style>
-@keyframes slideUpModal {
-  from { transform:translateX(-50%) translateY(100%); opacity:0; }
-  to   { transform:translateX(-50%) translateY(0); opacity:1; }
-}
-</style>
 
 <style>
 /* ================================================== */
@@ -2943,88 +2856,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </style>
 
 <script>
-// ── 选角弹窗 ──
-function openCharacterSelect() {
-  const overlay = document.getElementById('charSelectOverlay');
-  const modal = document.getElementById('charSelectModal');
-  if (!overlay || !modal) return;
-
-  // 更新当前角色勾选状态
-  const cur = typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : 'ghost';
-  ['ghost','keegan'].forEach(id => {
-    const check = document.getElementById('charCheck-' + id);
-    const card = document.getElementById('charCard-' + id);
-    if (check) check.style.display = id === cur ? 'block' : 'none';
-    if (card) card.style.border = id === cur
-      ? '1.5px solid rgba(90,160,70,0.5)'
-      : '1.5px solid rgba(255,255,255,0.9)';
-  });
-
-  // 更新天数
-  _updateCharSelectDays();
-
-  overlay.style.display = 'block';
-  modal.style.display = 'block';
-}
-
-function closeCharacterSelect() {
-  document.getElementById('charSelectOverlay').style.display = 'none';
-  document.getElementById('charSelectModal').style.display = 'none';
-}
-
-async function selectCharacterAndClose(charId) {
-  // 关弹窗
-  closeCharacterSelect();
-
-  // 显示切换 loading
-  const _loading = document.getElementById('charSwitchLoading');
-  const _loadingAvatar = document.getElementById('switchLoadingAvatar');
-  const _loadingName = document.getElementById('switchLoadingName');
-  const _loadingRing = document.getElementById('switchLoadingRing');
-
-  // 找到目标角色配置
-  const _targetConfig = typeof CHARACTER_LIST !== 'undefined'
-    ? CHARACTER_LIST.find(c => c.id === charId) : null;
-
-  if (_loading) {
-    // 设置头像和名字
-    if (_loadingAvatar && _targetConfig) _loadingAvatar.src = _targetConfig.defaultAvatar || '';
-    if (_loadingName && _targetConfig) _loadingName.textContent = _targetConfig.name;
-    _loading.style.display = 'flex';
-
-    // 进度条动画
-    let _progress = 0;
-    const _ringInterval = setInterval(() => {
-      _progress = Math.min(_progress + 4, 90); // 最多到90%，等切换完成才到100%
-      if (_loadingRing) _loadingRing.style.strokeDashoffset = 251 - (251 * _progress / 100);
-    }, 80);
-
-    // 等切换完成
-    if (typeof switchCharacter === 'function') {
-      await switchCharacter(charId);
-    }
-
-    // 进度条冲到100%
-    clearInterval(_ringInterval);
-    if (_loadingRing) _loadingRing.style.strokeDashoffset = 0;
-
-    // 再等一点让用户看到完成状态
-    await new Promise(r => setTimeout(r, 400));
-
-    // 隐藏 loading
-    _loading.style.display = 'none';
-  } else {
-    // 没有 loading 元素就直接切换
-    if (typeof switchCharacter === 'function') {
-      await switchCharacter(charId);
-    }
-  }
-
-  // 更新主页信息条
-  setTimeout(_updateMainCharInfo, 100);
-  setTimeout(_updateHomeHero, 120);
-}
-
 // 更新主页角色信息条
 function _updateMainCharInfo() {
   const config = typeof getCurrentCharacterConfig === 'function'
@@ -3041,14 +2872,12 @@ function _updateMainCharInfo() {
   const chatNameEl = document.getElementById('chatBotName');
   if (chatNameEl) {
     const nickname = localStorage.getItem('botNickname') || '';
-    chatNameEl.textContent = nickname || (config.id === 'keegan'
-      ? 'Keegan P. Russ'
-      : 'Simon "Ghost" Riley');
+    chatNameEl.textContent = nickname || 'Simon "Ghost" Riley';
   }
 
   if (nameEl) nameEl.textContent = config.name;
   if (subEl) subEl.textContent = config.fullName + ' · ' + config.location;
-  // Ghost 用云端自定义头像，Keegan 用默认头像
+  // 首页角色头像
   let _avaSrc = '';
   // 两个角色都直接用本地头像文件
   _avaSrc = config.defaultAvatar || '';
@@ -3061,7 +2890,7 @@ function _updateMainCharInfo() {
     if (avatarEl) avatarEl.style.display = 'none';
     if (_avaFallback) _avaFallback.style.display = 'flex';
   }
-  if (onlineEl) onlineEl.style.background = config.id === 'keegan' ? '#60c4e0' : '#4ade80';
+  if (onlineEl) onlineEl.style.background = '#4ade80';
 
   // 相处天数
   if (daysEl) {
@@ -3070,7 +2899,7 @@ function _updateMainCharInfo() {
       const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
       daysEl.textContent = '已相处 · ' + days + '天';
     } else {
-      daysEl.textContent = config.id === 'keegan' ? '点击开始 · 第一天' : '';
+      daysEl.textContent = '';
     }
   }
 }
@@ -3239,34 +3068,6 @@ function _renderHeroWeatherOnly() {
   el.textContent = info ? ((info.flag ? info.flag + ' ' : '') + info.name) : code;
 }
 
-// 更新弹窗里的天数 + Ghost 头像
-function _updateCharSelectDays() {
-  const marriageDate = localStorage.getItem('marriageDate');
-  const ghostDaysEl = document.getElementById('charDays-ghost');
-  const keeganDaysEl = document.getElementById('charDays-keegan');
-  if (ghostDaysEl && marriageDate) {
-    const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
-    ghostDaysEl.textContent = '已相处 · ' + days + '天';
-  }
-  if (keeganDaysEl) {
-    keeganDaysEl.textContent = '点击开始 · 第一天';
-  }
-
-  // 更新弹窗里 Ghost 的头像
-  // 优先用 ghostAvatarUrl（Supabase云端），没有就用本地默认头像
-  const _avaUrl = localStorage.getItem('ghostAvatarUrl') || '';
-  const _avaB64 = localStorage.getItem('ghostAvatarBase64') || '';
-  const _avaSrc = (_avaUrl && !_avaUrl.startsWith('data:')) ? _avaUrl
-    : (_avaB64 || 'images/ghost-avatar.png');
-  const ghostAvaEl = document.getElementById('charSelectGhostAva');
-  const ghostAvaFb = document.getElementById('charSelectGhostAvaFallback');
-  if (ghostAvaEl) {
-    ghostAvaEl.src = _avaSrc;
-    ghostAvaEl.style.display = 'block';
-    if (ghostAvaFb) ghostAvaFb.style.display = 'none';
-  }
-}
-
 // 页面加载时初始化主页信息条
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(_updateMainCharInfo, 500);
@@ -3276,46 +3077,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window._heroInterval = setInterval(_updateHomeHero, 60000);
 });
 </script>
-
-<!-- ═══ 切换角色 Loading 遮罩 ═══ -->
-<div id="charSwitchLoading" style="
-  display:none; position:fixed; inset:0; z-index:99999;
-  background:rgba(255,255,255,0.85);
-  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-  flex-direction:column; align-items:center; justify-content:center; gap:20px;
-">
-  <!-- 头像过渡动画 -->
-  <div style="position:relative;width:80px;height:80px;">
-    <img id="switchLoadingAvatar" src="" style="
-      width:80px;height:80px;border-radius:50%;object-fit:cover;
-      border:3px solid rgba(255,255,255,0.9);
-      box-shadow:0 8px 24px rgba(0,0,0,0.15);
-      animation:switchAvatarPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
-    ">
-    <!-- 进度圆环 -->
-    <svg style="position:absolute;inset:-6px;width:92px;height:92px;transform:rotate(-90deg);">
-      <circle cx="46" cy="46" r="40" fill="none" stroke="rgba(200,200,200,0.3)" stroke-width="3"/>
-      <circle id="switchLoadingRing" cx="46" cy="46" r="40" fill="none"
-        stroke="#5a9a46" stroke-width="3" stroke-linecap="round"
-        stroke-dasharray="251" stroke-dashoffset="251"
-        style="transition:stroke-dashoffset 0.1s linear;"/>
-    </svg>
-  </div>
-  <div style="text-align:center;">
-    <div id="switchLoadingName" style="font-size:18px;font-weight:700;color:#1e3d20;margin-bottom:4px;"></div>
-    <div id="switchLoadingStatus" style="font-size:12px;color:rgba(40,80,35,0.5);letter-spacing:0.5px;">正在切换中...</div>
-  </div>
-</div>
-
-<style>
-@keyframes switchAvatarPop {
-  from { transform:scale(0.7); opacity:0; }
-  to   { transform:scale(1); opacity:1; }
-}
-body.theme-keegan #switchLoadingRing { stroke:#3a7a96; }
-body.theme-keegan #switchLoadingName { color:#1a3a50; }
-body.theme-keegan #switchLoadingStatus { color:rgba(26,58,80,0.5); }
-</style>
 
 <!-- ═══ 底部 Tab Bar ═══ -->
 <div id="mainTabBar" style="

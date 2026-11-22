@@ -268,83 +268,33 @@ async function loadFromCloud() {
       setIfMissing('ghostUnlocked_blood_type', p.ghostUnlocked_blood_type);
       setIfMissing('ghostUnlocked_hometown', p.ghostUnlocked_hometown);
 
-      // ── 多角色：恢复各角色存档到前缀 key ──────────────
-      if (p.currentCharacter) {
-        localStorage.setItem('currentCharacter', p.currentCharacter);
-      }
-      if (p.characters && typeof p.characters === 'object') {
-        const _charKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
-        const _currentChar = localStorage.getItem('currentCharacter') || 'ghost';
-        Object.keys(p.characters).forEach(charId => {
-          const charData = p.characters[charId];
-          if (!charData || typeof charData !== 'object') return;
-          _charKeys.forEach(key => {
-            if (charData[key] !== undefined && charData[key] !== null) {
-              // purchaseFacts 特殊处理（Phase 1.5）：按 purchaseId 并集去重，
-              // 不做 last-write-wins 覆盖。云端快照 + 本地前缀 key 合并写回前缀 key；
-              // 当前角色再把 前缀 + 标准 key 一起并集写回标准 key。
-              // 并集不会丢数据，因此无视 cloudIsNewer，始终合并。
-              if (key === 'purchaseFacts') {
-                const _cloudFacts = charData[key];
-                const _localPrefixed = localStorage.getItem(`${charId}_purchaseFacts`);
-                const _mergedPrefixed = _mergePurchaseFacts(_localPrefixed, _cloudFacts);
-                localStorage.setItem(`${charId}_purchaseFacts`,
-                  JSON.stringify(_mergedPrefixed));
-                if (charId === _currentChar) {
-                  const _localStd = localStorage.getItem('purchaseFacts');
-                  const _mergedStd = _mergePurchaseFacts(_localStd, _mergedPrefixed);
-                  localStorage.setItem('purchaseFacts', JSON.stringify(_mergedStd));
-                }
-                return;
-              }
-              // chatHistory 特殊处理（修复退出重进丢记录）：
-              // profile.characters 快照只在节流 saveToCloud 时更新，是陈旧的；
-              // 第1步已把最新的 chat_history 列合并进标准 chatHistory。
-              // 当前角色绝不能用陈旧快照覆盖标准 key，否则刚合并的最新消息被冲掉，
-              // 下次 saveChatHistoryNow 再写回云端 → 永久丢失。
-              if (key === 'chatHistory' && charId === _currentChar) {
-                const mergedNow = localStorage.getItem('chatHistory');
-                let mergedArr = [];
-                try { mergedArr = JSON.parse(mergedNow || '[]'); } catch(e) {}
-                if (mergedArr.length > 0) {
-                  // 第1步已产出最新记录：回写前缀 key 保持一致，跳过快照覆盖
-                  localStorage.setItem(`${charId}_chatHistory`, mergedNow);
-                  return;
-                }
-                // 标准 key 为空（异常）：允许快照兜底恢复，继续往下写
-              }
-              // 头像是独立版本化状态，角色快照不能覆盖更新的标准头像。
-              // 同时回写前缀，避免切角色时再恢复旧头像。
-              if (charId === _currentChar && (key === 'ghostAvatarUrl' || key === 'ghostAvatarUpdatedAt' || key === 'ghostAvatarBase64')) {
-                const localAt = Number(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
-                const snapshotAt = Number(charData.ghostAvatarUpdatedAt || '0');
-                if (localAt > snapshotAt) {
-                  const latest = localStorage.getItem(key);
-                  if (latest !== null) localStorage.setItem(`${charId}_${key}`, latest);
-                  else localStorage.removeItem(`${charId}_${key}`);
-                  return;
-                }
-              }
-              const val = typeof charData[key] === 'string'
-                ? charData[key]
-                : JSON.stringify(charData[key]);
-              localStorage.setItem(`${charId}_${key}`, val);
-              // 当前角色的数据同时写进标准 key
-              if (charId === _currentChar) {
-                // 修复 #5（新动态忽闪 / 实时数据被冲）：
-                // p.characters 是节流 saveToCloud 时的快照，往往比本地旧。
-                // 若无条件用它覆盖标准 key，会把刚生成、还没来得及上云的实时
-                // 数据（coupleFeedHistory 朋友圈动态 / deliveries 快递 / affection 等）
-                // 冲掉，表现为"出现又消失"。只有云端更新、或本地标准 key 为空
-                // （换设备恢复）时才覆盖。chatHistory 已在上方单独保护，保持原行为。
-                if (key === 'chatHistory' || cloudIsNewer || !localStorage.getItem(key)) {
-                  localStorage.setItem(key, val);
-                }
-              }
-            }
-          });
+      // 兼容旧 Ghost 云端快照：只读取 ghost，不再恢复 Keegan 或写前缀 key。
+      // 聊天以 chat_history 主列为准；旧快照仅在主列和本地都为空时兜底。
+      localStorage.setItem('currentCharacter', 'ghost');
+      const _legacyGhost = p.characters && p.characters.ghost;
+      if (_legacyGhost && typeof _legacyGhost === 'object') {
+        const _keys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
+        _keys.forEach(key => {
+          const value = _legacyGhost[key];
+          if (value == null) return;
+          if (key === 'purchaseFacts') {
+            localStorage.setItem(key, JSON.stringify(_mergePurchaseFacts(
+              localStorage.getItem(key), value)));
+            return;
+          }
+          if (key === 'chatHistory') {
+            let existing = [];
+            try { existing = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+            if (Array.isArray(existing) && existing.length) return;
+            // 有独立聊天主列时，绝不从旧角色快照覆盖。
+            if (Array.isArray(data.chat_history) && data.chat_history.length) return;
+          }
+          // 旧快照仅补缺，不以旧角色副本覆盖已恢复的主存档。
+          // 头像也不从旧快照覆盖当前头像版本。
+          if (localStorage.getItem(key)) return;
+          const raw = typeof value === 'string' ? value : JSON.stringify(value);
+          localStorage.setItem(key, raw);
         });
-        console.log('[cloud] 多角色数据已恢复');
       }
     }
 
@@ -462,8 +412,8 @@ async function loadFromCloud() {
     }
 
     // ── 5. state_snapshot ─────────────────────────────────────
-    if (data.state_snapshot != null) {
-      const s = data.state_snapshot;
+    const s = data.state_snapshot;
+    if (s != null) {
 
       // 动态状态：云端更新才覆盖
       if (cloudIsNewer) {
@@ -780,10 +730,10 @@ async function loadFromCloud() {
         // 本地若还残留已墓碑的记录（跨设备删除传播），一并清掉
         const cleaned = merged.filter(m => !tomb.memSet.has(m.id));
         cleaned.sort((a, b) => (b.importance || 0) - (a.importance || 0));
-        localStorage.setItem('longTermMemories', JSON.stringify(cleaned.slice(0, 50)));
+        localStorage.setItem('longTermMemories', JSON.stringify(cleaned.slice(0, 300)));
       }
 
-      // 世界书（关键词记忆）：按 id 合并去重。上限 200，锁定的永不被裁掉。
+      // 世界书（关键词记忆）：按 id 合并去重。上限 500，锁定的永不被裁掉。
       if (Array.isArray(s.worldBook) && s.worldBook.length > 0) {
         const localWb = JSON.parse(localStorage.getItem('worldBook') || '[]');
         const mergedWb = [...localWb];
@@ -800,7 +750,7 @@ async function loadFromCloud() {
         const survived = mergedWb.filter(e => !tomb.wbSet.has(e.id));
         const lockedWb = survived.filter(e => e.locked);
         const unlockedWb = survived.filter(e => !e.locked);
-        const cappedWb = [...lockedWb, ...unlockedWb.slice(0, Math.max(0, 200 - lockedWb.length))];
+        const cappedWb = [...lockedWb, ...unlockedWb.slice(0, Math.max(0, 500 - lockedWb.length))];
         localStorage.setItem('worldBook', JSON.stringify(cappedWb));
       }
 
@@ -856,30 +806,9 @@ async function loadFromCloud() {
     }
 
     console.log('[cloud] 数据已加载');
-    // ── 内容去重：重建快照，记录云端当前状态 ────
-    // 加载云端数据后，重建快照缓存为云端当前值，
-    // 防止下次 save 时把云端数据当作"本地新增"重复写回云端
-    if (userId && s) {
-      if (!_lastSavedSnapshots[userId]) _lastSavedSnapshots[userId] = { state: '', chat: '' };
-      // 重建 state 快照（排除 chat_history）
-      const stateForSnap = {
-        friends: s.friends || [],
-        chatRecords: s.chatRecords || [],
-        ownedAssets: s.ownedAssets || [],
-        unlockedRoles: s.unlockedRoles || [],
-        unlockedScenarios: s.unlockedScenarios || [],
-        favoriteRoles: s.favoriteRoles || [],
-        favoriteScenarios: s.favoriteScenarios || [],
-        roleRatings: s.roleRatings || {},
-        scenarioRatings: s.scenarioRatings || {},
-        deliveryNotices: JSON.parse(localStorage.getItem('deliveryNotices') || '[]'),
-        feedEventPool: (typeof getFeedEventPool === 'function') ? getFeedEventPool() : []
-      };
-      _lastSavedSnapshots[userId].state = JSON.stringify(stateForSnap);
-      // 重建 chat 快照
-      const chatData = (typeof getChatHistory === 'function') ? getChatHistory() : [];
-      _lastSavedSnapshots[userId].chat = (chatData.length > 0) ? JSON.stringify(chatData) : '';
-    }
+    // 恢复时合并后的本地状态可能与云端不同，不能用另一种格式
+    // 伪造“已保存”快照。清空缓存，让下次完整保存重新比较并同步。
+    delete _lastSavedSnapshots[userId];
     // 通知徽章刷新（云端数据恢复后）
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
     // Simon 自主日程 V1：恢复云端日程数据（生成触发由 app.js 统一管理）
@@ -967,10 +896,6 @@ async function saveChatHistoryNow() {
     const now = new Date().toISOString();
     localStorage.setItem('chatUpdatedAt', now);
 
-    // 聊天记录也存到前缀 key，供多角色切换时保留
-    const _chatChar = localStorage.getItem('currentCharacter') || 'ghost';
-    localStorage.setItem(`${_chatChar}_chatHistory`, JSON.stringify(chatHistoryData));
-
     // ── 磁盘 IO 优化（2026-06-16）──────────────────────────────
     // 旧版用 upsert 整行写入：哪怕只改聊天记录，数据库也会重写整行（含头像/钱包/
     // 快递等几十个字段）+ 双倍 WAL，磁盘 IO 被烧爆。
@@ -986,17 +911,19 @@ async function saveChatHistoryNow() {
       .eq('user_id', userId)
       .select('user_id');
     // 没更新到任何行（新用户首存）→ 建行
+    let _writeErr = _updErr;
     if (!_updErr && (!_updated || _updated.length === 0)) {
-      await sb.from('user_data').upsert({
+      const { error: _insertErr } = await sb.from('user_data').upsert({
         user_id: userId,
         chat_history: chatHistoryData,
         chat_updated_at: now,
         updated_at: now,
       }, { onConflict: 'user_id' });
+      _writeErr = _insertErr;
     }
 
-    // 写入成功：记录快照（失败则保留旧快照等重试）
-    if (!_updErr) {
+    // 仅数据库实际写入成功后更新去重快照，失败时下次仍会重试。
+    if (!_writeErr) {
       _lastSavedSnapshots[userId].chat = chatSnapshot;
     }
   } catch(e) {
@@ -1113,36 +1040,10 @@ async function saveToCloud() {
       monthlyCheckinKey: 'monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1),
       monthlyCheckinCount: localStorage.getItem('monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1)) || '0',
       // ── 多角色：当前角色标记 ──
-      currentCharacter: localStorage.getItem('currentCharacter') || 'ghost',
+      currentCharacter: 'ghost',
     };
 
-    // ── 多角色：保存各角色的专属数据 ──────────────────────
-    // 先把当前角色数据刷进前缀 key，再统一读取存云端
-    const _currentChar = localStorage.getItem('currentCharacter') || 'ghost';
-    const _charKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
-    const _allChars = ['ghost', 'keegan'];
-
-    // 确保当前角色的数据已同步到前缀 key
-    if (_charKeys.length > 0) {
-      _charKeys.forEach(key => {
-        const val = localStorage.getItem(key);
-        if (val !== null) localStorage.setItem(`${_currentChar}_${key}`, val);
-      });
-    }
-
-    // 读取每个角色的存档
-    const _charactersData = {};
-    _allChars.forEach(charId => {
-      const charState = {};
-      _charKeys.forEach(key => {
-        const val = localStorage.getItem(`${charId}_${key}`);
-        if (val !== null) {
-          try { charState[key] = JSON.parse(val); } catch(e) { charState[key] = val; }
-        }
-      });
-      _charactersData[charId] = charState;
-    });
-    profile.characters = _charactersData;
+    // 单角色：不再复制 Ghost/Keegan 全量数据到 profile.characters。
     const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw
       ? JSON.parse(chatHistoryRaw)
@@ -1173,12 +1074,12 @@ async function saveToCloud() {
       storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 200),
       // 主人设(Ghost)真正使用的结构化长期记忆数组，state.js 的 recallLongTermMemory 读它。
       // 此前只同步单数 longTermMemory 字符串，这个复数数组从不上云 → 换设备丢记忆。
-      longTermMemories: JSON.parse(localStorage.getItem('longTermMemories') || '[]').slice(0, 50),
+      longTermMemories: JSON.parse(localStorage.getItem('longTermMemories') || '[]').slice(0, 300),
       worldBook: (() => {
         const wb = JSON.parse(localStorage.getItem('worldBook') || '[]');
         const lk = wb.filter(e => e.locked);
         const un = wb.filter(e => !e.locked);
-        return [...lk, ...un.slice(0, Math.max(0, 200 - lk.length))];
+        return [...lk, ...un.slice(0, Math.max(0, 500 - lk.length))];
       })(),
       // 删除墓碑：auto 联动删除的 wb/mem id，上云让其它设备也不复活它们
       linkTombstones: (() => {
@@ -1310,7 +1211,8 @@ async function saveToCloud() {
     // 修复：upsert 加 15 秒超时，防止 Supabase 无响应导致 _isSavingToCloud 永久锁死
     // 锁死后所有后续 saveToCloud 调用都被跳过，state 再也存不上去
     const _upsertWithTimeout = () => Promise.race([
-      sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' }),
+      // 每次调用都创建全新的 Supabase 请求，重试不能复用已完成的 Promise。
+      Promise.resolve().then(() => sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' })),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error('upsert timeout 15s')), 15000)
       )
@@ -1332,8 +1234,8 @@ async function saveToCloud() {
       localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
       localStorage.setItem('localUpdatedAt', Date.now().toString());
       // 记录快照（仅成功时）
-      if (stateSnapshotStr) _lastSavedSnapshots[userId].state = stateSnapshotStr;
-      if (chatSnapshotStr) _lastSavedSnapshots[userId].chat = chatSnapshotStr;
+      if (stateChanged) _lastSavedSnapshots[userId].state = stateSnapshotStr;
+      if (chatChanged) _lastSavedSnapshots[userId].chat = chatSnapshotStr;
       console.log('[cloud] 保存成功');
     } else {
       console.error('[cloud] 保存最终失败，数据暂存本地');
