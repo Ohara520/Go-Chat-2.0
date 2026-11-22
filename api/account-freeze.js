@@ -43,10 +43,10 @@ export default async function handler(req, res) {
     const banned = Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now());
     // 有充值记录的账号默认禁止自动规则冻结；避免误伤仍有权益的老用户。
     const { data: subscription, error: subscriptionError } = await supabase
-      .from('subscriptions').select('email,plan_id,monthly_quota,used_count')
+      .from('subscriptions').select('email,plan_id,afdian_order_id')
       .eq('email', (user.email || '').trim().toLowerCase()).maybeSingle();
     if (subscriptionError) return res.status(500).json({ ok: false, reason: 'subscription_check_failed' });
-    const hasSubscription = Boolean(subscription);
+    const hasSubscription = Boolean(subscription && (subscription.plan_id !== 'trial' && subscription.plan_id !== 'free' || subscription.afdian_order_id));
     const summary = { userId: user.id, email: user.email || null, createdAt: user.created_at,
       lastSignInAt: user.last_sign_in_at || null, lastActivityAt: new Date(latestActivity).toISOString(), eligible, banned, hasSubscription };
 
