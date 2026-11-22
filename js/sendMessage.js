@@ -1359,12 +1359,12 @@ Her: ${text}`
             `Reply: "${reply.slice(0, 300)}"`,
             10
           );
-          if (breakCheck.trim().toUpperCase().startsWith('YES')) reply = '';
+          if (breakCheck.trim().toUpperCase().startsWith('YES') && _isIdentityBreakout(reply)) reply = '';
         } catch(e) {}
       }
     }
 
-    const _isRealBreakout = reply && isBreakout(reply); // 有内容但拒演/自称AI = 内容问题
+    const _isRealBreakout = reply && _isIdentityBreakout(reply); // 仅身份出戏交接；内容安全拒绝不跨模型转送 // 有内容但拒演/自称AI = 内容问题
     const _isEmptyReply = !reply;                       // 空回复 = 瞬时故障
     if (_isRealBreakout || _isEmptyReply) {
       if (_isRealBreakout) {
@@ -1385,7 +1385,7 @@ Her: ${text}`
           if (!retryRes.ok) throw new Error('Claude retry failed');
           const retryData = await retryRes.json();
           const retryReply = retryData.content?.[0]?.text?.trim() || '';
-          if (retryReply && !isBreakout(retryReply)) reply = retryReply;
+          if (retryReply && !_isIdentityBreakout(retryReply)) reply = retryReply;
         } catch(e) {}
 
         if (reply === '___NETWORK_ERROR___') {
