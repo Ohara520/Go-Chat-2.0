@@ -1,3 +1,4 @@
+import { requireActiveAccount } from './_active-account.js';
 // ===================================================
 // api/gemini-extractor.js — Gemini 3.1 Flash Lite for background cognition tasks
 // Used by: state.js (Long-term Memory extraction), relationship.js (Relationship Understanding extraction)
@@ -83,6 +84,7 @@ async function callGeminiNative(user, model = GEMINI_MODEL) {
 }
 
 export default async function handler(req, res) {
+  if (!(await requireActiveAccount(req, res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
