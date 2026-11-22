@@ -30,16 +30,21 @@ export default async function handler(req, res) {
     if (error || !data?.user) return res.status(404).json({ ok: false, reason: 'user_not_found' });
     const user = data.user;
     const created = Date.parse(user.created_at || '');
-    const lastActive = Date.parse(user.last_sign_in_at || user.created_at || '');
-    // last_sign_in_at 不等于最后活跃时间：持久登录用户仍可能每天聊天。
+    // 优先核实真实活动；登录时间仅用于排除近期登录的账号。
     const { data: archive, error: archiveError } = await supabase.from('user_data')
       .select('updated_at,chat_updated_at').eq('user_id', userId).maybeSingle();
     if (archiveError) return res.status(500).json({ ok: false, reason: 'activity_check_failed' });
-    const recentActivity = [archive?.updated_at, archive?.chat_updated_at]
+    const activityTimes = [archive?.updated_at, archive?.chat_updated_at]
       .map(value => Date.parse(value || '')).filter(Number.isFinite);
-    const latestActivity = Math.max(lastActive, ...recentActivity);
-    const eligible = Number.isFinite(created) && Number.isFinite(latestActivity) &&
-      created < CUTOFF && latestActivity < Date.now() - INACTIVE_MS;
+    const lastActivity = activityTimes.length ? Math.max(...activityTimes) : null;
+    const lastSignIn = Date.parse(user.last_sign_in_at || '');
+    const inactivityCutoff = Date.now() - INACTIVE_MS;
+    // 无可靠活动记录、近期活跃或近期登录，均不允许冻结。
+    const hasReliableActivity = lastActivity !== null && Number.isFinite(lastActivity);
+    const inactiveByActivity = hasReliableActivity && lastActivity < inactivityCutoff;
+    const noRecentLogin = Number.isFinite(lastSignIn) && lastSignIn < inactivityCutoff;
+    const eligible = Number.isFinite(created) && created < CUTOFF &&
+      inactiveByActivity && noRecentLogin;
     const banned = Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now());
     // 有充值记录的账号默认禁止自动规则冻结；避免误伤仍有权益的老用户。
     const { data: subscription, error: subscriptionError } = await supabase
@@ -48,7 +53,7 @@ export default async function handler(req, res) {
     if (subscriptionError) return res.status(500).json({ ok: false, reason: 'subscription_check_failed' });
     const hasSubscription = Boolean(subscription && (subscription.plan_id !== 'trial' && subscription.plan_id !== 'free' || subscription.afdian_order_id));
     const summary = { userId: user.id, email: user.email || null, createdAt: user.created_at,
-      lastSignInAt: user.last_sign_in_at || null, lastActivityAt: new Date(latestActivity).toISOString(), eligible, banned, hasSubscription };
+      lastSignInAt: user.last_sign_in_at || null, lastActivityAt: hasReliableActivity ? new Date(lastActivity).toISOString() : null, eligible, banned, hasSubscription };
 
     if (action === 'preview') return res.status(200).json({ ok: true, ...summary });
     if (confirm !== 'CONFIRM_ACCOUNT_STATUS_CHANGE') {
