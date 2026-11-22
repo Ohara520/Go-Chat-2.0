@@ -127,7 +127,11 @@ async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
+    // 每次请求都使用当前 Supabase 会话，后端据此拒绝被冻结账号。
+    const { data: { session } } = await window.sbClient.auth.getSession();
+    if (!session?.access_token) throw new Error('登录状态已失效，请重新登录');
+    const headers = { ...(options?.headers || {}), Authorization: 'Bearer ' + session.access_token };
+    const res = await fetch(url, { ...options, headers, signal: controller.signal });
     clearTimeout(timer);
     return res;
   } catch (e) {
