@@ -806,30 +806,9 @@ async function loadFromCloud() {
     }
 
     console.log('[cloud] 数据已加载');
-    // ── 内容去重：重建快照，记录云端当前状态 ────
-    // 加载云端数据后，重建快照缓存为云端当前值，
-    // 防止下次 save 时把云端数据当作"本地新增"重复写回云端
-    if (userId && s) {
-      if (!_lastSavedSnapshots[userId]) _lastSavedSnapshots[userId] = { state: '', chat: '' };
-      // 重建 state 快照（排除 chat_history）
-      const stateForSnap = {
-        friends: s.friends || [],
-        chatRecords: s.chatRecords || [],
-        ownedAssets: s.ownedAssets || [],
-        unlockedRoles: s.unlockedRoles || [],
-        unlockedScenarios: s.unlockedScenarios || [],
-        favoriteRoles: s.favoriteRoles || [],
-        favoriteScenarios: s.favoriteScenarios || [],
-        roleRatings: s.roleRatings || {},
-        scenarioRatings: s.scenarioRatings || {},
-        deliveryNotices: JSON.parse(localStorage.getItem('deliveryNotices') || '[]'),
-        feedEventPool: (typeof getFeedEventPool === 'function') ? getFeedEventPool() : []
-      };
-      _lastSavedSnapshots[userId].state = JSON.stringify(stateForSnap);
-      // 重建 chat 快照
-      const chatData = (typeof getChatHistory === 'function') ? getChatHistory() : [];
-      _lastSavedSnapshots[userId].chat = (chatData.length > 0) ? JSON.stringify(chatData) : '';
-    }
+    // 恢复时合并后的本地状态可能与云端不同，不能用另一种格式
+    // 伪造“已保存”快照。清空缓存，让下次完整保存重新比较并同步。
+    delete _lastSavedSnapshots[userId];
     // 通知徽章刷新（云端数据恢复后）
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
     // Simon 自主日程 V1：恢复云端日程数据（生成触发由 app.js 统一管理）
@@ -1232,7 +1211,8 @@ async function saveToCloud() {
     // 修复：upsert 加 15 秒超时，防止 Supabase 无响应导致 _isSavingToCloud 永久锁死
     // 锁死后所有后续 saveToCloud 调用都被跳过，state 再也存不上去
     const _upsertWithTimeout = () => Promise.race([
-      sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' }),
+      // 每次调用都创建全新的 Supabase 请求，重试不能复用已完成的 Promise。
+      Promise.resolve().then(() => sb.from('user_data').upsert(upsertData, { onConflict: 'user_id' })),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error('upsert timeout 15s')), 15000)
       )
@@ -1254,8 +1234,8 @@ async function saveToCloud() {
       localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
       localStorage.setItem('localUpdatedAt', Date.now().toString());
       // 记录快照（仅成功时）
-      if (stateSnapshotStr) _lastSavedSnapshots[userId].state = stateSnapshotStr;
-      if (chatSnapshotStr) _lastSavedSnapshots[userId].chat = chatSnapshotStr;
+      if (stateChanged) _lastSavedSnapshots[userId].state = stateSnapshotStr;
+      if (chatChanged) _lastSavedSnapshots[userId].chat = chatSnapshotStr;
       console.log('[cloud] 保存成功');
     } else {
       console.error('[cloud] 保存最终失败，数据暂存本地');
