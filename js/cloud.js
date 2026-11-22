@@ -412,8 +412,8 @@ async function loadFromCloud() {
     }
 
     // ── 5. state_snapshot ─────────────────────────────────────
-    if (data.state_snapshot != null) {
-      const s = data.state_snapshot;
+    const s = data.state_snapshot;
+    if (s != null) {
 
       // 动态状态：云端更新才覆盖
       if (cloudIsNewer) {
