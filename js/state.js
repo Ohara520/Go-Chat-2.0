@@ -273,6 +273,7 @@ function updateLongTermMemoryEntry(memId, memory) {
 
   memories.sort((a, b) => (b.importance || 0) - (a.importance || 0));
   localStorage.setItem('longTermMemories', JSON.stringify(memories.slice(0, 50)));
+  if (typeof touchLocalState === 'function') touchLocalState();
   console.log('♻️ 更新长期记忆:', String(m.content).slice(0, 50));
 
   // 同步已有 auto WorldBook（原地，不新建）；无 wbId 或关联无效则跳过，UPDATE 本身仍成功
@@ -309,6 +310,7 @@ function saveLongTermMemoryEntry(memory) {
   memories.sort((a, b) => b.importance - a.importance);
   const trimmed = memories.slice(0, 50);
   localStorage.setItem('longTermMemories', JSON.stringify(trimmed));
+  if (typeof touchLocalState === 'function') touchLocalState();
   console.log('💾 保存长期记忆:', newMemory.content.slice(0, 50));
 
   // 同步进世界书：用 tags 作触发词，让 AI 抽到的记忆也能被关键词检索到
@@ -333,13 +335,13 @@ function linkMemoryAndWorldBook(memId, wbId) {
   try {
     const mems = JSON.parse(localStorage.getItem('longTermMemories') || '[]');
     const m = Array.isArray(mems) ? mems.find(x => x.id === memId) : null;
-    if (m) { m.wbId = wbId; localStorage.setItem('longTermMemories', JSON.stringify(mems)); }
+    if (m) { m.wbId = wbId; localStorage.setItem('longTermMemories', JSON.stringify(mems)); if (typeof touchLocalState === 'function') touchLocalState(); }
   } catch (e) {}
   // 写 WorldBook.memId（独立 try：一侧失败不拖累另一侧）
   try {
     const wb = JSON.parse(localStorage.getItem('worldBook') || '[]');
     const w = Array.isArray(wb) ? wb.find(x => x.id === wbId) : null;
-    if (w) { w.memId = memId; localStorage.setItem('worldBook', JSON.stringify(wb)); }
+    if (w) { w.memId = memId; localStorage.setItem('worldBook', JSON.stringify(wb)); if (typeof touchLocalState === 'function') touchLocalState(); }
   } catch (e) {}
 }
 
