@@ -917,10 +917,6 @@ async function saveChatHistoryNow() {
     const now = new Date().toISOString();
     localStorage.setItem('chatUpdatedAt', now);
 
-    // 聊天记录也存到前缀 key，供多角色切换时保留
-    const _chatChar = 'ghost';
-    localStorage.setItem(`${_chatChar}_chatHistory`, JSON.stringify(chatHistoryData));
-
     // ── 磁盘 IO 优化（2026-06-16）──────────────────────────────
     // 旧版用 upsert 整行写入：哪怕只改聊天记录，数据库也会重写整行（含头像/钱包/
     // 快递等几十个字段）+ 双倍 WAL，磁盘 IO 被烧爆。
@@ -936,17 +932,19 @@ async function saveChatHistoryNow() {
       .eq('user_id', userId)
       .select('user_id');
     // 没更新到任何行（新用户首存）→ 建行
+    let _writeErr = _updErr;
     if (!_updErr && (!_updated || _updated.length === 0)) {
-      await sb.from('user_data').upsert({
+      const { error: _insertErr } = await sb.from('user_data').upsert({
         user_id: userId,
         chat_history: chatHistoryData,
         chat_updated_at: now,
         updated_at: now,
       }, { onConflict: 'user_id' });
+      _writeErr = _insertErr;
     }
 
-    // 写入成功：记录快照（失败则保留旧快照等重试）
-    if (!_updErr) {
+    // 仅数据库实际写入成功后更新去重快照，失败时下次仍会重试。
+    if (!_writeErr) {
       _lastSavedSnapshots[userId].chat = chatSnapshot;
     }
   } catch(e) {
