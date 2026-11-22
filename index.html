@@ -2077,7 +2077,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script src="js/character.js"></script>
-<script src="js/keegan_persona.js"></script>
+<!-- Keegan persona removed from single-character runtime -->
 <script src="js/api.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/voice-settings.js"></script>
@@ -2173,31 +2173,6 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div id="charCheck-ghost" style="font-size:18px;display:none;">✅</div>
     <div style="font-size:16px;color:rgba(40,80,35,0.3);">›</div>
-  </div>
-
-  <!-- Keegan 卡片 — 即将上线 -->
-  <div id="charCard-keegan" style="
-    background:linear-gradient(135deg,rgba(100,165,205,0.15),rgba(130,190,220,0.12));
-    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-    border-radius:20px;padding:14px 16px;margin-bottom:12px;
-    border:1.5px solid rgba(100,160,195,0.2);
-    box-shadow:0 4px 16px rgba(40,100,140,0.05);
-    display:flex;align-items:center;gap:14px;
-    opacity:0.6;filter:grayscale(30%);cursor:default;">
-    <img src="images/keegan-avatar.png" style="width:48px;height:48px;border-radius:50%;
-      object-fit:cover;border:2px solid rgba(255,255,255,0.7);flex-shrink:0;"
-      onerror="this.style.display='none'">
-    <div style="flex:1;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div style="font-size:16px;font-weight:700;color:#1a3a50;">Keegan</div>
-        <div style="font-size:9px;font-weight:700;color:white;
-          background:linear-gradient(135deg,#3a7a96,#5aaac6);
-          padding:2px 8px;border-radius:10px;letter-spacing:1px;">即将上线</div>
-      </div>
-      <div style="font-size:11px;color:rgba(26,58,80,0.4);margin-top:2px;">Keegan P. Russ · Texas, USA</div>
-      <div style="font-size:10px;color:rgba(26,58,80,0.3);margin-top:3px;">敬请期待</div>
-    </div>
-    <div style="font-size:16px;color:rgba(26,58,80,0.2);">›</div>
   </div>
 
   <button onclick="closeCharacterSelect()" style="
@@ -2951,7 +2926,7 @@ function openCharacterSelect() {
 
   // 更新当前角色勾选状态
   const cur = typeof getCurrentCharacter === 'function' ? getCurrentCharacter() : 'ghost';
-  ['ghost','keegan'].forEach(id => {
+  ['ghost'].forEach(id => {
     const check = document.getElementById('charCheck-' + id);
     const card = document.getElementById('charCard-' + id);
     if (check) check.style.display = id === cur ? 'block' : 'none';
@@ -3041,9 +3016,7 @@ function _updateMainCharInfo() {
   const chatNameEl = document.getElementById('chatBotName');
   if (chatNameEl) {
     const nickname = localStorage.getItem('botNickname') || '';
-    chatNameEl.textContent = nickname || (config.id === 'keegan'
-      ? 'Keegan P. Russ'
-      : 'Simon "Ghost" Riley');
+    chatNameEl.textContent = nickname || 'Simon "Ghost" Riley';
   }
 
   if (nameEl) nameEl.textContent = config.name;
@@ -3061,7 +3034,7 @@ function _updateMainCharInfo() {
     if (avatarEl) avatarEl.style.display = 'none';
     if (_avaFallback) _avaFallback.style.display = 'flex';
   }
-  if (onlineEl) onlineEl.style.background = config.id === 'keegan' ? '#60c4e0' : '#4ade80';
+  if (onlineEl) onlineEl.style.background = '#4ade80';
 
   // 相处天数
   if (daysEl) {
@@ -3070,7 +3043,7 @@ function _updateMainCharInfo() {
       const days = Math.max(1, Math.floor((Date.now() - new Date(marriageDate)) / 86400000) + 1);
       daysEl.textContent = '已相处 · ' + days + '天';
     } else {
-      daysEl.textContent = config.id === 'keegan' ? '点击开始 · 第一天' : '';
+      daysEl.textContent = '';
     }
   }
 }
