@@ -1328,6 +1328,11 @@ Her: ${text}`
     hideTyping();
     let reply = data.content?.[0]?.text || '';
 
+    const _handoffImages = Array.isArray(messagesForRequest[messagesForRequest.length - 1]?.content)
+      ? messagesForRequest[messagesForRequest.length - 1].content.filter(b => b.type === 'image' && b.source?.data).map(b => b.source.data)
+      : [];
+    const _handoffOptions = { dailyMode: true, tagIntimate: false, images: _handoffImages };
+
     // ── Soft Handoff V1：交接窗口内的高置信身份出戏 → 丢弃候选，交 Gemini 日常接续 ──
     // 仅当"日常轮 + 近期有亲密"(_softHandoffWindow) 且候选明确出戏（自称 AI/否认 Simon
     // 或婚姻关系/拒演）时触发。此处候选 reply 尚未 append/push/save，直接丢弃零落地。
@@ -1335,7 +1340,7 @@ Her: ${text}`
     // 不走此路（不拿备用模型绕安全线）。失败不锁定：下一轮符合条件仍先让 Claude 试。
     if (_softHandoffWindow && reply && _isIdentityBreakout(reply)) {
       // 候选丢弃，改由本来就知道上下文的 Gemini 以日常模式自然承接
-      await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+      await _handleIntimateReply(text, rawHistory, _isSending, _handoffOptions);
       _isSending = false;
       return;
     }
@@ -1363,7 +1368,7 @@ Her: ${text}`
       if (_isRealBreakout) {
         // 真破防：候选不落地，交给当前备用模型 Gemini 用同一 Shared Ghost Core 日常接续。
         // 不再调用已退役的 Grok fallback，也不拿旧轻量人格重写 Simon。
-        await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+        await _handleIntimateReply(text, rawHistory, _isSending, _handoffOptions);
         _isSending = false;
         return;
       } else {
@@ -1388,7 +1393,7 @@ Her: ${text}`
         } catch(e) {}
 
         if (reply === '___NETWORK_ERROR___') {
-          await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+          await _handleIntimateReply(text, rawHistory, _isSending, _handoffOptions);
           _isSending = false;
           return;
         }
@@ -1918,7 +1923,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 日常接续模式（Soft Handoff）：她已从亲密自然转向日常。保留 Shared Ghost Core
     // 与近期真实上下文（他知道刚才发生了什么），但不注入 adult 许可 / 调情 persona /
     // 记忆摘要，明确不重新调情——只作为她的丈夫，平静自然地接住她当前这句日常话。
-    const _dailyContinueNote = `\nA moment of closeness happened between you a few minutes ago. She has now shifted into ordinary conversation.`;
+    const _dailyContinueNote = `\nContinue the real conversation naturally. Do not assume intimacy or a topic shift unless the messages establish it.`;
     // WorldBook Shared Recall V1：跨模型世界书共享召回。
     // 复用 Claude 侧同一份 localStorage['worldBook'] 与同一套匹配/enabled/lastHit 规则，
     // 只注入本轮实际命中的条目（未命中返回 ''，不加无关内容）。作为 Ghost 已知事实，非强制台词。
