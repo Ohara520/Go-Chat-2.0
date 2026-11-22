@@ -252,16 +252,16 @@ const BREAKOUT_PHRASES = [
   "i don't have a wife", "i don't have a partner",
   "we're not together", "we are not together",
   "we're not married", "we are not married",
-  "don't call me that", "don't call me",
-  "keep moving", "what's your aim",
-  "english only", "english.", "use my name", "stop with that", "stop calling me",
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
   // AI助手类
   "ai assistant", "development work", "coding questions", "coding problems",
   "here to help you", "what are you working on", "build something", "24/7",
   "creative writing communities", "roleplay platforms",
   // 明确跳出
-  "i need to be straight with you",
-  "i need to be honest with you",
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
   "what can i actually help",
   "help with something real",
   "help with something else",
@@ -1109,9 +1109,11 @@ async function _processMergedMessageWithContent(userContentForModel) {
     // 修复：最近6条有调情记录时，即使触发日常关键词也不走 Sonnet
     // 原因：调情进行中用户说"好饿"/"在干嘛"，应该留在 Grok，让 Grok 自然切换语气
     // Grok 的 CONTEXT SHIFT 指引负责接住这类切换，不需要路由给 Sonnet
-    const _isClearlyNormal = !_recentHasIntimate &&
-      ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) && !INTIMATE_PATTERNS.some(p => p.test(text)))
-      || _angryForceExit;
+    // 每轮独立判断：明确切换到日常时，立即给 Claude 尝试机会；
+    // 最近的亲密记录只用于承接语境，不锁定 Gemini。
+    const _isClearlyNormal = _forcedExitIntimate || _angryForceExit ||
+      ((_clearIntimateKws.test(text) || _normalAffection.test(text.trim())) &&
+        !INTIMATE_PATTERNS.some(p => p.test(text)) && !_recentHasIntimate);
 
     // 正则没命中：Haiku 同时判断调情+情绪（有图片时跳过）
     // 明确日常消息跳过此步骤
@@ -1124,8 +1126,8 @@ async function _processMergedMessageWithContent(userContentForModel) {
           .slice(-6)
           .some(m => m._intimate && (m._time || 0) > Date.now() - 10 * 60 * 1000);
         const _timeoutDefault = _hasRecentIntimateForTimeout
-          ? '{“flirt”:true,”suggestive”:false,”affectionate”:false}'
-          : '{“flirt”:false,”suggestive”:false,”affectionate”:false}';
+          ? '{"flirt":true,"suggestive":false,"affectionate":false}'
+          : '{"flirt":false,"suggestive":false,"affectionate":false}';
 
         // 最近5条上下文（排除当前这句）——供双关/暗示判断”最近是否暧昧”
         const _routingCtx = chatHistory
@@ -1135,12 +1137,12 @@ async function _processMergedMessageWithContent(userContentForModel) {
           .join('\n') || '(none)';
 
         const routingRaw = await Promise.race([
-          fetch('/api/gemini-extractor', {
+          fetchWithTimeout('/api/gemini-extractor', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               user: `You are a message classifier. Analyze the user's message and return JSON only.
-Format: {“flirt”:false,”suggestive”:false,”affectionate”:false}
+Format: {"flirt":false,"suggestive":false,"affectionate":false}
 
 flirt: explicit sexual content only (sex acts, genitals, sex toys, explicit invitations like “ride you”). Default false for anything unclear.
 suggestive: sexual innuendo, double meanings, or follow-up questions in an already sexual context (e.g. “what about you?” after a sexual question). Context-aware, not keyword-based.
@@ -1328,6 +1330,11 @@ Her: ${text}`
     hideTyping();
     let reply = data.content?.[0]?.text || '';
 
+    const _handoffImages = Array.isArray(messagesForRequest[messagesForRequest.length - 1]?.content)
+      ? messagesForRequest[messagesForRequest.length - 1].content.filter(b => b.type === 'image' && b.source?.data).map(b => b.source.data)
+      : [];
+    const _handoffOptions = { dailyMode: true, tagIntimate: false, images: _handoffImages };
+
     // ── Soft Handoff V1：交接窗口内的高置信身份出戏 → 丢弃候选，交 Gemini 日常接续 ──
     // 仅当"日常轮 + 近期有亲密"(_softHandoffWindow) 且候选明确出戏（自称 AI/否认 Simon
     // 或婚姻关系/拒演）时触发。此处候选 reply 尚未 append/push/save，直接丢弃零落地。
@@ -1335,7 +1342,7 @@ Her: ${text}`
     // 不走此路（不拿备用模型绕安全线）。失败不锁定：下一轮符合条件仍先让 Claude 试。
     if (_softHandoffWindow && reply && _isIdentityBreakout(reply)) {
       // 候选丢弃，改由本来就知道上下文的 Gemini 以日常模式自然承接
-      await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+      await _handleIntimateReply(text, rawHistory, _isSending, _handoffOptions);
       _isSending = false;
       return;
     }
@@ -1352,18 +1359,18 @@ Her: ${text}`
             `Reply: "${reply.slice(0, 300)}"`,
             10
           );
-          if (breakCheck.trim().toUpperCase().startsWith('YES')) reply = '';
+          if (breakCheck.trim().toUpperCase().startsWith('YES') && _isIdentityBreakout(reply)) reply = '';
         } catch(e) {}
       }
     }
 
-    const _isRealBreakout = reply && isBreakout(reply); // 有内容但拒演/自称AI = 内容问题
+    const _isRealBreakout = reply && _isIdentityBreakout(reply); // 仅身份出戏交接；内容安全拒绝不跨模型转送 // 有内容但拒演/自称AI = 内容问题
     const _isEmptyReply = !reply;                       // 空回复 = 瞬时故障
     if (_isRealBreakout || _isEmptyReply) {
       if (_isRealBreakout) {
         // 真破防：候选不落地，交给当前备用模型 Gemini 用同一 Shared Ghost Core 日常接续。
         // 不再调用已退役的 Grok fallback，也不拿旧轻量人格重写 Simon。
-        await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+        await _handleIntimateReply(text, rawHistory, _isSending, _handoffOptions);
         _isSending = false;
         return;
       } else {
@@ -1372,23 +1379,17 @@ Her: ${text}`
         reply = '___NETWORK_ERROR___';
         await new Promise(r => setTimeout(r, 400));
         try {
-          const retryRes = await fetchWithTimeout('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: getMainModel(),
-              max_tokens: 300,
-              system: finalSystem,
-              messages: messagesForRequest
-            })
-          }, 20000);
+          const retryRes = await fetchSonnetWithCache(
+            buildSystemPromptParts(_baseSystem), _extraHints, messagesForRequest, 300, _abortCtrl?.signal
+          );
+          if (!retryRes.ok) throw new Error('Claude retry failed');
           const retryData = await retryRes.json();
           const retryReply = retryData.content?.[0]?.text?.trim() || '';
-          if (retryReply && !isBreakout(retryReply)) reply = retryReply;
+          if (retryReply && !_isIdentityBreakout(retryReply)) reply = retryReply;
         } catch(e) {}
 
         if (reply === '___NETWORK_ERROR___') {
-          await _handleIntimateReply(text, rawHistory, _isSending, { dailyMode: true, tagIntimate: false });
+          await _handleIntimateReply(text, rawHistory, _isSending, _handoffOptions);
           _isSending = false;
           return;
         }
@@ -1850,22 +1851,13 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 因此是 rawHistory 的最后一条。这里 slice(-30, -1) 排除它，只取历史；
     // 当前这轮由下面 '\nHer: ' + text 显式追加一次，避免当前消息重复两遍。
     const _rawSlice = rawHistory.slice(-30, -1);
-    const _seenOpenings = new Set();
+    // 保留真实消息顺序；相同开头不代表重复消息，删除会破坏跨模型连续性。
     const recentMsgs = _rawSlice.map(m => {
       const who = m.role === 'user' ? 'Her' : 'Ghost';
-      const hasPhoto = m._photoBase64 || Array.isArray(m.content);
-      if (hasPhoto) return `${who}: [sent a photo]`;
-      const content = (m.content || '').slice(0, 150);
-      // Ghost 的回复：检查开头是否重复
-      if (m.role === 'assistant') {
-        const opening = content.toLowerCase().split(/[\s.,!?]+/).slice(0, 3).join(' ');
-        if (_seenOpenings.has(opening)) {
-          return null; // 跳过重复开头的回复，Grok 不看到就不会抄
-        }
-        _seenOpenings.add(opening);
-      }
-      return `${who}: ${content}`;
-    }).filter(Boolean).join('\n');
+      const hasPhoto = m._photoBase64?.length || Array.isArray(m.content);
+      const content = typeof m.content === 'string' ? m.content.slice(0, 500) : '';
+      return `${who}: ${hasPhoto ? '[sent a photo] ' : ''}${content}`;
+    }).join('\n');
 
     // 只保留成人 capability / safety boundary。
     // autonomy / 不servile / 有preferences 等人格文案已交给 Gemini Intimacy Persona，不在此重复。
@@ -1909,8 +1901,10 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 5. intimate memory / continuity
     // 只要 .fixed（Shared Ghost Core）；世界书召回在下方 _wbRecall 单独做一次，
     // 故这里 skipWorldBook，避免构建 fixed 时白跑一次召回、重复更新 lastHit。
-    const _sharedGhostCore = (typeof buildSystemPromptParts === 'function')
-      ? buildSystemPromptParts(null, { skipWorldBook: true }).fixed
+    const _sharedGhostParts = (typeof buildSystemPromptParts === 'function')
+      ? buildSystemPromptParts(null, { skipWorldBook: true }) : null;
+    const _sharedGhostCore = _sharedGhostParts
+      ? _sharedGhostParts.fixed + '\n\n' + _sharedGhostParts.dynamic
       : (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore());
     const _geminiIntimacyPersona = (typeof GEMINI_INTIMACY_PERSONA === 'string')
       ? '\n\n' + GEMINI_INTIMACY_PERSONA
@@ -1918,7 +1912,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 日常接续模式（Soft Handoff）：她已从亲密自然转向日常。保留 Shared Ghost Core
     // 与近期真实上下文（他知道刚才发生了什么），但不注入 adult 许可 / 调情 persona /
     // 记忆摘要，明确不重新调情——只作为她的丈夫，平静自然地接住她当前这句日常话。
-    const _dailyContinueNote = `\nA moment of closeness happened between you a few minutes ago. She has now shifted into ordinary conversation.`;
+    const _dailyContinueNote = `\nContinue the real conversation naturally. Do not assume intimacy or a topic shift unless the messages establish it.`;
     // WorldBook Shared Recall V1：跨模型世界书共享召回。
     // 复用 Claude 侧同一份 localStorage['worldBook'] 与同一套匹配/enabled/lastHit 规则，
     // 只注入本轮实际命中的条目（未命中返回 ''，不加无关内容）。作为 Ghost 已知事实，非强制台词。
@@ -2037,24 +2031,8 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
         .trim();
       // 修复备用模型偶发的整句连字/缺空格
       cleanedReply = _fixMissingSpaces(cleanedReply);
-      // 清理备用模型常见的重复开头
-      cleanedReply = cleanedReply
-        .replace(/^still (here|got|waiting|reading|thinking|holding|looking|sitting|quiet|listening|watching)[^.]*\.?\s*\n?/i, '')
-        .replace(/^quiet\.\s*\n?/i, '')
-        .replace(/^screen'?s?\s*(quiet|dark|low|still|says|glowing|down|at)[^.]*\.?\s*\n?/i, '')
-        .replace(/^yeah[.,]?\s*\n?/i, '')
-        .replace(/^damn[.,]?\s*/i, '')  // 不让"damn"当开头词
-        .replace(/^,\s*/i, '')
-        // 清理坏习惯短语
-        .replace(/[,.]?\s*(smiling like an idiot|grinning like an idiot|grinning here|smiling here|grinning to myself|smiling to myself)[.!]?\s*/gi, ' ')
-        .replace(/\.\s*(my turn now|your turn now|now it's my turn)[.!]?\s*$/i, '.')
-        .trim();
+      // 保留正常语气、句子与换行；仅清除技术标记，不截断自然回复。
 
-      // 强制截断：最多3行（Grok 经常无视 max_tokens）
-      const _lines = cleanedReply.split('\n').filter(l => l.trim());
-      if (_lines.length > 3) {
-        cleanedReply = _lines.slice(0, 3).join('\n');
-      }
       // 处理 unlock tag（解锁资料后从文本删掉）
       const _unlockMatch = cleanedReply.match(/"unlock"\s*:\s*"([^"]+)"/);
       if (_unlockMatch) {
@@ -2087,7 +2065,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
           _images
         );
         if (_retryReply && !_intimateBreakout(_retryReply)) {
-          const _retryClean = _fixMissingSpaces(_retryReply.trim()).split('\n').filter(l => l.trim()).slice(0, 2).join('\n');
+          const _retryClean = _fixMissingSpaces(_retryReply.trim());
           if (_retryClean) {
             appendMessage('bot', _retryClean);
             chatHistory.push({ role: 'assistant', content: _retryClean, ...(_tagIntimate ? { _intimate: true } : {}), _time: Date.now() });
