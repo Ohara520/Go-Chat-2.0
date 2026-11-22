@@ -780,10 +780,10 @@ async function loadFromCloud() {
         // 本地若还残留已墓碑的记录（跨设备删除传播），一并清掉
         const cleaned = merged.filter(m => !tomb.memSet.has(m.id));
         cleaned.sort((a, b) => (b.importance || 0) - (a.importance || 0));
-        localStorage.setItem('longTermMemories', JSON.stringify(cleaned.slice(0, 50)));
+        localStorage.setItem('longTermMemories', JSON.stringify(cleaned.slice(0, 300)));
       }
 
-      // 世界书（关键词记忆）：按 id 合并去重。上限 200，锁定的永不被裁掉。
+      // 世界书（关键词记忆）：按 id 合并去重。上限 500，锁定的永不被裁掉。
       if (Array.isArray(s.worldBook) && s.worldBook.length > 0) {
         const localWb = JSON.parse(localStorage.getItem('worldBook') || '[]');
         const mergedWb = [...localWb];
@@ -800,7 +800,7 @@ async function loadFromCloud() {
         const survived = mergedWb.filter(e => !tomb.wbSet.has(e.id));
         const lockedWb = survived.filter(e => e.locked);
         const unlockedWb = survived.filter(e => !e.locked);
-        const cappedWb = [...lockedWb, ...unlockedWb.slice(0, Math.max(0, 200 - lockedWb.length))];
+        const cappedWb = [...lockedWb, ...unlockedWb.slice(0, Math.max(0, 500 - lockedWb.length))];
         localStorage.setItem('worldBook', JSON.stringify(cappedWb));
       }
 
@@ -1173,12 +1173,12 @@ async function saveToCloud() {
       storyBook: JSON.parse(localStorage.getItem('storyBook') || '[]').slice(0, 200),
       // 主人设(Ghost)真正使用的结构化长期记忆数组，state.js 的 recallLongTermMemory 读它。
       // 此前只同步单数 longTermMemory 字符串，这个复数数组从不上云 → 换设备丢记忆。
-      longTermMemories: JSON.parse(localStorage.getItem('longTermMemories') || '[]').slice(0, 50),
+      longTermMemories: JSON.parse(localStorage.getItem('longTermMemories') || '[]').slice(0, 300),
       worldBook: (() => {
         const wb = JSON.parse(localStorage.getItem('worldBook') || '[]');
         const lk = wb.filter(e => e.locked);
         const un = wb.filter(e => !e.locked);
-        return [...lk, ...un.slice(0, Math.max(0, 200 - lk.length))];
+        return [...lk, ...un.slice(0, Math.max(0, 500 - lk.length))];
       })(),
       // 删除墓碑：auto 联动删除的 wb/mem id，上云让其它设备也不复活它们
       linkTombstones: (() => {
