@@ -1070,7 +1070,8 @@ async function saveToCloud() {
       currentCharacter: 'ghost',
     };
 
-    // 单角色：不再复制 Ghost/Keegan 全量数据到 profile.characters。\n    const chatHistoryRaw = localStorage.getItem('chatHistory');
+    // 单角色：不再复制 Ghost/Keegan 全量数据到 profile.characters。
+    const chatHistoryRaw = localStorage.getItem('chatHistory');
     const chatHistoryData = chatHistoryRaw
       ? JSON.parse(chatHistoryRaw)
           .filter(m => !m._system && !m._recalled)
