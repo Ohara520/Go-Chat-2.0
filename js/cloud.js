@@ -289,15 +289,11 @@ async function loadFromCloud() {
             // 有独立聊天主列时，绝不从旧角色快照覆盖。
             if (Array.isArray(data.chat_history) && data.chat_history.length) return;
           }
-          if (key === 'ghostAvatarUrl' || key === 'ghostAvatarBase64' || key === 'ghostAvatarUpdatedAt') {
-            const localAt = Number(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
-            const legacyAt = Number(_legacyGhost.ghostAvatarUpdatedAt || '0');
-            if (localAt > legacyAt) return;
-          } else if (localStorage.getItem(key) && !cloudIsNewer) {
-            return;
-          }
+          // 旧快照仅补缺，不以旧角色副本覆盖已恢复的主存档。
+          // 头像也不从旧快照覆盖当前头像版本。
+          if (localStorage.getItem(key)) return;
           const raw = typeof value === 'string' ? value : JSON.stringify(value);
-          if (!localStorage.getItem(key) || cloudIsNewer) localStorage.setItem(key, raw);
+          localStorage.setItem(key, raw);
         });
       }
     }
