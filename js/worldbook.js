@@ -86,6 +86,12 @@ function addWorldBookEntry({ keywords, content, source = 'manual', id = null, lo
   };
   arr.push(entry);
   _wbSave(arr);
+  // 达到容量上限时，_wbSave 可能淘汰刚加入的未锁定条目。
+  // 只有确实保存在本地的条目才能返回成功并建立 Memory 关联。
+  if (!_wbLoad().some(e => e.id === entry.id)) {
+    console.warn('[worldbook] 新条目因容量限制未保存:', entry.id);
+    return null;
+  }
   return entry;
 }
 
