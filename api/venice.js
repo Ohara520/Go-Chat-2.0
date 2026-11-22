@@ -1,3 +1,4 @@
+import { requireActiveAccount } from './_active-account.js';
 import OpenAI from 'openai';
 
 const BASE_URLS = [
@@ -242,6 +243,7 @@ async function callGeminiChat(system, user, model = VENICE_MODEL, diag = null, i
 }
 
 export default async function handler(req, res) {
+  if (!(await requireActiveAccount(req, res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
