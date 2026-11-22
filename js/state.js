@@ -216,7 +216,7 @@ ${conversationText}`;
       }
       updateLongTermMemoryEntry(target, memory);
     } else {
-      // add 及任何未知 action → 走原有新增流程（新 id / 门槛 / sort / top50 / survived / 建 wb）
+      // add 及任何未知 action → 走原有新增流程（新 id / 门槛 / sort / top300 / survived / 建 wb）
       saveLongTermMemoryEntry(memory);
     }
   } catch (e) {
@@ -272,7 +272,7 @@ function updateLongTermMemoryEntry(memId, memory) {
   // 保留 id / timestamp / wbId / lastRecalled 等其它字段不动
 
   memories.sort((a, b) => (b.importance || 0) - (a.importance || 0));
-  localStorage.setItem('longTermMemories', JSON.stringify(memories.slice(0, 50)));
+  localStorage.setItem('longTermMemories', JSON.stringify(memories.slice(0, 300)));
   if (typeof touchLocalState === 'function') touchLocalState();
   console.log('♻️ 更新长期记忆:', String(m.content).slice(0, 50));
 
@@ -308,13 +308,13 @@ function saveLongTermMemoryEntry(memory) {
 
   memories.push(newMemory);
   memories.sort((a, b) => b.importance - a.importance);
-  const trimmed = memories.slice(0, 50);
+  const trimmed = memories.slice(0, 300);
   localStorage.setItem('longTermMemories', JSON.stringify(trimmed));
   if (typeof touchLocalState === 'function') touchLocalState();
   console.log('💾 保存长期记忆:', newMemory.content.slice(0, 50));
 
   // 同步进世界书：用 tags 作触发词，让 AI 抽到的记忆也能被关键词检索到
-  // 建 auto WorldBook 前先确认这条 Memory 没被 top50 淘汰，否则不建、不关联、不补救
+  // 建 auto WorldBook 前先确认这条 Memory 没被 top300 淘汰，否则不建、不关联、不补救
   // （避免 wb.memId 指向一个已不存在的 Memory）
   const survived = trimmed.some(m => m.id === newMemory.id);
   if (survived && typeof addWorldBookEntry === 'function' && Array.isArray(newMemory.tags) && newMemory.tags.length) {
