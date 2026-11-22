@@ -308,8 +308,8 @@ async function _runPostTurnMemory(reply, text, turn) {
   if (reply.length <= 50) return;
 
   try {
-    // 短期记忆：每次都更新
-    await updateShortTermMemory(reply, text).catch(e =>
+    // 短期记忆独立执行，不能因其响应慢而阻塞每 5 轮的长期记忆检查
+    updateShortTermMemory(reply, text).catch(e =>
       console.warn('短期记忆更新失败:', e)
     );
 
