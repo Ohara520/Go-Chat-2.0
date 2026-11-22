@@ -469,23 +469,33 @@ async function callVenice(system, user, maxTokens = 300, intimateMemory = '') {
  * @returns {string} 回复文本，失败返回空字符串
  */
 async function callGemini(prompt, maxTokens = 300) {
-  try {
-    const res = await fetchWithTimeout('/api/gemini-extractor', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user: prompt, max_tokens: maxTokens }),
-    }, 15000);
-    if (!res.ok) return '';
-    const data = await res.json();
-    if (_isApiErrorBody(data)) {
-      console.warn('[callGemini] HTTP ok 但 body 是错误:', _apiErrorMsg(data));
-      return '';
+  // 只对临时网络/上游故障补试一次；参数错误、鉴权失败不重试。
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout('/api/gemini-extractor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: prompt, max_tokens: maxTokens }),
+      }, 25000);
+      if (!res.ok) {
+        console.warn('[callGemini] HTTP 失败:', res.status, '尝试:', attempt + 1);
+        if (attempt === 0 && [429, 502, 503, 504].includes(res.status)) continue;
+        return '';
+      }
+      const data = await res.json();
+      if (_isApiErrorBody(data)) {
+        console.warn('[callGemini] 响应包含错误:', _apiErrorMsg(data));
+        return '';
+      }
+      const result = data.text?.trim() || '';
+      if (!result) console.warn('[callGemini] 模型返回空文本');
+      return result;
+    } catch (e) {
+      console.warn('[callGemini] 请求异常:', e, '尝试:', attempt + 1);
+      if (attempt === 1) return '';
     }
-    return data.text?.trim() || '';
-  } catch (e) {
-    console.warn('[callGemini] 调用失败:', e);
-    return '';
   }
+  return '';
 }
 
 // ===== DeepSeek 生成调用 =====
