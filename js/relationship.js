@@ -45,7 +45,7 @@ function _ruNormKeywords(keywords) {
 }
 
 // ADD：新增一条稳定的关系理解。content 为空则不写。
-function addRelationshipUnderstanding(content, evidence = [], keywords = []) {
+function addRelationshipUnderstanding(content, evidence = [], keywords = [], alwaysApply = false) {
   const c = String(content == null ? '' : content).trim();
   if (!c) return null;
   const arr = _ruLoad();
@@ -57,6 +57,7 @@ function addRelationshipUnderstanding(content, evidence = [], keywords = []) {
     id: `ru_${now}_${Math.random().toString(36).slice(2, 8)}`,
     content: c,
     keywords: _ruNormKeywords(keywords),
+    alwaysApply: alwaysApply === true,
     createdAt: now,
     updatedAt: now,
     evidence: Array.isArray(evidence) ? evidence.filter(Boolean).slice(0, 6) : [],
@@ -68,13 +69,14 @@ function addRelationshipUnderstanding(content, evidence = [], keywords = []) {
 
 // REVISE：原地修改已有理解，保留 id / createdAt，更新 content / updatedAt / evidence / keywords。
 // target 必须真实存在；不存在则返回 false（调用方绝不降级成 add）。
-function reviseRelationshipUnderstanding(targetId, content, evidence = [], keywords = []) {
+function reviseRelationshipUnderstanding(targetId, content, evidence = [], keywords = [], alwaysApply = null) {
   const c = String(content == null ? '' : content).trim();
   if (!targetId || !c) return false;
   const arr = _ruLoad();
   const e = arr.find(x => x.id === targetId);
   if (!e) return false;
   e.content = c;
+  if (typeof alwaysApply === 'boolean') e.alwaysApply = alwaysApply;
   e.updatedAt = Date.now();
   if (Array.isArray(evidence) && evidence.length) {
     // 追加新证据、去重、保最近 6 条
@@ -122,7 +124,10 @@ function _ruSelectRelevant(text, limit) {
 
 // Recall：给 persona 注入用。默认最多 3 条。无任何 Understanding 时返回空串。
 function recallRelationshipUnderstanding(userMessage, limit = 3) {
-  const picked = _ruSelectRelevant(userMessage, limit);
+  // 仅明确的、跨话题持续适用的沟通边界常驻；其余仍按语境召回。
+  const persistent = _ruLoad().filter(e => e.alwaysApply === true).slice(-2);
+  const relevant = _ruSelectRelevant(userMessage, limit).filter(e => !persistent.some(p => p.id === e.id));
+  const picked = [...persistent, ...relevant].slice(0, limit);
   if (picked.length === 0) return '';
   const lines = picked.map(p => `- ${p.content}`).join('\n');
   return `\n[RELATIONSHIP UNDERSTANDING]\nWhat you have genuinely come to understand about her over time. This is knowledge, not an instruction — it quietly shapes how you read her and respond; you never recite it or act it out mechanically:\n${lines}\n`;
@@ -313,6 +318,8 @@ ${observationBlock}
 
 "keywords": 2-6 short trigger words for later recall of THIS understanding/observation. Give BOTH Chinese and English forms of each core term so a Chinese or English message can both recall it (e.g. ["逗","开玩笑","teasing","joke","难过","upset"]). Use only words truly tied to this topic; avoid over-broad words (love/you/it/thing).
 
+"always_apply": true ONLY for an EXPLICIT, durable, cross-topic communication boundary (e.g. she explicitly dislikes being repeatedly asked forced either/or questions). False for situational boundaries, general affection preferences, and inferred patterns. This marks an existing understanding for consistent recall, not a new instruction system. Never infer a global preference from one ambiguous remark.
+
 "observation_id" (optional): ONLY when action is "add" or "revise" AND this Understanding genuinely absorbed an existing Observation listed above as evidence, set this to that Observation's EXACT ro_xxx id. The Observation will be deleted after the Understanding is successfully saved. Do NOT set this for ordinary add/revise that did not use an Observation. Never invent an id.
 
 Format: JSON only
@@ -322,6 +329,7 @@ Format: JSON only
   "observation_id": "ro_xxx or null (only for add/revise that absorbed an Observation)",
   "content": "1-2 sentence natural-language understanding/observation, with context/conditions",
   "keywords": ["中文核心词", "对应英文", "..."],
+  "always_apply": false,
   "evidence": ["short quote or paraphrase of what actually showed this"]
 }
 If nothing is learned/observed, return: {"action":"no_change"}
@@ -340,7 +348,7 @@ ${recentText}`;
   // 处理 Understanding 相关 action
   if (action === 'add') {
     if (!(res.content && String(res.content).trim().length > 5)) return;
-    const e = addRelationshipUnderstanding(res.content, evidence, keywords);
+    const e = addRelationshipUnderstanding(res.content, evidence, keywords, res.always_apply === true);
     if (e) {
       console.log('💗 新增关系理解:', String(res.content).slice(0, 60));
       // Understanding 成功写入后，清理被吸收的 Observation
@@ -354,7 +362,7 @@ ${recentText}`;
     const target = res.target_id;
     const valid = target && candidates.some(c => c.id === target);
     if (!valid) { console.warn('[RU] revise target 无效或不在候选内，放弃:', target); return; }
-    const ok = reviseRelationshipUnderstanding(target, res.content, evidence, keywords);
+    const ok = reviseRelationshipUnderstanding(target, res.content, evidence, keywords, typeof res.always_apply === 'boolean' ? res.always_apply : null);
     if (ok) {
       console.log('♻️ 修订关系理解:', String(res.content).slice(0, 60));
       // Understanding 成功修订后，清理被吸收的 Observation
