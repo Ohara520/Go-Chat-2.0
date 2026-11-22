@@ -97,7 +97,8 @@ const CHARACTER_KEYS = [
 
 // ── 获取当前角色 ──────────────────────────────────────────
 function getCurrentCharacter() {
-  return localStorage.getItem('currentCharacter') || 'ghost';
+  // 单角色阶段：所有业务固定使用 Simon。旧 Keegan 存档暂不删除。
+  return 'ghost';
 }
 
 function getCurrentCharacterConfig() {
