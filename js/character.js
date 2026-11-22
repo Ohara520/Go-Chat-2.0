@@ -29,20 +29,6 @@ const CHARACTER_LIST = [
     personaBuilder: 'buildSystemPrompt', // 主人设构建函数名
     defaultAvatar: 'images/ghost-avatar.png',
   },
-  {
-    id: 'keegan',
-    name: 'Keegan',
-    fullName: 'Keegan P. Russ',
-    unit: 'Ghosts · Scout Sniper',
-    location: 'Texas, USA',
-    themeColor: '#5a9ab6',
-    bgFrom: '#eaf4f9',
-    bgTo: '#c4dfe9',
-    accentColor: '#3a7a96',
-    veniceEndpoint: '/api/venice-keegan', // Keegan 调情路由
-    personaBuilder: 'buildKeeganSystemPrompt',
-    defaultAvatar: 'images/keegan-avatar.png',
-  },
 ];
 
 // ── 角色专属的 localStorage key 列表 ─────────────────────
@@ -152,6 +138,8 @@ function _loadCharacterData(charId) {
 window._characterSwitching = false;
 
 async function switchCharacter(newCharId) {
+  // 单角色版本禁止切换，防止任何旧入口触发存档搬运。
+  return;
   const currentCharId = getCurrentCharacter();
   if (currentCharId === newCharId) return; // 没有变化
 
