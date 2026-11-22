@@ -252,16 +252,16 @@ const BREAKOUT_PHRASES = [
   "i don't have a wife", "i don't have a partner",
   "we're not together", "we are not together",
   "we're not married", "we are not married",
-  "don't call me that", "don't call me",
-  "keep moving", "what's your aim",
-  "english only", "english.", "use my name", "stop with that", "stop calling me",
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
   // AI助手类
   "ai assistant", "development work", "coding questions", "coding problems",
   "here to help you", "what are you working on", "build something", "24/7",
   "creative writing communities", "roleplay platforms",
   // 明确跳出
-  "i need to be straight with you",
-  "i need to be honest with you",
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
+  // Removed ambiguous phrase to avoid suppressing normal character dialogue.
   "what can i actually help",
   "help with something real",
   "help with something else",
@@ -1907,8 +1907,10 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
     // 5. intimate memory / continuity
     // 只要 .fixed（Shared Ghost Core）；世界书召回在下方 _wbRecall 单独做一次，
     // 故这里 skipWorldBook，避免构建 fixed 时白跑一次召回、重复更新 lastHit。
-    const _sharedGhostCore = (typeof buildSystemPromptParts === 'function')
-      ? buildSystemPromptParts(null, { skipWorldBook: true }).fixed
+    const _sharedGhostParts = (typeof buildSystemPromptParts === 'function')
+      ? buildSystemPromptParts(null, { skipWorldBook: true }) : null;
+    const _sharedGhostCore = _sharedGhostParts
+      ? _sharedGhostParts.fixed + '\n\n' + _sharedGhostParts.dynamic
       : (typeof buildCurrentStyleCore === 'function' ? buildCurrentStyleCore() : buildGhostStyleCore());
     const _geminiIntimacyPersona = (typeof GEMINI_INTIMACY_PERSONA === 'string')
       ? '\n\n' + GEMINI_INTIMACY_PERSONA
@@ -2035,24 +2037,8 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
         .trim();
       // 修复备用模型偶发的整句连字/缺空格
       cleanedReply = _fixMissingSpaces(cleanedReply);
-      // 清理备用模型常见的重复开头
-      cleanedReply = cleanedReply
-        .replace(/^still (here|got|waiting|reading|thinking|holding|looking|sitting|quiet|listening|watching)[^.]*\.?\s*\n?/i, '')
-        .replace(/^quiet\.\s*\n?/i, '')
-        .replace(/^screen'?s?\s*(quiet|dark|low|still|says|glowing|down|at)[^.]*\.?\s*\n?/i, '')
-        .replace(/^yeah[.,]?\s*\n?/i, '')
-        .replace(/^damn[.,]?\s*/i, '')  // 不让"damn"当开头词
-        .replace(/^,\s*/i, '')
-        // 清理坏习惯短语
-        .replace(/[,.]?\s*(smiling like an idiot|grinning like an idiot|grinning here|smiling here|grinning to myself|smiling to myself)[.!]?\s*/gi, ' ')
-        .replace(/\.\s*(my turn now|your turn now|now it's my turn)[.!]?\s*$/i, '.')
-        .trim();
+      // 保留正常语气、句子与换行；仅清除技术标记，不截断自然回复。
 
-      // 强制截断：最多3行（Grok 经常无视 max_tokens）
-      const _lines = cleanedReply.split('\n').filter(l => l.trim());
-      if (_lines.length > 3) {
-        cleanedReply = _lines.slice(0, 3).join('\n');
-      }
       // 处理 unlock tag（解锁资料后从文本删掉）
       const _unlockMatch = cleanedReply.match(/"unlock"\s*:\s*"([^"]+)"/);
       if (_unlockMatch) {
@@ -2085,7 +2071,7 @@ async function _handleIntimateReply(text, rawHistory, isSendingRef, opts = {}) {
           _images
         );
         if (_retryReply && !_intimateBreakout(_retryReply)) {
-          const _retryClean = _fixMissingSpaces(_retryReply.trim()).split('\n').filter(l => l.trim()).slice(0, 2).join('\n');
+          const _retryClean = _fixMissingSpaces(_retryReply.trim());
           if (_retryClean) {
             appendMessage('bot', _retryClean);
             chatHistory.push({ role: 'assistant', content: _retryClean, ...(_tagIntimate ? { _intimate: true } : {}), _time: Date.now() });
