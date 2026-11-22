@@ -1346,7 +1346,7 @@ async function generatePhoneMemo() {
 - 只输出3行，不要其他内容`;
 
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetchWithTimeout('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
