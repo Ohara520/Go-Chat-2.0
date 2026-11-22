@@ -1960,6 +1960,7 @@ window.__authReady = (async function() {
       document.body.textContent = '账号状态暂时无法验证，请稍后刷新重试。';
       throw new Error('account_status_unavailable');
     }
+    window.__accountAccessAllowed = true;
     // 修复账号串号：如果本次登录的用户与本地残留的 user_id 不一致，
     // 说明在同一设备换了账号（没走 logout / session 过期直登别号）。
     // 必须先清空上一个用户的本地数据，否则会被当作"本地已有"继承，
