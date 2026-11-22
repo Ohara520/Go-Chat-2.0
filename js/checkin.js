@@ -3,7 +3,7 @@
 //
 // 职责：
 // - renderCheckin()       渲染签到UI
-// - doCheckin()           执行签到（奖励/里程碑/云端同步）
+// - doCheckin()           执行签到（虚拟英镑/云端同步）
 // - showCheckinResult()   弹窗展示结果
 // - launchCheckinFlowers() 花瓣动画（手机/电脑通用）
 //
@@ -88,8 +88,7 @@ function applyLocalBonusMessages(count) {
 // 里程碑配置
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const CHECKIN_MILESTONES     = { 1: 10, 3: 20, 7: 50, 14: 100, 30: 200 };
-const CHECKIN_MILESTONE_DAYS = [1, 3, 7, 14, 30];
+// 签到仅奖励虚拟英镑，不再赠送聊天条数。
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -101,7 +100,6 @@ function renderCheckin() {
   const balance       = typeof getBalance === 'function' ? getBalance() : 0;
   const doneToday     = isCheckedInToday();
   const monthlyCount  = getMonthlyCheckinCount();
-  const nextMilestone = CHECKIN_MILESTONE_DAYS.find(m => m > monthlyCount);
   const isNewMonth    = checkNewMonthHint();
 
   const streakEl  = document.getElementById('checkinStreak');
@@ -127,91 +125,12 @@ function renderCheckin() {
     if (isNewMonth && !doneToday) {
       hintEl.textContent = '新的一月开始了，来签到吧';
     } else if (!doneToday) {
-      const bonus = nextMilestone ? CHECKIN_MILESTONES[nextMilestone] : null;
-      hintEl.textContent = bonus
-        ? `本月第${monthlyCount + 1}次签到，距里程碑还差${nextMilestone - monthlyCount}次，奖励+${bonus}条`
-        : '点击今天的日期签到';
+      hintEl.textContent = '点击今天的日期签到';
     } else {
       hintEl.textContent = '明天再来签到吧';
     }
     hintEl.textContent = hintEl.textContent.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').trim();
   }
-}
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 条数奖励发放
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function applyCheckinBonusMessages(count) {
-  const email = localStorage.getItem('userEmail') || localStorage.getItem('sb_user_email') || '';
-  if (email) {
-    // 立即清掉 pending，防止 retryPendingCheckinBonus 并发重复发放
-    localStorage.removeItem('pendingCheckinBonus');
-    localStorage.removeItem('pendingCheckinBonusEmail');
-    // 立即生效：先乐观更新本地缓存，不等 API 返回
-    if (typeof _subCache !== 'undefined' && _subCache && _subCache.remaining !== undefined) {
-      _subCache.remaining += count;
-    }
-    // 同步到后端持久化
-    fetch('/api/checkin-bonus', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, bonus: count })
-    }).then(r => r.json()).then(d => {
-      if (d.ok && typeof _subCache !== 'undefined' && _subCache) {
-        _subCache.remaining = d.remaining;
-      } else {
-        console.warn('[checkin] bonus API 返回异常:', d);
-        // 回滚乐观更新，再存待重试
-        if (typeof _subCache !== 'undefined' && _subCache && _subCache.remaining !== undefined) {
-          _subCache.remaining -= count;
-        }
-        _savePendingBonus(email, count);
-      }
-    }).catch(e => {
-      console.warn('[checkin] bonus API 调用失败:', e);
-      // 回滚乐观更新，再存待重试
-      if (typeof _subCache !== 'undefined' && _subCache && _subCache.remaining !== undefined) {
-        _subCache.remaining -= count;
-      }
-      _savePendingBonus(email, count);
-    });
-  } else {
-    applyLocalBonusMessages(count);
-  }
-}
-
-// 存储失败的 bonus，下次启动重试
-function _savePendingBonus(email, count) {
-  const existing = parseInt(localStorage.getItem('pendingCheckinBonus') || '0');
-  localStorage.setItem('pendingCheckinBonus', String(existing + count));
-  localStorage.setItem('pendingCheckinBonusEmail', email);
-}
-
-// 启动时重试未同步的 bonus
-function retryPendingCheckinBonus() {
-  const pending = parseInt(localStorage.getItem('pendingCheckinBonus') || '0');
-  const email = localStorage.getItem('pendingCheckinBonusEmail') || '';
-  if (!pending || !email) return;
-
-  fetch('/api/checkin-bonus', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, bonus: pending })
-  }).then(r => r.json()).then(d => {
-    if (d.ok) {
-      localStorage.removeItem('pendingCheckinBonus');
-      localStorage.removeItem('pendingCheckinBonusEmail');
-      if (typeof _subCache !== 'undefined' && _subCache) _subCache.remaining = d.remaining;
-      console.log('[checkin] 补发 bonus 成功:', pending);
-    }
-  }).catch(() => {});
-}
-
-// 页面加载时自动重试
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => setTimeout(retryPendingCheckinBonus, 3000));
 }
 
 
@@ -240,7 +159,6 @@ function doCheckin() {
   localStorage.setItem(monthKey, monthlyCount);
 
   // 里程碑奖励
-  const milestoneBonus = CHECKIN_MILESTONES[monthlyCount] || 0;
 
   // ── 主奖励 ──
   const luckyChance = getLuckyChance(streak);
@@ -266,12 +184,13 @@ function doCheckin() {
       ? `💰 签到奖励：£${baseCoins} × ${_baristaMulti.toFixed(1)} = £${coins}`
       : `💰 签到奖励：£${coins}`;
   } else {
-    let baseMsgCount = Math.floor(Math.random() * 3) + 1;
-    let msgCount = _isBarista ? Math.round(baseMsgCount * _baristaMulti) : baseMsgCount;
-    applyCheckinBonusMessages(msgCount);
+    let baseCoins = [5, 8, 10, 15, 20][Math.floor(Math.random() * 5)];
+    let coins = _isBarista ? Math.round(baseCoins * _baristaMulti) : baseCoins;
+    if (typeof addTransaction === 'function') addTransaction({ icon: '🎁', name: '签到奖励', amount: coins });
+    if (typeof renderWallet === 'function') renderWallet();
     rewardMsg = _isBarista
-      ? `💬 签到奖励：+${baseMsgCount}条 × ${_baristaMulti.toFixed(1)} = +${msgCount}条`
-      : `💬 签到奖励：+${msgCount}条`;
+      ? `💰 签到奖励：£${baseCoins} × ${_baristaMulti.toFixed(1)} = £${coins}`
+      : `💰 签到奖励：£${coins}`;
   }
 
   // 咖啡师加成提示
@@ -280,19 +199,12 @@ function doCheckin() {
     baristaMsg = `\n☕ 咖啡师加成 ×${_baristaMulti.toFixed(1)}`;
   }
 
-  // ── 里程碑额外奖励 ──
-  let milestoneMsg = '';
-  if (milestoneBonus > 0) {
-    applyCheckinBonusMessages(milestoneBonus);
-    milestoneMsg = `\n🏆 本月第${monthlyCount}次签到：额外+${milestoneBonus}条！`;
-  }
-
   // ── 连续签到特殊提示 ──
   let streakMsg = '';
   if (streak === 7)  streakMsg = '\n🔥 连续签到7天！';
   if (streak === 30) streakMsg = '\n👑 连续签到30天！';
 
-  showCheckinResult(rewardMsg + baristaMsg + milestoneMsg + streakMsg, streak);
+  showCheckinResult(rewardMsg + baristaMsg + streakMsg, streak);
   renderCheckin();
   if (typeof initCalendar === 'function') initCalendar();
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
