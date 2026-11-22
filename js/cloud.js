@@ -341,7 +341,18 @@ async function loadFromCloud() {
           break;
         }
       }
-      localStorage.setItem('visitStreak', String(Math.max(_realStreak, 1)));
+      // 今天尚未签到时，连续天数应从昨天开始算；不能在云同步时把30+天直接写成1。
+      // 若云端记录不完整，保留较高的历史值，避免仅因同步丢失而误断签。
+      const _previous = parseInt(localStorage.getItem('visitStreak') || '0', 10) || 0;
+      const _cloudPrevious = parseInt(data.profile?.visitStreak || '0', 10) || 0;
+      const _yesterday = new Date(_today);
+      _yesterday.setDate(_yesterday.getDate() - 1);
+      const _yesterdayKey = 'checkin_' + _yesterday.getFullYear() + '-' + String(_yesterday.getMonth()+1).padStart(2,'0') + '-' + String(_yesterday.getDate()).padStart(2,'0');
+      if (_realStreak > 0 || localStorage.getItem(_yesterdayKey)) {
+        localStorage.setItem('visitStreak', String(Math.max(_realStreak, _previous, _cloudPrevious, 1)));
+      } else if (_previous <= 1 && _cloudPrevious <= 1) {
+        localStorage.setItem('visitStreak', '1');
+      }
     }
 
     // ── 4. 钱包迁移标记 + 余额恢复（必须最早执行）────────────
@@ -1037,7 +1048,7 @@ async function saveToCloud() {
         }
         return keys;
       })(),
-      monthlyCheckinKey: 'monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1),
+      monthlyCheckinKey: 'monthlyCheckin_' + new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'),
       monthlyCheckinCount: localStorage.getItem('monthlyCheckin_' + new Date().getFullYear() + '_' + (new Date().getMonth() + 1)) || '0',
       // ── 多角色：当前角色标记 ──
       currentCharacter: 'ghost',
