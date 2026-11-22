@@ -31,8 +31,15 @@ export default async function handler(req, res) {
     const user = data.user;
     const created = Date.parse(user.created_at || '');
     const lastActive = Date.parse(user.last_sign_in_at || user.created_at || '');
-    const eligible = Number.isFinite(created) && Number.isFinite(lastActive) &&
-      created < CUTOFF && lastActive < Date.now() - INACTIVE_MS;
+    // last_sign_in_at 不等于最后活跃时间：持久登录用户仍可能每天聊天。
+    const { data: archive, error: archiveError } = await supabase.from('user_data')
+      .select('updated_at,chat_updated_at').eq('user_id', userId).maybeSingle();
+    if (archiveError) return res.status(500).json({ ok: false, reason: 'activity_check_failed' });
+    const recentActivity = [archive?.updated_at, archive?.chat_updated_at]
+      .map(value => Date.parse(value || '')).filter(Number.isFinite);
+    const latestActivity = Math.max(lastActive, ...recentActivity);
+    const eligible = Number.isFinite(created) && Number.isFinite(latestActivity) &&
+      created < CUTOFF && latestActivity < Date.now() - INACTIVE_MS;
     const banned = Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now());
     // 有充值记录的账号默认禁止自动规则冻结；避免误伤仍有权益的老用户。
     const { data: subscription, error: subscriptionError } = await supabase
@@ -41,7 +48,7 @@ export default async function handler(req, res) {
     if (subscriptionError) return res.status(500).json({ ok: false, reason: 'subscription_check_failed' });
     const hasSubscription = Boolean(subscription);
     const summary = { userId: user.id, email: user.email || null, createdAt: user.created_at,
-      lastSignInAt: user.last_sign_in_at || null, eligible, banned, hasSubscription };
+      lastSignInAt: user.last_sign_in_at || null, lastActivityAt: new Date(latestActivity).toISOString(), eligible, banned, hasSubscription };
 
     if (action === 'preview') return res.status(200).json({ ok: true, ...summary });
     if (confirm !== 'CONFIRM_ACCOUNT_STATUS_CHANGE') {
