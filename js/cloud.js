@@ -105,6 +105,30 @@ async function loadFromCloud() {
     // · 本地有数据 + 云端无 stateSavedAt（旧格式兼容）→ 保守处理，不覆盖本地
     const cloudIsNewer = localTs === 0 || (cloudStateTs > 0 && cloudStateTs > localTs + 500);
 
+    // ── 单角色过渡：旧用户可能最后停留在 Keegan ────────────
+    // 先恢复 Ghost 前缀存档，再进入常规云端合并。
+    // 严禁把 Keegan 的标准 key 直接当成 Simon 的数据上传。
+    const _legacySelectedChar = localStorage.getItem('currentCharacter');
+    const _legacyWasKeegan = _legacySelectedChar === 'keegan';
+    if (_legacyWasKeegan) {
+      const _ghostSnapshot = data.profile && data.profile.characters && data.profile.characters.ghost;
+      const _legacyKeys = typeof CHARACTER_KEYS !== 'undefined' ? CHARACTER_KEYS : [];
+      _legacyKeys.forEach(key => {
+        let raw = localStorage.getItem('ghost_' + key);
+        if (raw === null && _ghostSnapshot && _ghostSnapshot[key] != null) {
+          const value = _ghostSnapshot[key];
+          raw = typeof value === 'string' ? value : JSON.stringify(value);
+        }
+        // 无 Ghost 来源时移除当前 Keegan 值，避免串档。
+        if (raw !== null) localStorage.setItem(key, raw);
+        else localStorage.removeItem(key);
+      });
+      localStorage.setItem('currentCharacter', 'ghost');
+      // 聊天主列可能是 Keegan 的，后续不能无条件合并进 Ghost。
+      // 仅在旧 Ghost 存档完全没有聊天时保留空记录，等待人工核对。
+      console.log('[cloud] 已从旧角色存档恢复 Ghost 本地数据');
+    }
+
     // ── 1. 聊天记录：合并云端和本地，保留更多 ────────────────
     // 重置标记：用户刚重置了对话，云端已在重置时同步，跳过 merge 防止旧数据被恢复
     if (localStorage.getItem('chatResetConfirmed') === '1') {
@@ -117,7 +141,7 @@ async function loadFromCloud() {
         const cleanedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
         await sb.from('user_data').update({ chat_history: cleanedHistory }).eq('user_id', userId);
       } catch(e) {}
-    } else if (data.chat_history && data.chat_history.length > 0) {
+    } else if (!_legacyWasKeegan && data.chat_history && data.chat_history.length > 0) {
       const localRaw = localStorage.getItem('chatHistory');
       const localHistory = localRaw ? JSON.parse(localRaw) : [];
       if (localHistory.length === 0) {
