@@ -1938,6 +1938,28 @@ window.__authReady = (async function() {
     window.location.href = '/login.html';
     return;
   } else {
+    // 冻结检查必须在账号切换处理和云端数据恢复之前完成。
+    // 接口失败时暂停初始化，不把服务端故障误报为账号被冻结。
+    let statusResponse;
+    try {
+      statusResponse = await fetch('/api/account-status', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + session.access_token },
+        cache: 'no-store'
+      });
+    } catch (error) {
+      document.body.textContent = '账号状态暂时无法验证，请稍后刷新重试。';
+      throw new Error('account_status_network_error');
+    }
+    if (statusResponse.status === 403) {
+      await sbClient.auth.signOut();
+      document.body.textContent = '此账号已暂停使用。如需恢复，请联系管理员。';
+      return;
+    }
+    if (!statusResponse.ok) {
+      document.body.textContent = '账号状态暂时无法验证，请稍后刷新重试。';
+      throw new Error('account_status_unavailable');
+    }
     // 修复账号串号：如果本次登录的用户与本地残留的 user_id 不一致，
     // 说明在同一设备换了账号（没走 logout / session 过期直登别号）。
     // 必须先清空上一个用户的本地数据，否则会被当作"本地已有"继承，
