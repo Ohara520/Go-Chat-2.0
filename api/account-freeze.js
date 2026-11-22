@@ -34,13 +34,20 @@ export default async function handler(req, res) {
     const eligible = Number.isFinite(created) && Number.isFinite(lastActive) &&
       created < CUTOFF && lastActive < Date.now() - INACTIVE_MS;
     const banned = Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now());
-    const summary = { userId: user.id, createdAt: user.created_at,
-      lastSignInAt: user.last_sign_in_at || null, eligible, banned };
+    // 有充值记录的账号默认禁止自动规则冻结；避免误伤仍有权益的老用户。
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('subscriptions').select('email,plan_id,monthly_quota,used_count')
+      .eq('email', (user.email || '').trim().toLowerCase()).maybeSingle();
+    if (subscriptionError) return res.status(500).json({ ok: false, reason: 'subscription_check_failed' });
+    const hasSubscription = Boolean(subscription);
+    const summary = { userId: user.id, email: user.email || null, createdAt: user.created_at,
+      lastSignInAt: user.last_sign_in_at || null, eligible, banned, hasSubscription };
 
     if (action === 'preview') return res.status(200).json({ ok: true, ...summary });
     if (confirm !== 'CONFIRM_ACCOUNT_STATUS_CHANGE') {
       return res.status(400).json({ ok: false, reason: 'confirmation_required', ...summary });
     }
+    if (action === 'freeze' && hasSubscription) return res.status(409).json({ ok: false, reason: 'subscription_protected', ...summary });
     if (action === 'freeze' && !eligible) {
       return res.status(409).json({ ok: false, reason: 'not_eligible', ...summary });
     }
