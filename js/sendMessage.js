@@ -415,6 +415,19 @@ function saveHistory() {
   }
 }
 
+// Bare voice-style JSON is metadata, not dialogue.
+function _isVoiceMetadataOnly(value) {
+  if (typeof value !== 'string') return false;
+  const stripped = value.trim().replace(/(?:VOICE_STYLE|VOICE_STATE)\s*:\s*\{[^{}]*\}/gi, '').trim();
+  if (!stripped) return true;
+  try {
+    const obj = JSON.parse(stripped.replace(/^\x60\x60\x60(?:json)?\s*|\s*\x60\x60\x60$/gi, '').trim());
+    return !!obj && !Array.isArray(obj) && typeof obj === 'object' &&
+      Object.keys(obj).length > 0 && Object.keys(obj).every(k => ['tone', 'intensity', 'state'].includes(k)) &&
+      (typeof obj.tone === 'string' || typeof obj.state === 'string');
+  } catch (_) { return false; }
+}
+
 // ===== 长期记忆更新 =====
 function getLongTermMemory() {
   return localStorage.getItem('longTermMemory') || '';
@@ -1404,15 +1417,34 @@ Her: ${text}`
       return;
     }
 
-    // ── Step 4: 解析模型tag ──────────────────────────────────
-    const { cleanedReply, giveMoney: parsedMoney, sendGift, conflictStartCause, conflictResolve } = parseAssistantTags(reply);
-    reply = cleanedReply;
-
-    if (!reply || !reply.trim()) {
-      hideTyping();
-      _isSending = false;
+    // ── Step 4: Reject metadata-only or tag-only replies; retry Claude once ──
+    let parsed = parseAssistantTags(reply);
+    if (_isVoiceMetadataOnly(reply) || !parsed.cleanedReply.trim()) {
+      console.warn('[chat] metadata-only or empty-after-tags Claude reply; retry once');
+      try {
+        const retryRes = await fetchSonnetWithCache(
+          buildSystemPromptParts(_baseSystem),
+          _extraHints + '\n[RESPONSE FORMAT: Speak to your wife in natural dialogue first. Never output only voice-style JSON or metadata. Voice metadata is optional and must follow dialogue.]',
+          messagesForRequest, 300, _abortCtrl?.signal
+        );
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          const candidate = retryData.content?.[0]?.text || '';
+          if (candidate.trim() && !_isVoiceMetadataOnly(candidate) && !_isIdentityBreakout(candidate)) {
+            reply = candidate;
+            parsed = parseAssistantTags(reply);
+          }
+        }
+      } catch (e) { console.warn('[chat] dialogue retry failed:', e?.message); }
+    }
+    if (_isVoiceMetadataOnly(reply) || !parsed.cleanedReply.trim()) {
+      console.warn('[chat] no valid dialogue after retry');
+      _showTransientCommStatus('回复没有正常生成，请再试一次');
       return;
     }
+    const rawReplyForVoice = reply;
+    const { cleanedReply, giveMoney: parsedMoney, sendGift, conflictStartCause, conflictResolve } = parsed;
+    reply = cleanedReply;
 
     // ── Step 4.5 第三者审查已移除：原依赖 jealousyJustTriggered 旧嫉妒触发标记，现已随 Jealousy Director 下线 ──
 
@@ -1493,9 +1525,13 @@ Her: ${text}`
     // ── 最终文本清理（移除控制标签）──
     // 必须在 appendMessage 之前调用，移除 VOICE_STYLE 等控制标签
     reply = cleanBotText(reply);
+    if (!reply.trim() || _isVoiceMetadataOnly(reply)) {
+      console.warn('[chat] no dialogue after final cleanup');
+      _showTransientCommStatus('回复没有正常生成，请再试一次');
+      return;
+    }
 
     const finalParts = reply.split('\n---\n').filter(p => p.trim());
-    if (finalParts.length === 0) finalParts.push('...');
 
     let lastBotResult = null;
     let firstBotResult = null;
@@ -1586,7 +1622,7 @@ Her: ${text}`
     const historyReply = finalParts.join('\n');
 
     // V1.3：提取隐藏语音风格标签（Ghost 自主决定）
-    const voiceStyle = extractVoiceStyle(reply);
+    const voiceStyle = extractVoiceStyle(rawReplyForVoice);
 
     // V1.2：准备 voiceText（TTS 专用文本，保留情绪线索）
     const voiceText = prepareVoiceText(reply);
