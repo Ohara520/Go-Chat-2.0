@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 
 // 中转站节点（Anthropic 原生协议）
@@ -17,6 +18,66 @@ function _isHaikuModel(model) {
   return typeof model === 'string' && model.toLowerCase().startsWith('claude-haiku-');
 }
 
+// Gemini Argon main-chat route: OpenAI-compatible transport through the existing intermediary.
+// Keep the Anthropic-shaped response so the Go Chat frontend and voice pipeline remain unchanged.
+async function callGeminiArgon(model, system, messages, maxTokens) {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    const e = new Error('GEMINI_API_KEY or ANTHROPIC_API_KEY is not configured');
+    e.status = 500;
+    throw e;
+  }
+  const systemText = typeof system === 'string' ? system
+    : Array.isArray(system) ? system.map(b => b?.text || '').filter(Boolean).join('\n\n') : '';
+  const converted = [];
+  if (systemText) converted.push({ role: 'system', content: systemText });
+  for (const msg of messages) {
+    if (!['user', 'assistant'].includes(msg.role)) continue;
+    if (typeof msg.content === 'string') {
+      converted.push({ role: msg.role, content: msg.content });
+      continue;
+    }
+    if (Array.isArray(msg.content)) {
+      const parts = msg.content.map(part => {
+        if (part?.type === 'text') return { type: 'text', text: part.text || '' };
+        if (part?.type === 'image' && part.source?.type === 'base64') {
+          return { type: 'image_url', image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` } };
+        }
+        return null;
+      }).filter(Boolean);
+      converted.push({ role: msg.role, content: parts });
+    }
+  }
+  const client = new OpenAI({
+    apiKey,
+    baseURL: 'https://api.yunjintao.com/v1',
+    timeout: 25000,
+    maxRetries: 0,
+  });
+  const result = await client.chat.completions.create({
+    model,
+    messages: converted,
+    max_tokens: Math.max(1024, maxTokens || 1024),
+  });
+  const content = result.choices?.[0]?.message?.content;
+  const text = typeof content === 'string' ? content.trim()
+    : Array.isArray(content) ? content.map(p => p?.text || '').join('').trim() : '';
+  if (!text) {
+    const e = new Error('Gemini Argon returned no visible text');
+    e.status = 502;
+    throw e;
+  }
+  return {
+    id: result.id,
+    type: 'message',
+    role: 'assistant',
+    content: [{ type: 'text', text }],
+    model: result.model || model,
+    stop_reason: result.choices?.[0]?.finish_reason || null,
+    usage: result.usage,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -27,6 +88,20 @@ export default async function handler(req, res) {
 
     if (!model || !messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Invalid request' });
+    }
+
+    // Only the main chat's Gemini Argon request uses OpenAI-compatible transport.
+    // Claude/Haiku requests continue using their original Anthropic-native route.
+    if (model === 'gemini-4-argon') {
+      try {
+        const result = await callGeminiArgon(model, system, messages, max_tokens);
+        console.log('[api/chat] Gemini Argon success', { model: result.model, textLen: result.content[0].text.length });
+        return res.status(200).json(result);
+      } catch (err) {
+        console.error('[api/chat] Gemini Argon failed', { status: err.status, code: err.code, message: err.message });
+        const status = err.status === 400 || err.status === 401 || err.status === 403 || err.status === 404 || err.status === 429 ? err.status : 502;
+        return res.status(status).json({ error: 'Gemini Argon upstream request failed', code: err.code || 'upstream_error', detail: String(err.message).slice(0, 240) });
+      }
     }
 
     // Haiku/Sonnet Key 分流：Haiku 必须有独立 Key，否则明确报错
