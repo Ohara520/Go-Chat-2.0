@@ -21,9 +21,9 @@ function _isHaikuModel(model) {
 // Gemini Argon main-chat route: OpenAI-compatible transport through the existing intermediary.
 // Keep the Anthropic-shaped response so the Go Chat frontend and voice pipeline remain unchanged.
 async function callGeminiArgon(model, system, messages, maxTokens) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    const e = new Error('ANTHROPIC_API_KEY is not configured');
+    const e = new Error('GEMINI_API_KEY is not configured');
     e.status = 500;
     throw e;
   }
