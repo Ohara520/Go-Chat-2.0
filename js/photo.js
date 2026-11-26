@@ -606,6 +606,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
         console.warn('[avatar] 协商评估：base64 数据丢失，跳过执行');
         return false;
       }
+      if (window._avatarChangeIntent !== pending) return false;
       window._avatarChangeIntent = null;
       _pendingAvatarChoice = null;
       return await _executeAvatarSet(ghostB64);
@@ -619,7 +620,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
     const hasAvatarAction = /换|change.*(?:picture|photo|avatar)|use.*(?:as.*)?(?:avatar|profile|picture)|set.*(?:avatar|picture)/i.test(userText);
     const hasThisReference = /这张|那张|this\s+(?:one|photo|picture|image)/i.test(userText);
 
-    const userMentionsAvatar = hasAvatarKeyword || (hasAvatarAction && hasThisReference);
+    const userMentionsAvatar = hasAvatarKeyword || (hasAvatarAction && hasThisReference) || followup;
 
     if (!userMentionsAvatar) {
       console.log('[avatar] 协商评估：用户本轮未明确提及头像话题，跳过判断（防误触发）');
@@ -634,8 +635,8 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       body: JSON.stringify({
         model: 'claude-haiku-5-5',
         max_tokens: 10,
-        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires: (1) wife explicitly asked about using it as avatar this turn, AND (2) husband clearly agrees. Simple evaluations like "looks good" or "decent" without commitment are UNRESOLVED. Generic agreement like "yeah alright" when she only asked "how is it" (not "use it as avatar") is UNRESOLVED. Only ACCEPT when he commits to the avatar change action.`,
-        messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
+        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires: (1) wife explicitly asked about using it as avatar this turn or clearly continued the active avatar negotiation, AND (2) husband clearly agrees. Simple evaluations like "looks good" or "decent" without commitment are UNRESOLVED. Generic agreement like "yeah alright" when she only asked "how is it" (not "use it as avatar") is UNRESOLVED. Only ACCEPT when he commits to the avatar change action.`,
+        messages: [{ role: 'user', content: `Context: an explicit avatar negotiation is already active. Latest wife message: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
       })
     }, 8000);
     if (!res.ok) {
@@ -656,6 +657,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       console.warn('[avatar] 协商评估：base64 数据丢失，跳过执行');
       return false;
     }
+    if (window._avatarChangeIntent !== pending) return false;
     window._avatarChangeIntent = null;
     _pendingAvatarChoice = null;
     return await _executeAvatarSet(ghostB64);
@@ -722,7 +724,7 @@ async function _executeAvatarSet(ghostB64) {
   if (!uploadOk) {
     console.warn('[avatar] 上传失败，无可靠备份');
     // 检查 localStorage 是否也失败了
-    const hasLocalBackup = !!localStorage.getItem('ghostAvatarBase64');
+    const hasLocalBackup = localStorage.getItem('ghostAvatarBase64') === ghostB64;
     if (hasLocalBackup) {
       // localStorage 成功，只是云端失败，可以显示并等待下次上传
       if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
@@ -740,7 +742,7 @@ async function _executeAvatarSet(ghostB64) {
   // Ghost 已经在正常聊天中表达了自己的决定；执行层不再追加任何硬编码台词。
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   console.log('[avatar] 头像更换完成');
-  return uploadOk || !!localStorage.getItem('ghostAvatarBase64');
+  return uploadOk || localStorage.getItem('ghostAvatarBase64') === ghostB64;
 }
 
 // ===== 按钮触发 =====
