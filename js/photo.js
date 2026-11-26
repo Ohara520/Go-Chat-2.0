@@ -677,6 +677,9 @@ async function _executeAvatarSet(ghostB64) {
   const avatarElements = document.querySelectorAll('.ghost-avatar-img');
   console.log(`[avatar] 找到 ${avatarElements.length} 个头像元素，立即更新显示`);
   const timestamp = Date.now();
+  const uploadToken = {};
+  window._avatarUploadToken = uploadToken;
+  let localSaved = false;
   avatarElements.forEach(el => {
     // 强制破缓存：即使是base64也加参数，确保浏览器重新渲染
     el.src = `data:image/jpeg;base64,${ghostB64}#t=${timestamp}`;
@@ -687,6 +690,7 @@ async function _executeAvatarSet(ghostB64) {
     localStorage.setItem('ghostAvatarUrl', '');
     localStorage.setItem('ghostAvatarUpdatedAt', String(timestamp));
     if (typeof touchLocalState === 'function') touchLocalState();
+    localSaved = true;
     console.log('[avatar] base64 已存入 localStorage');
   } catch(e) {
     console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
@@ -703,7 +707,8 @@ async function _executeAvatarSet(ghostB64) {
       const url = await uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
       if (url) {
         console.log('[avatar] 上传成功，URL:', url);
-        if (localStorage.getItem('ghostAvatarUpdatedAt') !== String(timestamp) || localStorage.getItem('ghostAvatarBase64') !== ghostB64) return false;
+        if (window._avatarUploadToken !== uploadToken) return false;
+        if (localSaved && (localStorage.getItem('ghostAvatarUpdatedAt') !== String(timestamp) || localStorage.getItem('ghostAvatarBase64') !== ghostB64)) return false;
         updateGhostAvatar(url, timestamp);
         localStorage.removeItem('ghostAvatarBase64');
         uploadOk = true;
