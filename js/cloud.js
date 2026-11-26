@@ -297,7 +297,7 @@ async function loadFromCloud() {
           // 旧快照仅补缺，不以旧角色副本覆盖已恢复的主存档。
           // 头像也不从旧快照覆盖当前头像版本。
           if (['ghostAvatarUrl','ghostAvatarBase64','ghostAvatarUpdatedAt'].includes(key)) return;
-          if (localStorage.getItem(key)) return;
+          if (key !== 'chatHistory' && localStorage.getItem(key)) return;
           const raw = typeof value === 'string' ? value : JSON.stringify(value);
           localStorage.setItem(key, raw);
         });
@@ -815,6 +815,7 @@ async function loadFromCloud() {
     // 恢复时合并后的本地状态可能与云端不同，不能用另一种格式
     // 伪造“已保存”快照。清空缓存，让下次完整保存重新比较并同步。
     delete _lastSavedSnapshots[userId];
+    if (Array.isArray(data.chat_history)) _lastSavedSnapshots[userId] = { chat: JSON.stringify(data.chat_history) };
     // 通知徽章刷新（云端数据恢复后）
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
     // Simon 自主日程 V1：恢复云端日程数据（生成触发由 app.js 统一管理）
@@ -872,7 +873,15 @@ let _isSavingToCloud = false; // 写入锁：同一时间只允许一个完整sa
 const _lastSavedSnapshots = {}; // { userId: { state: string, chat: string } }
 
 // 聊天记录单独写入，绕过节流——每条消息成功后立刻调用
-async function saveChatHistoryNow() {
+let _chatWriteQueue = Promise.resolve();
+function saveChatHistoryNow() {
+  const owner = getSbUserId();
+  const run = () => owner && owner === getSbUserId() ? _saveChatHistoryOnce() : undefined;
+  const task = _chatWriteQueue.then(run, run);
+  _chatWriteQueue = task.catch(() => {});
+  return task;
+}
+async function _saveChatHistoryOnce() {
   const sb = getSbClient();
   const userId = getSbUserId();
   if (!sb || !userId) return;
@@ -900,40 +909,36 @@ async function saveChatHistoryNow() {
     }
 
     const now = new Date().toISOString();
-    localStorage.setItem('chatUpdatedAt', now);
-
-    // ── 磁盘 IO 优化（2026-06-16）──────────────────────────────
-    // 旧版用 upsert 整行写入：哪怕只改聊天记录，数据库也会重写整行（含头像/钱包/
-    // 快递等几十个字段）+ 双倍 WAL，磁盘 IO 被烧爆。
-    // 新版：发消息是高频操作，改成只 update 聊天相关的几列，不碰其它字段。
-    // 兜底：全新用户可能还没有这一行，update 影响 0 行时回退到 upsert 建行，保证不丢。
-    const { data: _updated, error: _updErr } = await sb
-      .from('user_data')
-      .update({
-        chat_history: chatHistoryData,
-        chat_updated_at: now,
-        updated_at: now,
-      })
-      .eq('user_id', userId)
-      .select('user_id');
-    // 没更新到任何行（新用户首存）→ 建行
-    let _writeErr = _updErr;
-    if (!_updErr && (!_updated || _updated.length === 0)) {
-      const { error: _insertErr } = await sb.from('user_data').upsert({
-        user_id: userId,
-        chat_history: chatHistoryData,
-        chat_updated_at: now,
-        updated_at: now,
-      }, { onConflict: 'user_id' });
-      _writeErr = _insertErr;
+    // Never overwrite a cloud revision that changed after this device loaded it.
+    const { data: remote, error: readErr } = await sb.from('user_data')
+      .select('chat_updated_at,chat_history').eq('user_id', userId).maybeSingle();
+    if (readErr) throw readErr;
+    if (getSbUserId() !== userId) return;
+    const remoteHistory = remote?.chat_history || [];
+    const key = m => JSON.stringify([m.role,m._time || null,m.content]);
+    const localKeys = new Set(chatHistoryData.map(key));
+    const known = _lastSavedSnapshots[userId].chat;
+    const baseline = known ? new Set(JSON.parse(known).map(key)) : null;
+    const remoteOnly = remoteHistory.filter(m => !localKeys.has(key(m)));
+    // Unknown remote messages must not be silently deleted. Known deletions remain allowed.
+    if (remoteOnly.some(m => !baseline || !baseline.has(key(m))) && !(chatHistoryData.length === 300 && remoteOnly.every(m => Number(m._time) > 0 && Number(m._time) < Number(chatHistoryData[0]._time)))) {
+      throw new Error('Chat revision conflict: reload and reconcile before saving');
     }
-
-    // 仅数据库实际写入成功后更新去重快照，失败时下次仍会重试。
-    if (!_writeErr) {
-      _lastSavedSnapshots[userId].chat = chatSnapshot;
+    let result;
+    if (remote) {
+      let q = sb.from('user_data').update({chat_history:chatHistoryData,chat_updated_at:now,updated_at:now}).eq('user_id',userId);
+      q = remote.chat_updated_at == null ? q.is('chat_updated_at',null) : q.eq('chat_updated_at',remote.chat_updated_at);
+      result = await q.select('user_id');
+      if (!result.error && !result.data?.length) throw new Error('Chat revision changed during save');
+    } else {
+      result = await sb.from('user_data').insert({user_id:userId,chat_history:chatHistoryData,chat_updated_at:now,updated_at:now});
     }
+    if (result.error) throw result.error;
+    _lastSavedSnapshots[userId].chat = chatSnapshot;
+    if (getSbUserId() === userId) localStorage.setItem('chatUpdatedAt', now);
   } catch(e) {
     console.warn('[cloud] 聊天记录快速保存失败:', e);
+    if (getSbUserId() === userId) localStorage.setItem('cloudSavePending','1');
   }
 }
 
@@ -1167,7 +1172,7 @@ async function saveToCloud() {
       console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/long_term_memory 字段写入，防止覆盖云端');
     }
     // 只在有内容时才存，防止空值覆盖云端已有数据
-    if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
+    // Chat writes are handled exclusively by the serialized chat writer.
     // 钱包余额从transactions实时计算，确保与本地显示一致
     const _txs = JSON.parse(localStorage.getItem('transactions') || '[]');
     const _txSum = _txs.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
@@ -1200,9 +1205,10 @@ async function saveToCloud() {
     // 判断是否需要写入
     const stateChanged = stateSnapshotStr && (_lastSavedSnapshots[userId].state !== stateSnapshotStr);
     const chatChanged = chatSnapshotStr && (_lastSavedSnapshots[userId].chat !== chatSnapshotStr);
+    if (chatChanged) await saveChatHistoryNow();
 
     // 两者都未变：完全跳过写入
-    if (!stateChanged && !chatChanged) {
+    if (!stateChanged) {
       _isSavingToCloud = false;
       _lastSyncTime = now; // 更新时间戳，防止频繁重试
       return;
@@ -1238,11 +1244,11 @@ async function saveToCloud() {
       }
     }
     if (saveOk) {
-      localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
+      // Chat timestamp belongs to the chat writer.
       localStorage.setItem('localUpdatedAt', Date.now().toString());
       // 记录快照（仅成功时）
       if (stateChanged) _lastSavedSnapshots[userId].state = stateSnapshotStr;
-      if (chatChanged) _lastSavedSnapshots[userId].chat = chatSnapshotStr;
+      // Only the chat writer acknowledges chat persistence.
       console.log('[cloud] 保存成功');
     } else {
       console.error('[cloud] 保存最终失败，数据暂存本地');
