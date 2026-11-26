@@ -170,7 +170,7 @@ async function uploadToStorage(base64, bucket, fileName) {
     const blob = new Blob([arr], { type: 'image/jpeg' });
     const path = `${userId}/${fileName}`;
     const { error } = await sb.storage.from(bucket).upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
-    if (error) return null;
+    if (error) { console.warn('[photo] Storage upload failed:', error.message); return null; }
     const { data } = sb.storage.from(bucket).getPublicUrl(path);
     return data.publicUrl;
   } catch(e) { return null; }
@@ -235,9 +235,9 @@ function _renderGhostAvatar(url) {
   });
 }
 
-function updateGhostAvatar(url) {
+function updateGhostAvatar(url, version = Date.now()) {
   if (!url) return;
-  const stamp = Date.now();
+  const stamp = version;
   localStorage.setItem('ghostAvatarUrl', url);
   localStorage.setItem('ghostAvatarUpdatedAt', String(stamp));
   _renderGhostAvatar(url);
@@ -279,12 +279,14 @@ async function restoreGhostAvatar() {
   // 正式 URL 不存在时，base64 是待同步的本地头像；只重试上传，不再用延时抢写头像。
   const url = localStorage.getItem('ghostAvatarUrl');
   const b64 = localStorage.getItem('ghostAvatarBase64');
-  if ((!url || url.startsWith('data:')) && b64) {
+  const version = localStorage.getItem('ghostAvatarUpdatedAt') || '0';
+  if (b64 && (!url || url.startsWith('data:'))) {
     refreshGhostAvatar();
     try {
       const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
       if (retryUrl) {
-        updateGhostAvatar(retryUrl);
+        if (localStorage.getItem('ghostAvatarBase64') !== b64 || (localStorage.getItem('ghostAvatarUpdatedAt') || '0') !== version) return;
+        updateGhostAvatar(retryUrl, Number(version) || 0);
         localStorage.removeItem('ghostAvatarBase64');
       }
     } catch(e) {
@@ -545,6 +547,7 @@ function _hasExplicitAvatarCommitment(ghostReply) {
     .replace(/['']/g, "'")
     .replace(/\s+/g, ' ');
   if (!t) return false;
+  if (/\b(?:not|never|won't|can't|cannot|don't|didn't|wouldn't)\b|不换|不想|没换|不能|不会换/.test(t)) return false;
 
   const explicitPatterns = [
     // 完成时态 - 已经换了
@@ -582,7 +585,8 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
   if (Date.now() - pending.startedAt > 10 * 60 * 1000) { window._avatarChangeIntent = null; _pendingAvatarChoice = null; return false; }
   // 头像协商只对本轮明确的头像请求授权，不能让日后普通图片/聊天触发旧候选。
   const avatarRequestThisTurn = /头像|avatar|profile\s*pic|profile\s*picture|pfp|大头照/i.test(String(userText || ''));
-  if (!avatarRequestThisTurn) return false;
+  const followup = /^(?:\s*)(?:那就|就用|就这|第一张|第二张|左边|右边|换吧|换了吧|你换了吗|你换好了吗|用这张|用这个|好吧|可以|please use|use (?:this|that|the first|the second)|did you change|go ahead)[\s\S]*$/i.test(String(userText || ''));
+  if (!avatarRequestThisTurn && !followup) return false;
 
   try {
     const selected = Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0
@@ -603,10 +607,10 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
         console.warn('[avatar] 协商评估：base64 数据丢失，跳过执行');
         return false;
       }
+      if (window._avatarChangeIntent !== pending) return false;
       window._avatarChangeIntent = null;
       _pendingAvatarChoice = null;
-      await _executeAvatarSet(ghostB64);
-      return true;
+      return await _executeAvatarSet(ghostB64);
     }
 
     // 其余自然表达仍交给语义分类器判断，保留对非固定措辞的理解能力。
@@ -617,7 +621,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
     const hasAvatarAction = /换|change.*(?:picture|photo|avatar)|use.*(?:as.*)?(?:avatar|profile|picture)|set.*(?:avatar|picture)/i.test(userText);
     const hasThisReference = /这张|那张|this\s+(?:one|photo|picture|image)/i.test(userText);
 
-    const userMentionsAvatar = hasAvatarKeyword || (hasAvatarAction && hasThisReference);
+    const userMentionsAvatar = hasAvatarKeyword || (hasAvatarAction && hasThisReference) || followup;
 
     if (!userMentionsAvatar) {
       console.log('[avatar] 协商评估：用户本轮未明确提及头像话题，跳过判断（防误触发）');
@@ -632,8 +636,8 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       body: JSON.stringify({
         model: 'claude-haiku-5-5',
         max_tokens: 10,
-        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires: (1) wife explicitly asked about using it as avatar this turn, AND (2) husband clearly agrees. Simple evaluations like "looks good" or "decent" without commitment are UNRESOLVED. Generic agreement like "yeah alright" when she only asked "how is it" (not "use it as avatar") is UNRESOLVED. Only ACCEPT when he commits to the avatar change action.`,
-        messages: [{ role: 'user', content: `Wife: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
+        system: `You are reading an avatar negotiation between a wife and her husband. ${targetFact}\nDecide whether the husband's latest reply commits to using the specific candidate image as his avatar.\nReply only ACCEPT or UNRESOLVED.\nACCEPT requires: (1) wife explicitly asked about using it as avatar this turn or clearly continued the active avatar negotiation, AND (2) husband clearly agrees. Simple evaluations like "looks good" or "decent" without commitment are UNRESOLVED. Generic agreement like "yeah alright" when she only asked "how is it" (not "use it as avatar") is UNRESOLVED. Only ACCEPT when he commits to the avatar change action.`,
+        messages: [{ role: 'user', content: `Context: an explicit avatar negotiation is already active. Latest wife message: ${String(userText || '').slice(0, 500)}\nHusband: ${String(ghostReply).slice(0, 700)}` }]
       })
     }, 8000);
     if (!res.ok) {
@@ -654,10 +658,10 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       console.warn('[avatar] 协商评估：base64 数据丢失，跳过执行');
       return false;
     }
+    if (window._avatarChangeIntent !== pending) return false;
     window._avatarChangeIntent = null;
     _pendingAvatarChoice = null;
-    await _executeAvatarSet(ghostB64);
-    return true;
+    return await _executeAvatarSet(ghostB64);
   } catch(e) {
     console.warn('[avatar] 头像协商决定读取失败:', e.message || e);
     return false;
@@ -673,6 +677,9 @@ async function _executeAvatarSet(ghostB64) {
   const avatarElements = document.querySelectorAll('.ghost-avatar-img');
   console.log(`[avatar] 找到 ${avatarElements.length} 个头像元素，立即更新显示`);
   const timestamp = Date.now();
+  const uploadToken = {};
+  window._avatarUploadToken = uploadToken;
+  let localSaved = false;
   avatarElements.forEach(el => {
     // 强制破缓存：即使是base64也加参数，确保浏览器重新渲染
     el.src = `data:image/jpeg;base64,${ghostB64}#t=${timestamp}`;
@@ -680,6 +687,10 @@ async function _executeAvatarSet(ghostB64) {
 
   try {
     localStorage.setItem('ghostAvatarBase64', ghostB64);
+    localStorage.setItem('ghostAvatarUrl', '');
+    localStorage.setItem('ghostAvatarUpdatedAt', String(timestamp));
+    if (typeof touchLocalState === 'function') touchLocalState();
+    localSaved = true;
     console.log('[avatar] base64 已存入 localStorage');
   } catch(e) {
     console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
@@ -696,7 +707,9 @@ async function _executeAvatarSet(ghostB64) {
       const url = await uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
       if (url) {
         console.log('[avatar] 上传成功，URL:', url);
-        updateGhostAvatar(url);
+        if (window._avatarUploadToken !== uploadToken) return false;
+        if (localSaved && (localStorage.getItem('ghostAvatarUpdatedAt') !== String(timestamp) || localStorage.getItem('ghostAvatarBase64') !== ghostB64)) return false;
+        updateGhostAvatar(url, timestamp);
         localStorage.removeItem('ghostAvatarBase64');
         uploadOk = true;
         if (typeof showToast === 'function') showToast('头像已更新 ✅');
@@ -717,7 +730,7 @@ async function _executeAvatarSet(ghostB64) {
   if (!uploadOk) {
     console.warn('[avatar] 上传失败，无可靠备份');
     // 检查 localStorage 是否也失败了
-    const hasLocalBackup = !!localStorage.getItem('ghostAvatarBase64');
+    const hasLocalBackup = localStorage.getItem('ghostAvatarBase64') === ghostB64;
     if (hasLocalBackup) {
       // localStorage 成功，只是云端失败，可以显示并等待下次上传
       if (typeof showToast === 'function') showToast('头像已设置，网络同步中…');
@@ -735,6 +748,7 @@ async function _executeAvatarSet(ghostB64) {
   // Ghost 已经在正常聊天中表达了自己的决定；执行层不再追加任何硬编码台词。
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   console.log('[avatar] 头像更换完成');
+  return uploadOk || localStorage.getItem('ghostAvatarBase64') === ghostB64;
 }
 
 // ===== 按钮触发 =====
