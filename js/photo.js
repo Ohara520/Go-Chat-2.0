@@ -235,9 +235,9 @@ function _renderGhostAvatar(url) {
   });
 }
 
-function updateGhostAvatar(url) {
+function updateGhostAvatar(url, version = Date.now()) {
   if (!url) return;
-  const stamp = Date.now();
+  const stamp = version;
   localStorage.setItem('ghostAvatarUrl', url);
   localStorage.setItem('ghostAvatarUpdatedAt', String(stamp));
   _renderGhostAvatar(url);
@@ -279,14 +279,15 @@ async function restoreGhostAvatar() {
   // 正式 URL 不存在时，base64 是待同步的本地头像；只重试上传，不再用延时抢写头像。
   const url = localStorage.getItem('ghostAvatarUrl');
   const b64 = localStorage.getItem('ghostAvatarBase64');
+  const version = localStorage.getItem('ghostAvatarUpdatedAt') || '0';
   if (b64 && (!url || url.startsWith('data:'))) {
     refreshGhostAvatar();
     try {
       const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
       if (retryUrl) {
-        if (localStorage.getItem('ghostAvatarBase64') !== b64) return;
+        if (localStorage.getItem('ghostAvatarBase64') !== b64 || (localStorage.getItem('ghostAvatarUpdatedAt') || '0') !== version) return;
+        updateGhostAvatar(retryUrl, Number(version) || 0);
         localStorage.removeItem('ghostAvatarBase64');
-        updateGhostAvatar(retryUrl);
       }
     } catch(e) {
       console.warn('[avatar] 待同步头像上传失败，保留本地备份');
@@ -702,9 +703,9 @@ async function _executeAvatarSet(ghostB64) {
       const url = await uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
       if (url) {
         console.log('[avatar] 上传成功，URL:', url);
-        if (localStorage.getItem('ghostAvatarUpdatedAt') !== String(timestamp) && localStorage.getItem('ghostAvatarBase64') !== ghostB64) return false;
+        if (localStorage.getItem('ghostAvatarUpdatedAt') !== String(timestamp) || localStorage.getItem('ghostAvatarBase64') !== ghostB64) return false;
+        updateGhostAvatar(url, timestamp);
         localStorage.removeItem('ghostAvatarBase64');
-        updateGhostAvatar(url);
         uploadOk = true;
         if (typeof showToast === 'function') showToast('头像已更新 ✅');
 
