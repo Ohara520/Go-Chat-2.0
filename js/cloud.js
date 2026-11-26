@@ -297,7 +297,7 @@ async function loadFromCloud() {
           // 旧快照仅补缺，不以旧角色副本覆盖已恢复的主存档。
           // 头像也不从旧快照覆盖当前头像版本。
           if (['ghostAvatarUrl','ghostAvatarBase64','ghostAvatarUpdatedAt'].includes(key)) return;
-          if (localStorage.getItem(key)) return;
+          if (key !== 'chatHistory' && localStorage.getItem(key)) return;
           const raw = typeof value === 'string' ? value : JSON.stringify(value);
           localStorage.setItem(key, raw);
         });
@@ -872,7 +872,15 @@ let _isSavingToCloud = false; // 写入锁：同一时间只允许一个完整sa
 const _lastSavedSnapshots = {}; // { userId: { state: string, chat: string } }
 
 // 聊天记录单独写入，绕过节流——每条消息成功后立刻调用
-async function saveChatHistoryNow() {
+let _chatWriteQueue = Promise.resolve();
+function saveChatHistoryNow() {
+  const owner = getSbUserId();
+  const run = () => owner && owner === getSbUserId() ? _saveChatHistoryOnce() : undefined;
+  const task = _chatWriteQueue.then(run, run);
+  _chatWriteQueue = task.catch(() => {});
+  return task;
+}
+async function _saveChatHistoryOnce() {
   const sb = getSbClient();
   const userId = getSbUserId();
   if (!sb || !userId) return;
@@ -931,6 +939,9 @@ async function saveChatHistoryNow() {
     // 仅数据库实际写入成功后更新去重快照，失败时下次仍会重试。
     if (!_writeErr) {
       _lastSavedSnapshots[userId].chat = chatSnapshot;
+    } else {
+      console.warn('[cloud] chat write failed:', _writeErr.message);
+      localStorage.setItem('cloudSavePending', '1');
     }
   } catch(e) {
     console.warn('[cloud] 聊天记录快速保存失败:', e);
@@ -1167,7 +1178,7 @@ async function saveToCloud() {
       console.warn('[cloud] profile 为空，跳过 profile/state_snapshot/long_term_memory 字段写入，防止覆盖云端');
     }
     // 只在有内容时才存，防止空值覆盖云端已有数据
-    if (chatHistoryData.length > 0) upsertData.chat_history = chatHistoryData;
+    // Chat writes are handled exclusively by the serialized chat writer.
     // 钱包余额从transactions实时计算，确保与本地显示一致
     const _txs = JSON.parse(localStorage.getItem('transactions') || '[]');
     const _txSum = _txs.reduce((s, t) => t.ghostCard ? s : s + (t.amount || 0), 0);
@@ -1200,9 +1211,10 @@ async function saveToCloud() {
     // 判断是否需要写入
     const stateChanged = stateSnapshotStr && (_lastSavedSnapshots[userId].state !== stateSnapshotStr);
     const chatChanged = chatSnapshotStr && (_lastSavedSnapshots[userId].chat !== chatSnapshotStr);
+    if (chatChanged) await saveChatHistoryNow();
 
     // 两者都未变：完全跳过写入
-    if (!stateChanged && !chatChanged) {
+    if (!stateChanged) {
       _isSavingToCloud = false;
       _lastSyncTime = now; // 更新时间戳，防止频繁重试
       return;
@@ -1238,11 +1250,11 @@ async function saveToCloud() {
       }
     }
     if (saveOk) {
-      localStorage.setItem('chatUpdatedAt', new Date(nowIso).getTime());
+      // Chat timestamp belongs to the chat writer.
       localStorage.setItem('localUpdatedAt', Date.now().toString());
       // 记录快照（仅成功时）
       if (stateChanged) _lastSavedSnapshots[userId].state = stateSnapshotStr;
-      if (chatChanged) _lastSavedSnapshots[userId].chat = chatSnapshotStr;
+      // Only the chat writer acknowledges chat persistence.
       console.log('[cloud] 保存成功');
     } else {
       console.error('[cloud] 保存最终失败，数据暂存本地');
