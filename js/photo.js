@@ -170,7 +170,7 @@ async function uploadToStorage(base64, bucket, fileName) {
     const blob = new Blob([arr], { type: 'image/jpeg' });
     const path = `${userId}/${fileName}`;
     const { error } = await sb.storage.from(bucket).upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
-    if (error) return null;
+    if (error) { console.warn('[photo] Storage upload failed:', error.message); return null; }
     const { data } = sb.storage.from(bucket).getPublicUrl(path);
     return data.publicUrl;
   } catch(e) { return null; }
@@ -279,7 +279,7 @@ async function restoreGhostAvatar() {
   // 正式 URL 不存在时，base64 是待同步的本地头像；只重试上传，不再用延时抢写头像。
   const url = localStorage.getItem('ghostAvatarUrl');
   const b64 = localStorage.getItem('ghostAvatarBase64');
-  if ((!url || url.startsWith('data:')) && b64) {
+  if (b64 && (!url || url.startsWith('data:'))) {
     refreshGhostAvatar();
     try {
       const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
@@ -605,8 +605,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
       }
       window._avatarChangeIntent = null;
       _pendingAvatarChoice = null;
-      await _executeAvatarSet(ghostB64);
-      return true;
+      return await _executeAvatarSet(ghostB64);
     }
 
     // 其余自然表达仍交给语义分类器判断，保留对非固定措辞的理解能力。
@@ -656,8 +655,7 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
     }
     window._avatarChangeIntent = null;
     _pendingAvatarChoice = null;
-    await _executeAvatarSet(ghostB64);
-    return true;
+    return await _executeAvatarSet(ghostB64);
   } catch(e) {
     console.warn('[avatar] 头像协商决定读取失败:', e.message || e);
     return false;
@@ -680,6 +678,9 @@ async function _executeAvatarSet(ghostB64) {
 
   try {
     localStorage.setItem('ghostAvatarBase64', ghostB64);
+    localStorage.setItem('ghostAvatarUrl', '');
+    localStorage.setItem('ghostAvatarUpdatedAt', String(timestamp));
+    if (typeof touchLocalState === 'function') touchLocalState();
     console.log('[avatar] base64 已存入 localStorage');
   } catch(e) {
     console.warn('[avatar] base64 存 localStorage 失败（可能空间不足）:', e);
@@ -735,6 +736,7 @@ async function _executeAvatarSet(ghostB64) {
   // Ghost 已经在正常聊天中表达了自己的决定；执行层不再追加任何硬编码台词。
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   console.log('[avatar] 头像更换完成');
+  return uploadOk || !!localStorage.getItem('ghostAvatarBase64');
 }
 
 // ===== 按钮触发 =====
