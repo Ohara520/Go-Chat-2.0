@@ -546,6 +546,7 @@ function _hasExplicitAvatarCommitment(ghostReply) {
     .replace(/['']/g, "'")
     .replace(/\s+/g, ' ');
   if (!t) return false;
+  if (/\b(?:not|never|won't|can't|cannot|don't|didn't|wouldn't)\b|不换|不想|没换|不能|不会换/.test(t)) return false;
 
   const explicitPatterns = [
     // 完成时态 - 已经换了
@@ -583,7 +584,8 @@ async function evaluateAvatarNegotiationAfterReply(userText, ghostReply) {
   if (Date.now() - pending.startedAt > 10 * 60 * 1000) { window._avatarChangeIntent = null; _pendingAvatarChoice = null; return false; }
   // 头像协商只对本轮明确的头像请求授权，不能让日后普通图片/聊天触发旧候选。
   const avatarRequestThisTurn = /头像|avatar|profile\s*pic|profile\s*picture|pfp|大头照/i.test(String(userText || ''));
-  if (!avatarRequestThisTurn) return false;
+  const followup = /^(?:\s*)(?:那就|就用|就这|第一张|第二张|左边|右边|换吧|换了吧|你换了吗|你换好了吗|用这张|用这个|好吧|可以|please use|use (?:this|that|the first|the second)|did you change|go ahead)[\s\S]*$/i.test(String(userText || ''));
+  if (!avatarRequestThisTurn && !followup) return false;
 
   try {
     const selected = Number.isInteger(pending.selectedIndex) && pending.selectedIndex >= 0
