@@ -243,18 +243,23 @@ async function loadFromCloud() {
       // marriageType 已退役：旧云端字段可保留，但 Simon 不再恢复到本地。
       // Ghost头像：按独立版本号决定谁更新，禁止旧云端头像覆盖刚换的新头像。
       // 旧云端没有 ghostAvatarUpdatedAt 时，只在本地没有头像时用于换设备恢复。
-      const _localAvatarUrl = localStorage.getItem('ghostAvatarUrl') || '';
-      const _localAvatarAt = parseInt(localStorage.getItem('ghostAvatarUpdatedAt') || '0');
-      const _cloudAvatarAt = parseInt(p.ghostAvatarUpdatedAt || '0');
-      const _shouldRestoreCloudAvatar = !!p.ghostAvatarUrl && (
-        !_localAvatarUrl || (_cloudAvatarAt > 0 && _cloudAvatarAt > _localAvatarAt)
-      );
-      if (_shouldRestoreCloudAvatar) {
-        localStorage.setItem('ghostAvatarUrl', p.ghostAvatarUrl);
-        if (_cloudAvatarAt > 0) localStorage.setItem('ghostAvatarUpdatedAt', String(_cloudAvatarAt));
+      const localAvatarAt = Number(localStorage.getItem('ghostAvatarUpdatedAt') || 0);
+      const localHasAvatar = !!(localStorage.getItem('ghostAvatarUrl') || localStorage.getItem('ghostAvatarBase64'));
+      const legacyAvatar = p.characters?.ghost || {};
+      const mainAvatar = {ghostAvatarUrl:p.ghostAvatarUrl, ghostAvatarBase64:p.ghostAvatarBase64, ghostAvatarUpdatedAt:p.ghostAvatarUpdatedAt};
+      const candidates = [mainAvatar, legacyAvatar].filter(a => a.ghostAvatarUrl || a.ghostAvatarBase64);
+      candidates.sort((a,b) => Number(b.ghostAvatarUpdatedAt || 0) - Number(a.ghostAvatarUpdatedAt || 0));
+      const avatar = candidates[0];
+      if (avatar && (!localHasAvatar || Number(avatar.ghostAvatarUpdatedAt || 0) > localAvatarAt)) {
+        localStorage.setItem('ghostAvatarUrl', avatar.ghostAvatarBase64 ? '' : (avatar.ghostAvatarUrl || ''));
+        if (avatar.ghostAvatarBase64) localStorage.setItem('ghostAvatarBase64', avatar.ghostAvatarBase64.replace(/^data:[^,]+,/, ''));
+        else localStorage.removeItem('ghostAvatarBase64');
+        localStorage.setItem('ghostAvatarUpdatedAt', String(avatar.ghostAvatarUpdatedAt || 0));
         if (typeof refreshGhostAvatar === 'function') refreshGhostAvatar();
-      } else if (_localAvatarUrl && _localAvatarAt > _cloudAvatarAt) {
-        // 本地头像更新：保留本地，稍后完整存档会把新版本同步到云端。
+      }
+      if (localStorage.getItem('ghostAvatarBase64') && typeof restoreGhostAvatar === 'function') {
+        restoreGhostAvatar().catch(e => console.warn('[avatar] recovery failed:', e));
+      } else if (localHasAvatar && localAvatarAt > Number(avatar?.ghostAvatarUpdatedAt || 0)) {
         if (typeof scheduleCloudSave === 'function') scheduleCloudSave(true);
       }
       setIfMissing('ghostHeight', p.ghostHeight);
@@ -291,6 +296,7 @@ async function loadFromCloud() {
           }
           // 旧快照仅补缺，不以旧角色副本覆盖已恢复的主存档。
           // 头像也不从旧快照覆盖当前头像版本。
+          if (['ghostAvatarUrl','ghostAvatarBase64','ghostAvatarUpdatedAt'].includes(key)) return;
           if (localStorage.getItem(key)) return;
           const raw = typeof value === 'string' ? value : JSON.stringify(value);
           localStorage.setItem(key, raw);
@@ -1000,6 +1006,7 @@ async function saveToCloud() {
       ghostDiary: localStorage.getItem('ghostDiary') || '[]',
       ghostAvatarUrl: (() => { const u = localStorage.getItem('ghostAvatarUrl') || ''; return u.startsWith('data:') ? '' : u; })(),
       ghostAvatarUpdatedAt: localStorage.getItem('ghostAvatarUpdatedAt') || '0',
+      ghostAvatarBase64: localStorage.getItem('ghostAvatarBase64') || '',
       ghostHeight: localStorage.getItem('ghostHeight') || '',
       ghostWeight: localStorage.getItem('ghostWeight') || '',
       ghostBloodType: localStorage.getItem('ghostBloodType') || '',
