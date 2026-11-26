@@ -284,8 +284,9 @@ async function restoreGhostAvatar() {
     try {
       const retryUrl = await uploadToStorage(b64, AVATAR_BUCKET, `avatar_retry_${Date.now()}.jpg`);
       if (retryUrl) {
-        updateGhostAvatar(retryUrl);
+        if (localStorage.getItem('ghostAvatarBase64') !== b64) return;
         localStorage.removeItem('ghostAvatarBase64');
+        updateGhostAvatar(retryUrl);
       }
     } catch(e) {
       console.warn('[avatar] 待同步头像上传失败，保留本地备份');
@@ -697,8 +698,9 @@ async function _executeAvatarSet(ghostB64) {
       const url = await uploadToStorage(ghostB64, AVATAR_BUCKET, `avatar_${Date.now()}.jpg`);
       if (url) {
         console.log('[avatar] 上传成功，URL:', url);
-        updateGhostAvatar(url);
+        if (localStorage.getItem('ghostAvatarUpdatedAt') !== String(timestamp) && localStorage.getItem('ghostAvatarBase64') !== ghostB64) return false;
         localStorage.removeItem('ghostAvatarBase64');
+        updateGhostAvatar(url);
         uploadOk = true;
         if (typeof showToast === 'function') showToast('头像已更新 ✅');
 
