@@ -815,6 +815,7 @@ async function loadFromCloud() {
     // 恢复时合并后的本地状态可能与云端不同，不能用另一种格式
     // 伪造“已保存”快照。清空缓存，让下次完整保存重新比较并同步。
     delete _lastSavedSnapshots[userId];
+    if (Array.isArray(data.chat_history)) _lastSavedSnapshots[userId] = { chat: JSON.stringify(data.chat_history) };
     // 通知徽章刷新（云端数据恢复后）
     if (typeof _updateMarketCardBadge === 'function') _updateMarketCardBadge();
     // Simon 自主日程 V1：恢复云端日程数据（生成触发由 app.js 统一管理）
@@ -920,7 +921,7 @@ async function _saveChatHistoryOnce() {
     const baseline = known ? new Set(JSON.parse(known).map(key)) : null;
     const remoteOnly = remoteHistory.filter(m => !localKeys.has(key(m)));
     // Unknown remote messages must not be silently deleted. Known deletions remain allowed.
-    if (remoteOnly.some(m => !baseline || !baseline.has(key(m)))) {
+    if (remoteOnly.some(m => !baseline || !baseline.has(key(m))) && !(chatHistoryData.length === 300 && remoteOnly.every(m => Number(m._time) > 0 && Number(m._time) < Number(chatHistoryData[0]._time)))) {
       throw new Error('Chat revision conflict: reload and reconcile before saving');
     }
     let result;
