@@ -908,43 +908,36 @@ async function _saveChatHistoryOnce() {
     }
 
     const now = new Date().toISOString();
-    localStorage.setItem('chatUpdatedAt', now);
-
-    // ── 磁盘 IO 优化（2026-06-16）──────────────────────────────
-    // 旧版用 upsert 整行写入：哪怕只改聊天记录，数据库也会重写整行（含头像/钱包/
-    // 快递等几十个字段）+ 双倍 WAL，磁盘 IO 被烧爆。
-    // 新版：发消息是高频操作，改成只 update 聊天相关的几列，不碰其它字段。
-    // 兜底：全新用户可能还没有这一行，update 影响 0 行时回退到 upsert 建行，保证不丢。
-    const { data: _updated, error: _updErr } = await sb
-      .from('user_data')
-      .update({
-        chat_history: chatHistoryData,
-        chat_updated_at: now,
-        updated_at: now,
-      })
-      .eq('user_id', userId)
-      .select('user_id');
-    // 没更新到任何行（新用户首存）→ 建行
-    let _writeErr = _updErr;
-    if (!_updErr && (!_updated || _updated.length === 0)) {
-      const { error: _insertErr } = await sb.from('user_data').upsert({
-        user_id: userId,
-        chat_history: chatHistoryData,
-        chat_updated_at: now,
-        updated_at: now,
-      }, { onConflict: 'user_id' });
-      _writeErr = _insertErr;
+    // Never overwrite a cloud revision that changed after this device loaded it.
+    const { data: remote, error: readErr } = await sb.from('user_data')
+      .select('chat_updated_at,chat_history').eq('user_id', userId).maybeSingle();
+    if (readErr) throw readErr;
+    if (getSbUserId() !== userId) return;
+    const remoteHistory = remote?.chat_history || [];
+    const key = m => JSON.stringify([m.role,m._time || null,m.content]);
+    const localKeys = new Set(chatHistoryData.map(key));
+    const known = _lastSavedSnapshots[userId].chat;
+    const baseline = known ? new Set(JSON.parse(known).map(key)) : null;
+    const remoteOnly = remoteHistory.filter(m => !localKeys.has(key(m)));
+    // Unknown remote messages must not be silently deleted. Known deletions remain allowed.
+    if (remoteOnly.some(m => !baseline || !baseline.has(key(m)))) {
+      throw new Error('Chat revision conflict: reload and reconcile before saving');
     }
-
-    // 仅数据库实际写入成功后更新去重快照，失败时下次仍会重试。
-    if (!_writeErr) {
-      _lastSavedSnapshots[userId].chat = chatSnapshot;
+    let result;
+    if (remote) {
+      let q = sb.from('user_data').update({chat_history:chatHistoryData,chat_updated_at:now,updated_at:now}).eq('user_id',userId);
+      q = remote.chat_updated_at == null ? q.is('chat_updated_at',null) : q.eq('chat_updated_at',remote.chat_updated_at);
+      result = await q.select('user_id');
+      if (!result.error && !result.data?.length) throw new Error('Chat revision changed during save');
     } else {
-      console.warn('[cloud] chat write failed:', _writeErr.message);
-      localStorage.setItem('cloudSavePending', '1');
+      result = await sb.from('user_data').insert({user_id:userId,chat_history:chatHistoryData,chat_updated_at:now,updated_at:now});
     }
+    if (result.error) throw result.error;
+    _lastSavedSnapshots[userId].chat = chatSnapshot;
+    if (getSbUserId() === userId) localStorage.setItem('chatUpdatedAt', now);
   } catch(e) {
     console.warn('[cloud] 聊天记录快速保存失败:', e);
+    if (getSbUserId() === userId) localStorage.setItem('cloudSavePending','1');
   }
 }
 
